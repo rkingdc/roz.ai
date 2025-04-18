@@ -1,120 +1,307 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Local AI Assistant</title>
+    <title>Enhanced AI Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         /* Basic styling */
-        body { font-family: 'Inter', sans-serif; }
-        #chatbox { height: calc(100vh - 150px); } /* Adjust height as needed */
-        .user-msg { text-align: right; margin-left: auto; background-color: #dbeafe; /* blue-100 */ }
-        .assistant-msg { text-align: left; margin-right: auto; background-color: #e5e7eb; /* gray-200 */ }
-        .message {
-            padding: 0.75rem;
-            margin-bottom: 0.5rem;
-            border-radius: 0.5rem;
-            max-width: 80%;
-            word-wrap: break-word;
-        }
-        /* Add scrollbar styling */
-         #chatbox::-webkit-scrollbar {
-            width: 8px;
-        }
-        #chatbox::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-        #chatbox::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 10px;
-        }
-        #chatbox::-webkit-scrollbar-thumb:hover {
-            background: #555;
-        }
+        body { font-family: 'Inter', sans-serif; display: flex; height: 100vh; overflow: hidden; } /* Use flex for layout */
+        #sidebar { width: 280px; background-color: #f3f4f6; /* gray-100 */ border-right: 1px solid #e5e7eb; /* gray-200 */ padding: 1rem; display: flex; flex-direction: column; }
+        #main-content { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; background-color: #ffffff; /* white */ }
+        #chat-area { padding: 1rem; flex-grow: 1; display: flex; flex-direction: column; }
+        #chatbox { flex-grow: 1; overflow-y: auto; margin-bottom: 1rem; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; background-color: #f9fafb; /* gray-50 */ }
+        #input-area { padding: 0 1rem 1rem 1rem; display: flex; align-items: center; gap: 0.5rem; border-top: 1px solid #e5e7eb; padding-top: 1rem; }
+
+        /* Message styling */
+        .message { padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 0.5rem; max-width: 85%; word-wrap: break-word; line-height: 1.5; }
+        .user-msg { margin-left: auto; background-color: #dbeafe; /* blue-100 */ color: #1e3a8a; /* blue-900 */ }
+        .assistant-msg { margin-right: auto; background-color: #e5e7eb; /* gray-200 */ color: #1f2937; /* gray-800 */ }
+        .error-msg { margin-right: auto; background-color: #fee2e2; /* red-100 */ color: #991b1b; /* red-800 */ font-style: italic; }
+
+        /* Scrollbar styling */
+        #chatbox::-webkit-scrollbar, #saved-chats-list::-webkit-scrollbar { width: 8px; }
+        #chatbox::-webkit-scrollbar-track, #saved-chats-list::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        #chatbox::-webkit-scrollbar-thumb, #saved-chats-list::-webkit-scrollbar-thumb { background: #a0aec0; /* gray-400 */ border-radius: 10px; }
+        #chatbox::-webkit-scrollbar-thumb:hover, #saved-chats-list::-webkit-scrollbar-thumb:hover { background: #718096; /* gray-500 */ }
+
+        /* Sidebar specific styling */
+        #saved-chats-list { max-height: calc(100vh - 300px); /* Adjust as needed */ overflow-y: auto; margin-top: 1rem; }
+        .chat-list-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; border-radius: 0.375rem; cursor: pointer; transition: background-color 0.2s ease-in-out; }
+        .chat-list-item:hover { background-color: #e5e7eb; /* gray-200 */ }
+        .chat-list-item.active { background-color: #dbeafe; /* blue-100 */ font-weight: 500; }
+        .delete-chat-btn { background: none; border: none; color: #ef4444; /* red-500 */ cursor: pointer; padding: 0.25rem; line-height: 1; opacity: 0.7; transition: opacity 0.2s; }
+        .delete-chat-btn:hover { opacity: 1; color: #dc2626; /* red-600 */ }
+        .chat-name-input { border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.3rem 0.5rem; width: 100%; }
+
+        /* Button styling */
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; transition: background-color 0.2s ease-in-out; cursor: pointer; border: 1px solid transparent; }
+        .btn-primary { background-color: #2563eb; /* blue-600 */ color: white; }
+        .btn-primary:hover { background-color: #1d4ed8; /* blue-700 */ }
+        .btn-secondary { background-color: #4b5563; /* gray-600 */ color: white; }
+        .btn-secondary:hover { background-color: #374151; /* gray-700 */ }
+        .btn-outline { border-color: #d1d5db; /* gray-300 */ color: #374151; /* gray-700 */ background-color: white; }
+        .btn-outline:hover { background-color: #f9fafb; /* gray-50 */ }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn i { margin-right: 0.5rem; }
+
     </style>
-     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gray-100 flex flex-col h-screen p-4">
+<body class="bg-gray-100">
 
-    <h1 class="text-2xl font-bold text-center mb-4 text-gray-800">Local AI Assistant</h1>
+    <aside id="sidebar">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Chat Sessions</h2>
 
-    <div id="chatbox" class="flex-grow bg-white rounded-lg shadow p-4 overflow-y-auto mb-4 border border-gray-200">
-        <div class="text-center text-gray-500">Loading history...</div>
-    </div>
-
-    <div id="input-area" class="flex items-center gap-2">
-        <textarea id="message-input" rows="2" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Type your message..."></textarea>
-        <button id="send-button" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 ease-in-out shadow">
-            Send
+        <button id="new-chat-btn" class="btn btn-primary w-full mb-4">
+            <i class="fas fa-plus"></i> New Chat
         </button>
-    </div>
+
+        <div class="mb-4 p-3 bg-white rounded-lg border border-gray-200 shadow-sm">
+            <label for="current-chat-name" class="block text-sm font-medium text-gray-600 mb-1">Current Chat:</label>
+            <div class="flex gap-2 items-center">
+                 <input type="text" id="current-chat-name" class="chat-name-input flex-grow text-sm" placeholder="Name this chat...">
+                 <button id="save-chat-name-btn" class="btn btn-outline p-1.5" title="Save Name">
+                     <i class="fas fa-save text-sm"></i>
+                 </button>
+            </div>
+            <div id="current-chat-id-display" class="text-xs text-gray-400 mt-1">ID: -</div>
+        </div>
+
+
+        <h3 class="text-lg font-medium text-gray-700 mb-2 border-t pt-3">Saved Chats</h3>
+        <div id="saved-chats-list" class="flex-grow">
+            <p class="text-gray-500 text-sm">Loading chats...</p>
+            </div>
+    </aside>
+
+    <main id="main-content">
+        <div id="chat-area">
+            <div id="chatbox">
+                <div class="text-center text-gray-500 p-4">Initializing chat...</div>
+            </div>
+        </div>
+        <div id="input-area">
+            <textarea id="message-input" rows="2" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
+            <button id="send-button" class="btn btn-primary self-end" style="height: 42px;"> <i class="fas fa-paper-plane"></i> Send
+            </button>
+        </div>
+         <div id="status-bar" class="text-xs text-gray-500 px-4 py-1 border-t bg-gray-50">Status: Idle</div>
+    </main>
 
     <script>
+        // DOM Elements
         const chatbox = document.getElementById('chatbox');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
+        const sidebar = document.getElementById('sidebar');
+        const savedChatsList = document.getElementById('saved-chats-list');
+        const newChatButton = document.getElementById('new-chat-btn');
+        const currentChatNameInput = document.getElementById('current-chat-name');
+        const saveChatNameButton = document.getElementById('save-chat-name-btn');
+        const currentChatIdDisplay = document.getElementById('current-chat-id-display');
+        const statusBar = document.getElementById('status-bar');
 
-        // Function to add a message to the chatbox
-        function addMessage(role, content) {
+        // State
+        let currentChatId = null;
+        let isLoading = false; // Prevent multiple simultaneous operations
+
+        // --- Utility Functions ---
+        function updateStatus(message, isError = false) {
+            statusBar.textContent = `Status: ${message}`;
+            statusBar.className = `text-xs px-4 py-1 border-t ${isError ? 'text-red-600 bg-red-50' : 'text-gray-500 bg-gray-50'}`;
+            console.log(`Status Update: ${message}`);
+        }
+
+        function setLoadingState(loading) {
+            isLoading = loading;
+            messageInput.disabled = loading;
+            sendButton.disabled = loading;
+            newChatButton.disabled = loading;
+            saveChatNameButton.disabled = loading;
+            // Disable chat list interaction while loading? Maybe not necessary.
+            sendButton.innerHTML = loading ? '<i class="fas fa-spinner fa-spin"></i> Sending...' : '<i class="fas fa-paper-plane"></i> Send';
+            if (loading) {
+                updateStatus("Processing...");
+            } else {
+                updateStatus("Idle");
+                messageInput.focus();
+            }
+        }
+
+        // --- Chat Message Display ---
+        function addMessage(role, content, isError = false) {
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('message');
-            messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg');
+            if (isError) {
+                 messageDiv.classList.add('error-msg');
+            } else {
+                messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg');
+            }
 
-            // Basic Markdown rendering (bold, italics, code blocks) - can be expanded
+            // Basic Markdown rendering (bold, italics, code blocks, inline code, newlines)
             content = content
-                .replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>') // Bold
-                .replace(/\\*([^*]+)\\*/g, '<em>$1</em>')     // Italics
-                .replace(/```([\\s\\S]*?)```/g, '<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm"><code>$1</code></pre>') // Code blocks
-                .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-sm">$1</code>'); // Inline code
+                .replace(/</g, '&lt;').replace(/>/g, '&gt;') // Basic HTML escaping first
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')     // Italics
+                .replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>$1</code></pre>') // Code blocks
+                .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-sm font-mono">$1</code>') // Inline code
+                .replace(/\n/g, '<br>'); // Render newlines
 
-            messageDiv.innerHTML = content.replace(/\\n/g, '<br>'); // Render newlines
+            messageDiv.innerHTML = content;
             chatbox.appendChild(messageDiv);
             chatbox.scrollTop = chatbox.scrollHeight; // Scroll to bottom
         }
 
-        // Function to load chat history
-        async function loadHistory() {
+        function clearChatbox() {
+            chatbox.innerHTML = '';
+        }
+
+        // --- API Interaction ---
+
+        // Fetch list of saved chats and populate sidebar
+        async function loadSavedChats() {
+            updateStatus("Loading saved chats...");
             try {
-                const response = await fetch('/get_history');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const history = await response.json();
-                 chatbox.innerHTML = ''; // Clear loading message
-                if (history.length === 0) {
-                     chatbox.innerHTML = '<div class="text-center text-gray-500">No chat history yet.</div>';
+                const response = await fetch('/api/chats');
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const chats = await response.json();
+
+                savedChatsList.innerHTML = ''; // Clear previous list
+                if (chats.length === 0) {
+                    savedChatsList.innerHTML = '<p class="text-gray-500 text-sm px-1">No saved chats yet.</p>';
                 } else {
-                    history.forEach(msg => addMessage(msg.role, msg.content));
+                    chats.forEach(chat => {
+                        const listItem = document.createElement('div');
+                        listItem.classList.add('chat-list-item');
+                        listItem.dataset.chatId = chat.id; // Store chat ID on the element
+
+                        const nameSpan = document.createElement('span');
+                        nameSpan.textContent = chat.name || `Chat ${chat.id}`; // Fallback name
+                        nameSpan.classList.add('truncate', 'flex-grow', 'mr-2');
+                        nameSpan.title = chat.name || `Chat ${chat.id}`; // Tooltip for long names
+
+                        const deleteButton = document.createElement('button');
+                        deleteButton.classList.add('delete-chat-btn');
+                        deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>';
+                        deleteButton.title = "Delete Chat";
+                        deleteButton.onclick = (e) => {
+                            e.stopPropagation(); // Prevent triggering loadChat
+                            handleDeleteChat(chat.id, listItem);
+                        };
+
+                        listItem.appendChild(nameSpan);
+                        listItem.appendChild(deleteButton);
+
+                        listItem.onclick = () => {
+                            if (chat.id !== currentChatId) {
+                                loadChat(chat.id);
+                            }
+                        };
+                        savedChatsList.appendChild(listItem);
+                    });
                 }
+                updateActiveChatListItem(); // Highlight the current chat if it's in the list
+                updateStatus("Saved chats loaded.");
             } catch (error) {
-                console.error('Error loading history:', error);
-                chatbox.innerHTML = '<div class="text-center text-red-500">Error loading chat history. Is the backend running?</div>';
+                console.error('Error loading saved chats:', error);
+                savedChatsList.innerHTML = '<p class="text-red-500 text-sm px-1">Error loading chats.</p>';
+                updateStatus("Error loading saved chats.", true);
             }
         }
 
-        // Function to send a message
+        // Create a new chat session
+        async function startNewChat() {
+            if (isLoading) return;
+            setLoadingState(true);
+            updateStatus("Creating new chat...");
+            try {
+                const response = await fetch('/api/chat', { method: 'POST' });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const newChat = await response.json();
+                await loadChat(newChat.id); // Load the newly created chat
+                await loadSavedChats(); // Refresh the sidebar list
+                updateStatus(`New chat created (ID: ${newChat.id}).`);
+            } catch (error) {
+                console.error('Error starting new chat:', error);
+                addMessage('system', `[Error creating new chat: ${error.message}]`, true);
+                updateStatus("Error creating new chat.", true);
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        // Load a specific chat's history and details
+        async function loadChat(chatId) {
+            if (isLoading) return;
+            setLoadingState(true);
+            updateStatus(`Loading chat ${chatId}...`);
+            clearChatbox();
+            addMessage('system', `Loading chat (ID: ${chatId})...`); // Placeholder message
+
+            try {
+                const response = await fetch(`/api/chat/${chatId}`);
+                if (!response.ok) {
+                     if (response.status === 404) {
+                         throw new Error(`Chat with ID ${chatId} not found.`);
+                     } else {
+                         throw new Error(`HTTP error! status: ${response.status}`);
+                     }
+                }
+                const data = await response.json();
+
+                currentChatId = chatId;
+                clearChatbox(); // Clear loading message
+
+                // Update UI elements
+                currentChatNameInput.value = data.details.name || '';
+                currentChatIdDisplay.textContent = `ID: ${currentChatId}`;
+
+                if (data.history.length === 0) {
+                    addMessage('system', 'This chat is empty. Start typing!');
+                } else {
+                    data.history.forEach(msg => addMessage(msg.role, msg.content));
+                }
+                updateActiveChatListItem(); // Highlight in sidebar
+                updateStatus(`Chat ${chatId} loaded.`);
+
+            } catch (error) {
+                console.error('Error loading chat:', error);
+                clearChatbox();
+                addMessage('system', `[Error loading chat ${chatId}: ${error.message}]`, true);
+                // Maybe start a new chat if loading fails? Or show error state.
+                currentChatId = null; // Reset current chat ID on failure
+                currentChatNameInput.value = '';
+                currentChatIdDisplay.textContent = 'ID: -';
+                updateStatus(`Error loading chat ${chatId}.`, true);
+                 updateActiveChatListItem();
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        // Send user message to backend
         async function sendMessage() {
+            if (isLoading || !currentChatId) {
+                 updateStatus("Cannot send message: No active chat or busy.", true);
+                 return;
+            }
             const message = messageInput.value.trim();
             if (!message) return;
 
             addMessage('user', message); // Display user message immediately
             messageInput.value = ''; // Clear input
-            messageInput.disabled = true; // Disable input while waiting
-            sendButton.disabled = true;
-            sendButton.textContent = 'Thinking...';
-
+            setLoadingState(true);
+            updateStatus("Sending message...");
 
             try {
-                const response = await fetch('/send_message', {
+                const response = await fetch(`/api/chat/${currentChatId}/message`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: message }),
                 });
 
@@ -125,30 +312,153 @@
 
                 const data = await response.json();
                 addMessage('assistant', data.reply);
+                updateStatus("Assistant replied.");
+                // Maybe refresh saved chats list if message sending implies update time change?
+                // await loadSavedChats(); // Could be slightly inefficient
 
             } catch (error) {
                 console.error('Error sending message:', error);
-                addMessage('assistant', `[Error: ${error.message}]`);
+                addMessage('assistant', `[Error: ${error.message}]`, true);
+                updateStatus("Error sending message.", true);
             } finally {
-                 messageInput.disabled = false; // Re-enable input
-                 sendButton.disabled = false;
-                 sendButton.textContent = 'Send';
-                 messageInput.focus(); // Set focus back to input
+                 setLoadingState(false);
+                 // Update timestamp in sidebar implicitly if needed by re-sorting backend/frontend
+                 // For simplicity, we might only update the list visually on explicit save/load/new
             }
         }
 
-        // Event listeners
+        // Save/Update the name of the current chat
+        async function handleSaveChatName() {
+            if (isLoading || !currentChatId) {
+                updateStatus("Cannot save name: No active chat or busy.", true);
+                return;
+            }
+            const newName = currentChatNameInput.value.trim();
+            if (!newName) {
+                updateStatus("Cannot save: Name cannot be empty.", true);
+                // Optionally revert input to previous name or add visual feedback
+                return;
+            }
+
+            setLoadingState(true); // Use general loading state
+            updateStatus(`Saving name for chat ${currentChatId}...`);
+
+            try {
+                const response = await fetch(`/api/chat/${currentChatId}/name`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newName }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+                updateStatus(`Chat ${currentChatId} name saved as "${newName}".`);
+                await loadSavedChats(); // Refresh sidebar to show new name and potentially reorder
+
+            } catch (error) {
+                console.error('Error saving chat name:', error);
+                updateStatus(`Error saving name: ${error.message}`, true);
+                // Optionally inform user in chatbox as well
+                // addMessage('system', `[Error saving chat name: ${error.message}]`, true);
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        // Delete a chat
+        async function handleDeleteChat(chatId, listItemElement) {
+             if (isLoading) return;
+
+             const chatName = listItemElement.querySelector('span').textContent || `Chat ${chatId}`;
+             if (!confirm(`Are you sure you want to delete "${chatName}"? This cannot be undone.`)) {
+                 return;
+             }
+
+             setLoadingState(true);
+             updateStatus(`Deleting chat ${chatId}...`);
+
+             try {
+                 const response = await fetch(`/api/chat/${chatId}`, { method: 'DELETE' });
+                 if (!response.ok) {
+                     const errorData = await response.json();
+                     throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                 }
+
+                 updateStatus(`Chat ${chatId} deleted.`);
+                 listItemElement.remove(); // Remove from sidebar immediately
+
+                 // If the deleted chat was the currently active one, start a new chat
+                 if (chatId === currentChatId) {
+                     await startNewChat();
+                 } else {
+                     // Just refresh the list in case order changed (though unlikely on delete)
+                     await loadSavedChats();
+                 }
+
+
+             } catch (error) {
+                 console.error(`Error deleting chat ${chatId}:`, error);
+                 updateStatus(`Error deleting chat: ${error.message}`, true);
+                 addMessage('system', `[Error deleting chat ${chatId}: ${error.message}]`, true);
+             } finally {
+                 setLoadingState(false);
+             }
+        }
+
+        // Highlight the active chat in the sidebar list
+        function updateActiveChatListItem() {
+            const items = savedChatsList.querySelectorAll('.chat-list-item');
+            items.forEach(item => {
+                if (parseInt(item.dataset.chatId) === currentChatId) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+
+        // --- Event Listeners ---
         sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keypress', (e) => {
-            // Send message on Enter key, unless Shift+Enter is pressed
             if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault(); // Prevent default newline insertion
+                e.preventDefault();
                 sendMessage();
             }
         });
 
-        // Initial load
-        loadHistory();
+        newChatButton.addEventListener('click', startNewChat);
+        saveChatNameButton.addEventListener('click', handleSaveChatName);
+        // Optional: Save name on Enter key in the input field
+        currentChatNameInput.addEventListener('keypress', (e) => {
+             if (e.key === 'Enter') {
+                 e.preventDefault();
+                 handleSaveChatName();
+             }
+        });
+
+
+        // --- Initial Load ---
+        async function initializeApp() {
+            await loadSavedChats(); // Load the list first
+            // Decide which chat to load initially
+            // Option 1: Always start a new chat
+            // await startNewChat();
+            // Option 2: Load the most recent chat (if any)
+            const firstChatElement = savedChatsList.querySelector('.chat-list-item');
+            if (firstChatElement) {
+                 const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
+                 await loadChat(mostRecentChatId);
+            } else {
+                 // No saved chats exist, create a new one
+                 await startNewChat();
+            }
+        }
+
+        // Start the application
+        initializeApp();
 
     </script>
 </body>
