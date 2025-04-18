@@ -108,30 +108,12 @@
         .user-msg { margin-left: auto; background-color: var(--rz-user-message-bg); color: var(--rz-user-message-text); }
         .assistant-msg { margin-right: auto; background-color: var(--rz-assistant-message-bg); color: var(--rz-assistant-message-text); }
         .error-msg { margin-right: auto; background-color: #fee2e2; color: #991b1b; font-style: italic; }
-        .system-msg { text-align: center; font-size: 0.8rem; color: #6b7280; margin-bottom: 0.5rem; }
+        .system-msg { text-align: center; font-size: 0.8rem; color: #6b7280; margin-bottom: 0.5rem; white-space: pre-wrap; }
         .message pre { margin-top: 0.5rem; background-color: var(--rz-frame); color: var(--rz-toolbar-field-text); padding: 0.5rem; border-radius: 0.25rem; }
         /* Attachment Icon Styling */
-        .attachment-icon {
-            display: inline-flex; /* Align icon and text */
-            align-items: center;
-            gap: 0.25rem; /* Space between icon and text */
-            font-size: 0.8rem; /* Slightly smaller */
-            color: inherit; /* Inherit color from message */
-            background-color: rgba(0, 0, 0, 0.05); /* Subtle background */
-            padding: 0.15rem 0.4rem;
-            border-radius: 0.25rem;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            margin-right: 0.25rem; /* Space after icon block */
-        }
-        .attachment-icon i {
-            opacity: 0.8;
-        }
-        .attachment-icon.error-marker { /* Style for error markers */
-             color: #991b1b;
-             background-color: rgba(254, 202, 202, 0.4);
-             border-color: rgba(248, 113, 113, 0.5);
-        }
-
+        .attachment-icon { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; color: inherit; background-color: rgba(0, 0, 0, 0.05); padding: 0.15rem 0.4rem; border-radius: 0.25rem; border: 1px solid rgba(0, 0, 0, 0.1); margin-right: 0.25rem; }
+        .attachment-icon i { opacity: 0.8; }
+        .attachment-icon.error-marker { color: #991b1b; background-color: rgba(254, 202, 202, 0.4); border-color: rgba(248, 113, 113, 0.5); }
 
         /* Scrollbar Styling */
         #chatbox::-webkit-scrollbar, #saved-chats-list::-webkit-scrollbar, #uploaded-files-list::-webkit-scrollbar, #selected-files-container::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -153,7 +135,7 @@
         .chat-name-input::placeholder { color: var(--rz-tab-background-text); }
 
         /* Plugin Section Styling */
-        .plugin-section { margin-bottom: 1rem; border: 1px solid var(--rz-sidebar-border); border-radius: 0.5rem; background-color: var(--rz-sidebar-bg); }
+        .plugin-section { margin-bottom: 1rem; border: 1px solid var(--rz-sidebar-border); border-radius: 0.5rem; background-color: var(--rz-sidebar-bg); flex-shrink: 0; /* Allow sections to shrink */ }
         .plugin-header { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background-color: var(--rz-frame); border-bottom: 1px solid var(--rz-sidebar-border); color: var(--rz-sidebar-text); font-weight: 500; border-top-left-radius: 0.5rem; border-top-right-radius: 0.5rem; cursor: pointer; }
         .plugin-header .toggle-icon { transition: transform 0.2s ease-in-out; color: var(--rz-sidebar-text); }
         .plugin-header.collapsed { border-bottom-color: transparent; }
@@ -183,7 +165,7 @@
         .btn-outline:hover:not(:disabled) { background-color: var(--rz-button-outline-hover-bg); border-color: var(--rz-button-outline-hover-bg); color: var(--rz-button-outline-hover-text); }
         .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn i.fa-plus, .btn i.fa-paper-plane, .btn i.fa-upload, .btn i.fa-check-double, .btn i.fa-book-open, .btn i.fa-list-alt { margin-right: 0.5rem; }
+        .btn i.fa-plus, .btn i.fa-paper-plane, .btn i.fa-upload, .btn i.fa-check-double, .btn i.fa-book-open, .btn i.fa-list-alt, .btn i.fa-calendar-days { margin-right: 0.5rem; }
         .btn i.fa-save { margin-right: 0; }
 
         /* File Input Styling */
@@ -267,19 +249,19 @@
 
     <aside id="plugins-sidebar">
         <h2 class="text-xl font-semibold mb-4 whitespace-nowrap">Plugins</h2>
-        <div class="plugin-section flex flex-col flex-grow min-h-0" id="file-plugin-section">
+
+        <div class="plugin-section flex flex-col" id="file-plugin-section">
             <div class="plugin-header flex-shrink-0" id="file-plugin-header">
-                <span><i class="fas fa-file-alt mr-2"></i> Upload File</span>
+                <span><i class="fas fa-file-alt mr-2"></i> Files</span>
                 <i class="fas fa-chevron-down toggle-icon"></i>
             </div>
-            <div class="plugin-content flex flex-col flex-grow min-h-0 p-2" id="file-plugin-content">
+            <div class="plugin-content flex flex-col p-2" id="file-plugin-content">
                 <input type="file" id="file-upload-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf" multiple>
                 <label for="file-upload-input" id="file-upload-label" class="btn btn-secondary btn-sm w-full mb-2 flex-shrink-0">
                     <i class="fas fa-upload"></i> Add New File(s)
                 </label>
                 <h4 class="text-sm font-medium text-rz-sidebar-text mb-1 flex-shrink-0">Available Files:</h4>
-                 <div class="sidebar-section-container flex-grow mb-2">
-                    <div id="uploaded-files-list" class="sidebar-list border border-rz-sidebar-border rounded p-1 bg-rz-sidebar-bg">
+                 <div class="sidebar-section-container flex-grow mb-2 max-h-60"> <div id="uploaded-files-list" class="sidebar-list border border-rz-sidebar-border rounded p-1 bg-rz-sidebar-bg">
                         <p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading files...</p>
                     </div>
                 </div>
@@ -293,6 +275,20 @@
                 </div>
             </div>
         </div>
+
+        <div class="plugin-section flex-shrink-0" id="calendar-plugin-section">
+             <div class="plugin-header flex-shrink-0" id="calendar-plugin-header">
+                 <span><i class="fas fa-calendar-alt mr-2"></i> Google Calendar</span>
+                 <i class="fas fa-chevron-down toggle-icon"></i>
+            </div>
+            <div class="plugin-content p-2 hidden" id="calendar-plugin-content">
+                <button id="load-calendar-btn" class="btn btn-secondary btn-sm w-full">
+                    <i class="fas fa-calendar-days"></i> Load Upcoming Events
+                </button>
+                 <p class="text-xs text-rz-tab-background-text mt-2">Note: Requires pre-configured credentials (token.json).</p>
+            </div>
+        </div>
+
     </aside>
 
     <button id="plugins-toggle-btn" class="toggle-btn" title="Toggle Plugins">
@@ -348,6 +344,9 @@
         const saveSummaryButton = document.getElementById('save-summary-btn');
         const summaryStatus = document.getElementById('summary-status');
         const modelSelector = document.getElementById('model-selector');
+        const calendarPluginHeader = document.getElementById('calendar-plugin-header');
+        const calendarPluginContent = document.getElementById('calendar-plugin-content');
+        const loadCalendarButton = document.getElementById('load-calendar-btn');
 
         // Application State (Unchanged)
         let currentChatId = null;
@@ -358,15 +357,13 @@
         const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
         const PLUGINS_COLLAPSED_KEY = 'pluginsCollapsed';
         const FILE_PLUGIN_COLLAPSED_KEY = 'filePluginCollapsed';
+        const CALENDAR_PLUGIN_COLLAPSED_KEY = 'calendarPluginCollapsed';
         const MAX_FILE_SIZE_MB = 10;
         const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-        // No longer needed for disabling buttons, but could be useful elsewhere
-        // const TEXT_FILE_EXTENSIONS = ['txt', 'py', 'js', 'html', 'css', 'md', 'json', 'csv'];
-
 
         // --- Utility Functions (Unchanged) ---
         function updateStatus(message, isError = false) { statusBar.textContent = `Status: ${message}`; statusBar.className = `text-xs px-4 py-1 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50 border-t border-red-200' : 'text-rz-status-bar-text bg-rz-status-bar-bg border-t border-rz-frame'}`; console.log(`Status Update: ${message}`); }
-        function setLoadingState(loading, operation = "Processing") { isLoading = loading; messageInput.disabled = loading; sendButton.disabled = loading; newChatButton.disabled = loading; saveChatNameButton.disabled = loading; sidebarToggleButton.disabled = loading; pluginsToggleButton.disabled = loading; fileUploadInput.disabled = loading; attachFullButton.disabled = loading; attachSummaryButton.disabled = loading; saveSummaryButton.disabled = loading; modelSelector.disabled = loading; uploadedFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading); selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading); sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send'; if (loading) { updateStatus(`${operation}...`); } else { updateStatus("Idle"); if (!bodyElement.classList.contains('sidebar-collapsed')) { messageInput.focus(); } } }
+        function setLoadingState(loading, operation = "Processing") { isLoading = loading; messageInput.disabled = loading; sendButton.disabled = loading; newChatButton.disabled = loading; saveChatNameButton.disabled = loading; sidebarToggleButton.disabled = loading; pluginsToggleButton.disabled = loading; fileUploadInput.disabled = loading; attachFullButton.disabled = loading; attachSummaryButton.disabled = loading; saveSummaryButton.disabled = loading; modelSelector.disabled = loading; loadCalendarButton.disabled = loading; uploadedFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading); selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading); sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send'; if (loading) { updateStatus(`${operation}...`); } else { updateStatus("Idle"); if (!bodyElement.classList.contains('sidebar-collapsed')) { messageInput.focus(); } } }
 
         // --- Sidebar & Plugin Toggle Functions (Unchanged) ---
         function setSidebarCollapsed(sidebarElement, toggleButton, collapsed, storageKey, positionClass) { const icon = toggleButton.querySelector('i'); const bodyClass = `${positionClass}-collapsed`; const isLeft = positionClass === 'sidebar'; const expandIcon = isLeft ? 'fa-chevron-left' : 'fa-chevron-right'; const collapseIcon = isLeft ? 'fa-chevron-right' : 'fa-chevron-left'; if (collapsed) { bodyElement.classList.add(bodyClass); icon.classList.remove(expandIcon); icon.classList.add(collapseIcon); toggleButton.title = `Expand ${isLeft ? 'Chat List' : 'Plugins'}`; localStorage.setItem(storageKey, 'true'); } else { bodyElement.classList.remove(bodyClass); icon.classList.remove(collapseIcon); icon.classList.add(expandIcon); toggleButton.title = `Collapse ${isLeft ? 'Chat List' : 'Plugins'}`; localStorage.setItem(storageKey, 'false'); } if (!collapsed && !isLoading) { setTimeout(() => messageInput.focus(), 350); } }
@@ -374,75 +371,27 @@
         function toggleRightSidebar() { setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, !bodyElement.classList.contains('plugins-collapsed'), PLUGINS_COLLAPSED_KEY, 'plugins'); }
         function setPluginSectionCollapsed(headerElement, contentElement, collapsed, storageKey) { const icon = headerElement.querySelector('.toggle-icon'); if (collapsed) { headerElement.classList.add('collapsed'); contentElement.classList.add('hidden'); if (icon) { icon.classList.remove('fa-chevron-down'); icon.classList.add('fa-chevron-up'); } localStorage.setItem(storageKey, 'true'); } else { headerElement.classList.remove('collapsed'); contentElement.classList.remove('hidden'); if (icon) { icon.classList.remove('fa-chevron-up'); icon.classList.add('fa-chevron-down'); } localStorage.setItem(storageKey, 'false'); } }
         function toggleFilePlugin() { const isCollapsed = filePluginContent.classList.contains('hidden'); setPluginSectionCollapsed(filePluginHeader, filePluginContent, !isCollapsed, FILE_PLUGIN_COLLAPSED_KEY); }
+        function toggleCalendarPlugin() { const isCollapsed = calendarPluginContent.classList.contains('hidden'); setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, !isCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY); }
 
-        // --- Chat Message Display (MODIFIED) ---
-        /** Adds a message to the chatbox UI, rendering Markdown and replacing markers with icons. */
-        function addMessage(role, content, isError = false) {
-            const messageDiv = document.createElement('div');
-            if (role === 'system') { messageDiv.classList.add('system-msg'); }
-            else { messageDiv.classList.add('message'); if (isError) messageDiv.classList.add('error-msg'); else messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg'); }
-
-            // Process content: Escape HTML, apply Markdown, replace markers, handle newlines
-            content = content
-                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') // 1. Escape HTML first
-                .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>') // 2. Apply Markdown
-                .replace(/\*(.*?)\*/gs, '<em>$1</em>')
-                .replace(/```([\s\S]*?)```/g, (match, code) => `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`)
-                .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-sm font-mono">$1</code>')
-                 // 3. Replace attachment markers with icons + filenames
-                .replace(/\[Attached File: '(.*?)' \(ID: \d+, Type: (full|summary)\)\]\n?/gi, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`)
-                .replace(/\[Error attaching (?:full file|summary): '(.*?)' \(ID: \d+\)\]\n?/gi, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`)
-                .replace(/\n/g, '<br>'); // 4. Handle newlines
-
-            messageDiv.innerHTML = content; // Set final HTML
-            chatbox.appendChild(messageDiv); // Add to DOM
-            chatbox.scrollTop = chatbox.scrollHeight; // Scroll down
-        }
-        /** Clears all messages from the chatbox. */
+        // --- Chat Message Display (Unchanged) ---
+        function addMessage(role, content, isError = false) { const messageDiv = document.createElement('div'); if (role === 'system') { messageDiv.classList.add('system-msg'); } else { messageDiv.classList.add('message'); if (isError) messageDiv.classList.add('error-msg'); else messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg'); } content = content .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>').replace(/\*(.*?)\*/gs, '<em>$1</em>') .replace(/```([\s\S]*?)```/g, (match, code) => `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`) .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-sm font-mono">$1</code>') .replace(/\[Attached File: '(.*?)' \(ID: \d+, Type: (full|summary)\)\]\n?/gi, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`) .replace(/\[Error attaching (?:full file|summary): '(.*?)' \(ID: \d+\)\]\n?/gi, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`) .replace(/\n/g, '<br>'); messageDiv.innerHTML = content; chatbox.appendChild(messageDiv); chatbox.scrollTop = chatbox.scrollHeight; }
         function clearChatbox() { chatbox.innerHTML = ''; }
 
-        // --- File Handling & Selection Functions ---
-        /** Formats file size in bytes to a human-readable string. */
+        // --- File Handling & Selection Functions (Unchanged) ---
         function formatFileSize(bytes) { if (bytes === 0) return '0 Bytes'; const k = 1024; const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; }
-
-        /** Loads the list of uploaded files into the plugin sidebar. */
-        async function loadUploadedFiles() {
-            // Removed the isTextFile check and button disabling logic here
-             updateStatus("Loading uploaded files..."); uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`; try { const response = await fetch('/api/files'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const files = await response.json(); uploadedFilesList.innerHTML = ''; if (files.length === 0) { uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`; } else { files.forEach(file => { const itemDiv = document.createElement('div'); itemDiv.classList.add('file-list-item'); itemDiv.dataset.fileId = file.id; itemDiv.dataset.filename = file.filename; itemDiv.dataset.hasSummary = file.has_summary; const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = file.id; checkbox.classList.add('file-checkbox'); checkbox.title = "Select file"; checkbox.addEventListener('change', (e) => { if (e.target.checked) itemDiv.classList.add('active-selection'); else itemDiv.classList.remove('active-selection'); }); const nameSpan = document.createElement('span'); nameSpan.textContent = file.filename; nameSpan.classList.add('filename'); nameSpan.title = file.filename; const actionsDiv = document.createElement('div'); actionsDiv.classList.add('file-actions'); const summaryBtn = document.createElement('button'); summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs'); summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i> Summary'; summaryBtn.title = "View/Edit Summary"; summaryBtn.disabled = false; /* Always enabled now */ summaryBtn.onclick = (e) => { e.stopPropagation(); showSummaryModal(file.id, file.filename); }; actionsDiv.appendChild(summaryBtn); itemDiv.appendChild(checkbox); itemDiv.appendChild(nameSpan); itemDiv.appendChild(actionsDiv); uploadedFilesList.appendChild(itemDiv); }); } updateStatus("Uploaded files loaded."); } catch (error) { console.error('Error loading uploaded files:', error); uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>'; updateStatus("Error loading files.", true); }
-        }
-
-        /** Handles file input change event, uploads files using FormData. */
-        function handleFileUpload(event) {
-             const files = event.target.files; if (!files || files.length === 0) return;
-             setLoadingState(true, "Uploading");
-             const formData = new FormData(); let fileCount = 0;
-             for (const file of files) { if (file.size > MAX_FILE_SIZE_BYTES) { alert(`Skipping "${file.name}": File is too large (${formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`); continue; } formData.append('file', file); fileCount++; }
-             if (fileCount === 0) { setLoadingState(false); fileUploadInput.value = ''; updateStatus("No valid files selected for upload.", true); return; }
-             fetch('/api/files', { method: 'POST', body: formData })
-             .then(async response => { const data = await response.json(); if (!response.ok) { throw new Error(data.error || `HTTP error! status: ${response.status}`); } const successfulUploads = data.uploaded_files?.length || 0; const errors = data.errors || []; let statusMsg = `Uploaded ${successfulUploads} file(s).`; if (errors.length > 0) { statusMsg += ` ${errors.length} failed: ${errors.join('; ')}`; console.warn("Upload errors:", errors); } updateStatus(statusMsg, errors.length > 0); })
-             .catch(error => { console.error('Error uploading files:', error); updateStatus(`Error uploading files: ${error.message}`, true); })
-             .finally(async () => { await loadUploadedFiles(); setLoadingState(false); fileUploadInput.value = ''; });
-        }
-
-        /** Adds files selected via checkboxes to the `selectedFiles` array with the specified type. */
-        function attachSelectedFiles(type) {
-              const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked'); if (checkboxes.length === 0) { updateStatus("No files selected to attach.", true); return; } let addedCount = 0;
-              checkboxes.forEach(checkbox => { const fileId = parseInt(checkbox.value); const listItem = checkbox.closest('.file-list-item'); const filename = listItem.dataset.filename;
-              // Removed the isTextFile check for summary
-              const alreadySelected = selectedFiles.some(f => f.id === fileId && f.type === type); if (!alreadySelected) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId)); selectedFiles.push({ id: fileId, filename: filename, type: type }); addedCount++; } checkbox.checked = false; listItem.classList.remove('active-selection'); }); renderSelectedFiles(); if (addedCount > 0) { updateStatus(`${addedCount} file(s) added as ${type}.`); } else { updateStatus(`Selected file(s) already attached as ${type}.`); }
-        }
-        /** Removes a specific file attachment from the `selectedFiles` array. */
+        async function loadUploadedFiles() { updateStatus("Loading uploaded files..."); uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`; try { const response = await fetch('/api/files'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const files = await response.json(); uploadedFilesList.innerHTML = ''; if (files.length === 0) { uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`; } else { files.forEach(file => { const itemDiv = document.createElement('div'); itemDiv.classList.add('file-list-item'); itemDiv.dataset.fileId = file.id; itemDiv.dataset.filename = file.filename; itemDiv.dataset.hasSummary = file.has_summary; const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = file.id; checkbox.classList.add('file-checkbox'); checkbox.title = "Select file"; checkbox.addEventListener('change', (e) => { if (e.target.checked) itemDiv.classList.add('active-selection'); else itemDiv.classList.remove('active-selection'); }); const nameSpan = document.createElement('span'); nameSpan.textContent = file.filename; nameSpan.classList.add('filename'); nameSpan.title = file.filename; const actionsDiv = document.createElement('div'); actionsDiv.classList.add('file-actions'); const summaryBtn = document.createElement('button'); summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs'); summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i> Summary'; summaryBtn.title = "View/Edit Summary"; summaryBtn.disabled = false; summaryBtn.onclick = (e) => { e.stopPropagation(); showSummaryModal(file.id, file.filename); }; actionsDiv.appendChild(summaryBtn); itemDiv.appendChild(checkbox); itemDiv.appendChild(nameSpan); itemDiv.appendChild(actionsDiv); uploadedFilesList.appendChild(itemDiv); }); } updateStatus("Uploaded files loaded."); } catch (error) { console.error('Error loading uploaded files:', error); uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>'; updateStatus("Error loading files.", true); } }
+        function handleFileUpload(event) { const files = event.target.files; if (!files || files.length === 0) return; setLoadingState(true, "Uploading"); const formData = new FormData(); let fileCount = 0; for (const file of files) { if (file.size > MAX_FILE_SIZE_BYTES) { alert(`Skipping "${file.name}": File is too large (${formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`); continue; } formData.append('file', file); fileCount++; } if (fileCount === 0) { setLoadingState(false); fileUploadInput.value = ''; updateStatus("No valid files selected for upload.", true); return; } fetch('/api/files', { method: 'POST', body: formData }) .then(async response => { const data = await response.json(); if (!response.ok) { throw new Error(data.error || `HTTP error! status: ${response.status}`); } const successfulUploads = data.uploaded_files?.length || 0; const errors = data.errors || []; let statusMsg = `Uploaded ${successfulUploads} file(s).`; if (errors.length > 0) { statusMsg += ` ${errors.length} failed: ${errors.join('; ')}`; console.warn("Upload errors:", errors); } updateStatus(statusMsg, errors.length > 0); }) .catch(error => { console.error('Error uploading files:', error); updateStatus(`Error uploading files: ${error.message}`, true); }) .finally(async () => { await loadUploadedFiles(); setLoadingState(false); fileUploadInput.value = ''; }); }
+        function attachSelectedFiles(type) { const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked'); if (checkboxes.length === 0) { updateStatus("No files selected to attach.", true); return; } let addedCount = 0; checkboxes.forEach(checkbox => { const fileId = parseInt(checkbox.value); const listItem = checkbox.closest('.file-list-item'); const filename = listItem.dataset.filename; const alreadySelected = selectedFiles.some(f => f.id === fileId && f.type === type); if (!alreadySelected) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId)); selectedFiles.push({ id: fileId, filename: filename, type: type }); addedCount++; } checkbox.checked = false; listItem.classList.remove('active-selection'); }); renderSelectedFiles(); if (addedCount > 0) { updateStatus(`${addedCount} file(s) added as ${type}.`); } else { updateStatus(`Selected file(s) already attached as ${type}.`); } }
         function removeSelectedFile(fileId, type) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId && f.type === type)); renderSelectedFiles(); updateStatus(`File attachment removed.`); }
-        /** Renders the `selectedFiles` array as tags in the display area above the input. */
         function renderSelectedFiles() { if (selectedFiles.length === 0) { selectedFilesContainer.classList.add('hidden'); selectedFilesContainer.innerHTML = ''; } else { selectedFilesContainer.classList.remove('hidden'); selectedFilesContainer.innerHTML = ''; selectedFiles.forEach(file => { const tag = document.createElement('span'); tag.classList.add('selected-file-tag'); tag.innerHTML = ` <span class="filename truncate" title="${file.filename}">${file.filename}</span> <span class="file-type">${file.type.toUpperCase()}</span> <button title="Remove Attachment">&times;</button> `; tag.querySelector('button').onclick = () => removeSelectedFile(file.id, file.type); selectedFilesContainer.appendChild(tag); }); } }
 
-        // --- Summary Modal Functions ---
-        /** Shows the summary modal, fetching or generating the summary via API. */
+        // --- Summary Modal Functions (Unchanged) ---
         async function showSummaryModal(fileId, filename) { currentEditingFileId = fileId; summaryModalFilename.textContent = filename; summaryTextarea.value = ""; summaryTextarea.placeholder = "Loading or generating summary..."; summaryStatus.textContent = ""; summaryStatus.classList.remove('text-red-500'); summaryModal.style.display = "block"; saveSummaryButton.disabled = true; updateStatus(`Fetching summary for ${filename}...`); try { const response = await fetch(`/api/files/${fileId}/summary`); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } const data = await response.json(); summaryTextarea.value = data.summary; summaryTextarea.placeholder = "Enter or edit summary here."; saveSummaryButton.disabled = false; updateStatus(`Summary loaded for ${filename}.`); if (data.summary.startsWith("[Error") || data.summary.startsWith("[Summary not applicable")) { summaryStatus.textContent = data.summary; summaryStatus.classList.add('text-red-500'); saveSummaryButton.disabled = data.summary.startsWith("[Summary not applicable"); } else { summaryStatus.textContent = "Summary loaded. You can edit and save changes."; } } catch (error) { console.error("Error fetching summary:", error); summaryTextarea.value = `[Error loading summary: ${error.message}]`; summaryTextarea.placeholder = "Could not load summary."; updateStatus(`Error fetching summary for ${filename}.`, true); summaryStatus.textContent = `Error: ${error.message}`; summaryStatus.classList.add('text-red-500'); } }
-        /** Saves the edited summary via the backend API (PUT request). Closes modal on success. */
         async function saveSummary() { if (!currentEditingFileId || isLoading) return; const updatedSummary = summaryTextarea.value; setLoadingState(true, "Saving Summary"); summaryStatus.textContent = "Saving..."; summaryStatus.classList.remove('text-red-500'); try { const response = await fetch(`/api/files/${currentEditingFileId}/summary`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: updatedSummary }) }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } updateStatus("Summary saved successfully."); summaryStatus.textContent = "Summary saved!"; await loadUploadedFiles(); closeModal(); /* Close modal on success */ } catch (error) { console.error("Error saving summary:", error); updateStatus("Error saving summary.", true); summaryStatus.textContent = `Error saving: ${error.message}`; summaryStatus.classList.add('text-red-500'); } finally { setLoadingState(false); } }
-        /** Closes the summary modal dialog. */
         function closeModal() { summaryModal.style.display = "none"; currentEditingFileId = null; }
+
+        // --- Calendar Plugin Function (Unchanged) ---
+        async function loadCalendarEvents() { if (isLoading) return; setLoadingState(true, "Loading Events"); updateStatus("Loading calendar events..."); addMessage('system', 'Fetching Google Calendar events...'); try { const response = await fetch('/api/calendar/events'); const data = await response.json(); if (!response.ok) { throw new Error(data.error || `HTTP error ${response.status}`); } addMessage('system', data.events || "[No event data received]"); updateStatus("Calendar events loaded."); } catch (error) { console.error('Error loading calendar events:', error); addMessage('system', `[Error loading calendar events: ${error.message}]`, true); updateStatus(`Error loading calendar events: ${error.message}`, true); } finally { setLoadingState(false); } }
 
         // --- API Interaction (Chats - Unchanged) ---
         async function loadSavedChats() { updateStatus("Loading saved chats..."); try { const response = await fetch('/api/chats'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const chats = await response.json(); savedChatsList.innerHTML = ''; if (chats.length === 0) { savedChatsList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved chats yet.</p>`; } else { chats.forEach(chat => { const listItem = document.createElement('div'); listItem.classList.add('list-item', 'chat-list-item'); listItem.dataset.chatId = chat.id; const nameSpan = document.createElement('span'); nameSpan.textContent = chat.name || `Chat ${chat.id}`; nameSpan.classList.add('filename'); nameSpan.title = chat.name || `Chat ${chat.id}`; const deleteButton = document.createElement('button'); deleteButton.classList.add('delete-btn'); deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; deleteButton.title = "Delete Chat"; deleteButton.onclick = (e) => { e.stopPropagation(); handleDeleteChat(chat.id, listItem); }; listItem.appendChild(nameSpan); listItem.appendChild(deleteButton); listItem.onclick = () => { if (chat.id != currentChatId) { loadChat(chat.id); } }; savedChatsList.appendChild(listItem); }); } updateActiveChatListItem(); updateStatus("Saved chats loaded."); } catch (error) { console.error('Error loading saved chats:', error); savedChatsList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading chats.</p>'; updateStatus("Error loading saved chats.", true); } }
@@ -452,7 +401,6 @@
         async function handleSaveChatName() { if (isLoading || !currentChatId) { updateStatus("Cannot save name: No active chat or busy.", true); return; } const newName = currentChatNameInput.value.trim(); setLoadingState(true, "Saving Name"); updateStatus(`Saving name for chat ${currentChatId}...`); try { const response = await fetch(`/api/chat/${currentChatId}/name`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName || 'New Chat' }), }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } updateStatus(`Chat ${currentChatId} name saved as "${newName || 'New Chat'}".`); await loadSavedChats(); } catch (error) { console.error('Error saving chat name:', error); updateStatus(`Error saving name: ${error.message}`, true); } finally { setLoadingState(false); } }
         async function handleDeleteChat(chatId, listItemElement) { if (isLoading) return; const chatName = listItemElement.querySelector('span.filename').textContent || `Chat ${chatId}`; if (!confirm(`Are you sure you want to delete "${chatName}"? This cannot be undone.`)) { return; } setLoadingState(true, "Deleting Chat"); updateStatus(`Deleting chat ${chatId}...`); try { const response = await fetch(`/api/chat/${chatId}`, { method: 'DELETE' }); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); updateStatus(`Chat ${chatId} deleted.`); listItemElement.remove(); if (!savedChatsList.querySelector('.list-item')) { savedChatsList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved chats yet.</p>`; } if (chatId == currentChatId) { await startNewChat(); } } catch (error) { console.error(`Error deleting chat ${chatId}:`, error); updateStatus(`Error deleting chat: ${error.message}`, true); addMessage('system', `[Error deleting chat ${chatId}: ${error.message}]`, true); } finally { setLoadingState(false); } }
         function updateActiveChatListItem() { const items = savedChatsList.querySelectorAll('.chat-list-item'); items.forEach(item => { if (item.dataset.chatId == currentChatId) { item.classList.add('active'); } else { item.classList.remove('active'); } }); }
-        /** Handles changes to the model selector dropdown, saving the choice to the backend. */
         async function handleModelChange() { if (!currentChatId || isLoading) return; const newModel = modelSelector.value; updateStatus(`Updating model to ${newModel}...`); setLoadingState(true, "Updating Model"); try { const response = await fetch(`/api/chat/${currentChatId}/model`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_name: newModel }) }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } updateStatus(`Model updated to ${newModel} for this chat.`); } catch (error) { console.error("Error updating model:", error); updateStatus(`Error updating model: ${error.message}`, true); } finally { setLoadingState(false); } }
 
 
@@ -468,6 +416,8 @@
         fileUploadInput.addEventListener('change', handleFileUpload);
         attachFullButton.addEventListener('click', () => attachSelectedFiles('full'));
         attachSummaryButton.addEventListener('click', () => attachSelectedFiles('summary'));
+        calendarPluginHeader.addEventListener('click', toggleCalendarPlugin); // Added listener
+        loadCalendarButton.addEventListener('click', loadCalendarEvents); // Added listener
         closeSummaryModalButton.addEventListener('click', closeModal);
         saveSummaryButton.addEventListener('click', saveSummary);
         summaryModal.addEventListener('click', (event) => { if (event.target === summaryModal) { closeModal(); } });
@@ -480,9 +430,11 @@
             const chatSidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
             const pluginSidebarCollapsed = localStorage.getItem(PLUGINS_COLLAPSED_KEY) === 'true';
             const filePluginCollapsed = localStorage.getItem(FILE_PLUGIN_COLLAPSED_KEY) === 'true';
+            const calendarPluginCollapsed = localStorage.getItem(CALENDAR_PLUGIN_COLLAPSED_KEY) === 'true';
             setSidebarCollapsed(sidebar, sidebarToggleButton, chatSidebarCollapsed, SIDEBAR_COLLAPSED_KEY, 'sidebar');
             setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, pluginSidebarCollapsed, PLUGINS_COLLAPSED_KEY, 'plugins');
             setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
+            setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY); // Apply calendar state
             await loadSavedChats();
             await loadUploadedFiles();
             const firstChatElement = savedChatsList.querySelector('.list-item');
