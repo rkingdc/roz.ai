@@ -149,8 +149,8 @@
         .file-list-item .filename { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; cursor: default; }
         .file-list-item .file-actions { display: flex; gap: 0.3rem; align-items: center; }
         .file-actions .btn-xs { padding: 0.15rem 0.3rem; font-size: 0.7rem; line-height: 1; background-color: transparent; color: var(--rz-sidebar-text); border: 1px solid var(--rz-sidebar-text); }
-        .file-actions .btn-xs:hover { background-color: var(--rz-sidebar-hover-bg); border-color: var(--rz-sidebar-hover-bg); }
-        .file-actions .btn-xs:disabled { opacity: 0.4; cursor: not-allowed; background-color: transparent !important; border-color: var(--rz-sidebar-text) !important; color: var(--rz-sidebar-text) !important; } /* Style disabled summary button */
+        .file-actions .btn-xs:hover:not(:disabled) { background-color: var(--rz-sidebar-hover-bg); border-color: var(--rz-sidebar-hover-bg); } /* Hover only if enabled */
+        .file-actions .btn-xs:disabled { opacity: 0.4; cursor: not-allowed; background-color: transparent !important; border-color: var(--rz-sidebar-text) !important; color: var(--rz-sidebar-text) !important; }
         .file-actions .btn-xs i { margin-right: 0.2rem; }
 
         /* Button Styling */
@@ -160,7 +160,7 @@
         .btn-secondary { background-color: var(--rz-button-secondary-bg); color: var(--rz-button-secondary-text); border-color: var(--rz-button-secondary-bg); }
         .btn-secondary:hover { background-color: var(--rz-button-secondary-hover-bg); border-color: var(--rz-button-secondary-hover-bg); }
         .btn-outline { border-color: var(--rz-button-outline-border); color: var(--rz-button-outline-text); background-color: transparent; }
-        .btn-outline:hover { background-color: var(--rz-button-outline-hover-bg); border-color: var(--rz-button-outline-hover-bg); color: var(--rz-button-outline-hover-text); }
+        .btn-outline:hover:not(:disabled) { background-color: var(--rz-button-outline-hover-bg); border-color: var(--rz-button-outline-hover-bg); color: var(--rz-button-outline-hover-text); } /* Hover only if enabled */
         .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
         .btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn i.fa-plus, .btn i.fa-paper-plane, .btn i.fa-upload, .btn i.fa-check-double, .btn i.fa-book-open, .btn i.fa-list-alt { margin-right: 0.5rem; }
@@ -193,7 +193,9 @@
 
     </style>
 </head>
-<body class="bg-gray-100"> <button id="sidebar-toggle-btn" class="toggle-btn" title="Toggle Chat List">
+<body class="bg-gray-100">
+
+    <button id="sidebar-toggle-btn" class="toggle-btn" title="Toggle Chat List">
         <i class="fas fa-chevron-left"></i>
     </button>
 
@@ -255,7 +257,7 @@
                 <i class="fas fa-chevron-down toggle-icon"></i>
             </div>
             <div class="plugin-content flex flex-col flex-grow min-h-0 p-2" id="file-plugin-content">
-                <input type="file" id="file-upload-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3" multiple>
+                <input type="file" id="file-upload-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf" multiple>
                 <label for="file-upload-input" id="file-upload-label" class="btn btn-secondary btn-sm w-full mb-2 flex-shrink-0">
                     <i class="fas fa-upload"></i> Add New File(s)
                 </label>
@@ -340,8 +342,9 @@
         const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
         const PLUGINS_COLLAPSED_KEY = 'pluginsCollapsed';
         const FILE_PLUGIN_COLLAPSED_KEY = 'filePluginCollapsed';
-        const MAX_FILE_SIZE_MB = 10; // Match backend
+        const MAX_FILE_SIZE_MB = 10;
         const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+        // Text extensions still used for frontend check (though backend now handles summary generation differently)
         const TEXT_FILE_EXTENSIONS = ['txt', 'py', 'js', 'html', 'css', 'md', 'json', 'csv'];
 
 
@@ -363,12 +366,11 @@
         // --- File Handling & Selection Functions ---
         /** Formats file size in bytes to a human-readable string. */
         function formatFileSize(bytes) { if (bytes === 0) return '0 Bytes'; const k = 1024; const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; }
-        /** Checks if a filename likely represents a text file based on extension. */
-        function isTextFile(filename) { const extension = filename.split('.').pop()?.toLowerCase(); return extension && TEXT_FILE_EXTENSIONS.includes(extension); }
+        // isTextFile function is no longer needed for disabling buttons
 
         /** Loads the list of uploaded files into the plugin sidebar. */
         async function loadUploadedFiles() {
-             updateStatus("Loading uploaded files..."); uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`; try { const response = await fetch('/api/files'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const files = await response.json(); uploadedFilesList.innerHTML = ''; if (files.length === 0) { uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`; } else { files.forEach(file => { const itemDiv = document.createElement('div'); itemDiv.classList.add('file-list-item'); itemDiv.dataset.fileId = file.id; itemDiv.dataset.filename = file.filename; itemDiv.dataset.hasSummary = file.has_summary; const fileIsText = isTextFile(file.filename); /* Check if text */ const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = file.id; checkbox.classList.add('file-checkbox'); checkbox.title = "Select file"; checkbox.addEventListener('change', (e) => { if (e.target.checked) itemDiv.classList.add('active-selection'); else itemDiv.classList.remove('active-selection'); }); const nameSpan = document.createElement('span'); nameSpan.textContent = file.filename; nameSpan.classList.add('filename'); nameSpan.title = file.filename; const actionsDiv = document.createElement('div'); actionsDiv.classList.add('file-actions'); const summaryBtn = document.createElement('button'); summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs'); summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i> Summary'; summaryBtn.title = fileIsText ? "View/Edit Summary" : "Summary only available for text files"; summaryBtn.disabled = !fileIsText; /* Disable for non-text */ summaryBtn.onclick = (e) => { e.stopPropagation(); if(fileIsText) showSummaryModal(file.id, file.filename); }; actionsDiv.appendChild(summaryBtn); itemDiv.appendChild(checkbox); itemDiv.appendChild(nameSpan); itemDiv.appendChild(actionsDiv); uploadedFilesList.appendChild(itemDiv); }); } updateStatus("Uploaded files loaded."); } catch (error) { console.error('Error loading uploaded files:', error); uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>'; updateStatus("Error loading files.", true); }
+             updateStatus("Loading uploaded files..."); uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`; try { const response = await fetch('/api/files'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const files = await response.json(); uploadedFilesList.innerHTML = ''; if (files.length === 0) { uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`; } else { files.forEach(file => { const itemDiv = document.createElement('div'); itemDiv.classList.add('file-list-item'); itemDiv.dataset.fileId = file.id; itemDiv.dataset.filename = file.filename; itemDiv.dataset.hasSummary = file.has_summary; /* Keep has_summary for potential future UI */ const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = file.id; checkbox.classList.add('file-checkbox'); checkbox.title = "Select file"; checkbox.addEventListener('change', (e) => { if (e.target.checked) itemDiv.classList.add('active-selection'); else itemDiv.classList.remove('active-selection'); }); const nameSpan = document.createElement('span'); nameSpan.textContent = file.filename; nameSpan.classList.add('filename'); nameSpan.title = file.filename; const actionsDiv = document.createElement('div'); actionsDiv.classList.add('file-actions'); const summaryBtn = document.createElement('button'); summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs'); summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i> Summary'; summaryBtn.title = "View/Edit Summary"; /* Enable for all types */ summaryBtn.disabled = false; /* Enable for all types */ summaryBtn.onclick = (e) => { e.stopPropagation(); showSummaryModal(file.id, file.filename); }; actionsDiv.appendChild(summaryBtn); itemDiv.appendChild(checkbox); itemDiv.appendChild(nameSpan); itemDiv.appendChild(actionsDiv); uploadedFilesList.appendChild(itemDiv); }); } updateStatus("Uploaded files loaded."); } catch (error) { console.error('Error loading uploaded files:', error); uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>'; updateStatus("Error loading files.", true); }
         }
 
         /** Handles file input change event, uploads files using FormData. */
@@ -387,7 +389,11 @@
         }
 
         /** Adds files selected via checkboxes to the `selectedFiles` array with the specified type. */
-        function attachSelectedFiles(type) { const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked'); if (checkboxes.length === 0) { updateStatus("No files selected to attach.", true); return; } let addedCount = 0; let skippedSummaryCount = 0; checkboxes.forEach(checkbox => { const fileId = parseInt(checkbox.value); const listItem = checkbox.closest('.file-list-item'); const filename = listItem.dataset.filename; const fileIsText = isTextFile(filename); if (type === 'summary' && !fileIsText) { skippedSummaryCount++; checkbox.checked = false; listItem.classList.remove('active-selection'); return; } const alreadySelected = selectedFiles.some(f => f.id === fileId && f.type === type); if (!alreadySelected) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId)); selectedFiles.push({ id: fileId, filename: filename, type: type }); addedCount++; } checkbox.checked = false; listItem.classList.remove('active-selection'); }); renderSelectedFiles(); let statusMsg = ""; if(addedCount > 0) statusMsg += `${addedCount} file(s) added as ${type}. `; else if(skippedSummaryCount === 0) statusMsg += `Selected file(s) already attached as ${type}. `; if(skippedSummaryCount > 0) statusMsg += `${skippedSummaryCount} non-text file(s) skipped for summary attachment.`; updateStatus(statusMsg.trim(), skippedSummaryCount > 0); }
+        function attachSelectedFiles(type) {
+              const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked'); if (checkboxes.length === 0) { updateStatus("No files selected to attach.", true); return; } let addedCount = 0; checkboxes.forEach(checkbox => { const fileId = parseInt(checkbox.value); const listItem = checkbox.closest('.file-list-item'); const filename = listItem.dataset.filename;
+              // No longer need to check if text for summary - backend handles it
+              const alreadySelected = selectedFiles.some(f => f.id === fileId && f.type === type); if (!alreadySelected) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId)); selectedFiles.push({ id: fileId, filename: filename, type: type }); addedCount++; } checkbox.checked = false; listItem.classList.remove('active-selection'); }); renderSelectedFiles(); if (addedCount > 0) { updateStatus(`${addedCount} file(s) added as ${type}.`); } else { updateStatus(`Selected file(s) already attached as ${type}.`); }
+        }
         /** Removes a specific file attachment from the `selectedFiles` array. */
         function removeSelectedFile(fileId, type) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId && f.type === type)); renderSelectedFiles(); updateStatus(`File attachment removed.`); }
         /** Renders the `selectedFiles` array as tags in the display area above the input. */
@@ -442,7 +448,7 @@
             setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
             await loadSavedChats();
             await loadUploadedFiles();
-            const firstChatElement = savedChatsList.querySelector('.list-item'); // Use .list-item
+            const firstChatElement = savedChatsList.querySelector('.list-item');
             if (firstChatElement) { const mostRecentChatId = parseInt(firstChatElement.dataset.chatId); await loadChat(mostRecentChatId); }
             else { await startNewChat(); }
             renderSelectedFiles();
