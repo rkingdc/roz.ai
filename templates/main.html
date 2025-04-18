@@ -23,6 +23,10 @@
 
         /* Main Content Area */
         #main-content { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; background-color: #ffffff; min-width: 0; }
+        /* Header for Model Selector */
+        #main-header { padding: 0.5rem 1rem; border-bottom: 1px solid #e5e7eb; background-color: #f9fafb; display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+        #model-selector { font-size: 0.875rem; padding: 0.25rem 0.5rem; border-radius: 0.375rem; border: 1px solid #d1d5db; background-color: white; }
+
         #chat-area { padding: 1rem; flex-grow: 1; display: flex; flex-direction: column; min-height: 0; }
         #chatbox { flex-grow: 1; overflow-y: auto; margin-bottom: 1rem; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; background-color: #f9fafb; }
         #input-area { padding: 0 1rem 1rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid #e5e7eb; padding-top: 1rem; flex-shrink: 0; }
@@ -65,11 +69,12 @@
         /* Sidebar Specific Styling */
         .sidebar-section-container { flex-grow: 1; overflow-y: hidden; display: flex; flex-direction: column; min-height: 0; }
         .sidebar-list { flex-grow: 1; overflow-y: auto; margin-top: 0.5rem; }
-        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; border-radius: 0.375rem; /* cursor: pointer; */ transition: background-color 0.2s ease-in-out; white-space: nowrap; } /* Removed direct cursor pointer */
+        .list-item { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; border-radius: 0.375rem; transition: background-color 0.2s ease-in-out; white-space: nowrap; }
         .list-item:hover { background-color: #e5e7eb; }
-        /* .list-item.active-selection { background-color: #dbeafe; } */ /* Highlight for selected files - Handled by file-list-item now */
-        .list-item .filename { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; margin-right: 0.5rem; font-size: 0.85rem; } /* Slightly smaller */
-        .list-item .filesize { font-size: 0.7rem; color: #6b7280; flex-shrink: 0; margin-left: auto; padding-left: 0.5rem; } /* Push size to right */
+        /* Highlight for active chat list item */
+        .list-item.active { background-color: #bfdbfe; font-weight: 500; } /* blue-200 */
+        .list-item .filename { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; margin-right: 0.5rem; font-size: 0.85rem; }
+        .list-item .filesize { font-size: 0.7rem; color: #6b7280; flex-shrink: 0; margin-left: auto; padding-left: 0.5rem; }
         .delete-btn { background: none; border: none; color: #ef4444; cursor: pointer; padding: 0.25rem; line-height: 1; opacity: 0.7; transition: opacity 0.2s; margin-left: 0.5rem; flex-shrink: 0; }
         .delete-btn:hover { opacity: 1; color: #dc2626; }
         .chat-name-input { border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.3rem 0.5rem; width: 100%; }
@@ -79,7 +84,7 @@
         .plugin-header { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background-color: #e5e7eb; border-bottom: 1px solid #d1d5db; font-weight: 500; border-top-left-radius: 0.5rem; border-top-right-radius: 0.5rem; cursor: pointer; }
         .plugin-header .toggle-icon { transition: transform 0.2s ease-in-out; }
         .plugin-header.collapsed .toggle-icon { transform: rotate(-90deg); } /* Rotate chevron when collapsed */
-        .plugin-content { padding: 0.75rem; display: block; transition: opacity 0.3s ease, max-height 0.3s ease, padding 0.3s ease, border 0.3s ease; max-height: 1000px; /* Large max-height for animation */ opacity: 1; overflow: hidden; border-top: 1px solid transparent; } /* Add transparent border for transition */
+        .plugin-content { padding: 0.75rem; display: block; transition: opacity 0.3s ease, max-height 0.3s ease, padding 0.3s ease, border 0.3s ease; max-height: 1000px; opacity: 1; overflow: hidden; border-top: 1px solid transparent; }
         .plugin-content.hidden { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0; border-top: none; overflow: hidden; } /* Animate collapse */
 
         /* File List Item specific styles */
@@ -87,9 +92,9 @@
         .file-list-item:hover { background-color: #e5e7eb; }
         .file-list-item.active-selection { background-color: #dbeafe; } /* Highlight if checkbox is checked */
         .file-list-item input[type="checkbox"] { margin-right: 0.5rem; cursor: pointer; }
-        .file-list-item .filename { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; cursor: default; } /* No pointer on name */
+        .file-list-item .filename { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; cursor: default; }
         .file-list-item .file-actions { display: flex; gap: 0.3rem; align-items: center; }
-        .file-actions .btn-xs { padding: 0.15rem 0.3rem; font-size: 0.7rem; line-height: 1; } /* Extra small button */
+        .file-actions .btn-xs { padding: 0.15rem 0.3rem; font-size: 0.7rem; line-height: 1; }
         .file-actions .btn-xs i { margin-right: 0.2rem; }
 
         /* Button Styling */
@@ -110,7 +115,7 @@
         #file-upload-label { cursor: pointer; }
 
         /* Modal Styling */
-        #summary-modal { display: none; /* Hidden by default */ position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); /* Dim background */ }
+        #summary-modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); }
         .modal-content { background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 0.5rem; position: relative; display: flex; flex-direction: column; max-height: 80vh; }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; margin-bottom: 1rem; }
         .modal-title { font-size: 1.1rem; font-weight: 500; }
@@ -118,7 +123,7 @@
         .close-btn:hover, .close-btn:focus { color: black; text-decoration: none; }
         .modal-body { flex-grow: 1; overflow-y: auto; margin-bottom: 1rem; }
         #summary-textarea { width: 100%; min-height: 200px; height: 40vh; border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.5rem; font-size: 0.9rem; resize: vertical; }
-        #summary-status { min-height: 1.2em; } /* Reserve space for status message */
+        #summary-status { min-height: 1.2em; }
         .modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; border-top: 1px solid #e5e7eb; padding-top: 1rem; }
 
     </style>
@@ -126,7 +131,8 @@
 <body class="bg-gray-100">
 
     <button id="sidebar-toggle-btn" class="toggle-btn" title="Toggle Chat List">
-        <i class="fas fa-chevron-left"></i> </button>
+        <i class="fas fa-chevron-left"></i>
+    </button>
 
     <aside id="sidebar">
         <h2 class="text-xl font-semibold text-gray-800 mb-4 whitespace-nowrap">Chat Sessions</h2>
@@ -138,26 +144,41 @@
             <div class="flex gap-2 items-center">
                  <input type="text" id="current-chat-name" class="chat-name-input flex-grow text-sm min-w-0" placeholder="Name this chat...">
                  <button id="save-chat-name-btn" class="btn btn-outline p-1.5 flex-shrink-0" title="Save Name">
-                     <i class="fas fa-save text-sm"></i> </button>
+                     <i class="fas fa-save text-sm"></i>
+                 </button>
             </div>
             <div id="current-chat-id-display" class="text-xs text-gray-400 mt-1 whitespace-nowrap">ID: -</div>
         </div>
-        <div class="flex flex-col min-h-0 flex-grow sidebar-section-container"> <h3 class="text-lg font-medium text-gray-700 mb-1 border-t pt-3 flex-shrink-0 whitespace-nowrap">Saved Chats</h3>
-            <div id="saved-chats-list" class="sidebar-list"> <p class="text-gray-500 text-sm p-1">Loading chats...</p> </div>
+        <div class="flex flex-col min-h-0 flex-grow sidebar-section-container">
+            <h3 class="text-lg font-medium text-gray-700 mb-1 border-t pt-3 flex-shrink-0 whitespace-nowrap">Saved Chats</h3>
+            <div id="saved-chats-list" class="sidebar-list">
+                <p class="text-gray-500 text-sm p-1">Loading chats...</p>
+            </div>
         </div>
     </aside>
 
     <main id="main-content">
+        <div id="main-header">
+            <label for="model-selector" class="text-sm font-medium text-gray-700">Model:</label>
+            <select id="model-selector" class="model-selector">
+                {% for model in available_models %}
+                    <option value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
         <div id="chat-area">
             <div id="chatbox">
-                <div class="system-msg p-4">Initializing chat...</div> </div>
+                <div class="system-msg p-4">Initializing chat...</div>
+            </div>
         </div>
         <div id="input-area">
              <div id="selected-files-container" class="hidden">
                  </div>
              <div id="input-controls">
                 <textarea id="message-input" rows="2" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
-                <button id="send-button" class="btn btn-primary self-end flex-shrink-0" style="height: 42px;"> <i class="fas fa-paper-plane"></i> Send
+                <button id="send-button" class="btn btn-primary self-end flex-shrink-0" style="height: 42px;">
+                    <i class="fas fa-paper-plane"></i> Send
                 </button>
             </div>
         </div>
@@ -170,14 +191,19 @@
         <div class="plugin-section flex flex-col flex-grow min-h-0" id="file-plugin-section">
             <div class="plugin-header flex-shrink-0" id="file-plugin-header">
                 <span><i class="fas fa-file-alt mr-2"></i> Upload File</span>
-                <i class="fas fa-chevron-down toggle-icon"></i> </div>
+                <i class="fas fa-chevron-down toggle-icon"></i>
+            </div>
             <div class="plugin-content flex flex-col flex-grow min-h-0 p-2" id="file-plugin-content">
-                <input type="file" id="file-upload-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv" multiple> <label for="file-upload-input" id="file-upload-label" class="btn btn-secondary btn-sm w-full mb-2 flex-shrink-0">
+                <input type="file" id="file-upload-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv" multiple>
+                <label for="file-upload-input" id="file-upload-label" class="btn btn-secondary btn-sm w-full mb-2 flex-shrink-0">
                     <i class="fas fa-upload"></i> Add New File(s)
                 </label>
 
                 <h4 class="text-sm font-medium text-gray-600 mb-1 flex-shrink-0">Available Files:</h4>
-                 <div class="sidebar-section-container flex-grow mb-2"> <div id="uploaded-files-list" class="sidebar-list border rounded p-1 bg-white"> <p class="text-gray-500 text-xs p-1">Loading files...</p> </div>
+                 <div class="sidebar-section-container flex-grow mb-2">
+                    <div id="uploaded-files-list" class="sidebar-list border rounded p-1 bg-white">
+                        <p class="text-gray-500 text-xs p-1">Loading files...</p>
+                        </div>
                 </div>
                 <div class="flex gap-2 flex-shrink-0">
                     <button id="attach-full-btn" class="btn btn-outline btn-sm flex-grow">
@@ -192,7 +218,8 @@
          </aside>
 
     <button id="plugins-toggle-btn" class="toggle-btn" title="Toggle Plugins">
-        <i class="fas fa-chevron-right"></i> </button>
+        <i class="fas fa-chevron-right"></i>
+    </button>
 
     <div id="summary-modal">
         <div class="modal-content">
@@ -203,7 +230,8 @@
             <div class="modal-body">
                 <p class="text-sm mb-2">Filename: <strong id="summary-modal-filename"></strong></p>
                 <textarea id="summary-textarea" placeholder="Loading or generating summary..."></textarea>
-                <p id="summary-status" class="text-xs text-gray-500 mt-1"></p> </div>
+                <p id="summary-status" class="text-xs text-gray-500 mt-1"></p>
+            </div>
             <div class="modal-footer">
                 <button id="save-summary-btn" class="btn btn-primary btn-sm">
                     <i class="fas fa-save mr-1"></i> Save Summary
@@ -218,65 +246,59 @@
         const chatbox = document.getElementById('chatbox');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
-        const sidebar = document.getElementById('sidebar'); // Left sidebar
+        const sidebar = document.getElementById('sidebar');
         const savedChatsList = document.getElementById('saved-chats-list');
         const newChatButton = document.getElementById('new-chat-btn');
         const currentChatNameInput = document.getElementById('current-chat-name');
         const saveChatNameButton = document.getElementById('save-chat-name-btn');
         const currentChatIdDisplay = document.getElementById('current-chat-id-display');
         const statusBar = document.getElementById('status-bar');
-        const sidebarToggleButton = document.getElementById('sidebar-toggle-btn'); // Left toggle
-        const pluginsSidebar = document.getElementById('plugins-sidebar'); // Right sidebar
-        const pluginsToggleButton = document.getElementById('plugins-toggle-btn'); // Right toggle
-        const fileUploadInput = document.getElementById('file-upload-input'); // Hidden file input
-        const uploadedFilesList = document.getElementById('uploaded-files-list'); // List in plugin sidebar
-        const selectedFilesContainer = document.getElementById('selected-files-container'); // Container for tags above input
-        const bodyElement = document.body; // Reference to body for adding classes
-        const filePluginHeader = document.getElementById('file-plugin-header'); // Header of file plugin section
-        const filePluginContent = document.getElementById('file-plugin-content'); // Content of file plugin section
-        const attachFullButton = document.getElementById('attach-full-btn'); // Attach selected as full content
-        const attachSummaryButton = document.getElementById('attach-summary-btn'); // Attach selected as summary
-        const summaryModal = document.getElementById('summary-modal'); // The modal dialog
-        const closeSummaryModalButton = document.getElementById('close-summary-modal'); // Modal close button
-        const summaryModalFilename = document.getElementById('summary-modal-filename'); // Filename display in modal
-        const summaryTextarea = document.getElementById('summary-textarea'); // Textarea for summary
-        const saveSummaryButton = document.getElementById('save-summary-btn'); // Save button in modal
-        const summaryStatus = document.getElementById('summary-status'); // Status message inside modal
+        const sidebarToggleButton = document.getElementById('sidebar-toggle-btn');
+        const pluginsSidebar = document.getElementById('plugins-sidebar');
+        const pluginsToggleButton = document.getElementById('plugins-toggle-btn');
+        const fileUploadInput = document.getElementById('file-upload-input');
+        const uploadedFilesList = document.getElementById('uploaded-files-list');
+        const selectedFilesContainer = document.getElementById('selected-files-container');
+        const bodyElement = document.body;
+        const filePluginHeader = document.getElementById('file-plugin-header');
+        const filePluginContent = document.getElementById('file-plugin-content');
+        const attachFullButton = document.getElementById('attach-full-btn');
+        const attachSummaryButton = document.getElementById('attach-summary-btn');
+        const summaryModal = document.getElementById('summary-modal');
+        const closeSummaryModalButton = document.getElementById('close-summary-modal');
+        const summaryModalFilename = document.getElementById('summary-modal-filename');
+        const summaryTextarea = document.getElementById('summary-textarea');
+        const saveSummaryButton = document.getElementById('save-summary-btn');
+        const summaryStatus = document.getElementById('summary-status');
+        const modelSelector = document.getElementById('model-selector'); // Model dropdown
 
 
         // Application State
-        let currentChatId = null; // ID of the currently active chat
-        let isLoading = false; // Flag to prevent concurrent operations
-        let selectedFiles = []; // Array to hold attached files: {id: number, filename: string, type: 'full'|'summary'}
-        let currentEditingFileId = null; // Track file ID being edited in summary modal
-        const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed'; // localStorage key for left sidebar state
-        const PLUGINS_COLLAPSED_KEY = 'pluginsCollapsed'; // localStorage key for right sidebar state
-        const FILE_PLUGIN_COLLAPSED_KEY = 'filePluginCollapsed'; // localStorage key for file plugin section state
-        const MAX_FILE_SIZE_MB = 5; // Frontend check to match backend limit
+        let currentChatId = null;
+        let isLoading = false;
+        let selectedFiles = []; // Array for {id, filename, type}
+        let currentEditingFileId = null;
+        // Get default model from Flask template (rendered in the select element's initial value)
+        const defaultModel = modelSelector.value;
+        const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
+        const PLUGINS_COLLAPSED_KEY = 'pluginsCollapsed';
+        const FILE_PLUGIN_COLLAPSED_KEY = 'filePluginCollapsed';
+        const MAX_FILE_SIZE_MB = 5;
         const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 
         // --- Utility Functions ---
-
-        /**
-         * Updates the status bar text and style.
-         * @param {string} message - The status message to display.
-         * @param {boolean} [isError=false] - Whether the status indicates an error.
-         */
+        /** Updates the status bar text and style. */
         function updateStatus(message, isError = false) {
             statusBar.textContent = `Status: ${message}`;
             statusBar.className = `text-xs text-gray-500 px-4 py-1 border-t bg-gray-50 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50' : 'text-gray-500 bg-gray-50'}`;
             console.log(`Status Update: ${message}`);
         }
 
-        /**
-         * Sets the loading state for UI elements, disabling/enabling them.
-         * @param {boolean} loading - Whether the application is currently loading.
-         * @param {string} [operation="Processing"] - The operation being performed.
-         */
+        /** Sets the loading state for UI elements, disabling/enabling them. */
         function setLoadingState(loading, operation = "Processing") {
             isLoading = loading;
-            // Disable/enable interactive elements
+            // Disable/enable elements
             messageInput.disabled = loading;
             sendButton.disabled = loading;
             newChatButton.disabled = loading;
@@ -286,9 +308,10 @@
             fileUploadInput.disabled = loading;
             attachFullButton.disabled = loading;
             attachSummaryButton.disabled = loading;
-            saveSummaryButton.disabled = loading; // Disable modal save button too
+            saveSummaryButton.disabled = loading;
+            modelSelector.disabled = loading; // Disable model selector during load
 
-            // Disable file list interactions (checkboxes, summary buttons)
+            // Disable file list interactions
             uploadedFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading);
             // Disable remove buttons on selected file tags
             selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading);
@@ -308,527 +331,185 @@
         }
 
         // --- Sidebar & Plugin Toggle Functions ---
-
-        /**
-         * Generic function to toggle the collapsed state of a sidebar (left or right).
-         * Updates body class, button icon, title, and saves state to localStorage.
-         */
+        /** Generic function to toggle the collapsed state of a sidebar (left or right). */
         function setSidebarCollapsed(sidebarElement, toggleButton, collapsed, storageKey, positionClass) {
             const icon = toggleButton.querySelector('i');
-            const bodyClass = `${positionClass}-collapsed`; // e.g., 'sidebar-collapsed' or 'plugins-collapsed'
+            const bodyClass = `${positionClass}-collapsed`;
             const isLeft = positionClass === 'sidebar';
-            // Determine correct chevron icons based on sidebar position
             const expandIcon = isLeft ? 'fa-chevron-left' : 'fa-chevron-right';
             const collapseIcon = isLeft ? 'fa-chevron-right' : 'fa-chevron-left';
-
             if (collapsed) {
-                bodyElement.classList.add(bodyClass); // Add class to body to trigger CSS changes
-                icon.classList.remove(expandIcon);
-                icon.classList.add(collapseIcon); // Change icon direction
-                toggleButton.title = `Expand ${isLeft ? 'Chat List' : 'Plugins'}`; // Update tooltip
-                localStorage.setItem(storageKey, 'true'); // Save state
+                bodyElement.classList.add(bodyClass);
+                icon.classList.remove(expandIcon); icon.classList.add(collapseIcon);
+                toggleButton.title = `Expand ${isLeft ? 'Chat List' : 'Plugins'}`;
+                localStorage.setItem(storageKey, 'true');
             } else {
-                bodyElement.classList.remove(bodyClass); // Remove class from body
-                icon.classList.remove(collapseIcon);
-                icon.classList.add(expandIcon); // Change icon direction
-                toggleButton.title = `Collapse ${isLeft ? 'Chat List' : 'Plugins'}`; // Update tooltip
-                localStorage.setItem(storageKey, 'false'); // Save state
+                bodyElement.classList.remove(bodyClass);
+                icon.classList.remove(collapseIcon); icon.classList.add(expandIcon);
+                toggleButton.title = `Collapse ${isLeft ? 'Chat List' : 'Plugins'}`;
+                localStorage.setItem(storageKey, 'false');
             }
-             // Restore focus to input after a short delay to allow transition, only if expanding
-             if (!collapsed && !isLoading) {
-                 setTimeout(() => messageInput.focus(), 350); // Delay slightly longer than CSS transition
-             }
+             // Restore focus after expanding
+             if (!collapsed && !isLoading) { setTimeout(() => messageInput.focus(), 350); }
         }
-
         /** Toggles the left (chat) sidebar. */
-        function toggleLeftSidebar() {
-            setSidebarCollapsed(sidebar, sidebarToggleButton, !bodyElement.classList.contains('sidebar-collapsed'), SIDEBAR_COLLAPSED_KEY, 'sidebar');
-        }
-
+        function toggleLeftSidebar() { setSidebarCollapsed(sidebar, sidebarToggleButton, !bodyElement.classList.contains('sidebar-collapsed'), SIDEBAR_COLLAPSED_KEY, 'sidebar'); }
         /** Toggles the right (plugins) sidebar. */
-        function toggleRightSidebar() {
-            setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, !bodyElement.classList.contains('plugins-collapsed'), PLUGINS_COLLAPSED_KEY, 'plugins');
-        }
+        function toggleRightSidebar() { setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, !bodyElement.classList.contains('plugins-collapsed'), PLUGINS_COLLAPSED_KEY, 'plugins'); }
 
-        /**
-         * Toggles the collapsed state of a plugin section within a sidebar.
-         * Updates header/content classes, icon, and saves state to localStorage.
-         */
+        /** Toggles the collapsed state of a plugin section within a sidebar. */
         function setPluginSectionCollapsed(headerElement, contentElement, collapsed, storageKey) {
-            const icon = headerElement.querySelector('.toggle-icon'); // Find the toggle icon within the header
+            const icon = headerElement.querySelector('.toggle-icon');
             if (collapsed) {
-                headerElement.classList.add('collapsed'); // Add class to header (optional, for styling)
-                contentElement.classList.add('hidden'); // Add class to content to hide/collapse it
-                // Update icon direction (optional)
-                if (icon) {
-                    icon.classList.remove('fa-chevron-down');
-                    icon.classList.add('fa-chevron-up'); // Point up when collapsed
-                }
-                localStorage.setItem(storageKey, 'true'); // Save state
+                headerElement.classList.add('collapsed'); contentElement.classList.add('hidden');
+                if (icon) { icon.classList.remove('fa-chevron-down'); icon.classList.add('fa-chevron-up'); }
+                localStorage.setItem(storageKey, 'true');
             } else {
-                headerElement.classList.remove('collapsed'); // Remove class from header
-                contentElement.classList.remove('hidden'); // Remove class from content to show/expand it
-                // Update icon direction (optional)
-                if (icon) {
-                    icon.classList.remove('fa-chevron-up');
-                    icon.classList.add('fa-chevron-down'); // Point down when expanded
-                }
-                localStorage.setItem(storageKey, 'false'); // Save state
+                headerElement.classList.remove('collapsed'); contentElement.classList.remove('hidden');
+                if (icon) { icon.classList.remove('fa-chevron-up'); icon.classList.add('fa-chevron-down'); }
+                localStorage.setItem(storageKey, 'false');
             }
         }
-
         /** Toggles the collapse state of the file plugin section specifically. */
-        function toggleFilePlugin() {
-            const isCollapsed = filePluginContent.classList.contains('hidden');
-            setPluginSectionCollapsed(filePluginHeader, filePluginContent, !isCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
-        }
+        function toggleFilePlugin() { const isCollapsed = filePluginContent.classList.contains('hidden'); setPluginSectionCollapsed(filePluginHeader, filePluginContent, !isCollapsed, FILE_PLUGIN_COLLAPSED_KEY); }
 
         // --- Chat Message Display ---
-
-        /**
-         * Adds a message to the chatbox UI, rendering Markdown and styling attachments.
-         * @param {string} role - 'user', 'assistant', or 'system'.
-         * @param {string} content - The message content.
-         * @param {boolean} [isError=false] - Whether this is an error message.
-         */
+        /** Adds a message to the chatbox UI, rendering Markdown and styling attachments. */
         function addMessage(role, content, isError = false) {
             const messageDiv = document.createElement('div');
             // Apply basic role/error classes
-            if (role === 'system') {
-                messageDiv.classList.add('system-msg');
-            } else {
-                 messageDiv.classList.add('message');
-                 if (isError) messageDiv.classList.add('error-msg');
-                 else messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg');
-            }
-
+            if (role === 'system') { messageDiv.classList.add('system-msg'); }
+            else { messageDiv.classList.add('message'); if (isError) messageDiv.classList.add('error-msg'); else messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg'); }
             // Render Markdown and style attachment markers
             content = content
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') // Basic HTML escaping
-                .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>') // Bold
-                .replace(/\*(.*?)\*/gs, '<em>$1</em>') // Italics
-                // Code Blocks (escape content inside)
-                .replace(/```([\s\S]*?)```/g, (match, code) => `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`)
-                // Inline Code
-                .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-sm font-mono">$1</code>')
+                .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>').replace(/\*(.*?)\*/gs, '<em>$1</em>') // Bold, Italics
+                .replace(/```([\s\S]*?)```/g, (match, code) => `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`) // Code Blocks
+                .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-sm font-mono">$1</code>') // Inline Code
                 // Style attachment markers (handles type: full/summary)
                 .replace(/\[Attached File: '(.*?)' \(ID: \d+, Type: (full|summary)\)\]\n?/gi, '<div class="attachment-marker">Attached $2: $1</div>')
                  // Style potential error markers from backend
                 .replace(/\[Error attaching (full file|summary): '(.*?)' \(ID: \d+\)\]\n?/gi, '<div class="attachment-marker error-marker">Error attaching $1: $2</div>')
-                .replace(/\n/g, '<br>'); // Convert newlines
+                .replace(/\n/g, '<br>'); // Newlines
 
-            messageDiv.innerHTML = content; // Set the final HTML
-            chatbox.appendChild(messageDiv); // Add to the DOM
+            messageDiv.innerHTML = content; // Set final HTML
+            chatbox.appendChild(messageDiv); // Add to DOM
             chatbox.scrollTop = chatbox.scrollHeight; // Scroll down
         }
-
         /** Clears all messages from the chatbox. */
         function clearChatbox() { chatbox.innerHTML = ''; }
 
         // --- File Handling & Selection Functions ---
-
         /** Formats file size in bytes to a human-readable string. */
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes'; const k = 1024; const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
+        function formatFileSize(bytes) { if (bytes === 0) return '0 Bytes'; const k = 1024; const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; }
 
         /** Loads the list of uploaded files into the plugin sidebar. */
         async function loadUploadedFiles() {
-            updateStatus("Loading uploaded files...");
-            uploadedFilesList.innerHTML = '<p class="text-gray-500 text-xs p-1">Loading...</p>'; // Loading indicator
-            try {
-                const response = await fetch('/api/files'); // GET request to fetch file list
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const files = await response.json(); // Parse JSON response
-                uploadedFilesList.innerHTML = ''; // Clear loading indicator/previous list
-
-                if (files.length === 0) {
-                    uploadedFilesList.innerHTML = '<p class="text-gray-500 text-xs p-1">No files uploaded yet.</p>';
-                } else {
-                    // Create list items for each file
-                    files.forEach(file => {
-                        const itemDiv = document.createElement('div');
-                        itemDiv.classList.add('file-list-item'); // Use grid layout class
-                        itemDiv.dataset.fileId = file.id; // Store ID
-                        itemDiv.dataset.filename = file.filename; // Store filename
-                        itemDiv.dataset.hasSummary = file.has_summary; // Store summary status (boolean)
-
-                        // Checkbox for selection
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.value = file.id;
-                        checkbox.classList.add('file-checkbox');
-                        checkbox.title = "Select file";
-                        // Add listener to toggle highlight class when checkbox changes
-                        checkbox.addEventListener('change', (e) => {
-                            if (e.target.checked) {
-                                itemDiv.classList.add('active-selection');
-                            } else {
-                                itemDiv.classList.remove('active-selection');
-                            }
-                        });
-
-                        // Filename span
-                        const nameSpan = document.createElement('span');
-                        nameSpan.textContent = file.filename;
-                        nameSpan.classList.add('filename');
-                        nameSpan.title = file.filename; // Tooltip for long names
-
-                        // Actions container (for Summary button)
-                        const actionsDiv = document.createElement('div');
-                        actionsDiv.classList.add('file-actions');
-                        const summaryBtn = document.createElement('button');
-                        summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs'); // Extra small button
-                        summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i> Summary';
-                        summaryBtn.title = "View/Edit Summary";
-                        // Add click listener to show the summary modal
-                        summaryBtn.onclick = (e) => {
-                            e.stopPropagation(); // Prevent potential parent clicks
-                            showSummaryModal(file.id, file.filename);
-                        };
-                        actionsDiv.appendChild(summaryBtn);
-
-                        // Assemble the list item
-                        itemDiv.appendChild(checkbox);
-                        itemDiv.appendChild(nameSpan);
-                        itemDiv.appendChild(actionsDiv);
-
-                        uploadedFilesList.appendChild(itemDiv); // Add to the list container
-                    });
-                }
-                updateStatus("Uploaded files loaded.");
-            } catch (error) {
-                console.error('Error loading uploaded files:', error);
-                uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>'; // Show error
-                updateStatus("Error loading files.", true);
-            }
+             updateStatus("Loading uploaded files..."); uploadedFilesList.innerHTML = '<p class="text-gray-500 text-xs p-1">Loading...</p>'; try { const response = await fetch('/api/files'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const files = await response.json(); uploadedFilesList.innerHTML = ''; if (files.length === 0) { uploadedFilesList.innerHTML = '<p class="text-gray-500 text-xs p-1">No files uploaded yet.</p>'; } else { files.forEach(file => { const itemDiv = document.createElement('div'); itemDiv.classList.add('file-list-item'); itemDiv.dataset.fileId = file.id; itemDiv.dataset.filename = file.filename; itemDiv.dataset.hasSummary = file.has_summary; const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = file.id; checkbox.classList.add('file-checkbox'); checkbox.title = "Select file"; checkbox.addEventListener('change', (e) => { if (e.target.checked) itemDiv.classList.add('active-selection'); else itemDiv.classList.remove('active-selection'); }); const nameSpan = document.createElement('span'); nameSpan.textContent = file.filename; nameSpan.classList.add('filename'); nameSpan.title = file.filename; const actionsDiv = document.createElement('div'); actionsDiv.classList.add('file-actions'); const summaryBtn = document.createElement('button'); summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs'); summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i> Summary'; summaryBtn.title = "View/Edit Summary"; summaryBtn.onclick = (e) => { e.stopPropagation(); showSummaryModal(file.id, file.filename); }; actionsDiv.appendChild(summaryBtn); itemDiv.appendChild(checkbox); itemDiv.appendChild(nameSpan); itemDiv.appendChild(actionsDiv); uploadedFilesList.appendChild(itemDiv); }); } updateStatus("Uploaded files loaded."); } catch (error) { console.error('Error loading uploaded files:', error); uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>'; updateStatus("Error loading files.", true); }
         }
 
         /** Handles file input change event for uploading multiple files. */
         function handleFileUpload(event) {
-            const files = event.target.files; // Get FileList object
-            if (!files || files.length === 0) return; // Exit if no files selected
-
-            setLoadingState(true, "Uploading"); // Set loading state
-            let uploadPromises = []; // Array to hold promises for each file upload
-
-            // Iterate through the selected files
-            for (const file of files) {
-                // Frontend size check
-                if (file.size > MAX_FILE_SIZE_BYTES) {
-                    alert(`Skipping "${file.name}": File is too large (${formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`);
-                    continue; // Skip this file and proceed to the next
-                }
-
-                // Create a promise for each file read and upload operation
-                const promise = new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    // Callback when file is successfully read
-                    reader.onload = async (e) => {
-                        const content = e.target.result; // File content as string
-                        try {
-                            // Send file data to backend API
-                            const response = await fetch('/api/files', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ filename: file.name, content: content }),
-                            });
-                            if (!response.ok) { // Check for HTTP errors
-                                const errorData = await response.json();
-                                throw new Error(errorData.error || `HTTP ${response.status}`);
-                            }
-                            resolve(await response.json()); // Resolve promise with new file metadata
-                        } catch (error) {
-                            console.error(`Error uploading ${file.name}:`, error);
-                            updateStatus(`Error uploading ${file.name}: ${error.message}`, true);
-                            reject(error); // Reject promise if upload fails
-                        }
-                    };
-                    // Callback if file reading fails
-                    reader.onerror = (e) => {
-                        console.error(`Error reading ${file.name}:`, e);
-                        updateStatus(`Error reading ${file.name}.`, true);
-                        reject(new Error(`Failed to read ${file.name}`));
-                    };
-                    // Read the file as text
-                    reader.readAsText(file);
-                });
-                uploadPromises.push(promise); // Add the promise to the array
-            }
-
-            // Wait for all upload attempts to settle (either resolve or reject)
-            Promise.allSettled(uploadPromises).then(async (results) => {
-                const successfulUploads = results.filter(r => r.status === 'fulfilled').length;
-                const failedUploads = results.length - successfulUploads;
-                updateStatus(`Uploaded ${successfulUploads} file(s). ${failedUploads > 0 ? `${failedUploads} failed.` : ''}`);
-                await loadUploadedFiles(); // Refresh the file list in the sidebar
-                setLoadingState(false); // Reset loading state
-                fileUploadInput.value = ''; // Clear the file input
-            });
+             const files = event.target.files; if (!files || files.length === 0) return; setLoadingState(true, "Uploading"); let uploadPromises = []; for (const file of files) { if (file.size > MAX_FILE_SIZE_BYTES) { alert(`Skipping "${file.name}": File is too large (${formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`); continue; } const promise = new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = async (e) => { const content = e.target.result; try { const response = await fetch('/api/files', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: file.name, content: content }), }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } resolve(await response.json()); } catch (error) { console.error(`Error uploading ${file.name}:`, error); updateStatus(`Error uploading ${file.name}: ${error.message}`, true); reject(error); } }; reader.onerror = (e) => { console.error(`Error reading ${file.name}:`, e); updateStatus(`Error reading ${file.name}.`, true); reject(new Error(`Failed to read ${file.name}`)); }; reader.readAsText(file); }); uploadPromises.push(promise); } Promise.allSettled(uploadPromises).then(async (results) => { const successfulUploads = results.filter(r => r.status === 'fulfilled').length; const failedUploads = results.length - successfulUploads; updateStatus(`Uploaded ${successfulUploads} file(s). ${failedUploads > 0 ? `${failedUploads} failed.` : ''}`); await loadUploadedFiles(); setLoadingState(false); fileUploadInput.value = ''; });
         }
 
-        /**
-         * Adds files selected via checkboxes to the `selectedFiles` array with the specified type.
-         * Updates the UI display area.
-         * @param {'full' | 'summary'} type - The type to attach the selected files as.
-         */
+        /** Adds files selected via checkboxes to the `selectedFiles` array with the specified type. */
         function attachSelectedFiles(type) {
-             const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked'); // Get checked checkboxes
-             if (checkboxes.length === 0) {
-                 updateStatus("No files selected to attach.", true);
-                 return; // Exit if none selected
-             }
-
-             let addedCount = 0;
-             checkboxes.forEach(checkbox => {
-                 const fileId = parseInt(checkbox.value);
-                 const listItem = checkbox.closest('.file-list-item'); // Find parent list item
-                 const filename = listItem.dataset.filename; // Get filename from data attribute
-
-                 // Check if this file (with this specific type) is already selected
-                 const alreadySelected = selectedFiles.some(f => f.id === fileId && f.type === type);
-
-                 if (!alreadySelected) {
-                     // If attaching with a new type, remove any existing entry for the same file ID
-                     selectedFiles = selectedFiles.filter(f => !(f.id === fileId));
-                     // Add the new entry
-                     selectedFiles.push({ id: fileId, filename: filename, type: type });
-                     addedCount++;
-                 }
-                 // Uncheck the box after processing
-                 checkbox.checked = false;
-                 listItem.classList.remove('active-selection'); // Remove highlight
-             });
-
-             renderSelectedFiles(); // Update the display area with selected file tags
-             if (addedCount > 0) {
-                updateStatus(`${addedCount} file(s) added as ${type}.`);
-             } else {
-                 updateStatus(`Selected file(s) already attached as ${type}.`);
-             }
+              const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked'); if (checkboxes.length === 0) { updateStatus("No files selected to attach.", true); return; } let addedCount = 0; checkboxes.forEach(checkbox => { const fileId = parseInt(checkbox.value); const listItem = checkbox.closest('.file-list-item'); const filename = listItem.dataset.filename; const alreadySelected = selectedFiles.some(f => f.id === fileId && f.type === type); if (!alreadySelected) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId)); selectedFiles.push({ id: fileId, filename: filename, type: type }); addedCount++; } checkbox.checked = false; listItem.classList.remove('active-selection'); }); renderSelectedFiles(); if (addedCount > 0) { updateStatus(`${addedCount} file(s) added as ${type}.`); } else { updateStatus(`Selected file(s) already attached as ${type}.`); }
         }
 
-        /**
-         * Removes a specific file attachment (by ID and type) from the `selectedFiles` array.
-         * Updates the UI display area.
-         */
+        /** Removes a specific file attachment from the `selectedFiles` array. */
         function removeSelectedFile(fileId, type) {
-            selectedFiles = selectedFiles.filter(f => !(f.id === fileId && f.type === type)); // Filter out the matching file
-            renderSelectedFiles(); // Re-render the tags
-            updateStatus(`File attachment removed.`);
+             selectedFiles = selectedFiles.filter(f => !(f.id === fileId && f.type === type)); renderSelectedFiles(); updateStatus(`File attachment removed.`);
         }
 
         /** Renders the `selectedFiles` array as tags in the display area above the input. */
         function renderSelectedFiles() {
-            if (selectedFiles.length === 0) {
-                selectedFilesContainer.classList.add('hidden'); // Hide container if empty
-                selectedFilesContainer.innerHTML = '';
-            } else {
-                selectedFilesContainer.classList.remove('hidden'); // Show container
-                selectedFilesContainer.innerHTML = ''; // Clear previous tags
-                // Create a tag for each selected file
-                selectedFiles.forEach(file => {
-                    const tag = document.createElement('span');
-                    tag.classList.add('selected-file-tag');
-                    // Set inner HTML for the tag, including filename, type, and remove button
-                    tag.innerHTML = `
-                        <span class="filename truncate" title="${file.filename}">${file.filename}</span>
-                        <span class="file-type">${file.type.toUpperCase()}</span>
-                        <button title="Remove Attachment">&times;</button>
-                    `;
-                    // Add click listener to the remove button within the tag
-                    tag.querySelector('button').onclick = () => removeSelectedFile(file.id, file.type);
-                    selectedFilesContainer.appendChild(tag); // Add tag to the container
-                });
-            }
+             if (selectedFiles.length === 0) { selectedFilesContainer.classList.add('hidden'); selectedFilesContainer.innerHTML = ''; } else { selectedFilesContainer.classList.remove('hidden'); selectedFilesContainer.innerHTML = ''; selectedFiles.forEach(file => { const tag = document.createElement('span'); tag.classList.add('selected-file-tag'); tag.innerHTML = ` <span class="filename truncate" title="${file.filename}">${file.filename}</span> <span class="file-type">${file.type.toUpperCase()}</span> <button title="Remove Attachment">&times;</button> `; tag.querySelector('button').onclick = () => removeSelectedFile(file.id, file.type); selectedFilesContainer.appendChild(tag); }); }
         }
-
 
         // --- Summary Modal Functions ---
-
         /** Shows the summary modal, fetching or generating the summary via API. */
         async function showSummaryModal(fileId, filename) {
-            currentEditingFileId = fileId; // Store ID for saving later
-            summaryModalFilename.textContent = filename; // Display filename in modal
-            summaryTextarea.value = ""; // Clear previous summary
-            summaryTextarea.placeholder = "Loading or generating summary..."; // Placeholder text
-            summaryStatus.textContent = ""; // Clear status message
-            summaryStatus.classList.remove('text-red-500'); // Clear error style
-            summaryModal.style.display = "block"; // Show the modal
-            saveSummaryButton.disabled = true; // Disable save button initially
-
-            updateStatus(`Fetching summary for ${filename}...`); // Update main status bar
-            try {
-                // Fetch summary from backend (GET request)
-                const response = await fetch(`/api/files/${fileId}/summary`);
-                if (!response.ok) { // Check for HTTP errors
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `HTTP ${response.status}`);
-                }
-                const data = await response.json(); // Parse JSON response
-                summaryTextarea.value = data.summary; // Populate textarea
-                summaryTextarea.placeholder = "Enter or edit summary here.";
-                saveSummaryButton.disabled = false; // Enable save button
-                updateStatus(`Summary loaded for ${filename}.`); // Update main status bar
-
-                // Check if the loaded summary indicates an error during generation
-                if (data.summary.startsWith("[Error")) {
-                     summaryStatus.textContent = "Could not generate summary automatically. You can write one manually.";
-                     summaryStatus.classList.add('text-red-500'); // Show error style in modal status
-                } else {
-                     summaryStatus.textContent = "Summary loaded. You can edit and save changes.";
-                }
-
-            } catch (error) {
-                console.error("Error fetching summary:", error);
-                summaryTextarea.value = `[Error loading summary: ${error.message}]`; // Show error in textarea
-                summaryTextarea.placeholder = "Could not load summary.";
-                updateStatus(`Error fetching summary for ${filename}.`, true); // Update main status bar
-                summaryStatus.textContent = `Error: ${error.message}`; // Show error in modal status
-                summaryStatus.classList.add('text-red-500');
-            }
+             currentEditingFileId = fileId; summaryModalFilename.textContent = filename; summaryTextarea.value = ""; summaryTextarea.placeholder = "Loading or generating summary..."; summaryStatus.textContent = ""; summaryStatus.classList.remove('text-red-500'); summaryModal.style.display = "block"; saveSummaryButton.disabled = true; updateStatus(`Fetching summary for ${filename}...`); try { const response = await fetch(`/api/files/${fileId}/summary`); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } const data = await response.json(); summaryTextarea.value = data.summary; summaryTextarea.placeholder = "Enter or edit summary here."; saveSummaryButton.disabled = false; updateStatus(`Summary loaded for ${filename}.`); if (data.summary.startsWith("[Error")) { summaryStatus.textContent = "Could not generate summary automatically. You can write one manually."; summaryStatus.classList.add('text-red-500'); } else { summaryStatus.textContent = "Summary loaded. You can edit and save changes."; } } catch (error) { console.error("Error fetching summary:", error); summaryTextarea.value = `[Error loading summary: ${error.message}]`; summaryTextarea.placeholder = "Could not load summary."; updateStatus(`Error fetching summary for ${filename}.`, true); summaryStatus.textContent = `Error: ${error.message}`; summaryStatus.classList.add('text-red-500'); }
         }
-
         /** Saves the edited summary via the backend API (PUT request). */
         async function saveSummary() {
-            if (!currentEditingFileId || isLoading) return; // Exit if no file ID or loading
-
-            const updatedSummary = summaryTextarea.value; // Get content from textarea
-            setLoadingState(true, "Saving Summary"); // Set loading state
-            summaryStatus.textContent = "Saving..."; // Update modal status
-            summaryStatus.classList.remove('text-red-500');
-
-            try {
-                // Send PUT request to update summary
-                const response = await fetch(`/api/files/${currentEditingFileId}/summary`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ summary: updatedSummary }) // Send new summary content
-                });
-                if (!response.ok) { // Check for HTTP errors
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `HTTP ${response.status}`);
-                }
-                updateStatus("Summary saved successfully."); // Update main status bar
-                summaryStatus.textContent = "Summary saved!"; // Update modal status
-                await loadUploadedFiles(); // Refresh file list to update summary status indicator
-
-                // Optional: Close modal automatically after successful save
-                // closeModal();
-
-            } catch (error) {
-                console.error("Error saving summary:", error);
-                updateStatus("Error saving summary.", true); // Update main status bar
-                summaryStatus.textContent = `Error saving: ${error.message}`; // Show error in modal status
-                summaryStatus.classList.add('text-red-500');
-            } finally {
-                setLoadingState(false); // Reset loading state
-            }
+             if (!currentEditingFileId || isLoading) return; const updatedSummary = summaryTextarea.value; setLoadingState(true, "Saving Summary"); summaryStatus.textContent = "Saving..."; summaryStatus.classList.remove('text-red-500'); try { const response = await fetch(`/api/files/${currentEditingFileId}/summary`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: updatedSummary }) }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } updateStatus("Summary saved successfully."); summaryStatus.textContent = "Summary saved!"; await loadUploadedFiles(); } catch (error) { console.error("Error saving summary:", error); updateStatus("Error saving summary.", true); summaryStatus.textContent = `Error saving: ${error.message}`; summaryStatus.classList.add('text-red-500'); } finally { setLoadingState(false); }
         }
-
         /** Closes the summary modal dialog. */
         function closeModal() {
-            summaryModal.style.display = "none"; // Hide the modal
-            currentEditingFileId = null; // Clear the ID being edited
+             summaryModal.style.display = "none"; currentEditingFileId = null;
         }
-
 
         // --- API Interaction (Chats) ---
-
         /** Fetches the list of saved chats and populates the left sidebar. */
         async function loadSavedChats() {
-             updateStatus("Loading saved chats..."); try { const response = await fetch('/api/chats'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const chats = await response.json(); savedChatsList.innerHTML = ''; if (chats.length === 0) { savedChatsList.innerHTML = '<p class="text-gray-500 text-sm p-1">No saved chats yet.</p>'; } else { chats.forEach(chat => { const listItem = document.createElement('div'); listItem.classList.add('list-item', 'chat-list-item'); listItem.dataset.chatId = chat.id; const nameSpan = document.createElement('span'); nameSpan.textContent = chat.name || `Chat ${chat.id}`; nameSpan.classList.add('filename'); nameSpan.title = chat.name || `Chat ${chat.id}`; const deleteButton = document.createElement('button'); deleteButton.classList.add('delete-btn'); deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; deleteButton.title = "Delete Chat"; deleteButton.onclick = (e) => { e.stopPropagation(); handleDeleteChat(chat.id, listItem); }; listItem.appendChild(nameSpan); listItem.appendChild(deleteButton); listItem.onclick = () => { if (chat.id != currentChatId) { loadChat(chat.id); } }; savedChatsList.appendChild(listItem); }); } updateActiveChatListItem(); updateStatus("Saved chats loaded."); } catch (error) { console.error('Error loading saved chats:', error); savedChatsList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading chats.</p>'; updateStatus("Error loading saved chats.", true); }
+              updateStatus("Loading saved chats..."); try { const response = await fetch('/api/chats'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const chats = await response.json(); savedChatsList.innerHTML = ''; if (chats.length === 0) { savedChatsList.innerHTML = '<p class="text-gray-500 text-sm p-1">No saved chats yet.</p>'; } else { chats.forEach(chat => { const listItem = document.createElement('div'); listItem.classList.add('list-item', 'chat-list-item'); listItem.dataset.chatId = chat.id; const nameSpan = document.createElement('span'); nameSpan.textContent = chat.name || `Chat ${chat.id}`; nameSpan.classList.add('filename'); nameSpan.title = chat.name || `Chat ${chat.id}`; const deleteButton = document.createElement('button'); deleteButton.classList.add('delete-btn'); deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; deleteButton.title = "Delete Chat"; deleteButton.onclick = (e) => { e.stopPropagation(); handleDeleteChat(chat.id, listItem); }; listItem.appendChild(nameSpan); listItem.appendChild(deleteButton); listItem.onclick = () => { if (chat.id != currentChatId) { loadChat(chat.id); } }; savedChatsList.appendChild(listItem); }); } updateActiveChatListItem(); updateStatus("Saved chats loaded."); } catch (error) { console.error('Error loading saved chats:', error); savedChatsList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading chats.</p>'; updateStatus("Error loading saved chats.", true); }
         }
 
-        /** Creates a new chat session via the backend API. */
+        /** Creates a new chat session, setting the model selector to default. */
         async function startNewChat() {
-             if (isLoading) return; setLoadingState(true, "Creating Chat"); updateStatus("Creating new chat..."); try { const response = await fetch('/api/chat', { method: 'POST' }); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const newChat = await response.json(); await loadChat(newChat.id); await loadSavedChats(); updateStatus(`New chat created (ID: ${newChat.id}).`); setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar'); selectedFiles = []; renderSelectedFiles(); /* Clear file selection */ } catch (error) { console.error('Error starting new chat:', error); addMessage('system', `[Error creating new chat: ${error.message}]`, true); updateStatus("Error creating new chat.", true); } finally { setLoadingState(false); }
+             if (isLoading) return; setLoadingState(true, "Creating Chat"); updateStatus("Creating new chat..."); try { const response = await fetch('/api/chat', { method: 'POST' }); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const newChat = await response.json(); await loadChat(newChat.id); await loadSavedChats(); updateStatus(`New chat created (ID: ${newChat.id}).`); setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar'); selectedFiles = []; renderSelectedFiles(); modelSelector.value = defaultModel; /* Reset model selector */ } catch (error) { console.error('Error starting new chat:', error); addMessage('system', `[Error creating new chat: ${error.message}]`, true); updateStatus("Error creating new chat.", true); } finally { setLoadingState(false); }
         }
 
-        /** Loads a specific chat's details and message history. */
+        /** Loads a specific chat, updating the model selector. */
         async function loadChat(chatId) {
-             if (isLoading) return; setLoadingState(true, "Loading Chat"); updateStatus(`Loading chat ${chatId}...`); clearChatbox(); addMessage('system', `Loading chat (ID: ${chatId})...`); try { const response = await fetch(`/api/chat/${chatId}`); if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`); const data = await response.json(); currentChatId = chatId; clearChatbox(); currentChatNameInput.value = data.details.name || ''; currentChatIdDisplay.textContent = `ID: ${currentChatId}`; if (data.history.length === 0) { addMessage('system', 'This chat is empty. Start typing!'); } else { data.history.forEach(msg => addMessage(msg.role, msg.content)); } updateActiveChatListItem(); updateStatus(`Chat ${chatId} loaded.`); setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar'); selectedFiles = []; renderSelectedFiles(); /* Clear file selection */ } catch (error) { console.error('Error loading chat:', error); clearChatbox(); addMessage('system', `[Error loading chat ${chatId}: ${error.message}]`, true); currentChatId = null; currentChatNameInput.value = ''; currentChatIdDisplay.textContent = 'ID: -'; updateStatus(`Error loading chat ${chatId}.`, true); updateActiveChatListItem(); } finally { setLoadingState(false); }
+             if (isLoading) return; setLoadingState(true, "Loading Chat"); updateStatus(`Loading chat ${chatId}...`); clearChatbox(); addMessage('system', `Loading chat (ID: ${chatId})...`); try { const response = await fetch(`/api/chat/${chatId}`); if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`); const data = await response.json(); currentChatId = chatId; clearChatbox(); currentChatNameInput.value = data.details.name || ''; currentChatIdDisplay.textContent = `ID: ${currentChatId}`;
+             // --- Update Model Selector ---
+             modelSelector.value = data.details.model_name || defaultModel; // Set dropdown value based on saved chat data
+             // ---------------------------
+             if (data.history.length === 0) { addMessage('system', 'This chat is empty. Start typing!'); } else { data.history.forEach(msg => addMessage(msg.role, msg.content)); } updateActiveChatListItem(); updateStatus(`Chat ${chatId} loaded.`); setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar'); selectedFiles = []; renderSelectedFiles(); /* Clear file selection */ } catch (error) { console.error('Error loading chat:', error); clearChatbox(); addMessage('system', `[Error loading chat ${chatId}: ${error.message}]`, true); currentChatId = null; currentChatNameInput.value = ''; currentChatIdDisplay.textContent = 'ID: -'; modelSelector.value = defaultModel; /* Reset model on error */ updateStatus(`Error loading chat ${chatId}.`, true); updateActiveChatListItem(); } finally { setLoadingState(false); }
         }
 
-        /** Sends the user's message and the list of attached files (ID + type) to the backend. */
+        /** Sends message and attached files (ID + type) to backend. */
         async function sendMessage() {
-            if (isLoading || !currentChatId) {
-                 updateStatus("Cannot send message: No active chat or busy.", true);
-                 return;
-            }
-            const message = messageInput.value.trim(); // Get message text
-
-            // Require message or attached files
-            if (!message && selectedFiles.length === 0) {
-                updateStatus("Cannot send: Type a message or attach file(s).", true);
-                return;
-            }
-
-             // --- Display user message + markers immediately ---
-            let displayMessage = message || (selectedFiles.length > 0 ? "(Files attached)" : ""); // Placeholder if only files
-            let markers = "";
-            if (selectedFiles.length > 0) {
-                 // Create marker divs for each attached file
-                 markers = selectedFiles.map(f => `<div class="attachment-marker">Attached ${f.type}: ${f.filename}</div>`).join('');
-                 displayMessage = markers + displayMessage; // Prepend markers
-            }
-            addMessage('user', displayMessage); // Add to chatbox
-
-            messageInput.value = ''; // Clear the text input field
-            setLoadingState(true, "Sending"); // Set loading state
-            updateStatus("Sending message...");
-
-            // --- Prepare payload for the backend ---
-            const payload = {
-                message: message, // Send the original text message content
-                attached_files: selectedFiles // Send the array of {id, filename, type} - backend only needs id, type
-            };
-
-            try {
-                // Send the request to the backend API
-                const response = await fetch(`/api/chat/${currentChatId}/message`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-
-                if (!response.ok) { // Check for HTTP errors
-                     const errorData = await response.json(); // Try to get error details
-                     throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-                }
-
-                const data = await response.json(); // Get the assistant's reply
-                addMessage('assistant', data.reply); // Add reply to the chatbox
-                updateStatus("Assistant replied.");
-                await loadSavedChats(); // Refresh chat list (updates timestamp/order)
-
-                // Clear selection AFTER successful send
-                selectedFiles = [];
-                renderSelectedFiles(); // Update UI to remove tags
-
-            } catch (error) {
-                console.error('Error sending message:', error);
-                addMessage('assistant', `[Error: ${error.message}]`, true); // Show error in chat
-                updateStatus("Error sending message.", true);
-                // Do NOT clear selection on error, allow user to retry or modify
-            } finally {
-                 setLoadingState(false); // Reset loading state
-            }
+            if (isLoading || !currentChatId) { updateStatus("Cannot send message: No active chat or busy.", true); return; } const message = messageInput.value.trim(); if (!message && selectedFiles.length === 0) { updateStatus("Cannot send: Type a message or attach file(s).", true); return; } let displayMessage = message || (selectedFiles.length > 0 ? "(Files attached)" : ""); let markers = ""; if (selectedFiles.length > 0) { markers = selectedFiles.map(f => `<div class="attachment-marker">Attached ${f.type}: ${f.filename}</div>`).join(''); displayMessage = markers + displayMessage; } addMessage('user', displayMessage); messageInput.value = ''; setLoadingState(true, "Sending"); updateStatus("Sending message..."); const payload = { message: message, attached_files: selectedFiles }; try { const response = await fetch(`/api/chat/${currentChatId}/message`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } const data = await response.json(); addMessage('assistant', data.reply); updateStatus("Assistant replied."); await loadSavedChats(); selectedFiles = []; renderSelectedFiles(); } catch (error) { console.error('Error sending message:', error); addMessage('assistant', `[Error: ${error.message}]`, true); updateStatus("Error sending message.", true); } finally { setLoadingState(false); }
         }
 
-        /** Saves the current chat's name via the backend API. */
+        /** Saves the current chat's name. */
         async function handleSaveChatName() {
              if (isLoading || !currentChatId) { updateStatus("Cannot save name: No active chat or busy.", true); return; } const newName = currentChatNameInput.value.trim(); setLoadingState(true, "Saving Name"); updateStatus(`Saving name for chat ${currentChatId}...`); try { const response = await fetch(`/api/chat/${currentChatId}/name`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName || 'New Chat' }), }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } updateStatus(`Chat ${currentChatId} name saved as "${newName || 'New Chat'}".`); await loadSavedChats(); } catch (error) { console.error('Error saving chat name:', error); updateStatus(`Error saving name: ${error.message}`, true); } finally { setLoadingState(false); }
         }
 
-        /** Deletes a chat via the backend API after confirmation. */
+        /** Deletes a chat after confirmation. */
         async function handleDeleteChat(chatId, listItemElement) {
              if (isLoading) return; const chatName = listItemElement.querySelector('span.filename').textContent || `Chat ${chatId}`; if (!confirm(`Are you sure you want to delete "${chatName}"? This cannot be undone.`)) { return; } setLoadingState(true, "Deleting Chat"); updateStatus(`Deleting chat ${chatId}...`); try { const response = await fetch(`/api/chat/${chatId}`, { method: 'DELETE' }); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); updateStatus(`Chat ${chatId} deleted.`); listItemElement.remove(); if (!savedChatsList.querySelector('.list-item')) { savedChatsList.innerHTML = '<p class="text-gray-500 text-sm p-1">No saved chats yet.</p>'; } if (chatId == currentChatId) { await startNewChat(); } } catch (error) { console.error(`Error deleting chat ${chatId}:`, error); updateStatus(`Error deleting chat: ${error.message}`, true); addMessage('system', `[Error deleting chat ${chatId}: ${error.message}]`, true); } finally { setLoadingState(false); }
         }
 
-        /** Highlights the currently active chat in the left sidebar list. */
+        /** Highlights the active chat in the left sidebar. */
         function updateActiveChatListItem() {
              const items = savedChatsList.querySelectorAll('.chat-list-item'); items.forEach(item => { if (item.dataset.chatId == currentChatId) { item.classList.add('active'); } else { item.classList.remove('active'); } });
+        }
+
+        /** Handles changes to the model selector dropdown, saving the choice to the backend. */
+        async function handleModelChange() {
+            if (!currentChatId || isLoading) return; // Don't save if no chat or busy
+
+            const newModel = modelSelector.value; // Get selected model name
+            updateStatus(`Updating model to ${newModel}...`);
+            setLoadingState(true, "Updating Model"); // Use loading state
+
+            try {
+                // Send PUT request to update the model for the current chat
+                const response = await fetch(`/api/chat/${currentChatId}/model`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_name: newModel }) // Send new model name
+                });
+                if (!response.ok) { // Check for HTTP errors
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP ${response.status}`);
+                }
+                updateStatus(`Model updated to ${newModel} for this chat.`);
+            } catch (error) {
+                console.error("Error updating model:", error);
+                updateStatus(`Error updating model: ${error.message}`, true);
+                // Consider reverting the dropdown if the save fails, although might be complex
+                // For now, log the error and let the dropdown show the attempted value.
+            } finally {
+                 setLoadingState(false); // Reset loading state
+            }
         }
 
 
@@ -844,50 +525,48 @@
         pluginsToggleButton.addEventListener('click', toggleRightSidebar);
 
         // File Plugin Listeners
-        filePluginHeader.addEventListener('click', toggleFilePlugin); // Collapse/expand plugin section
-        fileUploadInput.addEventListener('change', handleFileUpload); // Upload new file(s)
-        attachFullButton.addEventListener('click', () => attachSelectedFiles('full')); // Attach selected as full
-        attachSummaryButton.addEventListener('click', () => attachSelectedFiles('summary')); // Attach selected as summary
+        filePluginHeader.addEventListener('click', toggleFilePlugin); // Collapse/expand plugin
+        fileUploadInput.addEventListener('change', handleFileUpload); // Upload file(s)
+        attachFullButton.addEventListener('click', () => attachSelectedFiles('full')); // Attach as full
+        attachSummaryButton.addEventListener('click', () => attachSelectedFiles('summary')); // Attach as summary
 
         // Summary Modal Listeners
         closeSummaryModalButton.addEventListener('click', closeModal); // Close button
         saveSummaryButton.addEventListener('click', saveSummary); // Save button
-        // Close modal if clicking outside the content area (on the background overlay)
-        summaryModal.addEventListener('click', (event) => {
-             if (event.target === summaryModal) {
-                 closeModal();
-             }
-        });
+        // Close modal on background click
+        summaryModal.addEventListener('click', (event) => { if (event.target === summaryModal) { closeModal(); } });
+
+        // Model Selector Listener
+        modelSelector.addEventListener('change', handleModelChange); // Handle model change
 
 
         // --- Initial Application Load ---
-        /** Initializes the application on page load: sets sidebar states, loads data. */
+        /** Initializes the application on page load. */
         async function initializeApp() {
             // Set initial collapsed states from localStorage
             const chatSidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
             const pluginSidebarCollapsed = localStorage.getItem(PLUGINS_COLLAPSED_KEY) === 'true';
-            const filePluginCollapsed = localStorage.getItem(FILE_PLUGIN_COLLAPSED_KEY) === 'true'; // Load plugin section state
-            // Apply initial states
+            const filePluginCollapsed = localStorage.getItem(FILE_PLUGIN_COLLAPSED_KEY) === 'true';
             setSidebarCollapsed(sidebar, sidebarToggleButton, chatSidebarCollapsed, SIDEBAR_COLLAPSED_KEY, 'sidebar');
             setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, pluginSidebarCollapsed, PLUGINS_COLLAPSED_KEY, 'plugins');
-            setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY); // Apply plugin section state
+            setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
 
             // Load initial data (chats and files)
             await loadSavedChats();
             await loadUploadedFiles();
 
-            // Determine which chat to load initially (most recent or new)
+            // Load most recent chat or start new
             const firstChatElement = savedChatsList.querySelector('.chat-list-item');
             if (firstChatElement) {
                  const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
-                 await loadChat(mostRecentChatId);
+                 await loadChat(mostRecentChatId); // loadChat now sets the model selector
             } else {
-                 await startNewChat(); // Start new if no chats exist
+                 await startNewChat(); // startNewChat sets model selector to default
             }
             renderSelectedFiles(); // Render initially empty selected files area
         }
 
-        // Start the application initialization process when the script loads
+        // Start the application initialization process
         initializeApp();
 
     </script>
