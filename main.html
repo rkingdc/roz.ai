@@ -1,0 +1,155 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local AI Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Basic styling */
+        body { font-family: 'Inter', sans-serif; }
+        #chatbox { height: calc(100vh - 150px); } /* Adjust height as needed */
+        .user-msg { text-align: right; margin-left: auto; background-color: #dbeafe; /* blue-100 */ }
+        .assistant-msg { text-align: left; margin-right: auto; background-color: #e5e7eb; /* gray-200 */ }
+        .message {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.5rem;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        /* Add scrollbar styling */
+         #chatbox::-webkit-scrollbar {
+            width: 8px;
+        }
+        #chatbox::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        #chatbox::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        #chatbox::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 flex flex-col h-screen p-4">
+
+    <h1 class="text-2xl font-bold text-center mb-4 text-gray-800">Local AI Assistant</h1>
+
+    <div id="chatbox" class="flex-grow bg-white rounded-lg shadow p-4 overflow-y-auto mb-4 border border-gray-200">
+        <div class="text-center text-gray-500">Loading history...</div>
+    </div>
+
+    <div id="input-area" class="flex items-center gap-2">
+        <textarea id="message-input" rows="2" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Type your message..."></textarea>
+        <button id="send-button" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition duration-200 ease-in-out shadow">
+            Send
+        </button>
+    </div>
+
+    <script>
+        const chatbox = document.getElementById('chatbox');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        // Function to add a message to the chatbox
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+            messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg');
+
+            // Basic Markdown rendering (bold, italics, code blocks) - can be expanded
+            content = content
+                .replace(/\\*\\*([^*]+)\\*\\*/g, '<strong>$1</strong>') // Bold
+                .replace(/\\*([^*]+)\\*/g, '<em>$1</em>')     // Italics
+                .replace(/```([\\s\\S]*?)```/g, '<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm"><code>$1</code></pre>') // Code blocks
+                .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-sm">$1</code>'); // Inline code
+
+            messageDiv.innerHTML = content.replace(/\\n/g, '<br>'); // Render newlines
+            chatbox.appendChild(messageDiv);
+            chatbox.scrollTop = chatbox.scrollHeight; // Scroll to bottom
+        }
+
+        // Function to load chat history
+        async function loadHistory() {
+            try {
+                const response = await fetch('/get_history');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const history = await response.json();
+                 chatbox.innerHTML = ''; // Clear loading message
+                if (history.length === 0) {
+                     chatbox.innerHTML = '<div class="text-center text-gray-500">No chat history yet.</div>';
+                } else {
+                    history.forEach(msg => addMessage(msg.role, msg.content));
+                }
+            } catch (error) {
+                console.error('Error loading history:', error);
+                chatbox.innerHTML = '<div class="text-center text-red-500">Error loading chat history. Is the backend running?</div>';
+            }
+        }
+
+        // Function to send a message
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            addMessage('user', message); // Display user message immediately
+            messageInput.value = ''; // Clear input
+            messageInput.disabled = true; // Disable input while waiting
+            sendButton.disabled = true;
+            sendButton.textContent = 'Thinking...';
+
+
+            try {
+                const response = await fetch('/send_message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message }),
+                });
+
+                if (!response.ok) {
+                     const errorData = await response.json();
+                     throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                addMessage('assistant', data.reply);
+
+            } catch (error) {
+                console.error('Error sending message:', error);
+                addMessage('assistant', `[Error: ${error.message}]`);
+            } finally {
+                 messageInput.disabled = false; // Re-enable input
+                 sendButton.disabled = false;
+                 sendButton.textContent = 'Send';
+                 messageInput.focus(); // Set focus back to input
+            }
+        }
+
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            // Send message on Enter key, unless Shift+Enter is pressed
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // Prevent default newline insertion
+                sendMessage();
+            }
+        });
+
+        // Initial load
+        loadHistory();
+
+    </script>
+</body>
+</html>
