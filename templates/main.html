@@ -6,39 +6,32 @@
     <title>Enhanced AI Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         /* Basic styling */
         body {
             font-family: 'Inter', sans-serif;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-            position: relative; /* Needed for absolute positioning of toggle button */
+            display: flex; /* Enable flexbox for layout */
+            height: 100vh; /* Full viewport height */
+            overflow: hidden; /* Prevent body scroll */
+            position: relative; /* Needed for absolute positioning of toggle buttons */
         }
+
+        /* Left Sidebar (Chats) */
         #sidebar {
-            width: 320px; /* Increased width */
+            width: 320px; /* Default width */
             background-color: #f3f4f6; /* gray-100 */
             border-right: 1px solid #e5e7eb; /* gray-200 */
             padding: 1rem;
             display: flex;
-            flex-direction: column;
+            flex-direction: column; /* Stack elements vertically */
             flex-shrink: 0; /* Prevent sidebar from shrinking */
-            transition: width 0.3s ease-in-out, padding 0.3s ease-in-out, border 0.3s ease-in-out; /* Smooth transition */
+            transition: width 0.3s ease-in-out, padding 0.3s ease-in-out, border 0.3s ease-in-out; /* Smooth collapse/expand */
             overflow-x: hidden; /* Hide content when collapsing */
         }
-        #main-content {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            background-color: #ffffff; /* white */
-            min-width: 0; /* Prevent content from overflowing flex container */
-        }
-        #chat-area { padding: 1rem; flex-grow: 1; display: flex; flex-direction: column; min-height: 0; }
-        #chatbox { flex-grow: 1; overflow-y: auto; margin-bottom: 1rem; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; background-color: #f9fafb; /* gray-50 */ }
-        #input-area { padding: 0 1rem 1rem 1rem; display: flex; align-items: center; gap: 0.5rem; border-top: 1px solid #e5e7eb; padding-top: 1rem; flex-shrink: 0; }
-
-        /* Collapsed Sidebar Styles */
+        /* Styles for collapsed left sidebar */
         body.sidebar-collapsed #sidebar {
             width: 0;
             padding-left: 0;
@@ -46,271 +39,796 @@
             border-right-width: 0;
         }
 
-        /* Sidebar Toggle Button */
-        #sidebar-toggle-btn {
-            position: absolute;
-            top: 0.75rem; /* Align with top padding/elements */
-            left: 320px; /* Initial position just outside the expanded sidebar */
-            z-index: 50; /* Ensure it's above other content */
-            background-color: #f3f4f6; /* Match sidebar bg */
-            border: 1px solid #e5e7eb; /* Match sidebar border */
-            border-left: none; /* Hide left border */
-            padding: 0.75rem 0.5rem; /* Adjust padding */
-            cursor: pointer;
-            border-top-right-radius: 0.375rem; /* Rounded corners */
-            border-bottom-right-radius: 0.375rem;
-            transition: left 0.3s ease-in-out; /* Smooth transition */
-            box-shadow: 2px 0px 5px rgba(0,0,0,0.1);
+        /* Right Sidebar (Plugins) */
+        #plugins-sidebar {
+            width: 300px; /* Default width */
+            background-color: #f3f4f6; /* gray-100 */
+            border-left: 1px solid #e5e7eb; /* gray-200 */
+            padding: 1rem;
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+            flex-shrink: 0; /* Prevent sidebar from shrinking */
+            transition: width 0.3s ease-in-out, padding 0.3s ease-in-out, border 0.3s ease-in-out; /* Smooth collapse/expand */
+            overflow-x: hidden; /* Hide content when collapsing */
         }
+        /* Styles for collapsed right sidebar */
+        body.plugins-collapsed #plugins-sidebar {
+             width: 0;
+             padding-left: 0;
+             padding-right: 0;
+             border-left-width: 0;
+        }
+
+
+        /* Main Content Area */
+        #main-content {
+            flex-grow: 1; /* Allow main content to take remaining space */
+            display: flex;
+            flex-direction: column; /* Stack chat area and input area vertically */
+            height: 100vh;
+            background-color: #ffffff; /* white */
+            min-width: 0; /* Prevent content from overflowing flex container */
+        }
+        #chat-area {
+            padding: 1rem;
+            flex-grow: 1; /* Allow chat area to take available vertical space */
+            display: flex;
+            flex-direction: column;
+            min-height: 0; /* Important for nested flex scroll */
+        }
+        #chatbox {
+            flex-grow: 1; /* Allow chatbox to fill chat area */
+            overflow-y: auto; /* Enable vertical scroll */
+            margin-bottom: 1rem;
+            border: 1px solid #e5e7eb; /* gray-200 */
+            border-radius: 0.5rem; /* Rounded corners */
+            padding: 0.5rem;
+            background-color: #f9fafb; /* gray-50 */
+        }
+        #input-area {
+            padding: 0 1rem 1rem 1rem;
+            display: flex;
+            flex-direction: column; /* Stack selected file display and input controls */
+            gap: 0.5rem;
+            border-top: 1px solid #e5e7eb; /* gray-200 */
+            padding-top: 1rem;
+            flex-shrink: 0; /* Prevent input area from shrinking */
+        }
+        #input-controls {
+            display: flex;
+            align-items: center; /* Align items vertically */
+            gap: 0.5rem;
+        }
+        /* Style for the display area showing the attached file */
+        #selected-file-display {
+            font-size: 0.75rem; /* Small text */
+            color: #4b5563; /* gray-600 */
+            background-color: #e0e7ff; /* indigo-100 */
+            border: 1px solid #c7d2fe; /* indigo-200 */
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            display: flex; /* Use flex to align items */
+            align-items: center;
+            gap: 0.5rem; /* Space between name and button */
+        }
+        /* Style for the clear file button */
+        #selected-file-display button {
+            background: none;
+            border: none;
+            color: #4338ca; /* indigo-700 */
+            cursor: pointer;
+            padding: 0;
+            line-height: 1; /* Keep button small */
+        }
+        #selected-file-display button:hover {
+            color: #3730a3; /* indigo-800 */
+        }
+
+        /* Sidebar Toggle Buttons (Common Styles) */
+        .toggle-btn {
+            position: absolute; /* Position relative to body */
+            top: 0.75rem; /* Align vertically */
+            z-index: 50; /* Ensure button is above other content */
+            background-color: #f3f4f6; /* Match sidebar background */
+            border: 1px solid #e5e7eb; /* Match sidebar border */
+            padding: 0.75rem 0.5rem; /* Button size */
+            cursor: pointer;
+            transition: left 0.3s ease-in-out, right 0.3s ease-in-out; /* Animate position change */
+            box-shadow: 0px 0px 5px rgba(0,0,0,0.1); /* Subtle shadow */
+        }
+        .toggle-btn i {
+            color: #4b5563; /* gray-600 */
+            display: block; /* Prevent inline spacing issues */
+        }
+        .toggle-btn:hover {
+            background-color: #e5e7eb; /* gray-200 */
+        }
+
+        /* Left Toggle Button Specific Styles */
+        #sidebar-toggle-btn {
+            left: 320px; /* Initial position (width of left sidebar) */
+            border-left: none; /* Hide border touching sidebar */
+            border-top-right-radius: 0.375rem; /* Round outer corners */
+            border-bottom-right-radius: 0.375rem;
+        }
+        /* Position when left sidebar is collapsed */
         body.sidebar-collapsed #sidebar-toggle-btn {
-            left: 0px; /* Move toggle button to edge when collapsed */
-            border-left: 1px solid #e5e7eb; /* Show left border when collapsed */
-            border-right: none; /* Hide right border */
-            border-top-left-radius: 0.375rem; /* Adjust corners */
+            left: 0px; /* Move to edge */
+            border-left: 1px solid #e5e7eb; /* Show border */
+            border-right: none; /* Hide other border */
+            border-top-left-radius: 0.375rem; /* Adjust rounded corners */
             border-bottom-left-radius: 0.375rem;
             border-top-right-radius: 0;
             border-bottom-right-radius: 0;
         }
-        #sidebar-toggle-btn i {
+
+        /* Right Toggle Button Specific Styles */
+         #plugins-toggle-btn {
+            right: 300px; /* Initial position (width of right sidebar) */
+            border-right: none; /* Hide border touching sidebar */
+            border-top-left-radius: 0.375rem; /* Round outer corners */
+            border-bottom-left-radius: 0.375rem;
+        }
+        /* Position when right sidebar is collapsed */
+        body.plugins-collapsed #plugins-toggle-btn {
+            right: 0px; /* Move to edge */
+            border-right: 1px solid #e5e7eb; /* Show border */
+            border-left: none; /* Hide other border */
+            border-top-right-radius: 0.375rem; /* Adjust rounded corners */
+            border-bottom-right-radius: 0.375rem;
+             border-top-left-radius: 0;
+             border-bottom-left-radius: 0;
+        }
+
+        /* Message Styling */
+        .message {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: 0.5rem;
+            max-width: 85%; /* Limit message width */
+            word-wrap: break-word; /* Wrap long words */
+            line-height: 1.5; /* Improve readability */
+        }
+        .user-msg {
+            margin-left: auto; /* Align right */
+            background-color: #dbeafe; /* blue-100 */
+            color: #1e3a8a; /* blue-900 */
+        }
+        .assistant-msg {
+            margin-right: auto; /* Align left */
+            background-color: #e5e7eb; /* gray-200 */
+            color: #1f2937; /* gray-800 */
+        }
+        .error-msg {
+            margin-right: auto; /* Align left */
+            background-color: #fee2e2; /* red-100 */
+            color: #991b1b; /* red-800 */
+            font-style: italic;
+        }
+        .system-msg {
+            text-align: center;
+            font-size: 0.8rem;
+            color: #6b7280; /* gray-500 */
+            margin-bottom: 0.5rem;
+        }
+        /* Add space before code blocks within messages */
+        .message pre {
+            margin-top: 0.5rem;
+        }
+        /* Style the file attachment marker in messages */
+        .message .attachment-marker {
+            display: block; /* Ensure it's on its own line */
+            font-size: 0.75rem;
             color: #4b5563; /* gray-600 */
-            display: block; /* Ensure icon takes block space */
+            font-style: italic;
+            margin-bottom: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            border-left: 2px solid #9ca3af; /* gray-400 */
+            background-color: rgba(209, 213, 219, 0.3); /* gray-300 with transparency */
         }
-        #sidebar-toggle-btn:hover {
-             background-color: #e5e7eb; /* gray-200 */
+
+
+        /* Scrollbar Styling (Webkit browsers) */
+        #chatbox::-webkit-scrollbar,
+        #saved-chats-list::-webkit-scrollbar,
+        #uploaded-files-list::-webkit-scrollbar {
+            width: 8px; /* Scrollbar width */
+        }
+        #chatbox::-webkit-scrollbar-track,
+        #saved-chats-list::-webkit-scrollbar-track,
+        #uploaded-files-list::-webkit-scrollbar-track {
+            background: #f1f1f1; /* Track color */
+            border-radius: 10px;
+        }
+        #chatbox::-webkit-scrollbar-thumb,
+        #saved-chats-list::-webkit-scrollbar-thumb,
+        #uploaded-files-list::-webkit-scrollbar-thumb {
+            background: #a0aec0; /* gray-400 - Thumb color */
+            border-radius: 10px;
+        }
+        #chatbox::-webkit-scrollbar-thumb:hover,
+        #saved-chats-list::-webkit-scrollbar-thumb:hover,
+        #uploaded-files-list::-webkit-scrollbar-thumb:hover {
+            background: #718096; /* gray-500 - Thumb hover color */
         }
 
-
-        /* Message styling */
-        .message { padding: 0.75rem; margin-bottom: 0.5rem; border-radius: 0.5rem; max-width: 85%; word-wrap: break-word; line-height: 1.5; }
-        .user-msg { margin-left: auto; background-color: #dbeafe; /* blue-100 */ color: #1e3a8a; /* blue-900 */ }
-        .assistant-msg { margin-right: auto; background-color: #e5e7eb; /* gray-200 */ color: #1f2937; /* gray-800 */ }
-        .error-msg { margin-right: auto; background-color: #fee2e2; /* red-100 */ color: #991b1b; /* red-800 */ font-style: italic; }
-
-        /* Scrollbar styling */
-        #chatbox::-webkit-scrollbar, #saved-chats-list::-webkit-scrollbar { width: 8px; }
-        #chatbox::-webkit-scrollbar-track, #saved-chats-list::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-        #chatbox::-webkit-scrollbar-thumb, #saved-chats-list::-webkit-scrollbar-thumb { background: #a0aec0; /* gray-400 */ border-radius: 10px; }
-        #chatbox::-webkit-scrollbar-thumb:hover, #saved-chats-list::-webkit-scrollbar-thumb:hover { background: #718096; /* gray-500 */ }
-
-        /* Sidebar specific styling */
-         #saved-chats-list-container {
-            flex-grow: 1; /* Allow this container to take remaining space */
-            overflow-y: hidden; /* Hide scrollbar until needed */
-            display: flex; /* Use flex for inner list */
+        /* Sidebar Specific Styling */
+        /* Container to manage flex growth and scrolling within sidebars */
+        .sidebar-section-container {
+            flex-grow: 1; /* Allow container to fill space */
+            overflow-y: hidden; /* Hide its own scrollbar */
+            display: flex;
             flex-direction: column;
-            min-height: 0; /* Important for nested flex scroll */
+            min-height: 0; /* Crucial for nested flex scrolling */
         }
-        #saved-chats-list {
-            flex-grow: 1;
-            overflow-y: auto; /* Enable scrollbar here */
-            margin-top: 1rem;
+        /* The actual list that scrolls */
+        .sidebar-list {
+            flex-grow: 1; /* Allow list to fill container */
+            overflow-y: auto; /* Enable scrolling on the list */
+            margin-top: 0.5rem; /* Space above list */
         }
-        .chat-list-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; border-radius: 0.375rem; cursor: pointer; transition: background-color 0.2s ease-in-out; white-space: nowrap; /* Prevent wrapping when collapsing */ }
-        .chat-list-item:hover { background-color: #e5e7eb; /* gray-200 */ }
-        .chat-list-item.active { background-color: #dbeafe; /* blue-100 */ font-weight: 500; }
-        .delete-chat-btn { background: none; border: none; color: #ef4444; /* red-500 */ cursor: pointer; padding: 0.25rem; line-height: 1; opacity: 0.7; transition: opacity 0.2s; margin-left: 0.5rem; /* Add some space */ }
-        .delete-chat-btn:hover { opacity: 1; color: #dc2626; /* red-600 */ }
-        .chat-name-input { border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.3rem 0.5rem; width: 100%; }
+        /* Individual items in sidebar lists */
+        .list-item {
+            display: flex;
+            justify-content: space-between; /* Space out content */
+            align-items: center; /* Align vertically */
+            padding: 0.5rem;
+            border-radius: 0.375rem; /* Rounded corners */
+            cursor: pointer;
+            transition: background-color 0.2s ease-in-out; /* Hover effect */
+            white-space: nowrap; /* Prevent wrapping when collapsing */
+        }
+        .list-item:hover {
+            background-color: #e5e7eb; /* gray-200 */
+        }
+        /* Style for the active/selected list item */
+        .list-item.active {
+            background-color: #dbeafe; /* blue-100 */
+            font-weight: 500; /* Medium weight */
+        }
+        /* Styling for filename spans in lists */
+        .list-item .filename {
+            flex-grow: 1; /* Allow filename to take space */
+            overflow: hidden; /* Hide overflow */
+            text-overflow: ellipsis; /* Add ... for long names */
+            margin-right: 0.5rem; /* Space before size/delete button */
+            font-size: 0.9rem; /* Slightly smaller font */
+        }
+        /* Styling for filesize spans */
+        .list-item .filesize {
+            font-size: 0.75rem; /* Smaller text */
+            color: #6b7280; /* gray-500 */
+            flex-shrink: 0; /* Prevent shrinking */
+        }
+        /* Styling for delete buttons in lists */
+        .delete-btn {
+            background: none;
+            border: none;
+            color: #ef4444; /* red-500 */
+            cursor: pointer;
+            padding: 0.25rem;
+            line-height: 1;
+            opacity: 0.7; /* Slightly transparent */
+            transition: opacity 0.2s;
+            margin-left: 0.5rem; /* Space */
+            flex-shrink: 0; /* Prevent shrinking */
+        }
+        .delete-btn:hover {
+            opacity: 1; /* Fully opaque */
+            color: #dc2626; /* red-600 */
+        }
+        /* Input field for chat name */
+        .chat-name-input {
+            border: 1px solid #d1d5db; /* gray-300 */
+            border-radius: 0.375rem;
+            padding: 0.3rem 0.5rem;
+            width: 100%;
+        }
+        /* Container for a plugin section */
+        .plugin-section {
+            margin-bottom: 1rem;
+            border: 1px solid #d1d5db; /* gray-300 */
+            border-radius: 0.5rem;
+            background-color: white;
+        }
+        /* Header for a plugin section */
+        .plugin-header {
+            padding: 0.5rem 0.75rem;
+            background-color: #e5e7eb; /* gray-200 */
+            border-bottom: 1px solid #d1d5db; /* gray-300 */
+            font-weight: 500; /* Medium weight */
+            border-top-left-radius: 0.5rem; /* Match container rounding */
+            border-top-right-radius: 0.5rem;
+            cursor: pointer; /* Indicate collapsible (if implemented) */
+        }
+        /* Content area of a plugin */
+        .plugin-content {
+            padding: 0.75rem;
+            display: block; /* Default state */
+        }
+        /* Class to hide plugin content (for future collapsing) */
+        .plugin-content.hidden {
+            display: none;
+        }
 
-        /* Button styling */
-        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; transition: background-color 0.2s ease-in-out; cursor: pointer; border: 1px solid transparent; }
-        .btn-primary { background-color: #2563eb; /* blue-600 */ color: white; }
-        .btn-primary:hover { background-color: #1d4ed8; /* blue-700 */ }
-        .btn-secondary { background-color: #4b5563; /* gray-600 */ color: white; }
-        .btn-secondary:hover { background-color: #374151; /* gray-700 */ }
-        .btn-outline { border-color: #d1d5db; /* gray-300 */ color: #374151; /* gray-700 */ background-color: white; }
-        .btn-outline:hover { background-color: #f9fafb; /* gray-50 */ }
-        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn i.fa-plus, .btn i.fa-paper-plane { margin-right: 0.5rem; } /* Keep margin for specific icons */
-        .btn i.fa-save { margin-right: 0; } /* No margin for save icon in small button */
+        /* General Button Styling */
+        .btn {
+            display: inline-flex; /* Align icon and text */
+            align-items: center;
+            justify-content: center; /* Center content */
+            padding: 0.5rem 1rem; /* Default padding */
+            border-radius: 0.375rem; /* Rounded corners */
+            font-weight: 500; /* Medium weight */
+            transition: background-color 0.2s ease-in-out; /* Hover effect */
+            cursor: pointer;
+            border: 1px solid transparent; /* Base border */
+        }
+        .btn-primary { background-color: #2563eb; color: white; } /* blue-600 */
+        .btn-primary:hover { background-color: #1d4ed8; } /* blue-700 */
+        .btn-secondary { background-color: #4b5563; color: white; } /* gray-600 */
+        .btn-secondary:hover { background-color: #374151; } /* gray-700 */
+        .btn-outline { border-color: #d1d5db; color: #374151; background-color: white; } /* gray-300, gray-700 */
+        .btn-outline:hover { background-color: #f9fafb; } /* gray-50 */
+        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; } /* Smaller button */
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; } /* Disabled state */
+        /* Add margin to icons inside buttons (if they have text) */
+        .btn i.fa-plus, .btn i.fa-paper-plane, .btn i.fa-upload { margin-right: 0.5rem; }
+        /* No margin for save icon in small button */
+        .btn i.fa-save { margin-right: 0; }
+
+        /* File Input Styling */
+        #file-upload-input { display: none; } /* Hide the default ugly file input */
+        #file-upload-label { cursor: pointer; } /* Make the label look clickable */
 
     </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="bg-gray-100"> <button id="sidebar-toggle-btn" title="Toggle Sidebar">
+<body class="bg-gray-100"> <button id="sidebar-toggle-btn" class="toggle-btn" title="Toggle Chat List">
         <i class="fas fa-chevron-left"></i> </button>
 
     <aside id="sidebar">
         <h2 class="text-xl font-semibold text-gray-800 mb-4 whitespace-nowrap">Chat Sessions</h2>
-
         <button id="new-chat-btn" class="btn btn-primary w-full mb-4 flex-shrink-0">
             <i class="fas fa-plus"></i> New Chat
         </button>
-
         <div class="mb-4 p-3 bg-white rounded-lg border border-gray-200 shadow-sm flex-shrink-0">
             <label for="current-chat-name" class="block text-sm font-medium text-gray-600 mb-1 whitespace-nowrap">Current Chat:</label>
             <div class="flex gap-2 items-center">
                  <input type="text" id="current-chat-name" class="chat-name-input flex-grow text-sm min-w-0" placeholder="Name this chat...">
                  <button id="save-chat-name-btn" class="btn btn-outline p-1.5 flex-shrink-0" title="Save Name">
-                     <i class="fas fa-save text-sm"></i>
-                 </button>
+                     <i class="fas fa-save text-sm"></i> </button>
             </div>
             <div id="current-chat-id-display" class="text-xs text-gray-400 mt-1 whitespace-nowrap">ID: -</div>
         </div>
-
-        <div class="flex flex-col min-h-0 flex-grow"> <h3 class="text-lg font-medium text-gray-700 mb-2 border-t pt-3 flex-shrink-0 whitespace-nowrap">Saved Chats</h3>
-            <div id="saved-chats-list-container"> <div id="saved-chats-list">
-                    <p class="text-gray-500 text-sm">Loading chats...</p>
-                    </div>
-            </div>
+        <div class="flex flex-col min-h-0 flex-grow sidebar-section-container"> <h3 class="text-lg font-medium text-gray-700 mb-1 border-t pt-3 flex-shrink-0 whitespace-nowrap">Saved Chats</h3>
+            <div id="saved-chats-list" class="sidebar-list"> <p class="text-gray-500 text-sm p-1">Loading chats...</p> </div>
         </div>
     </aside>
 
     <main id="main-content">
         <div id="chat-area">
             <div id="chatbox">
-                <div class="text-center text-gray-500 p-4">Initializing chat...</div>
-            </div>
+                <div class="system-msg p-4">Initializing chat...</div> </div>
         </div>
         <div id="input-area">
-            <textarea id="message-input" rows="2" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
-            <button id="send-button" class="btn btn-primary self-end flex-shrink-0" style="height: 42px;">
-                <i class="fas fa-paper-plane"></i> Send
-            </button>
+             <div id="selected-file-display" class="hidden mb-1">
+                 <span class="truncate">File attached: <strong id="selected-file-name"></strong></span> <button id="clear-file-btn" title="Remove File"><i class="fas fa-times-circle"></i></button> </div>
+             <div id="input-controls">
+                <textarea id="message-input" rows="2" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
+                <button id="send-button" class="btn btn-primary self-end flex-shrink-0" style="height: 42px;"> <i class="fas fa-paper-plane"></i> Send
+                </button>
+            </div>
         </div>
          <div id="status-bar" class="text-xs text-gray-500 px-4 py-1 border-t bg-gray-50 flex-shrink-0">Status: Idle</div>
     </main>
 
+    <aside id="plugins-sidebar">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4 whitespace-nowrap">Plugins</h2>
+
+        <div class="plugin-section flex flex-col flex-grow min-h-0"> <div class="plugin-header flex-shrink-0">
+                <i class="fas fa-file-alt mr-2"></i> Upload File
+            </div>
+            <div class="plugin-content flex flex-col flex-grow min-h-0 p-2">
+                <input type="file" id="file-upload-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv"> <label for="file-upload-input" id="file-upload-label" class="btn btn-secondary btn-sm w-full mb-2">
+                    <i class="fas fa-upload"></i> Add New File
+                </label>
+
+                <h4 class="text-sm font-medium text-gray-600 mb-1 flex-shrink-0">Attach Existing File:</h4>
+                 <div class="sidebar-section-container flex-grow"> <div id="uploaded-files-list" class="sidebar-list border rounded p-1 bg-white"> <p class="text-gray-500 text-xs p-1">Loading files...</p> </div>
+                </div>
+            </div>
+        </div>
+         </aside>
+
+    <button id="plugins-toggle-btn" class="toggle-btn" title="Toggle Plugins">
+        <i class="fas fa-chevron-right"></i> </button>
+
     <script>
-        // DOM Elements
+        // DOM Element References
         const chatbox = document.getElementById('chatbox');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
-        const sidebar = document.getElementById('sidebar');
+        const sidebar = document.getElementById('sidebar'); // Left sidebar
         const savedChatsList = document.getElementById('saved-chats-list');
         const newChatButton = document.getElementById('new-chat-btn');
         const currentChatNameInput = document.getElementById('current-chat-name');
         const saveChatNameButton = document.getElementById('save-chat-name-btn');
         const currentChatIdDisplay = document.getElementById('current-chat-id-display');
         const statusBar = document.getElementById('status-bar');
-        const sidebarToggleButton = document.getElementById('sidebar-toggle-btn'); // Toggle Button
-        const bodyElement = document.body; // Body element
+        const sidebarToggleButton = document.getElementById('sidebar-toggle-btn'); // Left toggle
+        const pluginsSidebar = document.getElementById('plugins-sidebar'); // Right sidebar
+        const pluginsToggleButton = document.getElementById('plugins-toggle-btn'); // Right toggle
+        const fileUploadInput = document.getElementById('file-upload-input'); // Hidden file input
+        const uploadedFilesList = document.getElementById('uploaded-files-list'); // List in plugin sidebar
+        const selectedFileDisplay = document.getElementById('selected-file-display'); // Area above input
+        const selectedFileName = document.getElementById('selected-file-name'); // Span for filename
+        const clearFileButton = document.getElementById('clear-file-btn'); // Button to clear selection
+        const bodyElement = document.body; // Reference to body for adding classes
 
-        // State
-        let currentChatId = null;
-        let isLoading = false; // Prevent multiple simultaneous operations
-        const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed'; // localStorage key
+        // Application State
+        let currentChatId = null; // ID of the currently active chat
+        let isLoading = false; // Flag to prevent concurrent operations
+        let selectedFileId = null; // ID of the file selected for attachment
+        const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed'; // localStorage key for left sidebar state
+        const PLUGINS_COLLAPSED_KEY = 'pluginsCollapsed'; // localStorage key for right sidebar state
+        const MAX_FILE_SIZE_MB = 5; // Frontend check to match backend limit
+        const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 
         // --- Utility Functions ---
+
+        /**
+         * Updates the status bar text and style.
+         * @param {string} message - The status message to display.
+         * @param {boolean} [isError=false] - Whether the status indicates an error.
+         */
         function updateStatus(message, isError = false) {
             statusBar.textContent = `Status: ${message}`;
+            // Apply different styles for error messages
             statusBar.className = `text-xs text-gray-500 px-4 py-1 border-t bg-gray-50 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50' : 'text-gray-500 bg-gray-50'}`;
-            console.log(`Status Update: ${message}`);
+            console.log(`Status Update: ${message}`); // Log status for debugging
         }
 
-        function setLoadingState(loading) {
+        /**
+         * Sets the loading state for UI elements, disabling/enabling them.
+         * @param {boolean} loading - Whether the application is currently loading.
+         * @param {string} [operation="Processing"] - The operation being performed (e.g., "Sending", "Uploading").
+         */
+        function setLoadingState(loading, operation = "Processing") {
             isLoading = loading;
+            // Disable/enable interactive elements
             messageInput.disabled = loading;
             sendButton.disabled = loading;
             newChatButton.disabled = loading;
             saveChatNameButton.disabled = loading;
-            sidebarToggleButton.disabled = loading; // Disable toggle during loading
-            // Disable chat list interaction while loading? Maybe not necessary.
-            sendButton.innerHTML = loading ? '<i class="fas fa-spinner fa-spin mr-2"></i> Sending...' : '<i class="fas fa-paper-plane mr-2"></i> Send';
+            sidebarToggleButton.disabled = loading;
+            pluginsToggleButton.disabled = loading;
+            fileUploadInput.disabled = loading;
+            clearFileButton.disabled = loading; // Disable clear button while loading
+
+            // Update send button text/icon
+            sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send';
+
             if (loading) {
-                updateStatus("Processing...");
+                updateStatus(`${operation}...`);
             } else {
                 updateStatus("Idle");
-                // Only focus if not collapsed (avoids potential layout shift issues)
+                // Restore focus to input only if left sidebar is not collapsed
                 if (!bodyElement.classList.contains('sidebar-collapsed')) {
                      messageInput.focus();
                 }
             }
         }
 
-        // --- Sidebar Toggle ---
-        function setSidebarCollapsed(collapsed) {
-            const icon = sidebarToggleButton.querySelector('i');
+        // --- Sidebar Toggle Functions ---
+
+        /**
+         * Toggles the collapsed state of a sidebar.
+         * @param {HTMLElement} sidebarElement - The sidebar element itself.
+         * @param {HTMLElement} toggleButton - The button used to toggle the sidebar.
+         * @param {boolean} collapsed - The desired collapsed state (true = collapsed, false = expanded).
+         * @param {string} storageKey - The localStorage key to store the state.
+         * @param {string} positionClass - The base class name ('sidebar' or 'plugins').
+         */
+        function setSidebarCollapsed(sidebarElement, toggleButton, collapsed, storageKey, positionClass) {
+            const icon = toggleButton.querySelector('i');
+            const bodyClass = `${positionClass}-collapsed`; // e.g., 'sidebar-collapsed'
+            const isLeft = positionClass === 'sidebar';
+            // Determine correct chevron icons based on sidebar position
+            const expandIcon = isLeft ? 'fa-chevron-left' : 'fa-chevron-right';
+            const collapseIcon = isLeft ? 'fa-chevron-right' : 'fa-chevron-left';
+
             if (collapsed) {
-                bodyElement.classList.add('sidebar-collapsed');
-                icon.classList.remove('fa-chevron-left');
-                icon.classList.add('fa-chevron-right');
-                sidebarToggleButton.title = "Expand Sidebar";
-                localStorage.setItem(SIDEBAR_COLLAPSED_KEY, 'true');
+                bodyElement.classList.add(bodyClass); // Add class to body to trigger CSS changes
+                icon.classList.remove(expandIcon);
+                icon.classList.add(collapseIcon); // Change icon direction
+                toggleButton.title = `Expand ${isLeft ? 'Chat List' : 'Plugins'}`; // Update tooltip
+                localStorage.setItem(storageKey, 'true'); // Save state
             } else {
-                bodyElement.classList.remove('sidebar-collapsed');
-                icon.classList.remove('fa-chevron-right');
-                icon.classList.add('fa-chevron-left');
-                sidebarToggleButton.title = "Collapse Sidebar";
-                localStorage.setItem(SIDEBAR_COLLAPSED_KEY, 'false');
+                bodyElement.classList.remove(bodyClass); // Remove class from body
+                icon.classList.remove(collapseIcon);
+                icon.classList.add(expandIcon); // Change icon direction
+                toggleButton.title = `Collapse ${isLeft ? 'Chat List' : 'Plugins'}`; // Update tooltip
+                localStorage.setItem(storageKey, 'false'); // Save state
             }
-             // Add a small delay for the transition before potentially focusing
-             setTimeout(() => {
-                if (!collapsed && !isLoading) {
-                    messageInput.focus();
-                }
-            }, 350); // Slightly longer than transition duration
+
+             // Restore focus to input after a short delay to allow transition, only if expanding
+             if (!collapsed && !isLoading) {
+                 setTimeout(() => messageInput.focus(), 350); // Delay slightly longer than CSS transition
+             }
         }
 
-        function toggleSidebar() {
-            setSidebarCollapsed(!bodyElement.classList.contains('sidebar-collapsed'));
+        /** Toggles the left (chat) sidebar. */
+        function toggleLeftSidebar() {
+            setSidebarCollapsed(sidebar, sidebarToggleButton, !bodyElement.classList.contains('sidebar-collapsed'), SIDEBAR_COLLAPSED_KEY, 'sidebar');
+        }
+
+        /** Toggles the right (plugins) sidebar. */
+        function toggleRightSidebar() {
+            setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, !bodyElement.classList.contains('plugins-collapsed'), PLUGINS_COLLAPSED_KEY, 'plugins');
         }
 
         // --- Chat Message Display ---
+
+        /**
+         * Adds a message to the chatbox UI.
+         * @param {string} role - 'user', 'assistant', or 'system'.
+         * @param {string} content - The message content (can include basic Markdown).
+         * @param {boolean} [isError=false] - Whether this is an error message.
+         */
         function addMessage(role, content, isError = false) {
             const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message');
-            if (isError) {
-                 messageDiv.classList.add('error-msg');
+
+            // Apply appropriate classes based on role/error status
+            if (role === 'system') {
+                messageDiv.classList.add('system-msg');
             } else {
-                messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg');
+                 messageDiv.classList.add('message');
+                 if (isError) {
+                     messageDiv.classList.add('error-msg');
+                 } else {
+                    messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg');
+                 }
             }
 
-            // Basic Markdown rendering (bold, italics, code blocks, inline code, newlines)
-            // Improved code block handling for escaping
+            // Basic Markdown rendering and HTML escaping
+            // Escape basic HTML, then apply Markdown, then handle newlines and attachment markers
             content = content
                 .replace(/&/g, '&amp;') // Escape '&' first
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
-                .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>') // Bold (gs for multiline)
-                .replace(/\*(.*?)\*/gs, '<em>$1</em>')     // Italics (gs for multiline)
+                // Bold and Italics (support multiline with 's' flag)
+                .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/gs, '<em>$1</em>')
+                // Code Blocks (escape content inside)
                 .replace(/```([\s\S]*?)```/g, (match, code) => {
-                    // Escape HTML inside code blocks
                     const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapedCode}</code></pre>`;
                  })
-                .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-sm font-mono">$1</code>') // Inline code
-                .replace(/\n/g, '<br>'); // Render newlines
+                // Inline Code
+                .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-sm font-mono">$1</code>')
+                // Style the attachment marker added in the backend history
+                .replace(/\[Attached file: '(.*?)' \(ID: \d+\)\]\n?/g, '<div class="attachment-marker">Attached file: $1</div>')
+                // Convert newlines to <br> tags
+                .replace(/\n/g, '<br>');
 
-            messageDiv.innerHTML = content;
-            chatbox.appendChild(messageDiv);
-            chatbox.scrollTop = chatbox.scrollHeight; // Scroll to bottom
+            messageDiv.innerHTML = content; // Set the processed HTML
+            chatbox.appendChild(messageDiv); // Add to chatbox
+            chatbox.scrollTop = chatbox.scrollHeight; // Scroll to the bottom
         }
 
+        /** Clears all messages from the chatbox. */
         function clearChatbox() {
             chatbox.innerHTML = '';
         }
 
-        // --- API Interaction ---
+        // --- File Handling Functions ---
 
-        // Fetch list of saved chats and populate sidebar
+        /**
+         * Formats file size in bytes to a human-readable string (KB, MB, etc.).
+         * @param {number} bytes - The file size in bytes.
+         * @returns {string} - Human-readable file size.
+         */
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            // Determine the correct size unit
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            // Format the number with 2 decimal places
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        /** Fetches the list of uploaded files from the backend and populates the plugin sidebar. */
+        async function loadUploadedFiles() {
+            updateStatus("Loading uploaded files...");
+            uploadedFilesList.innerHTML = '<p class="text-gray-500 text-xs p-1">Loading...</p>'; // Show loading state
+            try {
+                const response = await fetch('/api/files'); // GET request
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const files = await response.json();
+
+                uploadedFilesList.innerHTML = ''; // Clear previous list/loading indicator
+                if (files.length === 0) {
+                    uploadedFilesList.innerHTML = '<p class="text-gray-500 text-xs p-1">No files uploaded yet.</p>';
+                } else {
+                    // Create list items for each file
+                    files.forEach(file => {
+                        const listItem = document.createElement('div');
+                        listItem.classList.add('list-item', 'file-item'); // Add 'file-item' for easier selection
+                        listItem.dataset.fileId = file.id; // Store ID for selection
+                        listItem.dataset.filename = file.filename; // Store filename
+
+                        // Filename span (truncated)
+                        const nameSpan = document.createElement('span');
+                        nameSpan.textContent = file.filename;
+                        nameSpan.classList.add('filename'); // Apply styling
+                        nameSpan.title = file.filename; // Show full name on hover
+
+                        // Filesize span
+                        const sizeSpan = document.createElement('span');
+                        sizeSpan.textContent = formatFileSize(file.filesize);
+                        sizeSpan.classList.add('filesize'); // Apply styling
+
+                        listItem.appendChild(nameSpan);
+                        listItem.appendChild(sizeSpan);
+                        // Future: Add delete button here if needed
+                        // const deleteButton = document.createElement('button'); ...
+
+                        // Add click listener to select the file
+                        listItem.onclick = () => {
+                            selectFile(file.id, file.filename);
+                        };
+                        uploadedFilesList.appendChild(listItem);
+                    });
+                }
+                updateStatus("Uploaded files loaded.");
+                updateActiveFileListItem(); // Re-apply highlighting if a file was selected
+            } catch (error) {
+                console.error('Error loading uploaded files:', error);
+                uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>'; // Show error
+                updateStatus("Error loading files.", true);
+            }
+        }
+
+        /**
+         * Handles the 'change' event of the file input element. Reads the file,
+         * validates size, and sends it to the backend for saving.
+         * @param {Event} event - The file input change event.
+         */
+        function handleFileUpload(event) {
+            const file = event.target.files[0]; // Get the selected file
+            if (!file) return; // No file selected
+
+            // Frontend file size validation
+            if (file.size > MAX_FILE_SIZE_BYTES) {
+                 alert(`File "${file.name}" is too large (${formatFileSize(file.size)}). Maximum size is ${MAX_FILE_SIZE_MB} MB.`);
+                 fileUploadInput.value = ''; // Reset the input field
+                 return;
+            }
+
+            setLoadingState(true, "Uploading"); // Set loading state
+            updateStatus(`Reading file ${file.name}...`);
+
+            const reader = new FileReader(); // Use FileReader API to read content
+
+            // Callback for successful file read
+            reader.onload = async (e) => {
+                const content = e.target.result; // File content as text
+                updateStatus(`Uploading file ${file.name}...`);
+                try {
+                    // Send file data to the backend API
+                    const response = await fetch('/api/files', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ filename: file.name, content: content }),
+                    });
+
+                    if (!response.ok) { // Check for HTTP errors
+                        const errorData = await response.json(); // Try to get error message from backend
+                        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                    }
+
+                    const newFileData = await response.json(); // Get metadata of the saved file
+                    updateStatus(`File "${file.name}" uploaded successfully.`);
+                    await loadUploadedFiles(); // Refresh the file list in the sidebar
+                    selectFile(newFileData.id, newFileData.filename); // Automatically select the newly uploaded file
+
+                } catch (error) {
+                     console.error('Error uploading file:', error);
+                     updateStatus(`Error uploading ${file.name}: ${error.message}`, true);
+                     alert(`Error uploading ${file.name}: ${error.message}`); // Show error to user
+                } finally {
+                     setLoadingState(false); // Reset loading state
+                     fileUploadInput.value = ''; // Reset the input field regardless of success/failure
+                }
+            };
+
+            // Callback for file read errors
+            reader.onerror = (e) => {
+                 console.error('Error reading file:', e);
+                 updateStatus(`Error reading file ${file.name}.`, true);
+                 alert(`Error reading file ${file.name}.`);
+                 setLoadingState(false);
+                 fileUploadInput.value = ''; // Reset input
+            };
+
+            // Read the file as text (adjust to readAsArrayBuffer or readAsDataURL for binary files)
+            reader.readAsText(file);
+        }
+
+        /**
+         * Selects a file to be attached to the next message. Updates UI elements.
+         * @param {number} fileId - The ID of the file to select.
+         * @param {string} filename - The name of the file to select.
+         */
+        function selectFile(fileId, filename) {
+            selectedFileId = fileId; // Store the selected file ID
+            selectedFileName.textContent = filename; // Display the filename
+            selectedFileDisplay.classList.remove('hidden'); // Show the display area
+            updateStatus(`File "${filename}" attached.`);
+            updateActiveFileListItem(); // Highlight the selected file in the list
+
+            // Optional: Collapse the plugin sidebar after selection for convenience
+            // setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, true, PLUGINS_COLLAPSED_KEY, 'plugins');
+        }
+
+        /** Clears the currently selected file attachment. Updates UI elements. */
+        function clearFileSelection() {
+            if (!selectedFileId) return; // Do nothing if no file is selected
+            const previouslySelectedFilename = selectedFileName.textContent;
+            selectedFileId = null; // Clear the stored ID
+            selectedFileDisplay.classList.add('hidden'); // Hide the display area
+            selectedFileName.textContent = ''; // Clear the displayed name
+            updateStatus(`File "${previouslySelectedFilename}" detached.`);
+            updateActiveFileListItem(); // Remove highlighting from the list
+        }
+
+         /** Highlights the currently selected file in the plugin sidebar list. */
+        function updateActiveFileListItem() {
+            const items = uploadedFilesList.querySelectorAll('.file-item');
+            items.forEach(item => {
+                // Use == for comparison as dataset.fileId is string, selectedFileId might be number
+                if (item.dataset.fileId == selectedFileId) {
+                    item.classList.add('active'); // Add 'active' class
+                } else {
+                    item.classList.remove('active'); // Remove 'active' class
+                }
+            });
+        }
+
+
+        // --- API Interaction (Chats) ---
+
+        /** Fetches the list of saved chats and populates the left sidebar. */
         async function loadSavedChats() {
             updateStatus("Loading saved chats...");
             try {
-                const response = await fetch('/api/chats');
+                const response = await fetch('/api/chats'); // GET request
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const chats = await response.json();
 
-                savedChatsList.innerHTML = ''; // Clear previous list
+                savedChatsList.innerHTML = ''; // Clear list
                 if (chats.length === 0) {
-                    savedChatsList.innerHTML = '<p class="text-gray-500 text-sm px-1">No saved chats yet.</p>';
+                    savedChatsList.innerHTML = '<p class="text-gray-500 text-sm p-1">No saved chats yet.</p>';
                 } else {
+                    // Create list items for each chat
                     chats.forEach(chat => {
                         const listItem = document.createElement('div');
-                        listItem.classList.add('chat-list-item');
-                        listItem.dataset.chatId = chat.id; // Store chat ID on the element
+                        listItem.classList.add('list-item', 'chat-list-item');
+                        listItem.dataset.chatId = chat.id; // Store chat ID
 
+                        // Chat name span
                         const nameSpan = document.createElement('span');
-                        nameSpan.textContent = chat.name || `Chat ${chat.id}`; // Fallback name
-                        nameSpan.classList.add('truncate', 'flex-grow', 'mr-2');
-                        nameSpan.title = chat.name || `Chat ${chat.id}`; // Tooltip for long names
+                        nameSpan.textContent = chat.name || `Chat ${chat.id}`; // Display name or default
+                        nameSpan.classList.add('filename'); // Use consistent styling
+                        nameSpan.title = chat.name || `Chat ${chat.id}`; // Tooltip
 
+                        // Delete button
                         const deleteButton = document.createElement('button');
-                        deleteButton.classList.add('delete-chat-btn', 'flex-shrink-0'); // flex-shrink-0
-                        deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>';
+                        deleteButton.classList.add('delete-btn'); // Use consistent styling
+                        deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Trash icon
                         deleteButton.title = "Delete Chat";
+                        // Add click listener for deletion
                         deleteButton.onclick = (e) => {
                             e.stopPropagation(); // Prevent triggering loadChat
                             handleDeleteChat(chat.id, listItem);
@@ -319,283 +837,317 @@
                         listItem.appendChild(nameSpan);
                         listItem.appendChild(deleteButton);
 
+                        // Add click listener to load the chat
                         listItem.onclick = () => {
-                            if (chat.id !== currentChatId) {
+                            // Use != for type flexibility (string vs number)
+                            if (chat.id != currentChatId) {
                                 loadChat(chat.id);
                             }
                         };
                         savedChatsList.appendChild(listItem);
                     });
                 }
-                updateActiveChatListItem(); // Highlight the current chat if it's in the list
+                updateActiveChatListItem(); // Highlight the current chat
                 updateStatus("Saved chats loaded.");
             } catch (error) {
                 console.error('Error loading saved chats:', error);
-                savedChatsList.innerHTML = '<p class="text-red-500 text-sm px-1">Error loading chats.</p>';
+                savedChatsList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading chats.</p>'; // Show error
                 updateStatus("Error loading saved chats.", true);
             }
         }
 
-        // Create a new chat session
+        /** Creates a new chat session via the backend API. */
         async function startNewChat() {
-            if (isLoading) return;
-            setLoadingState(true);
+            if (isLoading) return; // Prevent concurrent operations
+            setLoadingState(true, "Creating Chat");
             updateStatus("Creating new chat...");
             try {
-                const response = await fetch('/api/chat', { method: 'POST' });
+                const response = await fetch('/api/chat', { method: 'POST' }); // POST request
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const newChat = await response.json();
-                await loadChat(newChat.id); // Load the newly created chat
-                await loadSavedChats(); // Refresh the sidebar list
+                const newChat = await response.json(); // Get new chat details
+                await loadChat(newChat.id); // Load the new chat
+                await loadSavedChats(); // Refresh the chat list
                 updateStatus(`New chat created (ID: ${newChat.id}).`);
-                 // Ensure sidebar is expanded when creating a new chat
-                 setSidebarCollapsed(false);
+                // Ensure left sidebar is expanded when creating a new chat
+                setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar');
+                clearFileSelection(); // Clear any attached file
             } catch (error) {
                 console.error('Error starting new chat:', error);
-                addMessage('system', `[Error creating new chat: ${error.message}]`, true);
+                addMessage('system', `[Error creating new chat: ${error.message}]`, true); // Show error in chat
                 updateStatus("Error creating new chat.", true);
             } finally {
-                setLoadingState(false);
+                setLoadingState(false); // Reset loading state
             }
         }
 
-        // Load a specific chat's history and details
+        /**
+         * Loads a specific chat's details and message history.
+         * @param {number} chatId - The ID of the chat to load.
+         */
         async function loadChat(chatId) {
-            if (isLoading) return;
-            setLoadingState(true);
+            if (isLoading) return; // Prevent concurrent operations
+            setLoadingState(true, "Loading Chat");
             updateStatus(`Loading chat ${chatId}...`);
-            clearChatbox();
-            addMessage('system', `Loading chat (ID: ${chatId})...`); // Placeholder message
+            clearChatbox(); // Clear existing messages
+            addMessage('system', `Loading chat (ID: ${chatId})...`); // Show loading message
 
             try {
-                const response = await fetch(`/api/chat/${chatId}`);
-                if (!response.ok) {
-                     if (response.status === 404) {
-                         throw new Error(`Chat with ID ${chatId} not found.`);
-                     } else {
-                         throw new Error(`HTTP error! status: ${response.status}`);
-                     }
-                }
-                const data = await response.json();
+                const response = await fetch(`/api/chat/${chatId}`); // GET request for specific chat
+                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
+                const data = await response.json(); // Get chat details and history
 
-                currentChatId = chatId;
+                currentChatId = chatId; // Set the active chat ID
                 clearChatbox(); // Clear loading message
 
-                // Update UI elements
-                currentChatNameInput.value = data.details.name || '';
-                currentChatIdDisplay.textContent = `ID: ${currentChatId}`;
+                // Update UI with chat details
+                currentChatNameInput.value = data.details.name || ''; // Set chat name input
+                currentChatIdDisplay.textContent = `ID: ${currentChatId}`; // Display chat ID
 
+                // Populate chatbox with history
                 if (data.history.length === 0) {
                     addMessage('system', 'This chat is empty. Start typing!');
                 } else {
                     data.history.forEach(msg => addMessage(msg.role, msg.content));
                 }
-                updateActiveChatListItem(); // Highlight in sidebar
+                updateActiveChatListItem(); // Highlight this chat in the sidebar list
                 updateStatus(`Chat ${chatId} loaded.`);
-                 // Ensure sidebar is expanded when loading a chat
-                 setSidebarCollapsed(false);
+                // Ensure left sidebar is expanded when loading a chat
+                setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar');
+                clearFileSelection(); // Clear any attached file when switching chats
 
             } catch (error) {
                 console.error('Error loading chat:', error);
                 clearChatbox();
-                addMessage('system', `[Error loading chat ${chatId}: ${error.message}]`, true);
-                // Maybe start a new chat if loading fails? Or show error state.
-                currentChatId = null; // Reset current chat ID on failure
+                addMessage('system', `[Error loading chat ${chatId}: ${error.message}]`, true); // Show error in chat
+                // Reset state if loading fails
+                currentChatId = null;
                 currentChatNameInput.value = '';
                 currentChatIdDisplay.textContent = 'ID: -';
                 updateStatus(`Error loading chat ${chatId}.`, true);
-                 updateActiveChatListItem();
+                 updateActiveChatListItem(); // Remove highlighting
             } finally {
-                setLoadingState(false);
+                setLoadingState(false); // Reset loading state
             }
         }
 
-        // Send user message to backend
+        /** Sends the user's message (and any attached file ID) to the backend. */
         async function sendMessage() {
             if (isLoading || !currentChatId) {
                  updateStatus("Cannot send message: No active chat or busy.", true);
                  return;
             }
-            const message = messageInput.value.trim();
-            if (!message) return;
+            const message = messageInput.value.trim(); // Get message text
 
-            addMessage('user', message); // Display user message immediately
-            messageInput.value = ''; // Clear input
-            setLoadingState(true);
+            // Require either a message or an attached file
+            if (!message && !selectedFileId) {
+                updateStatus("Cannot send: Type a message or attach a file.", true);
+                return;
+            }
+
+             // Determine the message content to display locally in the chat history
+             // If only a file is attached, use a placeholder message.
+             const effectiveMessage = message || (selectedFileId ? "(File attached)" : "");
+
+            // Prepare the message to display in the chatbox UI, including the attachment marker if needed
+            let displayMessage = effectiveMessage;
+            if (selectedFileId) {
+                 const filename = selectedFileName.textContent; // Get filename from the display area
+                 // Prepend the marker to the displayed message
+                 displayMessage = `<div class="attachment-marker">Attached file: ${filename}</div>${effectiveMessage}`;
+            }
+            // Add the user's message (with marker) to the chatbox immediately
+            addMessage('user', displayMessage);
+
+            messageInput.value = ''; // Clear the text input field
+            setLoadingState(true, "Sending"); // Set loading state
             updateStatus("Sending message...");
 
+            // Prepare the payload for the backend API
+            const payload = {
+                message: message, // Send the original text message content
+                attached_file_id: selectedFileId // Send the ID of the attached file (or null)
+            };
+
             try {
+                // Send the message and file ID to the backend
                 const response = await fetch(`/api/chat/${currentChatId}/message`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message }),
+                    body: JSON.stringify(payload),
                 });
 
-                if (!response.ok) {
-                     const errorData = await response.json();
+                if (!response.ok) { // Check for HTTP errors
+                     const errorData = await response.json(); // Try to get error details
                      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
                 }
 
-                const data = await response.json();
-                addMessage('assistant', data.reply);
+                const data = await response.json(); // Get the assistant's reply
+                addMessage('assistant', data.reply); // Add reply to the chatbox
                 updateStatus("Assistant replied.");
-                // Refresh saved chats to update timestamp/order after sending a message
-                await loadSavedChats();
+                await loadSavedChats(); // Refresh chat list (updates timestamp/order)
+                clearFileSelection(); // Detach the file after the message is successfully sent
 
             } catch (error) {
                 console.error('Error sending message:', error);
-                addMessage('assistant', `[Error: ${error.message}]`, true);
+                addMessage('assistant', `[Error: ${error.message}]`, true); // Show error in chat
                 updateStatus("Error sending message.", true);
             } finally {
-                 setLoadingState(false);
-                 // Update timestamp in sidebar implicitly if needed by re-sorting backend/frontend
-                 // For simplicity, we might only update the list visually on explicit save/load/new
+                 setLoadingState(false); // Reset loading state
             }
         }
 
-        // Save/Update the name of the current chat
+        /** Saves the current chat's name via the backend API. */
         async function handleSaveChatName() {
             if (isLoading || !currentChatId) {
                 updateStatus("Cannot save name: No active chat or busy.", true);
                 return;
             }
-            const newName = currentChatNameInput.value.trim();
-            if (!newName) {
-                // Allow saving an empty name to revert to default 'New Chat' potentially
-                // Or display validation:
-                // updateStatus("Cannot save: Name cannot be empty.", true);
-                // return;
-            }
+            const newName = currentChatNameInput.value.trim(); // Get name from input
 
-            setLoadingState(true); // Use general loading state
+            setLoadingState(true, "Saving Name");
             updateStatus(`Saving name for chat ${currentChatId}...`);
 
             try {
+                // Send PUT request to update the name
                 const response = await fetch(`/api/chat/${currentChatId}/name`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: newName || 'New Chat' }), // Send default if empty
+                    // Send 'New Chat' if the input is empty, otherwise send the trimmed name
+                    body: JSON.stringify({ name: newName || 'New Chat' }),
                 });
 
-                if (!response.ok) {
+                if (!response.ok) { // Check for HTTP errors
                     const errorData = await response.json();
                     throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
                 }
                 updateStatus(`Chat ${currentChatId} name saved as "${newName || 'New Chat'}".`);
-                await loadSavedChats(); // Refresh sidebar to show new name and potentially reorder
+                await loadSavedChats(); // Refresh chat list to show the new name/order
 
             } catch (error) {
                 console.error('Error saving chat name:', error);
                 updateStatus(`Error saving name: ${error.message}`, true);
-                // Optionally inform user in chatbox as well
-                // addMessage('system', `[Error saving chat name: ${error.message}]`, true);
             } finally {
-                setLoadingState(false);
+                setLoadingState(false); // Reset loading state
             }
         }
 
-        // Delete a chat
+        /**
+         * Deletes a chat via the backend API after confirmation.
+         * @param {number} chatId - The ID of the chat to delete.
+         * @param {HTMLElement} listItemElement - The list item element in the sidebar to remove.
+         */
         async function handleDeleteChat(chatId, listItemElement) {
-             if (isLoading) return;
-
-             const chatName = listItemElement.querySelector('span').textContent || `Chat ${chatId}`;
+             if (isLoading) return; // Prevent concurrent operations
+             // Get chat name for confirmation dialog
+             const chatName = listItemElement.querySelector('span.filename').textContent || `Chat ${chatId}`;
+             // Confirm deletion with the user
              if (!confirm(`Are you sure you want to delete "${chatName}"? This cannot be undone.`)) {
-                 return;
+                 return; // User cancelled
              }
-
-             setLoadingState(true);
+             setLoadingState(true, "Deleting Chat");
              updateStatus(`Deleting chat ${chatId}...`);
-
              try {
+                 // Send DELETE request to the backend
                  const response = await fetch(`/api/chat/${chatId}`, { method: 'DELETE' });
-                 if (!response.ok) {
-                     const errorData = await response.json();
-                     throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-                 }
+                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
                  updateStatus(`Chat ${chatId} deleted.`);
-                 listItemElement.remove(); // Remove from sidebar immediately
+                 listItemElement.remove(); // Remove the item from the sidebar list immediately
 
-                 // Check if saved chats list is now empty
-                 if (!savedChatsList.querySelector('.chat-list-item')) {
-                     savedChatsList.innerHTML = '<p class="text-gray-500 text-sm px-1">No saved chats yet.</p>';
+                 // Check if the list is now empty
+                 if (!savedChatsList.querySelector('.list-item')) {
+                     savedChatsList.innerHTML = '<p class="text-gray-500 text-sm p-1">No saved chats yet.</p>';
                  }
 
                  // If the deleted chat was the currently active one, start a new chat
-                 if (chatId === currentChatId) {
-                     await startNewChat(); // This will also expand sidebar if collapsed
-                 } else {
-                     // Just refresh the list in case order changed (though unlikely on delete)
-                     // No need to call loadSavedChats() again as we manually removed the item
+                 if (chatId == currentChatId) { // Use == for type flexibility
+                     await startNewChat(); // This will load a new chat and clear state
                  }
-
-
              } catch (error) {
                  console.error(`Error deleting chat ${chatId}:`, error);
                  updateStatus(`Error deleting chat: ${error.message}`, true);
-                 addMessage('system', `[Error deleting chat ${chatId}: ${error.message}]`, true);
+                 addMessage('system', `[Error deleting chat ${chatId}: ${error.message}]`, true); // Show error in chat
              } finally {
-                 setLoadingState(false);
+                 setLoadingState(false); // Reset loading state
              }
         }
 
-        // Highlight the active chat in the sidebar list
+        /** Highlights the currently active chat in the left sidebar list. */
         function updateActiveChatListItem() {
             const items = savedChatsList.querySelectorAll('.chat-list-item');
             items.forEach(item => {
-                // Use == for comparison as dataset.chatId is string, currentChatId is number
+                // Use == for comparison (dataset value is string, currentChatId is number)
                 if (item.dataset.chatId == currentChatId) {
-                    item.classList.add('active');
+                    item.classList.add('active'); // Add highlight class
                 } else {
-                    item.classList.remove('active');
+                    item.classList.remove('active'); // Remove highlight class
                 }
             });
         }
 
 
-        // --- Event Listeners ---
+        // --- Event Listeners Setup ---
+
+        // Send button click
         sendButton.addEventListener('click', sendMessage);
+        // Enter key in message input (unless Shift is pressed)
         messageInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
+                e.preventDefault(); // Prevent adding a newline
                 sendMessage();
             }
         });
 
+        // New chat button click
         newChatButton.addEventListener('click', startNewChat);
+        // Save chat name button click
         saveChatNameButton.addEventListener('click', handleSaveChatName);
-        // Optional: Save name on Enter key in the input field
+        // Enter key in chat name input
         currentChatNameInput.addEventListener('keypress', (e) => {
              if (e.key === 'Enter') {
-                 e.preventDefault();
+                 e.preventDefault(); // Prevent form submission (if applicable)
                  handleSaveChatName();
-                 currentChatNameInput.blur(); // Remove focus after saving
+                 currentChatNameInput.blur(); // Remove focus from input
              }
         });
 
-        // Sidebar Toggle Listener
-        sidebarToggleButton.addEventListener('click', toggleSidebar);
+        // Sidebar Toggle Button Listeners
+        sidebarToggleButton.addEventListener('click', toggleLeftSidebar);
+        pluginsToggleButton.addEventListener('click', toggleRightSidebar);
+
+        // File Plugin Listeners
+        fileUploadInput.addEventListener('change', handleFileUpload); // File input change
+        clearFileButton.addEventListener('click', clearFileSelection); // Clear selection button
 
 
-        // --- Initial Load ---
+        // --- Initial Application Load ---
+
+        /** Initializes the application on page load. */
         async function initializeApp() {
-            // Check initial sidebar state from localStorage
-            const initiallyCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
-            setSidebarCollapsed(initiallyCollapsed); // Apply initial state without transition flicker if possible
+            // Set initial collapsed states from localStorage
+            const chatSidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
+            const pluginSidebarCollapsed = localStorage.getItem(PLUGINS_COLLAPSED_KEY) === 'true';
+            // Apply initial states (without animation if possible, though handled by CSS)
+            setSidebarCollapsed(sidebar, sidebarToggleButton, chatSidebarCollapsed, SIDEBAR_COLLAPSED_KEY, 'sidebar');
+            setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, pluginSidebarCollapsed, PLUGINS_COLLAPSED_KEY, 'plugins');
 
-            await loadSavedChats(); // Load the list first
-            // Decide which chat to load initially
+            // Load initial data
+            await loadSavedChats(); // Load chat list first
+            await loadUploadedFiles(); // Load file list
+
+            // Determine which chat to load initially
+            // Load the most recent chat (first in the sorted list) if available
             const firstChatElement = savedChatsList.querySelector('.chat-list-item');
             if (firstChatElement) {
                  const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
                  await loadChat(mostRecentChatId);
             } else {
-                 // No saved chats exist, create a new one
+                 // If no chats exist, start a new one
                  await startNewChat();
             }
         }
 
-        // Start the application
+        // Start the application initialization process
         initializeApp();
 
     </script>
