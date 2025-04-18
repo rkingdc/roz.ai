@@ -1,7 +1,8 @@
 import os
 import sqlite3
 import json
-from flask import Flask, request, jsonify, render_template_string
+# Import render_template along with other Flask components
+from flask import Flask, request, jsonify, render_template_string, render_template
 # Make sure to install google-generativeai: pip install google-generativeai
 import google.generativeai as genai
 from dotenv import load_dotenv # Optional: for loading API key from .env file
@@ -29,7 +30,7 @@ else:
     model = None # No model if API key is missing
 
 # --- Flask App Setup ---
-app = Flask(__name__)
+app = Flask(__name__) # Flask will automatically look for templates in a 'templates' folder
 
 # --- Database Setup ---
 def init_db():
@@ -106,8 +107,9 @@ def run_plugin(plugin_name, data):
 # --- Flask Routes ---
 @app.route('/')
 def index():
-    """Serves the main HTML page."""
-    return render_template('main.html') # Defined at the bottom
+    """Serves the main HTML page from the templates folder."""
+    # Use render_template to serve 'main.html' from the 'templates' folder
+    return render_template('main.html')
 
 @app.route('/get_history', methods=['GET'])
 def get_history():
@@ -171,6 +173,7 @@ def send_message():
 
     return jsonify({"reply": assistant_reply})
 
+# --- Frontend HTML is now removed from here ---
 
 # --- Main Execution ---
 if __name__ == '__main__':
