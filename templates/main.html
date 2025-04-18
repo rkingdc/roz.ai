@@ -15,7 +15,7 @@
 
         /* roz.ai Theme Colors from JSON */
         :root {
-            --rz-toolbar: rgba(129, 90, 118, 0.36); /* Translucent, use opaque below */
+            --rz-toolbar: rgba(129, 90, 118, 0.36);
             --rz-toolbar-opaque: rgb(129, 90, 118); /* #815a76 */
             --rz-toolbar-text: rgb(176, 146, 87); /* #b09257 */
             --rz-frame: rgb(48, 48, 63); /* #30303f */
@@ -25,18 +25,16 @@
             --rz-tab-line: rgb(174, 163, 142); /* #aea38e */
             --rz-popup: rgb(224, 229, 236); /* #e0e5ec */
             --rz-popup-text: rgb(33, 34, 72); /* #212248 */
-            --rz-tab-loading: rgb(174, 163, 142); /* #aea38e */
-
-            /* Derived/Assigned */
+            --rz-tab-loading: rgb(174, 163, 142);
             --rz-sidebar-bg: var(--rz-toolbar-field);
             --rz-sidebar-text: var(--rz-toolbar-text);
             --rz-sidebar-border: var(--rz-toolbar-text);
-            --rz-sidebar-hover-bg: var(--rz-frame); /* Use frame for hover */
+            --rz-sidebar-hover-bg: var(--rz-frame);
             --rz-sidebar-active-bg: var(--rz-toolbar-text);
             --rz-sidebar-active-text: var(--rz-toolbar-field);
             --rz-button-primary-bg: var(--rz-toolbar-text);
             --rz-button-primary-text: var(--rz-toolbar-field);
-            --rz-button-primary-hover-bg: var(--rz-tab-line); /* Use tab_line for hover */
+            --rz-button-primary-hover-bg: var(--rz-tab-line);
             --rz-button-secondary-bg: var(--rz-frame);
             --rz-button-secondary-text: var(--rz-toolbar-text);
             --rz-button-secondary-hover-bg: var(--rz-toolbar-opaque);
@@ -46,7 +44,7 @@
             --rz-button-outline-hover-text: var(--rz-toolbar-text);
             --rz-user-message-bg: var(--rz-popup);
             --rz-user-message-text: var(--rz-popup-text);
-            --rz-assistant-message-bg: #e5e7eb; /* Keep assistant gray */
+            --rz-assistant-message-bg: #e5e7eb;
             --rz-assistant-message-text: #1f2937;
             --rz-tag-bg: var(--rz-popup);
             --rz-tag-text: var(--rz-popup-text);
@@ -54,6 +52,17 @@
             --rz-modal-bg: var(--rz-popup);
             --rz-modal-text: var(--rz-popup-text);
             --rz-modal-header-text: var(--rz-frame);
+            --rz-main-bg: var(--rz-popup);
+            --rz-chatbox-bg: #ffffff;
+            --rz-input-bg: var(--rz-popup);
+            --rz-input-text-bg: #ffffff;
+            --rz-input-border: var(--rz-tab-line);
+            --rz-input-text: var(--rz-popup-text);
+            --rz-input-focus-ring: var(--rz-toolbar-text);
+            --rz-header-bg: var(--rz-frame);
+            --rz-header-text: var(--rz-toolbar-field-text);
+            --rz-status-bar-bg: var(--rz-frame);
+            --rz-status-bar-text: var(--rz-tab-background-text);
         }
 
         /* Left Sidebar (Chats) */
@@ -65,14 +74,18 @@
         body.plugins-collapsed #plugins-sidebar { width: 0; padding-left: 0; padding-right: 0; border-left-width: 0; }
 
         /* Main Content Area */
-        #main-content { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; background-color: #ffffff; min-width: 0; }
-        #main-header { padding: 0.5rem 1rem; border-bottom: 1px solid #e5e7eb; background-color: #f9fafb; display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-shrink: 0; }
-        #model-selector { font-size: 0.875rem; padding: 0.25rem 0.5rem; border-radius: 0.375rem; border: 1px solid #d1d5db; background-color: white; color: #374151; }
+        #main-content { flex-grow: 1; display: flex; flex-direction: column; height: 100vh; background-color: var(--rz-main-bg); min-width: 0; }
+        #main-header { padding: 0.5rem 1rem; border-bottom: 1px solid var(--rz-frame); background-color: var(--rz-header-bg); color: var(--rz-header-text); display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-shrink: 0; }
+        #model-selector { font-size: 0.875rem; padding: 0.25rem 0.5rem; border-radius: 0.375rem; border: 1px solid var(--rz-tab-line); background-color: var(--rz-toolbar-field); color: var(--rz-toolbar-field-text); }
+        #model-selector option { background-color: var(--rz-toolbar-field); color: var(--rz-toolbar-field-text); }
 
         #chat-area { padding: 1rem; flex-grow: 1; display: flex; flex-direction: column; min-height: 0; }
-        #chatbox { flex-grow: 1; overflow-y: auto; margin-bottom: 1rem; border: 1px solid #e5e7eb; border-radius: 0.5rem; padding: 0.5rem; background-color: #f8fafc; }
-        #input-area { padding: 0 1rem 1rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid #e5e7eb; padding-top: 1rem; flex-shrink: 0; }
+        #chatbox { flex-grow: 1; overflow-y: auto; margin-bottom: 1rem; border: 1px solid #d1d5db; border-radius: 0.5rem; padding: 0.5rem; background-color: var(--rz-chatbox-bg); }
+        #input-area { padding: 0 1rem 1rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid #d1d5db; padding-top: 1rem; flex-shrink: 0; background-color: var(--rz-input-bg); }
         #input-controls { display: flex; align-items: center; gap: 0.5rem; }
+        #message-input { background-color: var(--rz-input-text-bg); border: 1px solid var(--rz-input-border); color: var(--rz-input-text); }
+        #message-input::placeholder { color: var(--rz-tab-background-text); }
+        #message-input:focus { outline: none; box-shadow: 0 0 0 2px var(--rz-input-focus-ring); border-color: var(--rz-input-focus-ring); }
 
         /* Selected Files Display Area */
         #selected-files-container { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; max-height: 5em; overflow-y: auto; padding-bottom: 0.25rem;}
@@ -96,32 +109,32 @@
         .assistant-msg { margin-right: auto; background-color: var(--rz-assistant-message-bg); color: var(--rz-assistant-message-text); }
         .error-msg { margin-right: auto; background-color: #fee2e2; color: #991b1b; font-style: italic; }
         .system-msg { text-align: center; font-size: 0.8rem; color: #6b7280; margin-bottom: 0.5rem; }
-        .message pre { margin-top: 0.5rem; background-color: var(--rz-frame); color: var(--rz-toolbar-field-text); } /* Use frame color for code bg */
-        .message .attachment-marker { display: block; font-size: 0.75rem; color: var(--rz-popup-text); font-style: italic; margin-bottom: 0.25rem; padding: 0.25rem 0.5rem; border-left: 2px solid var(--rz-tab-line); background-color: rgba(224, 229, 236, 0.5); } /* Use popup bg with alpha */
+        .message pre { margin-top: 0.5rem; background-color: var(--rz-frame); color: var(--rz-toolbar-field-text); padding: 0.5rem; border-radius: 0.25rem; }
+        .message .attachment-marker { display: block; font-size: 0.75rem; color: var(--rz-popup-text); font-style: italic; margin-bottom: 0.25rem; padding: 0.25rem 0.5rem; border-left: 2px solid var(--rz-tab-line); background-color: rgba(224, 229, 236, 0.5); }
         .message .attachment-marker.error-marker { color: #991b1b; border-left-color: #f87171; background-color: rgba(254, 202, 202, 0.3); }
 
         /* Scrollbar Styling */
         #chatbox::-webkit-scrollbar, #saved-chats-list::-webkit-scrollbar, #uploaded-files-list::-webkit-scrollbar, #selected-files-container::-webkit-scrollbar { width: 6px; height: 6px; }
-        #chatbox::-webkit-scrollbar-track, #saved-chats-list::-webkit-scrollbar-track, #uploaded-files-list::-webkit-scrollbar-track, #selected-files-container::-webkit-scrollbar-track { background: #e5e7eb; border-radius: 10px; }
-        #chatbox::-webkit-scrollbar-thumb, #saved-chats-list::-webkit-scrollbar-thumb, #uploaded-files-list::-webkit-scrollbar-thumb, #selected-files-container::-webkit-scrollbar-thumb { background: var(--rz-tab-line); border-radius: 10px; } /* Gold scroll thumb */
-        #chatbox::-webkit-scrollbar-thumb:hover, #saved-chats-list::-webkit-scrollbar-thumb:hover, #uploaded-files-list::-webkit-scrollbar-thumb:hover, #selected-files-container::-webkit-scrollbar-thumb:hover { background: var(--rz-toolbar-text); } /* Darker gold hover */
+        #chatbox::-webkit-scrollbar-track, #saved-chats-list::-webkit-scrollbar-track, #uploaded-files-list::-webkit-scrollbar-track, #selected-files-container::-webkit-scrollbar-track { background: var(--rz-popup); border-radius: 10px; }
+        #chatbox::-webkit-scrollbar-thumb, #saved-chats-list::-webkit-scrollbar-thumb, #uploaded-files-list::-webkit-scrollbar-thumb, #selected-files-container::-webkit-scrollbar-thumb { background: var(--rz-tab-line); border-radius: 10px; }
+        #chatbox::-webkit-scrollbar-thumb:hover, #saved-chats-list::-webkit-scrollbar-thumb:hover, #uploaded-files-list::-webkit-scrollbar-thumb:hover, #selected-files-container::-webkit-scrollbar-thumb:hover { background: var(--rz-toolbar-text); }
 
         /* Sidebar Specific Styling */
         .sidebar-section-container { flex-grow: 1; overflow-y: hidden; display: flex; flex-direction: column; min-height: 0; }
         .sidebar-list { flex-grow: 1; overflow-y: auto; margin-top: 0.5rem; }
         .list-item { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.5rem; border-radius: 0.375rem; transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; white-space: nowrap; color: var(--rz-sidebar-text); }
         .list-item:hover { background-color: var(--rz-sidebar-hover-bg); }
-        .list-item.active { background-color: var(--rz-sidebar-active-bg); color: var(--rz-sidebar-active-text); font-weight: 500; } /* Active chat highlight */
+        .list-item.active { background-color: var(--rz-sidebar-active-bg); color: var(--rz-sidebar-active-text); font-weight: 500; }
         .list-item .filename { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; margin-right: 0.5rem; font-size: 0.85rem; }
-        .list-item .filesize { font-size: 0.7rem; color: var(--rz-tab-background-text); flex-shrink: 0; margin-left: auto; padding-left: 0.5rem; } /* Greyish text for size */
-        .delete-btn { background: none; border: none; color: var(--rz-toolbar-opaque); cursor: pointer; padding: 0.25rem; line-height: 1; opacity: 0.8; transition: opacity 0.2s, color 0.2s; margin-left: 0.5rem; flex-shrink: 0; } /* Use toolbar opaque for delete */
-        .delete-btn:hover { opacity: 1; color: var(--rz-toolbar-text); } /* Gold hover */
-        .chat-name-input { border: 1px solid var(--rz-sidebar-border); border-radius: 0.375rem; padding: 0.3rem 0.5rem; width: 100%; background-color: var(--rz-frame); color: var(--rz-toolbar-field-text); } /* Dark input */
+        .list-item .filesize { font-size: 0.7rem; color: var(--rz-tab-background-text); flex-shrink: 0; margin-left: auto; padding-left: 0.5rem; }
+        .delete-btn { background: none; border: none; color: var(--rz-toolbar-opaque); cursor: pointer; padding: 0.25rem; line-height: 1; opacity: 0.8; transition: opacity 0.2s, color 0.2s; margin-left: 0.5rem; flex-shrink: 0; }
+        .delete-btn:hover { opacity: 1; color: var(--rz-toolbar-text); }
+        .chat-name-input { border: 1px solid var(--rz-sidebar-border); border-radius: 0.375rem; padding: 0.3rem 0.5rem; width: 100%; background-color: var(--rz-frame); color: var(--rz-toolbar-field-text); }
         .chat-name-input::placeholder { color: var(--rz-tab-background-text); }
 
         /* Plugin Section Styling */
         .plugin-section { margin-bottom: 1rem; border: 1px solid var(--rz-sidebar-border); border-radius: 0.5rem; background-color: var(--rz-sidebar-bg); }
-        .plugin-header { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background-color: var(--rz-frame); border-bottom: 1px solid var(--rz-sidebar-border); color: var(--rz-sidebar-text); font-weight: 500; border-top-left-radius: 0.5rem; border-top-right-radius: 0.5rem; cursor: pointer; } /* Darker header */
+        .plugin-header { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background-color: var(--rz-frame); border-bottom: 1px solid var(--rz-sidebar-border); color: var(--rz-sidebar-text); font-weight: 500; border-top-left-radius: 0.5rem; border-top-right-radius: 0.5rem; cursor: pointer; }
         .plugin-header .toggle-icon { transition: transform 0.2s ease-in-out; color: var(--rz-sidebar-text); }
         .plugin-header.collapsed { border-bottom-color: transparent; }
         .plugin-header.collapsed .toggle-icon { transform: rotate(-90deg); }
@@ -131,12 +144,13 @@
         /* File List Item specific styles */
         .file-list-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 0.375rem; transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; white-space: nowrap; color: var(--rz-sidebar-text); }
         .file-list-item:hover { background-color: var(--rz-sidebar-hover-bg); }
-        .file-list-item.active-selection { background-color: var(--rz-sidebar-active-bg); color: var(--rz-sidebar-active-text); } /* Gold highlight for checkbox selection */
-        .file-list-item input[type="checkbox"] { margin-right: 0.5rem; cursor: pointer; accent-color: var(--rz-sidebar-active-bg); } /* Gold checkbox */
+        .file-list-item.active-selection { background-color: var(--rz-sidebar-active-bg); color: var(--rz-sidebar-active-text); }
+        .file-list-item input[type="checkbox"] { margin-right: 0.5rem; cursor: pointer; accent-color: var(--rz-sidebar-active-bg); }
         .file-list-item .filename { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; cursor: default; }
         .file-list-item .file-actions { display: flex; gap: 0.3rem; align-items: center; }
-        .file-actions .btn-xs { padding: 0.15rem 0.3rem; font-size: 0.7rem; line-height: 1; background-color: transparent; color: var(--rz-sidebar-text); border: 1px solid var(--rz-sidebar-text); } /* Outline summary button */
+        .file-actions .btn-xs { padding: 0.15rem 0.3rem; font-size: 0.7rem; line-height: 1; background-color: transparent; color: var(--rz-sidebar-text); border: 1px solid var(--rz-sidebar-text); }
         .file-actions .btn-xs:hover { background-color: var(--rz-sidebar-hover-bg); border-color: var(--rz-sidebar-hover-bg); }
+        .file-actions .btn-xs:disabled { opacity: 0.4; cursor: not-allowed; background-color: transparent !important; border-color: var(--rz-sidebar-text) !important; color: var(--rz-sidebar-text) !important; } /* Style disabled summary button */
         .file-actions .btn-xs i { margin-right: 0.2rem; }
 
         /* Button Styling */
@@ -157,7 +171,7 @@
         #file-upload-label { cursor: pointer; }
 
         /* Modal Styling */
-        #summary-modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(48, 48, 63, 0.7); } /* Use frame color with alpha */
+        #summary-modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(48, 48, 63, 0.7); }
         .modal-content { background-color: var(--rz-popup); margin: 10% auto; padding: 20px; border: 1px solid var(--rz-tab-line); width: 80%; max-width: 600px; border-radius: 0.5rem; position: relative; display: flex; flex-direction: column; max-height: 80vh; color: var(--rz-popup-text); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--rz-tab-line); padding-bottom: 0.5rem; margin-bottom: 1rem; color: var(--rz-popup-text); }
         .modal-title { font-size: 1.1rem; font-weight: 500; }
@@ -167,9 +181,15 @@
         #summary-textarea { width: 100%; min-height: 200px; height: 40vh; border: 1px solid var(--rz-tab-line); border-radius: 0.375rem; padding: 0.5rem; font-size: 0.9rem; resize: vertical; background-color: white; color: #374151; }
         #summary-status { min-height: 1.2em; color: var(--rz-popup-text); }
         .modal-footer { display: flex; justify-content: flex-end; gap: 0.5rem; border-top: 1px solid var(--rz-tab-line); padding-top: 1rem; }
-        /* Use primary button style (gold) for save in modal */
         #save-summary-btn.btn-primary { background-color: var(--rz-button-primary-bg); color: var(--rz-button-primary-text); border-color: var(--rz-button-primary-bg); }
         #save-summary-btn.btn-primary:hover { background-color: var(--rz-button-primary-hover-bg); border-color: var(--rz-button-primary-hover-bg); }
+
+        /* Status Bar Theming */
+        #status-bar {
+             background-color: var(--rz-status-bar-bg);
+             color: var(--rz-status-bar-text);
+             border-top: 1px solid var(--rz-frame); /* Match header border */
+        }
 
     </style>
 </head>
@@ -182,24 +202,27 @@
         <button id="new-chat-btn" class="btn btn-primary w-full mb-4 flex-shrink-0">
             <i class="fas fa-plus"></i> New Chat
         </button>
-        <div class="mb-4 p-3 bg-rz-frame rounded-lg border border-rz-sidebar-border shadow-sm flex-shrink-0"> <label for="current-chat-name" class="block text-sm font-medium text-rz-sidebar-text mb-1 whitespace-nowrap">Current Chat:</label>
+        <div class="mb-4 p-3 bg-rz-frame rounded-lg border border-rz-sidebar-border shadow-sm flex-shrink-0">
+            <label for="current-chat-name" class="block text-sm font-medium text-rz-sidebar-text mb-1 whitespace-nowrap">Current Chat:</label>
             <div class="flex gap-2 items-center">
                  <input type="text" id="current-chat-name" class="chat-name-input flex-grow text-sm min-w-0" placeholder="Name this chat...">
                  <button id="save-chat-name-btn" class="btn btn-outline p-1.5 flex-shrink-0" title="Save Name">
                      <i class="fas fa-save text-sm"></i>
                  </button>
             </div>
-            <div id="current-chat-id-display" class="text-xs text-rz-tab-background-text mt-1 whitespace-nowrap">ID: -</div> </div>
+            <div id="current-chat-id-display" class="text-xs text-rz-tab-background-text mt-1 whitespace-nowrap">ID: -</div>
+        </div>
         <div class="flex flex-col min-h-0 flex-grow sidebar-section-container">
             <h3 class="text-lg font-medium mb-1 border-t border-rz-sidebar-border pt-3 flex-shrink-0 whitespace-nowrap">Saved Chats</h3>
             <div id="saved-chats-list" class="sidebar-list">
-                <p class="text-rz-sidebar-text opacity-75 text-sm p-1">Loading chats...</p> </div>
+                <p class="text-rz-sidebar-text opacity-75 text-sm p-1">Loading chats...</p>
+            </div>
         </div>
     </aside>
 
     <main id="main-content">
         <div id="main-header">
-            <label for="model-selector" class="text-sm font-medium text-gray-700">Model:</label>
+            <label for="model-selector" class="text-sm font-medium">Model:</label>
             <select id="model-selector" class="model-selector">
                 {% for model in available_models %}
                     <option value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
@@ -213,44 +236,46 @@
             </div>
         </div>
         <div id="input-area">
-             <div id="selected-files-container" class="hidden">
-                 </div>
+             <div id="selected-files-container" class="hidden"></div>
              <div id="input-controls">
-                <textarea id="message-input" rows="2" class="flex-grow p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-rz-toolbar-text resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea> <button id="send-button" class="btn btn-primary self-end flex-shrink-0" style="height: 42px;">
+                <textarea id="message-input" rows="2" class="flex-grow p-2 rounded-lg focus:outline-none resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
+                <button id="send-button" class="btn btn-primary self-end flex-shrink-0" style="height: 42px;">
                     <i class="fas fa-paper-plane"></i> Send
                 </button>
             </div>
         </div>
-         <div id="status-bar" class="text-xs text-gray-500 px-4 py-1 border-t bg-gray-50 flex-shrink-0">Status: Idle</div>
+         <div id="status-bar" class="text-xs px-4 py-1 flex-shrink-0">Status: Idle</div>
     </main>
 
     <aside id="plugins-sidebar">
         <h2 class="text-xl font-semibold mb-4 whitespace-nowrap">Plugins</h2>
-
         <div class="plugin-section flex flex-col flex-grow min-h-0" id="file-plugin-section">
             <div class="plugin-header flex-shrink-0" id="file-plugin-header">
                 <span><i class="fas fa-file-alt mr-2"></i> Upload File</span>
                 <i class="fas fa-chevron-down toggle-icon"></i>
             </div>
             <div class="plugin-content flex flex-col flex-grow min-h-0 p-2" id="file-plugin-content">
-                <input type="file" id="file-upload-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv" multiple>
-                <label for="file-upload-input" id="file-upload-label" class="btn btn-secondary btn-sm w-full mb-2 flex-shrink-0"> <i class="fas fa-upload"></i> Add New File(s)
+                <input type="file" id="file-upload-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3" multiple>
+                <label for="file-upload-input" id="file-upload-label" class="btn btn-secondary btn-sm w-full mb-2 flex-shrink-0">
+                    <i class="fas fa-upload"></i> Add New File(s)
                 </label>
-
                 <h4 class="text-sm font-medium text-rz-sidebar-text mb-1 flex-shrink-0">Available Files:</h4>
                  <div class="sidebar-section-container flex-grow mb-2">
-                    <div id="uploaded-files-list" class="sidebar-list border border-rz-sidebar-border rounded p-1 bg-rz-sidebar-bg"> <p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading files...</p>
-                        </div>
+                    <div id="uploaded-files-list" class="sidebar-list border border-rz-sidebar-border rounded p-1 bg-rz-sidebar-bg">
+                        <p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading files...</p>
+                    </div>
                 </div>
                 <div class="flex gap-2 flex-shrink-0">
-                    <button id="attach-full-btn" class="btn btn-outline btn-sm flex-grow"> <i class="fas fa-book-open"></i> Attach Full
+                    <button id="attach-full-btn" class="btn btn-outline btn-sm flex-grow">
+                        <i class="fas fa-book-open"></i> Attach Full
                     </button>
-                     <button id="attach-summary-btn" class="btn btn-outline btn-sm flex-grow"> <i class="fas fa-list-alt"></i> Attach Summary
+                     <button id="attach-summary-btn" class="btn btn-outline btn-sm flex-grow">
+                        <i class="fas fa-list-alt"></i> Attach Summary
                     </button>
                 </div>
             </div>
         </div>
-         </aside>
+    </aside>
 
     <button id="plugins-toggle-btn" class="toggle-btn" title="Toggle Plugins">
         <i class="fas fa-chevron-right"></i>
@@ -265,17 +290,18 @@
             <div class="modal-body">
                 <p class="text-sm mb-2">Filename: <strong id="summary-modal-filename"></strong></p>
                 <textarea id="summary-textarea" placeholder="Loading or generating summary..."></textarea>
-                <p id="summary-status" class="text-xs mt-1"></p> </div>
+                <p id="summary-status" class="text-xs mt-1"></p>
+            </div>
             <div class="modal-footer">
-                <button id="save-summary-btn" class="btn btn-primary btn-sm"> <i class="fas fa-save mr-1"></i> Save Summary
+                <button id="save-summary-btn" class="btn btn-primary btn-sm">
+                    <i class="fas fa-save mr-1"></i> Save Summary
                 </button>
             </div>
         </div>
     </div>
 
-
     <script>
-        // DOM Element References
+        // DOM Element References (Unchanged)
         const chatbox = document.getElementById('chatbox');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
@@ -305,80 +331,63 @@
         const summaryStatus = document.getElementById('summary-status');
         const modelSelector = document.getElementById('model-selector');
 
-
-        // Application State
+        // Application State (Unchanged)
         let currentChatId = null;
         let isLoading = false;
-        let selectedFiles = []; // Array for {id, filename, type}
+        let selectedFiles = [];
         let currentEditingFileId = null;
         const defaultModel = modelSelector.value;
         const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
         const PLUGINS_COLLAPSED_KEY = 'pluginsCollapsed';
         const FILE_PLUGIN_COLLAPSED_KEY = 'filePluginCollapsed';
-        const MAX_FILE_SIZE_MB = 5;
+        const MAX_FILE_SIZE_MB = 10; // Match backend
         const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+        const TEXT_FILE_EXTENSIONS = ['txt', 'py', 'js', 'html', 'css', 'md', 'json', 'csv'];
 
 
-        // --- Utility Functions ---
-        /** Updates the status bar text and style. */
-        function updateStatus(message, isError = false) {
-            statusBar.textContent = `Status: ${message}`;
-            statusBar.className = `text-xs text-gray-500 px-4 py-1 border-t bg-gray-50 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50' : 'text-gray-500 bg-gray-50'}`;
-            console.log(`Status Update: ${message}`);
-        }
+        // --- Utility Functions (Unchanged) ---
+        function updateStatus(message, isError = false) { statusBar.textContent = `Status: ${message}`; statusBar.className = `text-xs px-4 py-1 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50 border-t border-red-200' : 'text-rz-status-bar-text bg-rz-status-bar-bg border-t border-rz-frame'}`; console.log(`Status Update: ${message}`); }
+        function setLoadingState(loading, operation = "Processing") { isLoading = loading; messageInput.disabled = loading; sendButton.disabled = loading; newChatButton.disabled = loading; saveChatNameButton.disabled = loading; sidebarToggleButton.disabled = loading; pluginsToggleButton.disabled = loading; fileUploadInput.disabled = loading; attachFullButton.disabled = loading; attachSummaryButton.disabled = loading; saveSummaryButton.disabled = loading; modelSelector.disabled = loading; uploadedFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading); selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading); sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send'; if (loading) { updateStatus(`${operation}...`); } else { updateStatus("Idle"); if (!bodyElement.classList.contains('sidebar-collapsed')) { messageInput.focus(); } } }
 
-        /** Sets the loading state for UI elements, disabling/enabling them. */
-        function setLoadingState(loading, operation = "Processing") {
-            isLoading = loading;
-            messageInput.disabled = loading;
-            sendButton.disabled = loading;
-            newChatButton.disabled = loading;
-            saveChatNameButton.disabled = loading;
-            sidebarToggleButton.disabled = loading;
-            pluginsToggleButton.disabled = loading;
-            fileUploadInput.disabled = loading;
-            attachFullButton.disabled = loading;
-            attachSummaryButton.disabled = loading;
-            saveSummaryButton.disabled = loading;
-            modelSelector.disabled = loading;
-
-            uploadedFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading);
-            selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading);
-
-            sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send';
-            if (loading) { updateStatus(`${operation}...`); }
-            else { updateStatus("Idle"); if (!bodyElement.classList.contains('sidebar-collapsed')) { messageInput.focus(); } }
-        }
-
-        // --- Sidebar & Plugin Toggle Functions ---
-        /** Generic function to toggle the collapsed state of a sidebar (left or right). */
-        function setSidebarCollapsed(sidebarElement, toggleButton, collapsed, storageKey, positionClass) {
-            const icon = toggleButton.querySelector('i'); const bodyClass = `${positionClass}-collapsed`; const isLeft = positionClass === 'sidebar'; const expandIcon = isLeft ? 'fa-chevron-left' : 'fa-chevron-right'; const collapseIcon = isLeft ? 'fa-chevron-right' : 'fa-chevron-left'; if (collapsed) { bodyElement.classList.add(bodyClass); icon.classList.remove(expandIcon); icon.classList.add(collapseIcon); toggleButton.title = `Expand ${isLeft ? 'Chat List' : 'Plugins'}`; localStorage.setItem(storageKey, 'true'); } else { bodyElement.classList.remove(bodyClass); icon.classList.remove(collapseIcon); icon.classList.add(expandIcon); toggleButton.title = `Collapse ${isLeft ? 'Chat List' : 'Plugins'}`; localStorage.setItem(storageKey, 'false'); } if (!collapsed && !isLoading) { setTimeout(() => messageInput.focus(), 350); }
-        }
-        /** Toggles the left (chat) sidebar. */
+        // --- Sidebar & Plugin Toggle Functions (Unchanged) ---
+        function setSidebarCollapsed(sidebarElement, toggleButton, collapsed, storageKey, positionClass) { const icon = toggleButton.querySelector('i'); const bodyClass = `${positionClass}-collapsed`; const isLeft = positionClass === 'sidebar'; const expandIcon = isLeft ? 'fa-chevron-left' : 'fa-chevron-right'; const collapseIcon = isLeft ? 'fa-chevron-right' : 'fa-chevron-left'; if (collapsed) { bodyElement.classList.add(bodyClass); icon.classList.remove(expandIcon); icon.classList.add(collapseIcon); toggleButton.title = `Expand ${isLeft ? 'Chat List' : 'Plugins'}`; localStorage.setItem(storageKey, 'true'); } else { bodyElement.classList.remove(bodyClass); icon.classList.remove(collapseIcon); icon.classList.add(expandIcon); toggleButton.title = `Collapse ${isLeft ? 'Chat List' : 'Plugins'}`; localStorage.setItem(storageKey, 'false'); } if (!collapsed && !isLoading) { setTimeout(() => messageInput.focus(), 350); } }
         function toggleLeftSidebar() { setSidebarCollapsed(sidebar, sidebarToggleButton, !bodyElement.classList.contains('sidebar-collapsed'), SIDEBAR_COLLAPSED_KEY, 'sidebar'); }
-        /** Toggles the right (plugins) sidebar. */
         function toggleRightSidebar() { setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, !bodyElement.classList.contains('plugins-collapsed'), PLUGINS_COLLAPSED_KEY, 'plugins'); }
-        /** Toggles the collapsed state of a plugin section within a sidebar. */
         function setPluginSectionCollapsed(headerElement, contentElement, collapsed, storageKey) { const icon = headerElement.querySelector('.toggle-icon'); if (collapsed) { headerElement.classList.add('collapsed'); contentElement.classList.add('hidden'); if (icon) { icon.classList.remove('fa-chevron-down'); icon.classList.add('fa-chevron-up'); } localStorage.setItem(storageKey, 'true'); } else { headerElement.classList.remove('collapsed'); contentElement.classList.remove('hidden'); if (icon) { icon.classList.remove('fa-chevron-up'); icon.classList.add('fa-chevron-down'); } localStorage.setItem(storageKey, 'false'); } }
-        /** Toggles the collapse state of the file plugin section specifically. */
         function toggleFilePlugin() { const isCollapsed = filePluginContent.classList.contains('hidden'); setPluginSectionCollapsed(filePluginHeader, filePluginContent, !isCollapsed, FILE_PLUGIN_COLLAPSED_KEY); }
 
-        // --- Chat Message Display ---
-        /** Adds a message to the chatbox UI, rendering Markdown and styling attachments. */
+        // --- Chat Message Display (Unchanged) ---
         function addMessage(role, content, isError = false) { const messageDiv = document.createElement('div'); if (role === 'system') { messageDiv.classList.add('system-msg'); } else { messageDiv.classList.add('message'); if (isError) messageDiv.classList.add('error-msg'); else messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg'); } content = content .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>').replace(/\*(.*?)\*/gs, '<em>$1</em>') .replace(/```([\s\S]*?)```/g, (match, code) => `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`) .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-sm font-mono">$1</code>') .replace(/\[Attached File: '(.*?)' \(ID: \d+, Type: (full|summary)\)\]\n?/gi, '<div class="attachment-marker">Attached $2: $1</div>') .replace(/\[Error attaching (full file|summary): '(.*?)' \(ID: \d+\)\]\n?/gi, '<div class="attachment-marker error-marker">Error attaching $1: $2</div>') .replace(/\n/g, '<br>'); messageDiv.innerHTML = content; chatbox.appendChild(messageDiv); chatbox.scrollTop = chatbox.scrollHeight; }
-        /** Clears all messages from the chatbox. */
         function clearChatbox() { chatbox.innerHTML = ''; }
 
         // --- File Handling & Selection Functions ---
         /** Formats file size in bytes to a human-readable string. */
         function formatFileSize(bytes) { if (bytes === 0) return '0 Bytes'; const k = 1024; const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; }
+        /** Checks if a filename likely represents a text file based on extension. */
+        function isTextFile(filename) { const extension = filename.split('.').pop()?.toLowerCase(); return extension && TEXT_FILE_EXTENSIONS.includes(extension); }
+
         /** Loads the list of uploaded files into the plugin sidebar. */
-        async function loadUploadedFiles() { updateStatus("Loading uploaded files..."); uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`; try { const response = await fetch('/api/files'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const files = await response.json(); uploadedFilesList.innerHTML = ''; if (files.length === 0) { uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`; } else { files.forEach(file => { const itemDiv = document.createElement('div'); itemDiv.classList.add('file-list-item'); itemDiv.dataset.fileId = file.id; itemDiv.dataset.filename = file.filename; itemDiv.dataset.hasSummary = file.has_summary; const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = file.id; checkbox.classList.add('file-checkbox'); checkbox.title = "Select file"; checkbox.addEventListener('change', (e) => { if (e.target.checked) itemDiv.classList.add('active-selection'); else itemDiv.classList.remove('active-selection'); }); const nameSpan = document.createElement('span'); nameSpan.textContent = file.filename; nameSpan.classList.add('filename'); nameSpan.title = file.filename; const actionsDiv = document.createElement('div'); actionsDiv.classList.add('file-actions'); const summaryBtn = document.createElement('button'); summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs'); summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i> Summary'; summaryBtn.title = "View/Edit Summary"; summaryBtn.onclick = (e) => { e.stopPropagation(); showSummaryModal(file.id, file.filename); }; actionsDiv.appendChild(summaryBtn); itemDiv.appendChild(checkbox); itemDiv.appendChild(nameSpan); itemDiv.appendChild(actionsDiv); uploadedFilesList.appendChild(itemDiv); }); } updateStatus("Uploaded files loaded."); } catch (error) { console.error('Error loading uploaded files:', error); uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>'; updateStatus("Error loading files.", true); } }
-        /** Handles file input change event for uploading multiple files. */
-        function handleFileUpload(event) { const files = event.target.files; if (!files || files.length === 0) return; setLoadingState(true, "Uploading"); let uploadPromises = []; for (const file of files) { if (file.size > MAX_FILE_SIZE_BYTES) { alert(`Skipping "${file.name}": File is too large (${formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`); continue; } const promise = new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = async (e) => { const content = e.target.result; try { const response = await fetch('/api/files', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: file.name, content: content }), }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } resolve(await response.json()); } catch (error) { console.error(`Error uploading ${file.name}:`, error); updateStatus(`Error uploading ${file.name}: ${error.message}`, true); reject(error); } }; reader.onerror = (e) => { console.error(`Error reading ${file.name}:`, e); updateStatus(`Error reading ${file.name}.`, true); reject(new Error(`Failed to read ${file.name}`)); }; reader.readAsText(file); }); uploadPromises.push(promise); } Promise.allSettled(uploadPromises).then(async (results) => { const successfulUploads = results.filter(r => r.status === 'fulfilled').length; const failedUploads = results.length - successfulUploads; updateStatus(`Uploaded ${successfulUploads} file(s). ${failedUploads > 0 ? `${failedUploads} failed.` : ''}`); await loadUploadedFiles(); setLoadingState(false); fileUploadInput.value = ''; }); }
+        async function loadUploadedFiles() {
+             updateStatus("Loading uploaded files..."); uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`; try { const response = await fetch('/api/files'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const files = await response.json(); uploadedFilesList.innerHTML = ''; if (files.length === 0) { uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`; } else { files.forEach(file => { const itemDiv = document.createElement('div'); itemDiv.classList.add('file-list-item'); itemDiv.dataset.fileId = file.id; itemDiv.dataset.filename = file.filename; itemDiv.dataset.hasSummary = file.has_summary; const fileIsText = isTextFile(file.filename); /* Check if text */ const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = file.id; checkbox.classList.add('file-checkbox'); checkbox.title = "Select file"; checkbox.addEventListener('change', (e) => { if (e.target.checked) itemDiv.classList.add('active-selection'); else itemDiv.classList.remove('active-selection'); }); const nameSpan = document.createElement('span'); nameSpan.textContent = file.filename; nameSpan.classList.add('filename'); nameSpan.title = file.filename; const actionsDiv = document.createElement('div'); actionsDiv.classList.add('file-actions'); const summaryBtn = document.createElement('button'); summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs'); summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i> Summary'; summaryBtn.title = fileIsText ? "View/Edit Summary" : "Summary only available for text files"; summaryBtn.disabled = !fileIsText; /* Disable for non-text */ summaryBtn.onclick = (e) => { e.stopPropagation(); if(fileIsText) showSummaryModal(file.id, file.filename); }; actionsDiv.appendChild(summaryBtn); itemDiv.appendChild(checkbox); itemDiv.appendChild(nameSpan); itemDiv.appendChild(actionsDiv); uploadedFilesList.appendChild(itemDiv); }); } updateStatus("Uploaded files loaded."); } catch (error) { console.error('Error loading uploaded files:', error); uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>'; updateStatus("Error loading files.", true); }
+        }
+
+        /** Handles file input change event, uploads files using FormData. */
+        function handleFileUpload(event) {
+             const files = event.target.files; if (!files || files.length === 0) return;
+             setLoadingState(true, "Uploading");
+             const formData = new FormData(); // Use FormData for file uploads
+             let fileCount = 0;
+             for (const file of files) { if (file.size > MAX_FILE_SIZE_BYTES) { alert(`Skipping "${file.name}": File is too large (${formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`); continue; } formData.append('file', file); fileCount++; }
+             if (fileCount === 0) { setLoadingState(false); fileUploadInput.value = ''; updateStatus("No valid files selected for upload.", true); return; }
+             // Send FormData to the backend
+             fetch('/api/files', { method: 'POST', body: formData })
+             .then(async response => { const data = await response.json(); if (!response.ok) { throw new Error(data.error || `HTTP error! status: ${response.status}`); } const successfulUploads = data.uploaded_files?.length || 0; const errors = data.errors || []; let statusMsg = `Uploaded ${successfulUploads} file(s).`; if (errors.length > 0) { statusMsg += ` ${errors.length} failed: ${errors.join('; ')}`; console.warn("Upload errors:", errors); } updateStatus(statusMsg, errors.length > 0); })
+             .catch(error => { console.error('Error uploading files:', error); updateStatus(`Error uploading files: ${error.message}`, true); })
+             .finally(async () => { await loadUploadedFiles(); setLoadingState(false); fileUploadInput.value = ''; });
+        }
+
         /** Adds files selected via checkboxes to the `selectedFiles` array with the specified type. */
-        function attachSelectedFiles(type) { const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked'); if (checkboxes.length === 0) { updateStatus("No files selected to attach.", true); return; } let addedCount = 0; checkboxes.forEach(checkbox => { const fileId = parseInt(checkbox.value); const listItem = checkbox.closest('.file-list-item'); const filename = listItem.dataset.filename; const alreadySelected = selectedFiles.some(f => f.id === fileId && f.type === type); if (!alreadySelected) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId)); selectedFiles.push({ id: fileId, filename: filename, type: type }); addedCount++; } checkbox.checked = false; listItem.classList.remove('active-selection'); }); renderSelectedFiles(); if (addedCount > 0) { updateStatus(`${addedCount} file(s) added as ${type}.`); } else { updateStatus(`Selected file(s) already attached as ${type}.`); } }
+        function attachSelectedFiles(type) { const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked'); if (checkboxes.length === 0) { updateStatus("No files selected to attach.", true); return; } let addedCount = 0; let skippedSummaryCount = 0; checkboxes.forEach(checkbox => { const fileId = parseInt(checkbox.value); const listItem = checkbox.closest('.file-list-item'); const filename = listItem.dataset.filename; const fileIsText = isTextFile(filename); if (type === 'summary' && !fileIsText) { skippedSummaryCount++; checkbox.checked = false; listItem.classList.remove('active-selection'); return; } const alreadySelected = selectedFiles.some(f => f.id === fileId && f.type === type); if (!alreadySelected) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId)); selectedFiles.push({ id: fileId, filename: filename, type: type }); addedCount++; } checkbox.checked = false; listItem.classList.remove('active-selection'); }); renderSelectedFiles(); let statusMsg = ""; if(addedCount > 0) statusMsg += `${addedCount} file(s) added as ${type}. `; else if(skippedSummaryCount === 0) statusMsg += `Selected file(s) already attached as ${type}. `; if(skippedSummaryCount > 0) statusMsg += `${skippedSummaryCount} non-text file(s) skipped for summary attachment.`; updateStatus(statusMsg.trim(), skippedSummaryCount > 0); }
         /** Removes a specific file attachment from the `selectedFiles` array. */
         function removeSelectedFile(fileId, type) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId && f.type === type)); renderSelectedFiles(); updateStatus(`File attachment removed.`); }
         /** Renders the `selectedFiles` array as tags in the display area above the input. */
@@ -386,26 +395,19 @@
 
         // --- Summary Modal Functions ---
         /** Shows the summary modal, fetching or generating the summary via API. */
-        async function showSummaryModal(fileId, filename) { currentEditingFileId = fileId; summaryModalFilename.textContent = filename; summaryTextarea.value = ""; summaryTextarea.placeholder = "Loading or generating summary..."; summaryStatus.textContent = ""; summaryStatus.classList.remove('text-red-500'); summaryModal.style.display = "block"; saveSummaryButton.disabled = true; updateStatus(`Fetching summary for ${filename}...`); try { const response = await fetch(`/api/files/${fileId}/summary`); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } const data = await response.json(); summaryTextarea.value = data.summary; summaryTextarea.placeholder = "Enter or edit summary here."; saveSummaryButton.disabled = false; updateStatus(`Summary loaded for ${filename}.`); if (data.summary.startsWith("[Error")) { summaryStatus.textContent = "Could not generate summary automatically. You can write one manually."; summaryStatus.classList.add('text-red-500'); } else { summaryStatus.textContent = "Summary loaded. You can edit and save changes."; } } catch (error) { console.error("Error fetching summary:", error); summaryTextarea.value = `[Error loading summary: ${error.message}]`; summaryTextarea.placeholder = "Could not load summary."; updateStatus(`Error fetching summary for ${filename}.`, true); summaryStatus.textContent = `Error: ${error.message}`; summaryStatus.classList.add('text-red-500'); } }
-        /** Saves the edited summary via the backend API (PUT request). */
-        async function saveSummary() { if (!currentEditingFileId || isLoading) return; const updatedSummary = summaryTextarea.value; setLoadingState(true, "Saving Summary"); summaryStatus.textContent = "Saving..."; summaryStatus.classList.remove('text-red-500'); try { const response = await fetch(`/api/files/${currentEditingFileId}/summary`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: updatedSummary }) }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } updateStatus("Summary saved successfully."); summaryStatus.textContent = "Summary saved!"; await loadUploadedFiles(); } catch (error) { console.error("Error saving summary:", error); updateStatus("Error saving summary.", true); summaryStatus.textContent = `Error saving: ${error.message}`; summaryStatus.classList.add('text-red-500'); } finally { setLoadingState(false); } }
+        async function showSummaryModal(fileId, filename) { currentEditingFileId = fileId; summaryModalFilename.textContent = filename; summaryTextarea.value = ""; summaryTextarea.placeholder = "Loading or generating summary..."; summaryStatus.textContent = ""; summaryStatus.classList.remove('text-red-500'); summaryModal.style.display = "block"; saveSummaryButton.disabled = true; updateStatus(`Fetching summary for ${filename}...`); try { const response = await fetch(`/api/files/${fileId}/summary`); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } const data = await response.json(); summaryTextarea.value = data.summary; summaryTextarea.placeholder = "Enter or edit summary here."; saveSummaryButton.disabled = false; updateStatus(`Summary loaded for ${filename}.`); if (data.summary.startsWith("[Error") || data.summary.startsWith("[Summary not applicable")) { summaryStatus.textContent = data.summary; summaryStatus.classList.add('text-red-500'); saveSummaryButton.disabled = data.summary.startsWith("[Summary not applicable"); } else { summaryStatus.textContent = "Summary loaded. You can edit and save changes."; } } catch (error) { console.error("Error fetching summary:", error); summaryTextarea.value = `[Error loading summary: ${error.message}]`; summaryTextarea.placeholder = "Could not load summary."; updateStatus(`Error fetching summary for ${filename}.`, true); summaryStatus.textContent = `Error: ${error.message}`; summaryStatus.classList.add('text-red-500'); } }
+        /** Saves the edited summary via the backend API (PUT request). Closes modal on success. */
+        async function saveSummary() { if (!currentEditingFileId || isLoading) return; const updatedSummary = summaryTextarea.value; setLoadingState(true, "Saving Summary"); summaryStatus.textContent = "Saving..."; summaryStatus.classList.remove('text-red-500'); try { const response = await fetch(`/api/files/${currentEditingFileId}/summary`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: updatedSummary }) }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } updateStatus("Summary saved successfully."); summaryStatus.textContent = "Summary saved!"; await loadUploadedFiles(); closeModal(); /* Close modal on success */ } catch (error) { console.error("Error saving summary:", error); updateStatus("Error saving summary.", true); summaryStatus.textContent = `Error saving: ${error.message}`; summaryStatus.classList.add('text-red-500'); } finally { setLoadingState(false); } }
         /** Closes the summary modal dialog. */
         function closeModal() { summaryModal.style.display = "none"; currentEditingFileId = null; }
 
-        // --- API Interaction (Chats) ---
-        /** Fetches the list of saved chats and populates the left sidebar. */
+        // --- API Interaction (Chats - Unchanged) ---
         async function loadSavedChats() { updateStatus("Loading saved chats..."); try { const response = await fetch('/api/chats'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const chats = await response.json(); savedChatsList.innerHTML = ''; if (chats.length === 0) { savedChatsList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved chats yet.</p>`; } else { chats.forEach(chat => { const listItem = document.createElement('div'); listItem.classList.add('list-item', 'chat-list-item'); listItem.dataset.chatId = chat.id; const nameSpan = document.createElement('span'); nameSpan.textContent = chat.name || `Chat ${chat.id}`; nameSpan.classList.add('filename'); nameSpan.title = chat.name || `Chat ${chat.id}`; const deleteButton = document.createElement('button'); deleteButton.classList.add('delete-btn'); deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; deleteButton.title = "Delete Chat"; deleteButton.onclick = (e) => { e.stopPropagation(); handleDeleteChat(chat.id, listItem); }; listItem.appendChild(nameSpan); listItem.appendChild(deleteButton); listItem.onclick = () => { if (chat.id != currentChatId) { loadChat(chat.id); } }; savedChatsList.appendChild(listItem); }); } updateActiveChatListItem(); updateStatus("Saved chats loaded."); } catch (error) { console.error('Error loading saved chats:', error); savedChatsList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading chats.</p>'; updateStatus("Error loading saved chats.", true); } }
-        /** Creates a new chat session, setting the model selector to default. */
         async function startNewChat() { if (isLoading) return; setLoadingState(true, "Creating Chat"); updateStatus("Creating new chat..."); try { const response = await fetch('/api/chat', { method: 'POST' }); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const newChat = await response.json(); await loadChat(newChat.id); await loadSavedChats(); updateStatus(`New chat created (ID: ${newChat.id}).`); setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar'); selectedFiles = []; renderSelectedFiles(); modelSelector.value = defaultModel; } catch (error) { console.error('Error starting new chat:', error); addMessage('system', `[Error creating new chat: ${error.message}]`, true); updateStatus("Error creating new chat.", true); } finally { setLoadingState(false); } }
-        /** Loads a specific chat, updating the model selector. */
         async function loadChat(chatId) { if (isLoading) return; setLoadingState(true, "Loading Chat"); updateStatus(`Loading chat ${chatId}...`); clearChatbox(); addMessage('system', `Loading chat (ID: ${chatId})...`); try { const response = await fetch(`/api/chat/${chatId}`); if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`); const data = await response.json(); currentChatId = chatId; clearChatbox(); currentChatNameInput.value = data.details.name || ''; currentChatIdDisplay.textContent = `ID: ${currentChatId}`; modelSelector.value = data.details.model_name || defaultModel; if (data.history.length === 0) { addMessage('system', 'This chat is empty. Start typing!'); } else { data.history.forEach(msg => addMessage(msg.role, msg.content)); } updateActiveChatListItem(); updateStatus(`Chat ${chatId} loaded.`); setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar'); selectedFiles = []; renderSelectedFiles(); } catch (error) { console.error('Error loading chat:', error); clearChatbox(); addMessage('system', `[Error loading chat ${chatId}: ${error.message}]`, true); currentChatId = null; currentChatNameInput.value = ''; currentChatIdDisplay.textContent = 'ID: -'; modelSelector.value = defaultModel; updateStatus(`Error loading chat ${chatId}.`, true); updateActiveChatListItem(); } finally { setLoadingState(false); } }
-        /** Sends message and attached files (ID + type) to backend. */
         async function sendMessage() { if (isLoading || !currentChatId) { updateStatus("Cannot send message: No active chat or busy.", true); return; } const message = messageInput.value.trim(); if (!message && selectedFiles.length === 0) { updateStatus("Cannot send: Type a message or attach file(s).", true); return; } let displayMessage = message || (selectedFiles.length > 0 ? "(Files attached)" : ""); let markers = ""; if (selectedFiles.length > 0) { markers = selectedFiles.map(f => `<div class="attachment-marker">Attached ${f.type}: ${f.filename}</div>`).join(''); displayMessage = markers + displayMessage; } addMessage('user', displayMessage); messageInput.value = ''; setLoadingState(true, "Sending"); updateStatus("Sending message..."); const payload = { message: message, attached_files: selectedFiles }; try { const response = await fetch(`/api/chat/${currentChatId}/message`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } const data = await response.json(); addMessage('assistant', data.reply); updateStatus("Assistant replied."); await loadSavedChats(); selectedFiles = []; renderSelectedFiles(); } catch (error) { console.error('Error sending message:', error); addMessage('assistant', `[Error: ${error.message}]`, true); updateStatus("Error sending message.", true); } finally { setLoadingState(false); } }
-        /** Saves the current chat's name. */
         async function handleSaveChatName() { if (isLoading || !currentChatId) { updateStatus("Cannot save name: No active chat or busy.", true); return; } const newName = currentChatNameInput.value.trim(); setLoadingState(true, "Saving Name"); updateStatus(`Saving name for chat ${currentChatId}...`); try { const response = await fetch(`/api/chat/${currentChatId}/name`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName || 'New Chat' }), }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } updateStatus(`Chat ${currentChatId} name saved as "${newName || 'New Chat'}".`); await loadSavedChats(); } catch (error) { console.error('Error saving chat name:', error); updateStatus(`Error saving name: ${error.message}`, true); } finally { setLoadingState(false); } }
-        /** Deletes a chat after confirmation. */
         async function handleDeleteChat(chatId, listItemElement) { if (isLoading) return; const chatName = listItemElement.querySelector('span.filename').textContent || `Chat ${chatId}`; if (!confirm(`Are you sure you want to delete "${chatName}"? This cannot be undone.`)) { return; } setLoadingState(true, "Deleting Chat"); updateStatus(`Deleting chat ${chatId}...`); try { const response = await fetch(`/api/chat/${chatId}`, { method: 'DELETE' }); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); updateStatus(`Chat ${chatId} deleted.`); listItemElement.remove(); if (!savedChatsList.querySelector('.list-item')) { savedChatsList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved chats yet.</p>`; } if (chatId == currentChatId) { await startNewChat(); } } catch (error) { console.error(`Error deleting chat ${chatId}:`, error); updateStatus(`Error deleting chat: ${error.message}`, true); addMessage('system', `[Error deleting chat ${chatId}: ${error.message}]`, true); } finally { setLoadingState(false); } }
-        /** Highlights the active chat in the left sidebar. */
         function updateActiveChatListItem() { const items = savedChatsList.querySelectorAll('.chat-list-item'); items.forEach(item => { if (item.dataset.chatId == currentChatId) { item.classList.add('active'); } else { item.classList.remove('active'); } }); }
         /** Handles changes to the model selector dropdown, saving the choice to the backend. */
         async function handleModelChange() { if (!currentChatId || isLoading) return; const newModel = modelSelector.value; updateStatus(`Updating model to ${newModel}...`); setLoadingState(true, "Updating Model"); try { const response = await fetch(`/api/chat/${currentChatId}/model`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_name: newModel }) }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } updateStatus(`Model updated to ${newModel} for this chat.`); } catch (error) { console.error("Error updating model:", error); updateStatus(`Error updating model: ${error.message}`, true); } finally { setLoadingState(false); } }
@@ -440,7 +442,7 @@
             setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
             await loadSavedChats();
             await loadUploadedFiles();
-            const firstChatElement = savedChatsList.querySelector('.chat-list-item');
+            const firstChatElement = savedChatsList.querySelector('.list-item'); // Use .list-item
             if (firstChatElement) { const mostRecentChatId = parseInt(firstChatElement.dataset.chatId); await loadChat(mostRecentChatId); }
             else { await startNewChat(); }
             renderSelectedFiles();
