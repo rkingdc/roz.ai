@@ -19,9 +19,8 @@ def create_new_chat():
         new_chat_id = db.create_new_chat_entry()
         chat_details = db.get_chat_details_from_db(new_chat_id)
         if not chat_details:
-             # Should not happen right after creation, but handle defensively
              return jsonify({"error": "Failed to retrieve newly created chat details"}), 500
-        return jsonify(chat_details), 201 # 201 Created
+        return jsonify(chat_details), 201
     except Exception as e:
         current_app.logger.error(f"Error creating new chat: {e}", exc_info=True)
         return jsonify({"error": "Failed to create new chat"}), 500
@@ -33,22 +32,18 @@ def get_chat(chat_id):
     if not details:
         return jsonify({"error": "Chat not found"}), 404
     history = db.get_chat_history_from_db(chat_id)
-    return jsonify({
-        "details": details,
-        "history": history
-    })
+    return jsonify({"details": details, "history": history})
 
 @bp.route('/chat/<int:chat_id>/name', methods=['PUT'])
 def save_chat_name(chat_id):
     """API endpoint to update the name of a chat."""
     data = request.json
     new_name = data.get('name', '').strip()
-    if not new_name: new_name = 'New Chat' # Default if empty
+    if not new_name: new_name = 'New Chat'
 
     if db.save_chat_name_in_db(chat_id, new_name):
         return jsonify({"message": "Chat name updated successfully."})
     else:
-        # Log error? DB function already prints
         return jsonify({"error": "Failed to update chat name"}), 500
 
 @bp.route('/chat/<int:chat_id>/model', methods=['PUT'])
@@ -61,16 +56,14 @@ def save_chat_model(chat_id):
     if not new_model_name:
         return jsonify({"error": "Model name not provided"}), 400
 
-    # Optional: Strict validation against available models
     if new_model_name not in available_models:
          print(f"Warning: Saving potentially unknown model '{new_model_name}' for chat {chat_id}.")
-         # Depending on requirements, you might return an error here:
-         # return jsonify({"error": f"Invalid model name specified. Choose from: {', '.join(available_models)}"}), 400
 
     if db.update_chat_model(chat_id, new_model_name):
         return jsonify({"message": f"Chat model updated to {new_model_name}."})
     else:
         return jsonify({"error": "Failed to update chat model"}), 500
+
 
 @bp.route('/chat/<int:chat_id>', methods=['DELETE'])
 def delete_chat(chat_id):
@@ -82,30 +75,30 @@ def delete_chat(chat_id):
 
 @bp.route('/chat/<int:chat_id>/message', methods=['POST'])
 def send_message_route(chat_id):
-    """API endpoint to handle user messages, potentially with attached files, and get assistant responses."""
+    """API endpoint to handle user messages, potentially with attached files/calendar context, and get assistant responses."""
     data = request.json
     user_message = data.get('message', '')
-    attached_files = data.get('attached_files', []) # Expecting [{id, type}]
+    attached_files = data.get('attached_files', [])
+    calendar_context = data.get('calendar_context') # <<< Get calendar context from request
 
-    if not user_message and not attached_files:
-        return jsonify({"error": "No message or attached files provided"}), 400
+    if not user_message and not attached_files and not calendar_context: # Check all potential inputs
+        return jsonify({"error": "No message, files, or calendar context provided"}), 400
 
     try:
-        # Call the AI service function to handle the core logic
+        # Call the AI service function, passing calendar_context
         assistant_reply = ai_services.generate_chat_response(
             chat_id,
             user_message,
-            attached_files
+            attached_files,
+            calendar_context # <<< Pass calendar context
         )
         # Check if the reply indicates an internal error occurred
-        if assistant_reply.startswith("[Error:"):
-             # Return a 500 status for internal errors signaled this way
+        if isinstance(assistant_reply, str) and assistant_reply.startswith("[Error:"):
              return jsonify({"reply": assistant_reply}), 500
         else:
             return jsonify({"reply": assistant_reply})
 
     except Exception as e:
-        # Catch unexpected errors during the process
         current_app.logger.error(f"Unexpected error in send_message route for chat {chat_id}: {e}", exc_info=True)
         return jsonify({"reply": f"[Unexpected Server Error: {e}]"}), 500
 
