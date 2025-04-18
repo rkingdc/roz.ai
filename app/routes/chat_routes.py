@@ -19,8 +19,9 @@ def create_new_chat():
         new_chat_id = db.create_new_chat_entry()
         chat_details = db.get_chat_details_from_db(new_chat_id)
         if not chat_details:
+             # Should not happen right after creation, but handle defensively
              return jsonify({"error": "Failed to retrieve newly created chat details"}), 500
-        return jsonify(chat_details), 201
+        return jsonify(chat_details), 201 # 201 Created
     except Exception as e:
         current_app.logger.error(f"Error creating new chat: {e}", exc_info=True)
         return jsonify({"error": "Failed to create new chat"}), 500
@@ -32,18 +33,22 @@ def get_chat(chat_id):
     if not details:
         return jsonify({"error": "Chat not found"}), 404
     history = db.get_chat_history_from_db(chat_id)
-    return jsonify({"details": details, "history": history})
+    return jsonify({
+        "details": details,
+        "history": history
+    })
 
 @bp.route('/chat/<int:chat_id>/name', methods=['PUT'])
 def save_chat_name(chat_id):
     """API endpoint to update the name of a chat."""
     data = request.json
     new_name = data.get('name', '').strip()
-    if not new_name: new_name = 'New Chat'
+    if not new_name: new_name = 'New Chat' # Default if empty
 
     if db.save_chat_name_in_db(chat_id, new_name):
         return jsonify({"message": "Chat name updated successfully."})
     else:
+        # Log error? DB function already prints
         return jsonify({"error": "Failed to update chat name"}), 500
 
 @bp.route('/chat/<int:chat_id>/model', methods=['PUT'])
@@ -56,8 +61,11 @@ def save_chat_model(chat_id):
     if not new_model_name:
         return jsonify({"error": "Model name not provided"}), 400
 
+    # Optional: Strict validation against available models
     if new_model_name not in available_models:
          print(f"Warning: Saving potentially unknown model '{new_model_name}' for chat {chat_id}.")
+         # Depending on requirements, you might return an error here:
+         # return jsonify({"error": f"Invalid model name specified. Choose from: {', '.join(available_models)}"}), 400
 
     if db.update_chat_model(chat_id, new_model_name):
         return jsonify({"message": f"Chat model updated to {new_model_name}."})
@@ -79,26 +87,40 @@ def send_message_route(chat_id):
     data = request.json
     user_message = data.get('message', '')
     attached_files = data.get('attached_files', [])
-    calendar_context = data.get('calendar_context') # <<< Get calendar context from request
+    calendar_context = data.get('calendar_context') # Get calendar context from request
+    session_files = data.get('session_files', []) # Get session files from request
 
-    if not user_message and not attached_files and not calendar_context: # Check all potential inputs
-        return jsonify({"error": "No message, files, or calendar context provided"}), 400
+    # Check if there's any actual input to process
+    if not user_message and not attached_files and not calendar_context and not session_files:
+        return jsonify({"error": "No message, files, or context provided"}), 400
 
     try:
-        # Call the AI service function, passing calendar_context
+        # Call the AI service function to handle the core logic
         assistant_reply = ai_services.generate_chat_response(
-            chat_id,
-            user_message,
-            attached_files,
-            calendar_context # <<< Pass calendar context
+            chat_id=chat_id,
+            user_message=user_message,
+            attached_files=attached_files,
+            calendar_context=calendar_context, # Pass calendar context
+            session_files=session_files # Pass session files
         )
         # Check if the reply indicates an internal error occurred
         if isinstance(assistant_reply, str) and assistant_reply.startswith("[Error:"):
-             return jsonify({"reply": assistant_reply}), 500
+             # Determine appropriate status code based on error message if possible
+             status_code = 500 # Default to internal server error
+             if "not found" in assistant_reply.lower():
+                 status_code = 404
+             elif "quota exceeded" in assistant_reply.lower() or "too many requests" in assistant_reply.lower():
+                 status_code = 429
+             elif "invalid api key" in assistant_reply.lower():
+                 status_code = 503 # Service unavailable due to config
+             elif "request too large" in assistant_reply.lower():
+                 status_code = 413 # Payload too large
+             return jsonify({"reply": assistant_reply}), status_code
         else:
             return jsonify({"reply": assistant_reply})
 
     except Exception as e:
+        # Catch unexpected errors during the process
         current_app.logger.error(f"Unexpected error in send_message route for chat {chat_id}: {e}", exc_info=True)
-        return jsonify({"reply": f"[Unexpected Server Error: {e}]"}), 500
+        return jsonify({"reply": f"[Unexpected Server Error: Check logs for details.]"}), 500
 

@@ -41,7 +41,7 @@ def upload_file_route():
 
                 # Check size after reading
                 if filesize > max_size:
-                     errors.append(f"File '{filename}' ({filesize} bytes) exceeds size limit ({max_size} bytes).")
+                     errors.append(f"File '{filename}' ({filesize} bytes) exceeds size limit ({max_size // 1024 // 1024} MB).")
                      continue # Skip this file
 
                 # Save record and blob to DB
@@ -65,7 +65,8 @@ def upload_file_route():
                 current_app.logger.error(f"Error processing upload for '{filename}': {e}", exc_info=True)
 
         elif file: # File submitted but extension not allowed
-            errors.append(f"File type not allowed for '{file.filename}'.")
+            allowed_ext_str = ', '.join(current_app.config.get('ALLOWED_EXTENSIONS', []))
+            errors.append(f"File type not allowed for '{file.filename}'. Allowed: {allowed_ext_str}")
 
     # --- Response Handling ---
     if not uploaded_files_data and errors:
@@ -87,18 +88,20 @@ def get_summary_route(file_id):
     """Gets or generates a summary for a specific file."""
     try:
         summary = ai_services.get_or_generate_summary(file_id)
-        if summary.startswith("[Error"): # Check if the result is an error message
-            return jsonify({"summary": summary}), 500 # Internal Server Error status for errors
+        if isinstance(summary, str) and summary.startswith("[Error"): # Check if the result is an error message
+            # Determine appropriate status code based on error type if possible
+            status_code = 500 if "API" in summary or "generating" in summary else 404 if "not found" in summary else 400
+            return jsonify({"error": summary}), status_code
         else:
             return jsonify({"summary": summary})
     except Exception as e:
         current_app.logger.error(f"Error getting/generating summary for file {file_id}: {e}", exc_info=True)
-        return jsonify({"error": "Could not retrieve or generate summary"}), 500
+        return jsonify({"error": "Could not retrieve or generate summary due to server error"}), 500
 
 @bp.route('/files/<int:file_id>/summary', methods=['PUT'])
 def update_summary_route(file_id):
     """Manually updates the summary for a specific file."""
-    # Allow saving summary for ANY file type now
+    # Allow saving summary for ANY file type now (user might manually summarize non-text)
     data = request.json
     new_summary = data.get('summary')
     if new_summary is None: # Check for None explicitly, allow empty string
@@ -109,4 +112,25 @@ def update_summary_route(file_id):
     else:
         # DB function already logs error
         return jsonify({"error": "Failed to update summary"}), 500
+
+@bp.route('/files/<int:file_id>', methods=['DELETE'])
+def delete_file_route(file_id):
+    """API endpoint to delete a file record and its content."""
+    # Optional: Add authentication/authorization checks here
+
+    # Attempt to delete the file record from the database
+    deleted = db.delete_file_record_from_db(file_id)
+
+    if deleted:
+        return jsonify({"message": f"File ID {file_id} deleted successfully."})
+    else:
+        # Check if the file simply wasn't found or if another DB error occurred
+        # For simplicity, returning 404 if delete function indicated not found (returned False)
+        # A more robust check might involve querying first before deleting
+        details = db.get_file_details_from_db(file_id) # Check if it existed
+        if not details:
+             return jsonify({"error": f"File ID {file_id} not found."}), 404
+        else:
+             # If it exists but delete failed, it's likely a server error
+             return jsonify({"error": f"Failed to delete file ID {file_id}."}), 500
 
