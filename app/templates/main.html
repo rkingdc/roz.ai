@@ -436,11 +436,25 @@ fileUploadSessionLabel.addEventListener('click', () => {
 // Event Listener for Session File Input
 fileUploadSessionInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
-    if (!file) return; //No file selected
+    if (!file) {
+        sessionFile = null; // Ensure sessionFile is null if no file is chosen
+        sessionFileDisplay.innerHTML = '';
+        return;
+    }
 
-    sessionFile = file;
+    // Reset sessionFile before reading the new one
+    sessionFile = null;
+    sessionFileDisplay.innerHTML = '<span class="text-xs text-rz-tab-background-text">Loading file...</span>'; // Indicate loading
+
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function(event) {
+        // Store file details AND content
+        sessionFile = {
+            filename: file.name,
+            mimetype: file.type,
+            content: event.target.result // Store the Base64 content
+        };
+
         // Update display
         sessionFileDisplay.innerHTML = `<span class="selected-file-tag">
                                             <span class="filename truncate" title="${file.name}">${file.name}</span>
@@ -449,7 +463,14 @@ fileUploadSessionInput.addEventListener('change', async (e) => {
         sessionFileDisplay.querySelector('button').onclick = () => {
             sessionFile = null; // Clear the selected file on removal.
             sessionFileDisplay.innerHTML = '';
+            fileUploadSessionInput.value = ''; // Reset file input
         };
+    }
+    reader.onerror = function(error) {
+        console.error("Error reading file:", error);
+        sessionFileDisplay.innerHTML = '<span class="text-xs text-red-500">Error reading file.</span>';
+        sessionFile = null;
+        fileUploadSessionInput.value = ''; // Reset file input
     }
     reader.readAsDataURL(file); // Read file as data URL (Base64)
 });
@@ -718,8 +739,12 @@ async function loadUploadedFiles() {
 		message: message,
 		attached_files: selectedFiles,
 		calendar_context: (isCalendarContextActive && calendarContext) ? calendarContext : null,
-		session_files: sessionFile ? [{ filename: sessionFile.name, content: reader.result, mimetype: sessionFile.type }] : [] //Send Session File
+		// Use the stored sessionFile object which now includes content
+		session_files: sessionFile ? [{ filename: sessionFile.filename, content: sessionFile.content, mimetype: sessionFile.mimetype }] : []
 	    };
+
+            // Store session file temporarily to clear it in finally block
+            const sentSessionFile = sessionFile;
 
             try {
                 const response = await fetch(`/api/chat/${currentChatId}/message`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
