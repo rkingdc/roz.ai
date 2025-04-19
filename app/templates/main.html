@@ -6,9 +6,12 @@
     <title>roz.ai</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         /* Basic styling */
         body { font-family: 'Inter', sans-serif; display: flex; height: 100vh; overflow: hidden; position: relative; }
@@ -213,6 +216,13 @@
         <div id="input-area">
              <div id="selected-files-container" class="hidden"></div>
              <div id="input-controls">
+	       <div id="file-upload-session-container" class="hidden">
+    <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/<em>,audio/</em>,application/pdf">
+    <label class="btn btn-secondary btn-sm p-1 flex-shrink-0" id="file-upload-session-label" for="file-upload-session-input">
+        <i class="fas fa-paperclip"></i> Attach
+    </label>
+    <div id="session-file-display"></div>
+</div>
                 <textarea id="message-input" rows="2" class="flex-grow p-2 rounded-lg focus:outline-none resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
                 <button id="send-button" class="btn btn-primary self-end flex-shrink-0" style="height: 42px;">
                     <i class="fas fa-paper-plane"></i> Send
@@ -236,7 +246,8 @@
                 </label>
                 <h4 class="text-sm font-medium text-rz-sidebar-text mb-1 flex-shrink-0">Available Files:</h4>
                  <div class="sidebar-section-container flex-grow mb-2 max-h-60">
-                    <div id="uploaded-files-list" class="sidebar-list border border-rz-sidebar-border rounded p-1 bg-rz-sidebar-bg">
+                   <div id="uploaded-files-list" class="sidebar-list border border-rz-sidebar-border rounded p-1 bg-rz-sidebar-bg">
+		     
                         <p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading files...</p>
                     </div>
                 </div>
@@ -364,7 +375,38 @@
         const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
         // --- Utility Functions (Unchanged) ---
-        function updateStatus(message, isError = false) { statusBar.textContent = `Status: ${message}`; statusBar.className = `text-xs px-4 py-1 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50 border-t border-red-200' : 'text-rz-status-bar-text bg-rz-status-bar-bg border-t border-rz-frame'}`; console.log(`Status Update: ${message}`); }
+      function updateStatus(message, isError = false) { statusBar.textContent = `Status: ${message}`; statusBar.className = `text-xs px-4 py-1 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50 border-t border-red-200' : 'text-rz-status-bar-text bg-rz-status-bar-bg border-t border-rz-frame'}`; console.log(`Status Update: ${message}`); }
+      async function deleteFile(fileId) {
+            if (isLoading) return;
+            if (!confirm("Are you sure you want to delete this file? This action cannot be undone.")) {
+                return;
+            }
+
+            setLoadingState(true, "Deleting File");
+            updateStatus(`Deleting file ${fileId}...`);
+
+            try {
+                const response = await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
+                if (!response.ok) {
+                    const errorData = await response.json();
+		    throw new Error(`${errorData.error || `HTTP error! status: ${response.status}`}`);
+                }
+
+                updateStatus(`File ${fileId} deleted.`);
+                await loadUploadedFiles(); // Reload the file list
+
+                // Remove from selected files if it's selected
+                selectedFiles = selectedFiles.filter(f => f.id !== fileId);
+                renderSelectedFiles();
+
+            } catch (error) {
+                console.error('Error deleting file:', error);
+                updateStatus(`Error deleting file: ${error.message}`, true);
+            } finally {
+                setLoadingState(false);
+            }
+        } 
+      
         function setLoadingState(loading, operation = "Processing") { isLoading = loading; messageInput.disabled = loading; sendButton.disabled = loading; newChatButton.disabled = loading; saveChatNameButton.disabled = loading; sidebarToggleButton.disabled = loading; pluginsToggleButton.disabled = loading; fileUploadInput.disabled = loading; attachFullButton.disabled = loading; attachSummaryButton.disabled = loading; saveSummaryButton.disabled = loading; modelSelector.disabled = loading; loadCalendarButton.disabled = loading; calendarToggle.disabled = loading; viewCalendarButton.disabled = loading || !calendarContext; uploadedFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading); selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading); sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send'; if (loading) { updateStatus(`${operation}...`); } else { updateStatus("Idle"); if (!bodyElement.classList.contains('sidebar-collapsed')) { messageInput.focus(); } } }
 
         // --- Sidebar & Plugin Toggle Functions (Unchanged) ---
@@ -373,39 +415,160 @@
         function toggleRightSidebar() { setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, !bodyElement.classList.contains('plugins-collapsed'), PLUGINS_COLLAPSED_KEY, 'plugins'); }
         function setPluginSectionCollapsed(headerElement, contentElement, collapsed, storageKey) { const icon = headerElement.querySelector('.toggle-icon'); if (collapsed) { headerElement.classList.add('collapsed'); contentElement.classList.add('hidden'); if (icon) { icon.classList.remove('fa-chevron-down'); icon.classList.add('fa-chevron-up'); } localStorage.setItem(storageKey, 'true'); } else { headerElement.classList.remove('collapsed'); contentElement.classList.remove('hidden'); if (icon) { icon.classList.remove('fa-chevron-up'); icon.classList.add('fa-chevron-down'); } localStorage.setItem(storageKey, 'false'); } }
         function toggleFilePlugin() { const isCollapsed = filePluginContent.classList.contains('hidden'); setPluginSectionCollapsed(filePluginHeader, filePluginContent, !isCollapsed, FILE_PLUGIN_COLLAPSED_KEY); }
-        function toggleCalendarPlugin() { const isCollapsed = calendarPluginContent.classList.contains('hidden'); setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, !isCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY); }
+      function toggleCalendarPlugin() { const isCollapsed = calendarPluginContent.classList.contains('hidden'); setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, !isCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY); }
+      
+// Assume 'marked' is available globally or imported
+// Make sure you have 
+// and Font Awesome if using the UI markers.
 
-        // --- Chat Message Display (MODIFIED) ---
-        /** Adds a message to the chatbox UI, rendering Markdown and replacing markers with icons. */
-        function addMessage(role, content, isError = false) {
-            const messageDiv = document.createElement('div');
-            if (role === 'system') { messageDiv.classList.add('system-msg'); }
-            else { messageDiv.classList.add('message'); if (isError) messageDiv.classList.add('error-msg'); else messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg'); }
+// Create a custom renderer to apply your specific classes
+// to code blocks and inline code, matching the original function's output.
+const renderer = new marked.Renderer();
 
-            // Process content: Escape HTML, apply Markdown, replace markers, handle newlines
-            content = content
-                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') // 1. Escape HTML first
-                .replace(/\*\*(.*?)\*\*/gs, '<strong>$1</strong>') // 2. Apply Markdown
-                .replace(/\*(.*?)\*/gs, '<em>$1</em>')
-                .replace(/```([\s\S]*?)```/g, (match, code) => `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>`)
-                .replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 rounded text-sm font-mono">$1</code>')
-                 // 3. Replace attachment markers with icons + filenames
-                .replace(/\[UI-MARKER:file:(.*?):(.*?)\]/g, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`) // File marker
-                .replace(/\[UI-MARKER:calendar\]/g, `<span class="attachment-icon" title="Calendar Context Active"><i class="fas fa-calendar-check"></i> Calendar</span>`) // Calendar marker
-                .replace(/\[UI-MARKER:error:(.*?)\]/g, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`) // Error marker (optional)
-                .replace(/\n/g, '<br>'); // 4. Handle newlines
+// Helper function for basic HTML escaping within code
+function escapeHtml(html) {
+  return html
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
-            messageDiv.innerHTML = content; // Set final HTML
-            chatbox.appendChild(messageDiv); // Add to DOM
-            chatbox.scrollTop = chatbox.scrollHeight; // Scroll down
+ renderer.code = function(code, language) {
+  // Ensure the input 'code' is treated as a string and escape its content
+    const escapedCode = escapeHtml(String(code.text));
+    console.log(escapedCode)
+    return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapedCode}</code></pre>`;
+};
+
+renderer.codespan = function(text) {
+   // Ensure the input 'text' is treated as a string and escape its content
+   const escapedText = escapeHtml(String(text.text));
+
+   // Return the HTML string with your desired classes
+   return `<code class="bg-gray-200 px-1 rounded text-sm font-mono">${escapedText}</code>`;
+};
+
+// Define options for marked.parse
+// Use the custom renderer
+// Note: marked's default behavior for newlines is different from your original
+const markedOptions = {
+renderer: renderer,
+   breaks: true 
+};
+
+
+function addMessage(role, content, isError = false) {
+    const messageDiv = document.createElement('div');
+    if (role === 'system') {
+        messageDiv.classList.add('system-msg');
+    } else {
+        messageDiv.classList.add('message');
+        if (isError) messageDiv.classList.add('error-msg');
+        else messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg');
+    }
+    console.log("content")
+    console.log(content)
+    let processedContent = content;
+    processedContent = processedContent.replace(/\[UI-MARKER:file:(.*?):(.*?)\]/g, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`).replace(/\[UI-MARKER:calendar\]/g, `<span class="attachment-icon" title="Calendar Context Active"><i class="fas fa-calendar-check"></i> Calendar</span>`).replace(/\[UI-MARKER:error:(.*?)\]/g, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`);
+    console.log("processed Content")
+    console.log(processedContent)
+    const htmlContent = marked.parse(processedContent, markedOptions);
+
+    messageDiv.innerHTML = htmlContent;
+
+    // Assuming 'chatbox' is a pre-existing element in your DOM
+    const chatbox = document.getElementById('chatbox');
+
+    if (chatbox) {
+        chatbox.appendChild(messageDiv); 
+        chatbox.scrollTop = chatbox.scrollHeight;
+    } else {
+        console.error("Chatbox element with ID 'chatbox' not found.");
+    }
+}
+
+// Example usage (assuming chatbox element exists in your HTML):
+// addMessage('user', 'Hello **world**!');
+// addMessage('assistant', 'Here is some `inline code` and a ```javascript\nconsole.log("block");\n```');
+// addMessage('assistant', 'Attached file: [UI-MARKER:file:report.pdf:application/pdf]');
+// addMessage('system', 'System message here.');
+// addMessage('assistant', 'Error during attach: [UI-MARKER:error:image.jpg]', true);
+
+
+      
+
+async function loadUploadedFiles() {
+    updateStatus("Loading uploaded files...");
+    uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`;
+    try {
+        const response = await fetch('/api/files');
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const files = await response.json();
+        uploadedFilesList.innerHTML = '';
+        if (files.length === 0) {
+            uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`;
+        } else {
+            files.forEach(file => {
+                const itemDiv = document.createElement('div');
+                itemDiv.classList.add('file-list-item');
+                itemDiv.dataset.fileId = file.id;
+                itemDiv.dataset.filename = file.filename;
+                itemDiv.dataset.hasSummary = file.has_summary;
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = file.id;
+                checkbox.classList.add('file-checkbox');
+                checkbox.title = "Select file";
+                checkbox.addEventListener('change', (e) => {
+                    if (e.target.checked) itemDiv.classList.add('active-selection');
+                    else itemDiv.classList.remove('active-selection');
+                });
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = file.filename;
+                nameSpan.classList.add('filename');
+                nameSpan.title = file.filename;
+                const actionsDiv = document.createElement('div');
+                actionsDiv.classList.add('file-actions');
+                const summaryBtn = document.createElement('button');
+                summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs');
+                summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i> Summary';
+                summaryBtn.title = "View/Edit Summary";
+                summaryBtn.disabled = false;
+                summaryBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    showSummaryModal(file.id, file.filename);
+                };
+                actionsDiv.appendChild(summaryBtn);
+
+                // --- Add Delete Button Here ---
+                const deleteBtn = document.createElement('button');
+                deleteBtn.classList.add('btn', 'btn-outline', 'btn-xs', 'delete-btn'); // Added 'delete-btn' class
+                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete';
+                deleteBtn.title = "Delete File";
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation(); // Stop itemDiv onclick from triggering
+                    deleteFile(file.id); // Call the deleteFile function
+                };
+                actionsDiv.appendChild(deleteBtn);
+                // --- End Delete Button ---
+
+                itemDiv.appendChild(checkbox);
+                itemDiv.appendChild(nameSpan);
+                itemDiv.appendChild(actionsDiv);
+                uploadedFilesList.appendChild(itemDiv);
+            });
         }
-        /** Clears all messages from the chatbox. */
-        function clearChatbox() { chatbox.innerHTML = ''; }
+        updateStatus("Uploaded files loaded.");
+    } catch (error) {
+        console.error('Error loading uploaded files:', error);
+        uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
+        updateStatus("Error loading files.", true);
+    }
+}
 
-        // --- File Handling & Selection Functions (Unchanged) ---
-        function formatFileSize(bytes) { if (bytes === 0) return '0 Bytes'; const k = 1024; const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']; const i = Math.floor(Math.log(bytes) / Math.log(k)); return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]; }
-        async function loadUploadedFiles() { updateStatus("Loading uploaded files..."); uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`; try { const response = await fetch('/api/files'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const files = await response.json(); uploadedFilesList.innerHTML = ''; if (files.length === 0) { uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`; } else { files.forEach(file => { const itemDiv = document.createElement('div'); itemDiv.classList.add('file-list-item'); itemDiv.dataset.fileId = file.id; itemDiv.dataset.filename = file.filename; itemDiv.dataset.hasSummary = file.has_summary; const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.value = file.id; checkbox.classList.add('file-checkbox'); checkbox.title = "Select file"; checkbox.addEventListener('change', (e) => { if (e.target.checked) itemDiv.classList.add('active-selection'); else itemDiv.classList.remove('active-selection'); }); const nameSpan = document.createElement('span'); nameSpan.textContent = file.filename; nameSpan.classList.add('filename'); nameSpan.title = file.filename; const actionsDiv = document.createElement('div'); actionsDiv.classList.add('file-actions'); const summaryBtn = document.createElement('button'); summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs'); summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i> Summary'; summaryBtn.title = "View/Edit Summary"; summaryBtn.disabled = false; summaryBtn.onclick = (e) => { e.stopPropagation(); showSummaryModal(file.id, file.filename); }; actionsDiv.appendChild(summaryBtn); itemDiv.appendChild(checkbox); itemDiv.appendChild(nameSpan); itemDiv.appendChild(actionsDiv); uploadedFilesList.appendChild(itemDiv); }); } updateStatus("Uploaded files loaded."); } catch (error) { console.error('Error loading uploaded files:', error); uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>'; updateStatus("Error loading files.", true); } }
-        function handleFileUpload(event) { const files = event.target.files; if (!files || files.length === 0) return; setLoadingState(true, "Uploading"); const formData = new FormData(); let fileCount = 0; for (const file of files) { if (file.size > MAX_FILE_SIZE_BYTES) { alert(`Skipping "${file.name}": File is too large (${formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`); continue; } formData.append('file', file); fileCount++; } if (fileCount === 0) { setLoadingState(false); fileUploadInput.value = ''; updateStatus("No valid files selected for upload.", true); return; } fetch('/api/files', { method: 'POST', body: formData }) .then(async response => { const data = await response.json(); if (!response.ok) { throw new Error(data.error || `HTTP error! status: ${response.status}`); } const successfulUploads = data.uploaded_files?.length || 0; const errors = data.errors || []; let statusMsg = `Uploaded ${successfulUploads} file(s).`; if (errors.length > 0) { statusMsg += ` ${errors.length} failed: ${errors.join('; ')}`; console.warn("Upload errors:", errors); } updateStatus(statusMsg, errors.length > 0); }) .catch(error => { console.error('Error uploading files:', error); updateStatus(`Error uploading files: ${error.message}`, true); }) .finally(async () => { await loadUploadedFiles(); setLoadingState(false); fileUploadInput.value = ''; }); }
+      
+      function handleFileUpload(event) { const files = event.target.files; if (!files || files.length === 0) return; setLoadingState(true, "Uploading"); const formData = new FormData(); let fileCount = 0; for (const file of files) { if (file.size > MAX_FILE_SIZE_BYTES) { alert(`Skipping "${file.name}": File is too large (${formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`); continue; } formData.append('file', file); fileCount++; } if (fileCount === 0) { setLoadingState(false); fileUploadInput.value = ''; updateStatus("No valid files selected for upload.", true); return; } fetch('/api/files', { method: 'POST', body: formData }) .then(async response => { const data = await response.json(); if (!response.ok) { throw new Error(data.error || `HTTP error! status: ${response.status}`); } const successfulUploads = data.uploaded_files?.length || 0; const errors = data.errors || []; let statusMsg = `Uploaded ${successfulUploads} file(s).`; if (errors.length > 0) { statusMsg += ` ${errors.length} failed: ${errors.join('; ')}`; console.warn("Upload errors:", errors); } updateStatus(statusMsg, errors.length > 0); }) .catch(error => { console.error('Error uploading files:', error); updateStatus(`Error uploading files: ${error.message}`, true); }) .finally(async () => { await loadUploadedFiles(); setLoadingState(false); fileUploadInput.value = ''; }); }
+      
         function attachSelectedFiles(type) { const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked'); if (checkboxes.length === 0) { updateStatus("No files selected to attach.", true); return; } let addedCount = 0; checkboxes.forEach(checkbox => { const fileId = parseInt(checkbox.value); const listItem = checkbox.closest('.file-list-item'); const filename = listItem.dataset.filename; const alreadySelected = selectedFiles.some(f => f.id === fileId && f.type === type); if (!alreadySelected) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId)); selectedFiles.push({ id: fileId, filename: filename, type: type }); addedCount++; } checkbox.checked = false; listItem.classList.remove('active-selection'); }); renderSelectedFiles(); if (addedCount > 0) { updateStatus(`${addedCount} file(s) added as ${type}.`); } else { updateStatus(`Selected file(s) already attached as ${type}.`); } }
         function removeSelectedFile(fileId, type) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId && f.type === type)); renderSelectedFiles(); updateStatus(`File attachment removed.`); }
         function renderSelectedFiles() { if (selectedFiles.length === 0) { selectedFilesContainer.classList.add('hidden'); selectedFilesContainer.innerHTML = ''; } else { selectedFilesContainer.classList.remove('hidden'); selectedFilesContainer.innerHTML = ''; selectedFiles.forEach(file => { const tag = document.createElement('span'); tag.classList.add('selected-file-tag'); tag.innerHTML = ` <span class="filename truncate" title="${file.filename}">${file.filename}</span> <span class="file-type">${file.type.toUpperCase()}</span> <button title="Remove Attachment">&times;</button> `; tag.querySelector('button').onclick = () => removeSelectedFile(file.id, file.type); selectedFilesContainer.appendChild(tag); }); } }
@@ -477,6 +640,8 @@
             }
         }
 
+ function clearChatbox() { chatbox.innerHTML = ''; }
+	
         // --- API Interaction (Chats - MODIFIED sendMessage) ---
         async function loadSavedChats() { updateStatus("Loading saved chats..."); try { const response = await fetch('/api/chats'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const chats = await response.json(); savedChatsList.innerHTML = ''; if (chats.length === 0) { savedChatsList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved chats yet.</p>`; } else { chats.forEach(chat => { const listItem = document.createElement('div'); listItem.classList.add('list-item', 'chat-list-item'); listItem.dataset.chatId = chat.id; const nameSpan = document.createElement('span'); nameSpan.textContent = chat.name || `Chat ${chat.id}`; nameSpan.classList.add('filename'); nameSpan.title = chat.name || `Chat ${chat.id}`; const deleteButton = document.createElement('button'); deleteButton.classList.add('delete-btn'); deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; deleteButton.title = "Delete Chat"; deleteButton.onclick = (e) => { e.stopPropagation(); handleDeleteChat(chat.id, listItem); }; listItem.appendChild(nameSpan); listItem.appendChild(deleteButton); listItem.onclick = () => { if (chat.id != currentChatId) { loadChat(chat.id); } }; savedChatsList.appendChild(listItem); }); } updateActiveChatListItem(); updateStatus("Saved chats loaded."); } catch (error) { console.error('Error loading saved chats:', error); savedChatsList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading chats.</p>'; updateStatus("Error loading saved chats.", true); } }
         async function startNewChat() { if (isLoading) return; setLoadingState(true, "Creating Chat"); updateStatus("Creating new chat..."); try { const response = await fetch('/api/chat', { method: 'POST' }); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const newChat = await response.json(); await loadChat(newChat.id); await loadSavedChats(); updateStatus(`New chat created (ID: ${newChat.id}).`); setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar'); selectedFiles = []; renderSelectedFiles(); calendarContext = null; isCalendarContextActive = false; calendarToggle.checked = false; updateCalendarStatus(); viewCalendarButton.classList.add('hidden'); modelSelector.value = defaultModel; } catch (error) { console.error('Error starting new chat:', error); addMessage('system', `[Error creating new chat: ${error.message}]`, true); updateStatus("Error creating new chat.", true); } finally { setLoadingState(false); } }

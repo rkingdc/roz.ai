@@ -30,7 +30,8 @@ class Config:
     AVAILABLE_MODELS = [
         'gemini-1.5-flash',
         'gemini-1.5-pro-latest',
-        'gemini-pro',
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-thinking-exp-01-21',
         # Add other valid models as needed
     ]
     GEMINI_REQUEST_TIMEOUT = 300 # Timeout for Gemini API calls in seconds
