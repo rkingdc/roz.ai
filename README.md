@@ -144,30 +144,6 @@ The application uses an SQLite database with the following tables:
 *   `messages`: Stores chat messages (id, chat\_id, role, content, timestamp).
 *   `uploaded\_files`: Stores file metadata and content (id, filename, content, mimetype, filesize, summary, uploaded\_at).
 
-## File Structure
-
-roz.ai/
-├── app/
-│ ├── init.py
-│ ├── ai_services.py # Contains AI-related functions (summarization, response generation)
-│ ├── config.py # Configuration settings
-│ ├── database.py # Database interaction functions
-│ ├── file_utils.py # File utility functions (extension validation)
-│ ├── plugins/ # Plugin-related modules
-│ │ └── google_calendar.py # Google Calendar integration (if implemented)
-│ │ └── web_search.py #Contains the web search functionality
-│ ├── routes/ # Flask route definitions
-│ │ ├── main_routes.py # Main routes (index page)
-│ │ ├── calendar_routes.py # Calendar API routes
-│ │ ├── file_routes.py # File API routes
-│ │ └── chat_routes.py # Chat API routes
-│ ├── templates/ # HTML templates
-│ │ └── main.html # Main application template
-├── run.py # Application entry point
-├── requirements.txt # Python dependencies
-├── README.md # This file
-├── .env # Environment variable file (not committed to Git)
-
 
 ## Future Enhancements
 
