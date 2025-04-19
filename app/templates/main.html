@@ -216,12 +216,13 @@
         <div id="input-area">
              <div id="selected-files-container" class="hidden"></div>
              <div id="input-controls">
-	 
+                <!-- File upload trigger moved here -->
+                <label class="btn btn-secondary btn-sm p-1 flex-shrink-0 self-end mb-1 me-1" id="file-upload-session-label" for="file-upload-session-input" title="Attach file to message" style="height: 42px; line-height: 1.5rem;">
+                    <i class="fas fa-paperclip"></i>
+                </label>
 	       <div id="file-upload-session-container" class="hidden">
-    <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/<em>,audio/</em>,application/pdf">
-    <label class="btn btn-secondary btn-sm p-1 flex-shrink-0" id="file-upload-session-label" for="file-upload-session-input">
-        <i class="fas fa-paperclip"></i> Attach
-    </label>
+    <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf">
+    <!-- Label moved to input-controls div -->
     <div id="session-file-display"></div>
 </div>
                 <textarea id="message-input" rows="2" class="flex-grow p-2 rounded-lg focus:outline-none resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
