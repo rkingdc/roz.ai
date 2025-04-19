@@ -209,6 +209,8 @@
         </div>
 
         <div id="chat-area">
+            <!-- Area to display the currently attached session file -->
+            <div id="session-file-display-area" class="px-4 pb-2"></div>
             <div id="chatbox">
                 <div class="system-msg p-4">Initializing chat...</div>
             </div>
@@ -223,7 +225,7 @@
 	       <div id="file-upload-session-container" class="hidden">
     <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf">
     <!-- Label moved to input-controls div -->
-    <div id="session-file-display"></div>
+    <!-- <div id="session-file-display"></div> --> <!-- This div is no longer used -->
 </div>
                 <textarea id="message-input" rows="2" class="flex-grow p-2 rounded-lg focus:outline-none resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
                 <button id="send-button" class="btn btn-primary self-end flex-shrink-0" style="height: 42px;">
@@ -424,10 +426,11 @@
       
 const fileUploadSessionInput = document.getElementById('file-upload-session-input');
 const fileUploadSessionLabel = document.getElementById('file-upload-session-label');
-const sessionFileDisplay = document.getElementById('session-file-display');
+// const sessionFileDisplay = document.getElementById('session-file-display'); // No longer needed
+const sessionFileDisplayArea = document.getElementById('session-file-display-area'); // New display area above chatbox
 let sessionFile = null; // Variable to store selected session file
 
-// Show the file upload container
+// Show the file upload container (logic remains the same)
 fileUploadSessionLabel.addEventListener('click', () => {
     fileUploadSessionContainer.classList.remove('hidden');
     fileUploadSessionInput.click(); // Simulate click to open file dialog.
@@ -438,13 +441,13 @@ fileUploadSessionInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) {
         sessionFile = null; // Ensure sessionFile is null if no file is chosen
-        sessionFileDisplay.innerHTML = '';
+        sessionFileDisplayArea.innerHTML = ''; // Clear the new display area
         return;
     }
 
     // Reset sessionFile before reading the new one
     sessionFile = null;
-    sessionFileDisplay.innerHTML = '<span class="text-xs text-rz-tab-background-text">Loading file...</span>'; // Indicate loading
+    sessionFileDisplayArea.innerHTML = '<span class="text-xs text-rz-tab-background-text">Loading file...</span>'; // Indicate loading in the new area
 
     const reader = new FileReader();
     reader.onload = function(event) {
@@ -455,20 +458,21 @@ fileUploadSessionInput.addEventListener('change', async (e) => {
             content: event.target.result // Store the Base64 content
         };
 
-        // Update display
-        sessionFileDisplay.innerHTML = `<span class="selected-file-tag">
+        // Update display in the new area above chatbox
+        sessionFileDisplayArea.innerHTML = `<span class="selected-file-tag">
+                                            <i class="fas fa-paperclip mr-1 text-xs"></i> <!-- Optional icon -->
                                             <span class="filename truncate" title="${file.name}">${file.name}</span>
-                                            <button title="Remove Attachment">&times;</button>
+                                            <button title="Remove Attachment" class="ml-2">&times;</button>
                                         </span>`;
-        sessionFileDisplay.querySelector('button').onclick = () => {
+        sessionFileDisplayArea.querySelector('button').onclick = () => {
             sessionFile = null; // Clear the selected file on removal.
-            sessionFileDisplay.innerHTML = '';
+            sessionFileDisplayArea.innerHTML = ''; // Clear the new display area
             fileUploadSessionInput.value = ''; // Reset file input
         };
     }
     reader.onerror = function(error) {
         console.error("Error reading file:", error);
-        sessionFileDisplay.innerHTML = '<span class="text-xs text-red-500">Error reading file.</span>';
+        sessionFileDisplayArea.innerHTML = '<span class="text-xs text-red-500">Error reading file.</span>'; // Show error in new area
         sessionFile = null;
         fileUploadSessionInput.value = ''; // Reset file input
     }
@@ -764,7 +768,7 @@ async function loadUploadedFiles() {
                  // Clear the session file if it was the one sent
                  if (sentSessionFile && sessionFile === sentSessionFile) {
                      sessionFile = null;
-                     sessionFileDisplay.innerHTML = '';
+                     sessionFileDisplayArea.innerHTML = ''; // Clear the new display area
                      fileUploadSessionInput.value = ''; // Reset file input
                  }
                  setLoadingState(false);
