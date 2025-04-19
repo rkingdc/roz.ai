@@ -215,8 +215,7 @@
             </div>
         </div>
         <div id="input-area">
-             <!-- Area to display the currently attached session file -->
-             <div id="session-file-display-area" class="px-4 pb-2"></div>
+             <!-- Container for ALL attached files (session + plugin) -->
              <div id="selected-files-container" class="hidden"></div>
              <div id="input-controls">
                 <!-- File upload trigger moved here -->
@@ -427,11 +426,10 @@
       
 const fileUploadSessionInput = document.getElementById('file-upload-session-input');
 const fileUploadSessionLabel = document.getElementById('file-upload-session-label');
-// const sessionFileDisplay = document.getElementById('session-file-display'); // No longer needed
-const sessionFileDisplayArea = document.getElementById('session-file-display-area'); // New display area above chatbox
+// const sessionFileDisplayArea = document.getElementById('session-file-display-area'); // Removed
 let sessionFile = null; // Variable to store selected session file
 
-// Show the file upload container (logic remains the same)
+// Show the file upload container
 fileUploadSessionLabel.addEventListener('click', () => {
     fileUploadSessionContainer.classList.remove('hidden');
     fileUploadSessionInput.click(); // Simulate click to open file dialog.
@@ -440,18 +438,32 @@ fileUploadSessionLabel.addEventListener('click', () => {
 // Event Listener for Session File Input
 fileUploadSessionInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
+    // Clear any existing session file tag first
+    const existingSessionTag = selectedFilesContainer.querySelector('.session-file-tag');
+    if (existingSessionTag) {
+        existingSessionTag.remove();
+    }
+
     if (!file) {
         sessionFile = null; // Ensure sessionFile is null if no file is chosen
-        sessionFileDisplayArea.innerHTML = ''; // Clear the new display area
+        renderSelectedFiles(); // Re-render to ensure container visibility is correct
         return;
     }
 
     // Reset sessionFile before reading the new one
     sessionFile = null;
-    sessionFileDisplayArea.innerHTML = '<span class="text-xs text-rz-tab-background-text">Loading file...</span>'; // Indicate loading in the new area
+    // Show loading state within the shared container
+    selectedFilesContainer.classList.remove('hidden');
+    const loadingTag = document.createElement('span');
+    loadingTag.classList.add('selected-file-tag', 'session-file-tag', 'opacity-75'); // Add session-file-tag class
+    loadingTag.innerHTML = `<span class="text-xs">Loading ${file.name}...</span>`;
+    selectedFilesContainer.appendChild(loadingTag);
+
 
     const reader = new FileReader();
     reader.onload = function(event) {
+        // Remove loading tag
+        loadingTag.remove();
         // Store file details AND content
         sessionFile = {
             filename: file.name,
@@ -459,23 +471,40 @@ fileUploadSessionInput.addEventListener('change', async (e) => {
             content: event.target.result // Store the Base64 content
         };
 
-        // Update display in the new area above chatbox
-        sessionFileDisplayArea.innerHTML = `<span class="selected-file-tag">
-                                            <i class="fas fa-paperclip mr-1 text-xs"></i> <!-- Optional icon -->
-                                            <span class="filename truncate" title="${file.name}">${file.name}</span>
-                                            <button title="Remove Attachment" class="ml-2">&times;</button>
-                                        </span>`;
-        sessionFileDisplayArea.querySelector('button').onclick = () => {
-            sessionFile = null; // Clear the selected file on removal.
-            sessionFileDisplayArea.innerHTML = ''; // Clear the new display area
+        // Update display in the shared container
+        selectedFilesContainer.classList.remove('hidden'); // Ensure container is visible
+        const tag = document.createElement('span');
+        tag.classList.add('selected-file-tag', 'session-file-tag'); // Add session-file-tag class
+        tag.innerHTML = `
+            <i class="fas fa-paperclip mr-1 text-xs"></i> <!-- Icon for session file -->
+            <span class="filename truncate" title="${file.name}">${file.name}</span>
+            <span class="file-type">SESSION</span> <!-- Differentiate session file -->
+            <button title="Remove Attachment" class="ml-2">&times;</button>
+        `;
+        tag.querySelector('button').onclick = () => {
+            sessionFile = null; // Clear the selected file state.
+            tag.remove(); // Remove the tag itself.
+            renderSelectedFiles(); // Re-render to potentially hide container if empty
             fileUploadSessionInput.value = ''; // Reset file input
         };
+        // Prepend session file tag for visual distinction or append, user preference? Let's prepend.
+        selectedFilesContainer.prepend(tag);
     }
     reader.onerror = function(error) {
+        // Remove loading tag if it exists
+        loadingTag.remove();
         console.error("Error reading file:", error);
-        sessionFileDisplayArea.innerHTML = '<span class="text-xs text-red-500">Error reading file.</span>'; // Show error in new area
+        // Optionally show error in the container or just log it
+        // Example: add a temporary error tag
+        const errorTag = document.createElement('span');
+        errorTag.classList.add('selected-file-tag', 'session-file-tag', 'bg-red-100', 'text-red-700', 'border-red-300');
+        errorTag.textContent = `Error loading ${file.name}`;
+        selectedFilesContainer.prepend(errorTag);
+        setTimeout(() => errorTag.remove(), 3000); // Remove error after 3s
+
         sessionFile = null;
         fileUploadSessionInput.value = ''; // Reset file input
+        renderSelectedFiles(); // Re-render to potentially hide container
     }
     reader.readAsDataURL(file); // Read file as data URL (Base64)
 });
@@ -638,7 +667,30 @@ async function loadUploadedFiles() {
       
         function attachSelectedFiles(type) { const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked'); if (checkboxes.length === 0) { updateStatus("No files selected to attach.", true); return; } let addedCount = 0; checkboxes.forEach(checkbox => { const fileId = parseInt(checkbox.value); const listItem = checkbox.closest('.file-list-item'); const filename = listItem.dataset.filename; const alreadySelected = selectedFiles.some(f => f.id === fileId && f.type === type); if (!alreadySelected) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId)); selectedFiles.push({ id: fileId, filename: filename, type: type }); addedCount++; } checkbox.checked = false; listItem.classList.remove('active-selection'); }); renderSelectedFiles(); if (addedCount > 0) { updateStatus(`${addedCount} file(s) added as ${type}.`); } else { updateStatus(`Selected file(s) already attached as ${type}.`); } }
         function removeSelectedFile(fileId, type) { selectedFiles = selectedFiles.filter(f => !(f.id === fileId && f.type === type)); renderSelectedFiles(); updateStatus(`File attachment removed.`); }
-        function renderSelectedFiles() { if (selectedFiles.length === 0) { selectedFilesContainer.classList.add('hidden'); selectedFilesContainer.innerHTML = ''; } else { selectedFilesContainer.classList.remove('hidden'); selectedFilesContainer.innerHTML = ''; selectedFiles.forEach(file => { const tag = document.createElement('span'); tag.classList.add('selected-file-tag'); tag.innerHTML = ` <span class="filename truncate" title="${file.filename}">${file.filename}</span> <span class="file-type">${file.type.toUpperCase()}</span> <button title="Remove Attachment">&times;</button> `; tag.querySelector('button').onclick = () => removeSelectedFile(file.id, file.type); selectedFilesContainer.appendChild(tag); }); } }
+        function renderSelectedFiles() {
+            // Clear only non-session file tags
+            selectedFilesContainer.querySelectorAll('.selected-file-tag:not(.session-file-tag)').forEach(tag => tag.remove());
+
+            // Render plugin-selected files
+            selectedFiles.forEach(file => {
+                const tag = document.createElement('span');
+                tag.classList.add('selected-file-tag'); // No session-file-tag class here
+                tag.innerHTML = `
+                    <span class="filename truncate" title="${file.filename}">${file.filename}</span>
+                    <span class="file-type">${file.type.toUpperCase()}</span>
+                    <button title="Remove Attachment">&times;</button>
+                `;
+                tag.querySelector('button').onclick = () => removeSelectedFile(file.id, file.type);
+                selectedFilesContainer.appendChild(tag); // Append plugin files
+            });
+
+            // Update container visibility based on whether *any* tags exist (session or plugin)
+            if (selectedFilesContainer.children.length === 0) {
+                selectedFilesContainer.classList.add('hidden');
+            } else {
+                selectedFilesContainer.classList.remove('hidden');
+            }
+        }
 
         // --- Summary Modal Functions (Unchanged) ---
         async function showSummaryModal(fileId, filename) { currentEditingFileId = fileId; summaryModalFilename.textContent = filename; summaryTextarea.value = ""; summaryTextarea.placeholder = "Loading or generating summary..."; summaryStatus.textContent = ""; summaryStatus.classList.remove('text-red-500'); summaryModal.style.display = "block"; saveSummaryButton.disabled = true; updateStatus(`Fetching summary for ${filename}...`); try { const response = await fetch(`/api/files/${fileId}/summary`); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } const data = await response.json(); summaryTextarea.value = data.summary; summaryTextarea.placeholder = "Enter or edit summary here."; saveSummaryButton.disabled = false; updateStatus(`Summary loaded for ${filename}.`); if (data.summary.startsWith("[Error") || data.summary.startsWith("[Summary not applicable")) { summaryStatus.textContent = data.summary; summaryStatus.classList.add('text-red-500'); saveSummaryButton.disabled = data.summary.startsWith("[Summary not applicable"); } else { summaryStatus.textContent = "Summary loaded. You can edit and save changes."; } } catch (error) { console.error("Error fetching summary:", error); summaryTextarea.value = `[Error loading summary: ${error.message}]`; summaryTextarea.placeholder = "Could not load summary."; updateStatus(`Error fetching summary for ${filename}.`, true); summaryStatus.textContent = `Error: ${error.message}`; summaryStatus.classList.add('text-red-500'); } }
@@ -715,9 +767,11 @@ async function loadUploadedFiles() {
             updateStatus(`New chat created (ID: ${newChat.id}).`);
             setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar');
             selectedFiles = []; // Clear permanent file selections
-            renderSelectedFiles();
-            sessionFile = null; // Clear session file
-            sessionFileDisplayArea.innerHTML = ''; // Clear session file display
+            sessionFile = null; // Clear session file state
+            // Clear session file tag from container
+            const existingSessionTag = selectedFilesContainer.querySelector('.session-file-tag');
+            if (existingSessionTag) existingSessionTag.remove();
+            renderSelectedFiles(); // Render (clears plugin files and updates visibility)
             fileUploadSessionInput.value = ''; // Reset session file input
             calendarContext = null;
             isCalendarContextActive = false;
@@ -729,9 +783,11 @@ async function loadUploadedFiles() {
             updateStatus(`Chat ${chatId} loaded.`);
             setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar');
             selectedFiles = []; // Clear permanent file selections
-            renderSelectedFiles();
-            sessionFile = null; // Clear session file
-            sessionFileDisplayArea.innerHTML = ''; // Clear session file display
+            sessionFile = null; // Clear session file state
+            // Clear session file tag from container
+            const existingSessionTag = selectedFilesContainer.querySelector('.session-file-tag');
+            if (existingSessionTag) existingSessionTag.remove();
+            renderSelectedFiles(); // Render (clears plugin files and updates visibility)
             fileUploadSessionInput.value = ''; // Reset session file input
             calendarContext = null;
             isCalendarContextActive = false;
@@ -789,13 +845,15 @@ async function loadUploadedFiles() {
                 addMessage('assistant', `[Error: ${error.message}]`, true);
                 updateStatus("Error sending message.", true);
             } finally {
-                 // Clear the session file if it was the one sent
-                 if (sentSessionFile && sessionFile === sentSessionFile) {
-                     sessionFile = null;
-                     sessionFileDisplayArea.innerHTML = ''; // Clear the new display area
-                     fileUploadSessionInput.value = ''; // Reset file input
-                 }
-                 setLoadingState(false);
+                // Clear the session file state and its tag if it was the one sent
+                if (sentSessionFile && sessionFile === sentSessionFile) {
+                    sessionFile = null;
+                    const existingSessionTag = selectedFilesContainer.querySelector('.session-file-tag');
+                    if (existingSessionTag) existingSessionTag.remove();
+                    renderSelectedFiles(); // Update container visibility if needed
+                    fileUploadSessionInput.value = ''; // Reset file input
+                }
+                setLoadingState(false);
             }
         }
         async function handleSaveChatName() { if (isLoading || !currentChatId) { updateStatus("Cannot save name: No active chat or busy.", true); return; } const newName = currentChatNameInput.value.trim(); setLoadingState(true, "Saving Name"); updateStatus(`Saving name for chat ${currentChatId}...`); try { const response = await fetch(`/api/chat/${currentChatId}/name`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName || 'New Chat' }), }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } updateStatus(`Chat ${currentChatId} name saved as "${newName || 'New Chat'}".`); await loadSavedChats(); } catch (error) { console.error('Error saving chat name:', error); updateStatus(`Error saving name: ${error.message}`, true); } finally { setLoadingState(false); } }
