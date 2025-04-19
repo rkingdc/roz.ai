@@ -413,10 +413,11 @@ def generate_chat_response(
                         f"[System: Error processing file '{filename}'.]"
                     )
 
+        web_search_error_for_user = None # Initialize variable to hold user-facing errors
         if enable_web_search:
             try:
-                search_query = generate_search_query(user_message)
-                print(f"Web search enabled, searching for: '{search_query}'")
+                search_query = generate_search_query(user_message) # Note: search_query isn't used below, consider removing if not needed elsewhere
+                print(f"Web search enabled, searching for: '{search_query}'") # Using user_message for search now
                 search_results = perform_web_search(
                     user_message
                 )  # Call the new function
