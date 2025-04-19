@@ -627,7 +627,7 @@ async function loadUploadedFiles() {
                 actionsDiv.classList.add('file-actions');
                 const summaryBtn = document.createElement('button');
                 summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs');
-                summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i> Summary';
+                summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i>';
                 summaryBtn.title = "View/Edit Summary";
                 summaryBtn.disabled = false;
                 summaryBtn.onclick = (e) => {
@@ -639,7 +639,7 @@ async function loadUploadedFiles() {
                 // --- Add Delete Button Here ---
                 const deleteBtn = document.createElement('button');
                 deleteBtn.classList.add('btn', 'btn-outline', 'btn-xs', 'delete-btn'); // Added 'delete-btn' class
-                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete';
+                deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
                 deleteBtn.title = "Delete File";
                 deleteBtn.onclick = (e) => {
                     e.stopPropagation(); // Stop itemDiv onclick from triggering
