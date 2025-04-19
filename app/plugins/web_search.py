@@ -1,5 +1,6 @@
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from flask import current_app
 
 def perform_web_search(query, num_results=3):
     """

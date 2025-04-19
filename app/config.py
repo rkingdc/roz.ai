@@ -25,6 +25,8 @@ class Config:
 
     # Gemini API
     API_KEY = os.getenv("GEMINI_API_KEY")
+    GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+    GOOGLE_CSE_ID = os.getenv('GOOGLE_CSE_ID')
     DEFAULT_MODEL = 'gemini-2.0-flash'
     SUMMARY_MODEL = 'gemini-2.0-flash' # Model used specifically for summarization
     AVAILABLE_MODELS = [

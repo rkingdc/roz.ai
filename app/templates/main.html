@@ -419,7 +419,8 @@
             }
         } 
       
-        function setLoadingState(loading, operation = "Processing") { isLoading = loading; messageInput.disabled = loading; sendButton.disabled = loading; newChatButton.disabled = loading; saveChatNameButton.disabled = loading; sidebarToggleButton.disabled = loading; pluginsToggleButton.disabled = loading; fileUploadInput.disabled = loading; attachFullButton.disabled = loading; attachSummaryButton.disabled = loading; saveSummaryButton.disabled = loading; modelSelector.disabled = loading; loadCalendarButton.disabled = loading; calendarToggle.disabled = loading; viewCalendarButton.disabled = loading || !calendarContext; webSearchToggle.disabled = loading; // Disable web search toggle uploadedFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading); selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading); sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send'; if (loading) { updateStatus(`${operation}...`); } else { updateStatus("Idle"); if (!bodyElement.classList.contains('sidebar-collapsed')) { messageInput.focus(); } } }
+      function setLoadingState(loading, operation = "Processing") { isLoading = loading; messageInput.disabled = loading; sendButton.disabled = loading; newChatButton.disabled = loading; saveChatNameButton.disabled = loading; sidebarToggleButton.disabled = loading; pluginsToggleButton.disabled = loading; fileUploadInput.disabled = loading; attachFullButton.disabled = loading; attachSummaryButton.disabled = loading; saveSummaryButton.disabled = loading; modelSelector.disabled = loading; loadCalendarButton.disabled = loading; calendarToggle.disabled = loading; viewCalendarButton.disabled = loading || !calendarContext; webSearchToggle.disabled = loading; // Disable web search toggle
+								    uploadedFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading); selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading); sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send'; if (loading) { updateStatus(`${operation}...`); } else { updateStatus("Idle"); if (!bodyElement.classList.contains('sidebar-collapsed')) { messageInput.focus(); } } }
 
         // --- Sidebar & Plugin Toggle Functions (Unchanged) ---
         function setSidebarCollapsed(sidebarElement, toggleButton, collapsed, storageKey, positionClass) { const icon = toggleButton.querySelector('i'); const bodyClass = `${positionClass}-collapsed`; const isLeft = positionClass === 'sidebar'; const expandIcon = isLeft ? 'fa-chevron-left' : 'fa-chevron-right'; const collapseIcon = isLeft ? 'fa-chevron-right' : 'fa-chevron-left'; if (collapsed) { bodyElement.classList.add(bodyClass); icon.classList.remove(expandIcon); icon.classList.add(collapseIcon); toggleButton.title = `Expand ${isLeft ? 'Chat List' : 'Plugins'}`; localStorage.setItem(storageKey, 'true'); } else { bodyElement.classList.remove(bodyClass); icon.classList.remove(collapseIcon); icon.classList.add(expandIcon); toggleButton.title = `Collapse ${isLeft ? 'Chat List' : 'Plugins'}`; localStorage.setItem(storageKey, 'false'); } if (!collapsed && !isLoading) { setTimeout(() => messageInput.focus(), 350); } }
@@ -783,11 +784,28 @@ async function loadUploadedFiles() {
             fileUploadSessionInput.value = ''; // Reset session file input
             calendarContext = null;
             isCalendarContextActive = false;
-            calendarToggle.checked = false; updateCalendarStatus(); viewCalendarButton.classList.add('hidden'); modelSelector.value = defaultModel; webSearchToggle.checked = false; // Reset web search toggle } catch (error) { console.error('Error starting new chat:', error); addMessage('system', `[Error creating new chat: ${error.message}]`, true); updateStatus("Error creating new chat.", true); } finally { setLoadingState(false); } }
-      async function loadChat(chatId) { if (isLoading) return; setLoadingState(true, "Loading Chat"); updateStatus(`Loading chat ${chatId}...`); clearChatbox(); addMessage('system', `Loading chat (ID: ${chatId})...`); try { const response = await fetch(`/api/chat/${chatId}`); if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`); const data = await response.json(); currentChatId = chatId; clearChatbox(); currentChatNameInput.value = data.details.name || ''; currentChatIdDisplay.textContent = `ID: ${currentChatId}`; modelSelector.value = data.details.model_name || defaultModel; if (data.history.length === 0) { addMessage('system', 'This chat is empty. Start typing!'); } else { data.history.forEach(msg => addMessage(msg.role, msg.content)); }
-
-
-					updateActiveChatListItem();
+																		 calendarToggle.checked = false; updateCalendarStatus(); viewCalendarButton.classList.add('hidden'); modelSelector.value = defaultModel; webSearchToggle.checked = false; // Reset web search toggle
+																	       } catch (error) { console.error('Error starting new chat:', error); addMessage('system', `[Error creating new chat: ${error.message}]`, true); updateStatus("Error creating new chat.", true); } finally { setLoadingState(false); } }
+																		 async function loadChat(chatId) {
+																		     if (isLoading) return;
+																		     setLoadingState(true, "Loading Chat");
+																		     updateStatus(`Loading chat ${chatId}...`);
+																		     clearChatbox();
+																		     addMessage('system', `Loading chat (ID: ${chatId})...`);
+																		     try {
+																			 const response = await fetch(`/api/chat/${chatId}`);
+																			 if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
+																			 const data = await response.json();
+																			 currentChatId = chatId;
+																			 clearChatbox();
+																			 currentChatNameInput.value = data.details.name || '';
+																			 currentChatIdDisplay.textContent = `ID: ${currentChatId}`;
+																			 modelSelector.value = data.details.model_name || defaultModel;
+																			 if (data.history.length === 0) {
+																			     addMessage('system', 'This chat is empty. Start typing!');
+																			 } else {
+																			     data.history.forEach(msg => addMessage(msg.role, msg.content)); } 
+																		updateActiveChatListItem();
             updateStatus(`Chat ${chatId} loaded.`);
             setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar');
             selectedFiles = []; // Clear permanent file selections
@@ -799,7 +817,10 @@ async function loadUploadedFiles() {
             fileUploadSessionInput.value = ''; // Reset session file input
             calendarContext = null;
             isCalendarContextActive = false;
-            calendarToggle.checked = false;																							updateCalendarStatus(); viewCalendarButton.classList.add('hidden'); webSearchToggle.checked = false; // Reset web search toggle } catch (error) { console.error('Error loading chat:', error); clearChatbox(); addMessage('system', `[Error loading chat ${chatId}: ${error.message}]`, true); currentChatId = null; currentChatNameInput.value = ''; currentChatIdDisplay.textContent = 'ID: -'; modelSelector.value = defaultModel; updateStatus(`Error loading chat ${chatId}.`, true); updateActiveChatListItem(); } finally { setLoadingState(false); } }
+																			 calendarToggle.checked = false;																							updateCalendarStatus();
+																			 viewCalendarButton.classList.add('hidden');
+																			 webSearchToggle.checked = false; // Reset web search toggle
+																		     } catch (error) { console.error('Error loading chat:', error); clearChatbox(); addMessage('system', `[Error loading chat ${chatId}: ${error.message}]`, true); currentChatId = null; currentChatNameInput.value = ''; currentChatIdDisplay.textContent = 'ID: -'; modelSelector.value = defaultModel; updateStatus(`Error loading chat ${chatId}.`, true); updateActiveChatListItem(); } finally { setLoadingState(false); } }
 
         /** Sends message, attached files, and optionally calendar context to backend. */
         async function sendMessage() {
