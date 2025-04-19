@@ -761,7 +761,13 @@ async function loadUploadedFiles() {
                 addMessage('assistant', `[Error: ${error.message}]`, true);
                 updateStatus("Error sending message.", true);
             } finally {
-                setLoadingState(false);
+                 // Clear the session file if it was the one sent
+                 if (sentSessionFile && sessionFile === sentSessionFile) {
+                     sessionFile = null;
+                     sessionFileDisplay.innerHTML = '';
+                     fileUploadSessionInput.value = ''; // Reset file input
+                 }
+                 setLoadingState(false);
             }
         }
         async function handleSaveChatName() { if (isLoading || !currentChatId) { updateStatus("Cannot save name: No active chat or busy.", true); return; } const newName = currentChatNameInput.value.trim(); setLoadingState(true, "Saving Name"); updateStatus(`Saving name for chat ${currentChatId}...`); try { const response = await fetch(`/api/chat/${currentChatId}/name`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName || 'New Chat' }), }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } updateStatus(`Chat ${currentChatId} name saved as "${newName || 'New Chat'}".`); await loadSavedChats(); } catch (error) { console.error('Error saving chat name:', error); updateStatus(`Error saving name: ${error.message}`, true); } finally { setLoadingState(false); } }
