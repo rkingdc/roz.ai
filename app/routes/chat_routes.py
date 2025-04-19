@@ -89,9 +89,13 @@ def send_message_route(chat_id):
     attached_files = data.get('attached_files', [])
     calendar_context = data.get('calendar_context') # Get calendar context from request
     session_files = data.get('session_files', []) # Get session files from request
+    enable_web_search = data.get('enable_web_search', False) # Get web search flag, default to False
 
     # Check if there's any actual input to process
     if not user_message and not attached_files and not calendar_context and not session_files:
+        # Note: We might still want to allow sending if only web search is enabled,
+        # but currently the AI function likely needs *some* user input.
+        # Keeping the original check for now.
         return jsonify({"error": "No message, files, or context provided"}), 400
 
     try:
@@ -101,8 +105,8 @@ def send_message_route(chat_id):
             user_message=user_message,
             attached_files=attached_files,
             calendar_context=calendar_context, # Pass calendar context
-            session_files=session_files # Pass session files
-            enable_web_search=enable_web_search
+            session_files=session_files, # Pass session files
+            enable_web_search=enable_web_search # Pass web search flag
         )
         # Check if the reply indicates an internal error occurred
         if isinstance(assistant_reply, str) and assistant_reply.startswith("[Error:"):
