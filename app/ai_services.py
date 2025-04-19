@@ -158,7 +158,7 @@ def generate_search_query(user_message: str, max_retries=1) -> str | None:
         print("INFO: Cannot generate search query from empty user message.")
         return None
 
-    model_name = current_app.config.get('DEFAULT_MODEL') # Use the app's default
+    model_name = current_app.config.get('SUMMARY_MODEL') 
     print(f"Attempting to generate search query using model '{model_name}'...")
 
     # Construct the prompt for the LLM
