@@ -7,6 +7,12 @@ import base64  # Needed for decoding session file content
 from . import database  # Use relative import
 from .plugins.web_search import perform_web_search
 
+# Configure logging
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Global variable to hold configured status
 gemini_configured = False
 
@@ -19,12 +25,12 @@ def configure_gemini(app):
         try:
             genai.configure(api_key=api_key)
             gemini_configured = True
-            print("Gemini API configured successfully.")
+            logger.info("Gemini API configured successfully.")
         except Exception as e:
-            print(f"Error configuring Gemini API: {e}")
+            logger.error(f"Error configuring Gemini API: {e}")
             gemini_configured = False
     else:
-        print("Gemini API key not found in config. AI features disabled.")
+        logger.error("Gemini API key not found in config. AI features disabled.")
         gemini_configured = False
     return gemini_configured
 
@@ -45,7 +51,7 @@ def generate_summary(file_id):
     mimetype = file_details["mimetype"]
     content_blob = file_details["content"]
     summary_model_name = current_app.config["SUMMARY_MODEL"]
-    print(
+    logger.info(
         f"Attempting summary generation for '{filename}' (Type: {mimetype}) using model '{summary_model_name}'..."
     )
 
@@ -71,7 +77,7 @@ def generate_summary(file_id):
                     temp_file.write(content_blob)
                     temp_filepath = temp_file.name
                     temp_file_to_clean = temp_filepath
-                print(
+                logger.info(
                     f"Uploading temp file '{temp_filepath}' for summary generation..."
                 )
                 uploaded_file = genai.upload_file(
@@ -79,7 +85,7 @@ def generate_summary(file_id):
                 )
                 parts.append(prompt)
                 parts.append(uploaded_file)
-                print(
+                logger.info(
                     f"File '{filename}' uploaded for summary, URI: {uploaded_file.uri}"
                 )
             except Exception as upload_err:
@@ -98,10 +104,10 @@ def generate_summary(file_id):
             parts, request_options={"timeout": timeout}
         )
         summary = response.text
-        print(f"Summary generated successfully for '{filename}'.")
+        logger.info(f"Summary generated successfully for '{filename}'.")
         return summary
     except Exception as e:
-        print(f"Error during summary generation API call for '{filename}': {e}")
+        logger.error(f"Error during summary generation API call for '{filename}': {e}")
         if "prompt was blocked" in str(e).lower():
             return "[Error: Summary generation blocked due to safety settings]"
         return f"[Error generating summary via API: {e}]"
@@ -109,9 +115,11 @@ def generate_summary(file_id):
         if temp_file_to_clean:
             try:
                 os.remove(temp_file_to_clean)
-                print(f"Cleaned up temp summary file: {temp_file_to_clean}")
+                logger.info(f"Cleaned up temp summary file: {temp_file_to_clean}")
             except OSError as e:
-                print(f"Error removing temp summary file {temp_file_to_clean}: {e}")
+                logger.info(
+                    f"Error removing temp summary file {temp_file_to_clean}: {e}"
+                )
 
 
 def get_or_generate_summary(file_id):
@@ -124,15 +132,15 @@ def get_or_generate_summary(file_id):
         and file_details["summary"]
         and not file_details["summary"].startswith("[")
     ):
-        print(f"Retrieved existing summary for file ID: {file_id}")
+        logger.info(f"Retrieved existing summary for file ID: {file_id}")
         return file_details["summary"]
     else:
-        print(f"Generating summary for file ID: {file_id}...")
+        logger.info(f"Generating summary for file ID: {file_id}...")
         new_summary = generate_summary(file_id)
         if database.save_summary_in_db(file_id, new_summary):
             return new_summary
         else:
-            print(
+            logger.info(
                 f"Error: Failed to save newly generated summary for file ID: {file_id}"
             )
             return new_summary
@@ -152,14 +160,16 @@ def generate_search_query(user_message: str, max_retries=1) -> str | None:
                     or the LLM couldn't produce a useful query.
     """
     if not gemini_configured:
-        print("ERROR: Cannot generate search query - Gemini API Key not configured.")
+        logger.info(
+            "ERROR: Cannot generate search query - Gemini API Key not configured."
+        )
         return None
     if not user_message or user_message.isspace():
-        print("INFO: Cannot generate search query from empty user message.")
+        logger.info("INFO: Cannot generate search query from empty user message.")
         return None
 
-    model_name = current_app.config.get('SUMMARY_MODEL') 
-    print(f"Attempting to generate search query using model '{model_name}'...")
+    model_name = current_app.config.get("SUMMARY_MODEL")
+    logger.info(f"Attempting to generate search query using model '{model_name}'...")
 
     # Construct the prompt for the LLM
     prompt = f"""Analyze the following user message and generate a concise and effective web search query (ideally 3-7 words) that would find information directly helpful in answering or augmenting the user's request.
@@ -184,55 +194,72 @@ Search Query:"""
                 generation_config=genai.types.GenerationConfig(
                     # candidate_count=1, # Default is 1
                     # stop_sequences=['\n'], # Could try stopping at newline, but LLM might ignore
-                    max_output_tokens=50, # Limit output tokens significantly for just a query
-                    temperature=0.2 # Lower temperature for more focused, less creative query
-                )
+                    max_output_tokens=50,  # Limit output tokens significantly for just a query
+                    temperature=0.2,  # Lower temperature for more focused, less creative query
+                ),
             )
 
             # --- Response Cleaning ---
             if not response.parts:
-                 print(f"Warning: LLM response for query generation had no parts. Prompt Blocked? Text: {response.text}")
-                 # Check if prompt was blocked
-                 if response.prompt_feedback and response.prompt_feedback.block_reason:
-                     print(f"Prompt blocked, reason: {response.prompt_feedback.block_reason}")
-                     # Don't retry if blocked by safety/policy
-                     return None
-                 # Otherwise, maybe transient issue, allow retry
-                 raise ValueError("LLM response contained no parts.") # Raise error to trigger retry
+                logger.info(
+                    f"Warning: LLM response for query generation had no parts. Prompt Blocked? Text: {response.text}"
+                )
+                # Check if prompt was blocked
+                if response.prompt_feedback and response.prompt_feedback.block_reason:
+                    logger.info(
+                        f"Prompt blocked, reason: {response.prompt_feedback.block_reason}"
+                    )
+                    # Don't retry if blocked by safety/policy
+                    return None
+                # Otherwise, maybe transient issue, allow retry
+                raise ValueError(
+                    "LLM response contained no parts."
+                )  # Raise error to trigger retry
 
             generated_query = response.text.strip()
 
             # Further cleaning: Remove potential surrounding quotes if the LLM added them
-            generated_query = re.sub(r'^"|"$', '', generated_query)
+            generated_query = re.sub(r'^"|"$', "", generated_query)
             # Remove potential markdown list markers or similar artifacts
-            generated_query = re.sub(r'^\s*[-\*\d]+\.?\s*', '', generated_query)
+            generated_query = re.sub(r"^\s*[-\*\d]+\.?\s*", "", generated_query)
             # Remove potential introductory phrases sometimes added by LLMs
-            generated_query = re.sub(r'^(?:Search Query:|Here is a search query:|query:)\s*', '', generated_query, flags=re.IGNORECASE)
-
+            generated_query = re.sub(
+                r"^(?:Search Query:|Here is a search query:|query:)\s*",
+                "",
+                generated_query,
+                flags=re.IGNORECASE,
+            )
 
             if generated_query:
-                print(f"Generated Search Query: '{generated_query}'")
+                logger.info(f"Generated Search Query: '{generated_query}'")
                 return generated_query
             else:
-                print("Warning: LLM generated an empty search query.")
+                logger.info("Warning: LLM generated an empty search query.")
                 # Don't retry if the LLM deliberately returned empty, treat as failure
                 return None
 
         except Exception as e:
             retries += 1
-            print(f"Error generating search query (Attempt {retries}/{max_retries+1}): {e}")
+            logger.info(
+                f"Error generating search query (Attempt {retries}/{max_retries+1}): {e}"
+            )
             if retries > max_retries:
-                print("Max retries reached for search query generation.")
+                logger.info("Max retries reached for search query generation.")
                 return None
             # Optional: Add a small delay before retrying
             # import time
             # time.sleep(1)
 
-    return None # Should technically be unreachable if loop condition is correct, but safety return
+    return None  # Should technically be unreachable if loop condition is correct, but safety return
 
 
 def generate_chat_response(
-        chat_id, user_message, attached_files, calendar_context=None, session_files=None, enable_web_search=False
+    chat_id,
+    user_message,
+    attached_files,
+    calendar_context=None,
+    session_files=None,
+    enable_web_search=False,
 ):  # Added session_files parameter
     """
     Generates a chat response using the appropriate model and context.
@@ -247,7 +274,7 @@ def generate_chat_response(
         return "[Error: Chat session not found]"
 
     model_name = chat_details.get("model_name", current_app.config["DEFAULT_MODEL"])
-    print(f"Using model '{model_name}' for chat {chat_id} response.")
+    logger.info(f"Using model '{model_name}' for chat {chat_id} response.")
 
     gemini_parts = []
     temp_files_to_clean = []
@@ -259,7 +286,7 @@ def generate_chat_response(
     try:
         # --- Add Calendar Context FIRST if provided ---
         if calendar_context:
-            print("Prepending calendar context to AI query.")
+            logger.info("Prepending calendar context to AI query.")
             gemini_parts.extend(
                 [
                     "--- Start Calendar Context ---",
@@ -270,7 +297,7 @@ def generate_chat_response(
 
         # --- Process Session Files SECOND ---
         if session_files:
-            print(f"Processing {len(session_files)} session files for Gemini...")
+            logger.info(f"Processing {len(session_files)} session files for Gemini...")
             for session_file in session_files:
                 filename = session_file.get("filename", "unknown_session_file")
                 base64_content = session_file.get(
@@ -281,7 +308,7 @@ def generate_chat_response(
                 )  # Get mimetype if available
 
                 if not base64_content:
-                    print(
+                    logger.info(
                         f"Warning: Skipping session file '{filename}' due to missing content."
                     )
                     continue
@@ -292,7 +319,7 @@ def generate_chat_response(
                     header, encoded = base64_content.split(",", 1)
                     decoded_data = base64.b64decode(encoded)
 
-                    print(
+                    logger.info(
                         f"Preparing session file '{filename}' (Type: {mimetype}) for API upload..."
                     )
                     from werkzeug.utils import secure_filename
@@ -304,7 +331,7 @@ def generate_chat_response(
                         temp_filepath = temp_file.name
                         temp_files_to_clean.append(temp_filepath)
 
-                    print(
+                    logger.info(
                         f"Uploading temp session file '{temp_filepath}' for '{filename}' via API..."
                     )
                     try:
@@ -316,12 +343,12 @@ def generate_chat_response(
                         gemini_parts.append(
                             uploaded_file
                         )  # Add file reference to parts for AI
-                        print(
+                        logger.info(
                             f"Session file '{filename}' uploaded, URI: {uploaded_file.uri}"
                         )
                         # DO NOT add marker to files_info_for_history for session files
                     except Exception as api_upload_err:
-                        print(
+                        logger.info(
                             f"Error uploading session file '{filename}' to Gemini API: {api_upload_err}"
                         )
                         gemini_parts.append(
@@ -329,7 +356,7 @@ def generate_chat_response(
                         )  # Add system message part for AI
 
                 except Exception as processing_err:
-                    print(
+                    logger.info(
                         f"Error processing session file '{filename}' for Gemini: {processing_err}"
                     )
                     gemini_parts.append(
@@ -338,7 +365,7 @@ def generate_chat_response(
 
         # --- Process Attached (Permanent) Files THIRD ---
         if attached_files:
-            print(
+            logger.info(
                 f"Processing {len(attached_files)} attached permanent files for Gemini..."
             )
             for file_info in attached_files:
@@ -369,7 +396,7 @@ def generate_chat_response(
                             temp_file.write(content_blob)
                             temp_filepath = temp_file.name
                             temp_files_to_clean.append(temp_filepath)
-                        print(
+                        logger.info(
                             f"Uploading temp file '{temp_filepath}' for '{filename}' via API..."
                         )
                         try:
@@ -379,12 +406,12 @@ def generate_chat_response(
                                 mime_type=mimetype,
                             )
                             gemini_parts.append(uploaded_file)
-                            print(
+                            logger.info(
                                 f"File '{filename}' uploaded, URI: {uploaded_file.uri}"
                             )
                             files_info_for_history.append(history_marker)
                         except Exception as api_upload_err:
-                            print(
+                            logger.info(
                                 f"Error uploading file '{filename}' to Gemini API: {api_upload_err}"
                             )
                             files_info_for_history.append(
@@ -394,7 +421,7 @@ def generate_chat_response(
                                 f"[System: Error processing file '{filename}'. Upload failed.]"
                             )
                     elif attach_type == "summary":
-                        print(
+                        logger.info(
                             f"Getting/Generating summary for '{filename}' (ID: {file_id})"
                         )
                         summary = get_or_generate_summary(file_id)
@@ -403,7 +430,7 @@ def generate_chat_response(
                         )
                         files_info_for_history.append(history_marker)
                 except Exception as processing_err:
-                    print(
+                    logger.info(
                         f"Error processing file ID {file_id} ('{filename}') for Gemini: {processing_err}"
                     )
                     files_info_for_history.append(
@@ -413,11 +440,17 @@ def generate_chat_response(
                         f"[System: Error processing file '{filename}'.]"
                     )
 
-        web_search_error_for_user = None # Initialize variable to hold user-facing errors
+        web_search_error_for_user = (
+            None  # Initialize variable to hold user-facing errors
+        )
         if enable_web_search:
             try:
-                search_query = generate_search_query(user_message) # Note: search_query isn't used below, consider removing if not needed elsewhere
-                print(f"Web search enabled, searching for: '{search_query}'") # Using user_message for search now
+                search_query = generate_search_query(
+                    user_message
+                )  # Note: search_query isn't used below, consider removing if not needed elsewhere
+                logger.info(
+                    f"Web search enabled, searching for: '{search_query}'"
+                )  # Using user_message for search now
                 search_results = perform_web_search(
                     user_message
                 )  # Call the new function
@@ -446,7 +479,7 @@ def generate_chat_response(
                     files_info_for_history.append("[Web search attempted, no results]")
             except Exception as search_err:
                 # This outer catch might catch errors *calling* perform_web_search, though most errors should be handled *inside* it.
-                print(f"Error during web search integration logic: {search_err}")
+                logger.info(f"Error during web search integration logic: {search_err}")
                 gemini_parts.append(
                     f"[System: Error occurred trying to perform web search: {search_err}]"
                 )
@@ -465,7 +498,7 @@ def generate_chat_response(
             + user_message
         )
         if not database.add_message_to_db(chat_id, "user", history_message):
-            print(
+            logger.info(
                 f"Warning: Failed to save user message for chat {chat_id} after processing files."
             )
             return "[Error: Failed to save user message to history]"
@@ -477,7 +510,7 @@ def generate_chat_response(
             try:
                 chat_model = genai.GenerativeModel(model_name)
             except Exception as model_init_error:
-                print(
+                logger.info(
                     f"Error initializing model '{model_name}': {model_init_error}. Falling back to default '{current_app.config['DEFAULT_MODEL']}'."
                 )
                 chat_model = genai.GenerativeModel(current_app.config["DEFAULT_MODEL"])
@@ -493,13 +526,13 @@ def generate_chat_response(
             if gemini_context and gemini_context[-1]["role"] == "user":
                 gemini_context.pop()
 
-            print(
+            logger.info(
                 f"--- Sending to Gemini (Chat ID: {chat_id}, Model: {model_name}) ---"
             )
-            print(
+            logger.info(
                 f"Content Parts: {[str(p)[:100]+'...' if isinstance(p, str) else type(p) for p in gemini_parts]}"
             )
-            print("--- End Gemini Send ---")
+            logger.info("--- End Gemini Send ---")
 
             full_request_content = gemini_context + [
                 {"role": "user", "parts": gemini_parts}
@@ -514,10 +547,10 @@ def generate_chat_response(
                 assistant_reply += current_reply
             else:
                 assistant_reply = current_reply
-            print(f"Gemini Response: {assistant_reply[:100]}...")
+            logger.info(f"Gemini Response: {assistant_reply[:100]}...")
 
         except Exception as e:
-            print(
+            logger.info(
                 f"Error calling Gemini API for chat {chat_id} with model {model_name}: {e}"
             )
             error_message = f"[Error communicating with AI: {e}]"
@@ -554,10 +587,10 @@ def generate_chat_response(
 
     finally:
         # Clean up temporary files
-        print(f"Cleaning up {len(temp_files_to_clean)} temporary files...")
+        logger.info(f"Cleaning up {len(temp_files_to_clean)} temporary files...")
         for temp_path in temp_files_to_clean:
             try:
                 os.remove(temp_path)
-                print(f"Removed temp file: {temp_path}")
+                logger.info(f"Removed temp file: {temp_path}")
             except OSError as e:
-                print(f"Error removing temp file {temp_path}: {e}")
+                logger.info(f"Error removing temp file {temp_path}: {e}")

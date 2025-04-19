@@ -2,6 +2,11 @@
 import os
 from dotenv import load_dotenv
 
+# Configure logging
+import logging        
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Load environment variables from .env file if it exists
 load_dotenv()
 
@@ -41,7 +46,7 @@ class Config:
 
     # Ensure API Key is present for core functionality
     if not API_KEY:
-        print("CRITICAL WARNING: GEMINI_API_KEY environment variable not set.")
+        logger.info("CRITICAL WARNING: GEMINI_API_KEY environment variable not set.")
         # In a real app, you might raise an error or have clearer handling
         # For now, allows app to run but AI features will fail.
 

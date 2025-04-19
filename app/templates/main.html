@@ -18,7 +18,7 @@
 
         /* roz.ai Theme Colors from JSON */
         :root {
-            --rz-toolbar: rgba(129, 90, 118, 0.36); --rz-toolbar-opaque: rgb(129, 90, 118); /* #815a76 */ --rz-toolbar-text: rgb(176, 146, 87); /* #b09257 */ --rz-frame: rgb(48, 48, 63); /* #30303f */ --rz-tab-background-text: rgb(150, 146, 143); /* #96928f */ --rz-toolbar-field: rgb(61, 50, 61); /* #3d323d */ --rz-toolbar-field-text: rgb(255, 250, 241); /* #fffaf1 */ --rz-tab-line: rgb(174, 163, 142); /* #aea38e */ --rz-popup: rgb(224, 229, 236); /* #e0e5ec */ --rz-popup-text: rgb(33, 34, 72); /* #212248 */ --rz-tab-loading: rgb(174, 163, 142); --rz-sidebar-bg: var(--rz-toolbar-field); --rz-sidebar-text: var(--rz-toolbar-text); --rz-sidebar-border: var(--rz-toolbar-text); --rz-sidebar-hover-bg: var(--rz-frame); --rz-sidebar-active-bg: var(--rz-toolbar-text); --rz-sidebar-active-text: var(--rz-toolbar-field); --rz-button-primary-bg: var(--rz-toolbar-text); --rz-button-primary-text: var(--rz-toolbar-field); --rz-button-primary-hover-bg: var(--rz-tab-line); --rz-button-secondary-bg: var(--rz-frame); --rz-button-secondary-text: var(--rz-toolbar-text); --rz-button-secondary-hover-bg: var(--rz-toolbar-opaque); --rz-button-outline-border: var(--rz-toolbar-text); --rz-button-outline-text: var(--rz-toolbar-text); --rz-button-outline-hover-bg: var(--rz-frame); --rz-button-outline-hover-text: var(--rz-toolbar-text); --rz-user-message-bg: var(--rz-popup); --rz-user-message-text: var(--rz-popup-text); --rz-assistant-message-bg: #e5e7eb; --rz-assistant-message-text: #1f2937; --rz-tag-bg: var(--rz-popup); --rz-tag-text: var(--rz-popup-text); --rz-tag-border: var(--rz-tab-line); --rz-modal-bg: var(--rz-popup); --rz-modal-text: var(--rz-popup-text); --rz-modal-header-text: var(--rz-frame); --rz-main-bg: var(--rz-popup); --rz-chatbox-bg: #ffffff; --rz-input-bg: var(--rz-popup); --rz-input-text-bg: #ffffff; --rz-input-border: var(--rz-tab-line); --rz-input-text: var(--rz-popup-text); --rz-input-focus-ring: var(--rz-toolbar-text); --rz-header-bg: var(--rz-frame); --rz-header-text: var(--rz-toolbar-field-text); --rz-status-bar-bg: var(--rz-frame); --rz-status-bar-text: var(--rz-tab-background-text);
+            --rz-toolbar: rgba(129, 90, 118, 0.36); --rz-toolbar-opaque: rgb(129, 90, 118); /* #815a76 */ --rz-toolbar-text: rgb(176, 146, 87); /* #b09257 */ --rz-frame: rgb(48, 48, 63); /* #30303f */ --rz-tab-background-text: rgb(150, 146, 143); /* #96928f */ --rz-toolbar-field: rgb(61, 50, 61); /* #3d323d */ --rz-toolbar-field-text: rgb(255, 250, 241); /* #fffaf1 */ --rz-tab-line: rgb(174, 163, 142); /* #aea38e */ --rz-popup: rgb(224, 229, 236); /* #e0e5ec */ --rz-popup-text: rgb(33, 34, 72); /* #212248 */ --rz-tab-loading: rgb(174, 163, 142); --rz-sidebar-bg: var(--rz-toolbar-field); --rz-sidebar-text: rgb(174, 163, 142); --rz-sidebar-border: var(--rz-toolbar-text); --rz-sidebar-hover-bg: var(--rz-frame); --rz-sidebar-active-bg: var(--rz-toolbar-text); --rz-sidebar-active-text: var(--rz-toolbar-field); --rz-button-primary-bg: var(--rz-toolbar-text); --rz-button-primary-text: var(--rz-toolbar-field); --rz-button-primary-hover-bg: var(--rz-tab-line); --rz-button-secondary-bg: var(--rz-frame); --rz-button-secondary-text: var(--rz-toolbar-text); --rz-button-secondary-hover-bg: var(--rz-toolbar-opaque); --rz-button-outline-border: var(--rz-toolbar-text); --rz-button-outline-text: var(--rz-toolbar-text); --rz-button-outline-hover-bg: var(--rz-frame); --rz-button-outline-hover-text: var(--rz-toolbar-text); --rz-user-message-bg: var(--rz-popup); --rz-user-message-text: var(--rz-popup-text); --rz-assistant-message-bg: #e5e7eb; --rz-assistant-message-text: #1f2937; --rz-tag-bg: var(--rz-popup); --rz-tag-text: var(--rz-popup-text); --rz-tag-border: var(--rz-tab-line); --rz-modal-bg: var(--rz-popup); --rz-modal-text: var(--rz-popup-text); --rz-modal-header-text: var(--rz-frame); --rz-main-bg: var(--rz-popup); --rz-chatbox-bg: #ffffff; --rz-input-bg: var(--rz-popup); --rz-input-text-bg: #ffffff; --rz-input-border: var(--rz-tab-line); --rz-input-text: var(--rz-popup-text); --rz-input-focus-ring: var(--rz-toolbar-text); --rz-header-bg: var(--rz-frame); --rz-header-text: var(--rz-toolbar-field-text); --rz-status-bar-bg: var(--rz-frame); --rz-status-bar-text: var(--rz-tab-background-text);
         }
 
         /* Left Sidebar (Chats) */
@@ -35,6 +35,42 @@
         #model-selector { font-size: 0.875rem; padding: 0.25rem 0.5rem; border-radius: 0.375rem; border: 1px solid var(--rz-tab-line); background-color: var(--rz-toolbar-field); color: var(--rz-toolbar-field-text); }
         #model-selector option { background-color: var(--rz-toolbar-field); color: var(--rz-toolbar-field-text); }
 
+.chat-list-item {
+    display: flex;           /* Use Flexbox for the list item */
+    flex-direction: column;  /* Stack name/button and timestamp vertically */
+    align-items: stretch;   /* Make children stretch to fill the container width */
+}
+
+.name-container {
+    display: flex;          /* Use Flexbox for the name/button container */
+    justify-content: space-between; /* Put space between name and button */
+    align-items: center;       /* Vertically center the name and button */
+    width: 100%;              /* Ensure it takes full width */
+}
+
+.delete-btn {
+    /* Optional: Adjust styling for the button */
+    margin-left: auto;       /* Push the button to the right (alternative to space-between) */
+    /* Add other styling as needed (e.g., padding, colors) */
+}
+
+.filename {
+    /* Optional: Style the filename */
+}
+
+.text-xs { /* if not already defined*/
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.text-rz-sidebar-text {
+    color: var(--rz-toolbar-field-text); 
+}
+	
+.text-rz-tab-background-text { /* if not already defined*/
+  color: var(--rz-tab-background-text);
+}
+	
         #chat-area { padding: 1rem; flex-grow: 1; display: flex; flex-direction: column; min-height: 0; }
         #chatbox { flex-grow: 1; overflow-y: auto; margin-bottom: 1rem; border: 1px solid #d1d5db; border-radius: 0.5rem; padding: 0.5rem; background-color: var(--rz-chatbox-bg); }
         #input-area { padding: 0 1rem 1rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid #d1d5db; padding-top: 1rem; flex-shrink: 0; background-color: var(--rz-input-bg); }
@@ -770,8 +806,81 @@ async function loadUploadedFiles() {
 
  function clearChatbox() { chatbox.innerHTML = ''; }
 	
-        // --- API Interaction (Chats - MODIFIED sendMessage) ---
-        async function loadSavedChats() { updateStatus("Loading saved chats..."); try { const response = await fetch('/api/chats'); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const chats = await response.json(); savedChatsList.innerHTML = ''; if (chats.length === 0) { savedChatsList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved chats yet.</p>`; } else { chats.forEach(chat => { const listItem = document.createElement('div'); listItem.classList.add('list-item', 'chat-list-item'); listItem.dataset.chatId = chat.id; const nameSpan = document.createElement('span'); nameSpan.textContent = chat.name || `Chat ${chat.id}`; nameSpan.classList.add('filename'); nameSpan.title = chat.name || `Chat ${chat.id}`; const deleteButton = document.createElement('button'); deleteButton.classList.add('delete-btn'); deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; deleteButton.title = "Delete Chat"; deleteButton.onclick = (e) => { e.stopPropagation(); handleDeleteChat(chat.id, listItem); }; listItem.appendChild(nameSpan); listItem.appendChild(deleteButton); listItem.onclick = () => { if (chat.id != currentChatId) { loadChat(chat.id); } }; savedChatsList.appendChild(listItem); }); } updateActiveChatListItem(); updateStatus("Saved chats loaded."); } catch (error) { console.error('Error loading saved chats:', error); savedChatsList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading chats.</p>'; updateStatus("Error loading saved chats.", true); } }
+
+async function loadSavedChats() {
+        updateStatus("Loading saved chats...");
+        try {
+            const response = await fetch('/api/chats');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const chats = await response.json();
+            savedChatsList.innerHTML = '';
+            if (chats.length === 0) {
+                savedChatsList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved chats yet.</p>`;
+            } else {
+                chats.forEach(chat => {
+    const listItem = document.createElement('div');
+    listItem.classList.add('list-item', 'chat-list-item');
+    listItem.dataset.chatId = chat.id;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = chat.name || `Chat ${chat.id}`;
+    nameSpan.classList.add('filename');
+    nameSpan.title = chat.name || `Chat ${chat.id}`;
+
+    const timestampElement = document.createElement('div');
+    const date = new Date(chat.last_updated_at);
+    // Format the date (example)
+    const formattedDate = date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+    });
+
+    timestampElement.textContent = `Last updated: ${formattedDate}`;
+    timestampElement.classList.add('text-xs', 'text-rz-tab-background-text', 'mt-0.5'); // Styling for the timestamp
+
+
+    const deleteButton = document.createElement('button');
+    deleteButton.classList.add('delete-btn');
+    deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>';
+    deleteButton.title = "Delete Chat";
+    deleteButton.onclick = (e) => {
+        e.stopPropagation();
+        handleDeleteChat(chat.id, listItem);
+    };
+
+
+    const nameContainer = document.createElement('div');  // Create a container
+    nameContainer.classList.add('name-container');       // for name and delete button
+
+    nameContainer.appendChild(nameSpan);   // Add name to the container
+    nameContainer.appendChild(deleteButton); // Add button to container
+
+    listItem.appendChild(nameContainer);     // Add the container to the list item
+    listItem.appendChild(timestampElement);
+
+    listItem.onclick = () => {
+        if (chat.id != currentChatId) {
+            loadChat(chat.id);
+        }
+    };
+    savedChatsList.appendChild(listItem);
+});
+            }
+            updateActiveChatListItem();
+            updateStatus("Saved chats loaded.");
+        } catch (error) {
+            console.error('Error loading saved chats:', error);
+            savedChatsList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading chats.</p>';
+            updateStatus("Error loading saved chats.", true);
+        }
+    }
+
+
+
+      
       async function startNewChat() { if (isLoading) return; setLoadingState(true, "Creating Chat"); updateStatus("Creating new chat..."); try { const response = await fetch('/api/chat', { method: 'POST' }); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); const newChat = await response.json(); await loadChat(newChat.id);await loadSavedChats();
             updateStatus(`New chat created (ID: ${newChat.id}).`);
             setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar');
@@ -888,7 +997,27 @@ async function loadUploadedFiles() {
         }
         async function handleSaveChatName() { if (isLoading || !currentChatId) { updateStatus("Cannot save name: No active chat or busy.", true); return; } const newName = currentChatNameInput.value.trim(); setLoadingState(true, "Saving Name"); updateStatus(`Saving name for chat ${currentChatId}...`); try { const response = await fetch(`/api/chat/${currentChatId}/name`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newName || 'New Chat' }), }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); } updateStatus(`Chat ${currentChatId} name saved as "${newName || 'New Chat'}".`); await loadSavedChats(); } catch (error) { console.error('Error saving chat name:', error); updateStatus(`Error saving name: ${error.message}`, true); } finally { setLoadingState(false); } }
         async function handleDeleteChat(chatId, listItemElement) { if (isLoading) return; const chatName = listItemElement.querySelector('span.filename').textContent || `Chat ${chatId}`; if (!confirm(`Are you sure you want to delete "${chatName}"? This cannot be undone.`)) { return; } setLoadingState(true, "Deleting Chat"); updateStatus(`Deleting chat ${chatId}...`); try { const response = await fetch(`/api/chat/${chatId}`, { method: 'DELETE' }); if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); updateStatus(`Chat ${chatId} deleted.`); listItemElement.remove(); if (!savedChatsList.querySelector('.list-item')) { savedChatsList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved chats yet.</p>`; } if (chatId == currentChatId) { await startNewChat(); } } catch (error) { console.error(`Error deleting chat ${chatId}:`, error); updateStatus(`Error deleting chat: ${error.message}`, true); addMessage('system', `[Error deleting chat ${chatId}: ${error.message}]`, true); } finally { setLoadingState(false); } }
-        function updateActiveChatListItem() { const items = savedChatsList.querySelectorAll('.chat-list-item'); items.forEach(item => { if (item.dataset.chatId == currentChatId) { item.classList.add('active'); } else { item.classList.remove('active'); } }); }
+
+function updateActiveChatListItem() {
+    const chatListItems = document.querySelectorAll('.chat-list-item');
+
+    chatListItems.forEach(item => {
+        const chatId = parseInt(item.dataset.chatId);
+        const timestampElement = item.querySelector('.text-xs'); // select the timestamp element
+
+        if (chatId === currentChatId) {
+            item.classList.add('active');
+            timestampElement.classList.remove('text-rz-tab-background-text'); // Remove inactive color
+            timestampElement.classList.add('text-rz-sidebar-text');          // Add active color
+        } else {
+            item.classList.remove('active');
+            timestampElement.classList.remove('text-rz-sidebar-text');          // Remove active color
+            timestampElement.classList.add('text-rz-tab-background-text'); // Add inactive color
+        }
+    });
+}
+
+	    
         async function handleModelChange() { if (!currentChatId || isLoading) return; const newModel = modelSelector.value; updateStatus(`Updating model to ${newModel}...`); setLoadingState(true, "Updating Model"); try { const response = await fetch(`/api/chat/${currentChatId}/model`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model_name: newModel }) }); if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP ${response.status}`); } updateStatus(`Model updated to ${newModel} for this chat.`); } catch (error) { console.error("Error updating model:", error); updateStatus(`Error updating model: ${error.message}`, true); } finally { setLoadingState(false); } }
 
 

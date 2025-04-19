@@ -7,6 +7,11 @@ from .. import database as db # Use relative import for database module
 from .. import ai_services # Use relative import for ai services
 from .. import file_utils # Use relative import for file utils
 
+# Configure logging
+import logging        
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Create Blueprint for file API, using '/api' prefix
 bp = Blueprint('file_api', __name__, url_prefix='/api')
 

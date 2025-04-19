@@ -2,6 +2,11 @@
 from flask import Blueprint, jsonify, current_app, session, redirect, url_for, request
 from ..plugins import google_calendar # Use relative import for plugin module
 
+# Configure logging
+import logging        
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Create Blueprint for calendar API, using '/api/calendar' prefix
 bp = Blueprint('calendar_api', __name__, url_prefix='/api/calendar')
 
@@ -12,13 +17,13 @@ bp = Blueprint('calendar_api', __name__, url_prefix='/api/calendar')
 @bp.route('/events', methods=['GET'])
 def get_calendar_events():
     """API endpoint to fetch upcoming calendar events."""
-    print("Received request for /api/calendar/events")
+    logger.info("Received request for /api/calendar/events")
     service = google_calendar.get_calendar_service()
 
     if not service:
         # If service failed (e.g., token invalid, needs re-auth)
         # In a full app, might redirect to connect route or return specific error
-        print("Failed to get calendar service (likely auth issue).")
+        logger.error("Failed to get calendar service (likely auth issue).")
         return jsonify({"error": "Could not connect to Google Calendar. Please ensure credentials/token are valid."}), 503 # Service Unavailable
 
     # Fetch events for the next 3 months (default)

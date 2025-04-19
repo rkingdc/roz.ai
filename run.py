@@ -1,3 +1,10 @@
+
+# Configure logging
+import logging        
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
 # run.py
 # This script creates the Flask app using the factory
 # and runs the development server.
@@ -14,7 +21,9 @@ if __name__ == '__main__':
     port = int(os.environ.get('FLASK_RUN_PORT', 5678))
     debug = app.config.get('DEBUG', False)
 
-    print(f"Starting Flask server on http://{host}:{port} (DB: {db_name})")
+    logger.info(f"Starting Flask server on http://{host}:{port} (DB: {db_name})")
     # Use debug=True carefully in production
     app.run(host=host, port=port, debug=debug)
+
+
 

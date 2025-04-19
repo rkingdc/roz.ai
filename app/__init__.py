@@ -3,6 +3,11 @@ import os
 from flask import Flask
 import google.generativeai as genai
 
+# Configure logging
+import logging        
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 def create_app(test_config=None):
     """Create and configure an instance of the Flask application."""
     app = Flask(__name__, instance_relative_config=True)
@@ -17,9 +22,9 @@ def create_app(test_config=None):
     # Ensure instance folder exists
     try:
         os.makedirs(app.instance_path)
-        print(f"Instance folder created at {app.instance_path}")
+        logger.info(f"Instance folder created at {app.instance_path}")
     except OSError:
-        print(f"Instance folder found at {app.instance_path}")
+        logger.info(f"Instance folder found at {app.instance_path}")
 
     # Configure Gemini API
     from . import ai_services
@@ -34,17 +39,17 @@ def create_app(test_config=None):
     app.register_blueprint(main_routes.bp)
     app.register_blueprint(chat_routes.bp)
     app.register_blueprint(file_routes.bp)
-    print("Registered blueprints: main, chat_api, file_api")
+    logger.info("Registered blueprints: main, chat_api, file_api")
 
     # --- Register Calendar Blueprint ---
     try:
         from .routes import calendar_routes
         app.register_blueprint(calendar_routes.bp)
-        print("Registered blueprint: calendar_api")
+        logger.info("Registered blueprint: calendar_api")
     except ImportError:
-        print("Calendar routes not found or import error, skipping registration.")
+        logger.error("Calendar routes not found or import error, skipping registration.")
     except Exception as e:
-        print(f"Error registering calendar blueprint: {e}")
+        logger.error(f"Error registering calendar blueprint: {e}")
     # ---------------------------------
 
     # Health Check Route
@@ -52,6 +57,6 @@ def create_app(test_config=None):
     def health():
         return "OK"
 
-    print("Flask app created and configured.")
+    logger.info("Flask app created and configured.")
     return app
 

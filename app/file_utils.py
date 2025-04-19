@@ -1,3 +1,8 @@
+# Configure logging
+import logging        
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # app/file_utils.py
 from flask import current_app
 
@@ -10,4 +15,5 @@ def allowed_file(filename):
 # Add other file-related utility functions here if needed in the future
 # e.g., functions for managing the (now unused) upload directory,
 # or more complex filename sanitization.
+
 

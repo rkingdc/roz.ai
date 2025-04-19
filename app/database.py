@@ -1,3 +1,8 @@
+# Configure logging
+import logging        
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # app/database.py
 import sqlite3
 import click
@@ -18,9 +23,9 @@ def get_db():
                 detect_types=sqlite3.PARSE_DECLTYPES
             )
             g.db.row_factory = sqlite3.Row
-            print(f"Database connection opened: {current_app.config['DB_NAME']}")
+            logger.info(f"Database connection opened: {current_app.config['DB_NAME']}")
         except sqlite3.Error as e:
-            print(f"Error connecting to database '{current_app.config['DB_NAME']}': {e}")
+            logger.info(f"Error connecting to database '{current_app.config['DB_NAME']}': {e}")
             raise # Re-raise the error after logging
     return g.db
 
@@ -29,7 +34,7 @@ def close_db(e=None):
     db = g.pop('db', None)
     if db is not None:
         db.close()
-        print("Database connection closed.")
+        logger.info("Database connection closed.")
 
 # --- Database Initialization ---
 
@@ -38,12 +43,12 @@ def init_db():
     db = get_db()
     cursor = db.cursor()
 
-    print(f"Initializing database schema for {current_app.config['DB_NAME']}...")
+    logger.info(f"Initializing database schema for {current_app.config['DB_NAME']}...")
 
     cursor.execute("DROP TABLE IF EXISTS messages")
     cursor.execute("DROP TABLE IF EXISTS uploaded_files")
     cursor.execute("DROP TABLE IF EXISTS chats")
-    print("Dropped existing tables (if any).")
+    logger.info("Dropped existing tables (if any).")
 
     # Create chats table - Removed DEFAULT for name column
     cursor.execute(f'''
@@ -55,7 +60,7 @@ def init_db():
             model_name TEXT DEFAULT '{current_app.config["DEFAULT_MODEL"]}'
         )
     ''')
-    print("Created 'chats' table.")
+    logger.info("Created 'chats' table.")
 
     # Create messages table
     cursor.execute('''
@@ -69,7 +74,7 @@ def init_db():
         )
     ''')
     cursor.execute('CREATE INDEX idx_messages_chat_id ON messages (chat_id)')
-    print("Created 'messages' table and index.")
+    logger.info("Created 'messages' table and index.")
 
     # Create uploaded_files table (with BLOB)
     cursor.execute('''
@@ -84,10 +89,10 @@ def init_db():
         )
     ''')
     cursor.execute('CREATE INDEX idx_files_filename ON uploaded_files (filename)')
-    print("Created 'uploaded_files' table and index.")
+    logger.info("Created 'uploaded_files' table and index.")
 
     db.commit()
-    print("Database schema initialized successfully.")
+    logger.info("Database schema initialized successfully.")
 
 # --- CLI Command for DB Initialization ---
 
@@ -123,7 +128,7 @@ def create_new_chat_entry():
                    (default_chat_name, now, now, default_model))
     db.commit()
     new_chat_id = cursor.lastrowid
-    print(f"Created new chat with ID: {new_chat_id}, Name: '{default_chat_name}', Model: {default_model}")
+    logger.info(f"Created new chat with ID: {new_chat_id}, Name: '{default_chat_name}', Model: {default_model}")
     return new_chat_id
 
 def update_chat_timestamp(chat_id):
@@ -143,7 +148,7 @@ def get_chat_details_from_db(chat_id):
         chat_details = cursor.fetchone()
         return dict(chat_details) if chat_details else None
     except sqlite3.Error as e:
-        print(f"Database error getting details for chat {chat_id}: {e}")
+        logger.info(f"Database error getting details for chat {chat_id}: {e}")
         return None
 
 def get_saved_chats_from_db():
@@ -155,7 +160,7 @@ def get_saved_chats_from_db():
         chats = cursor.fetchall()
         return [dict(row) for row in chats]
     except sqlite3.Error as e:
-        print(f"Database error getting saved chats: {e}")
+        logger.info(f"Database error getting saved chats: {e}")
         return []
 
 def save_chat_name_in_db(chat_id, name):
@@ -167,10 +172,10 @@ def save_chat_name_in_db(chat_id, name):
         effective_name = name.strip() if name and name.strip() else f"Chat {chat_id}" # Fallback if empty
         cursor.execute("UPDATE chats SET name = ?, last_updated_at = ? WHERE id = ?", (effective_name, datetime.now(), chat_id))
         db.commit()
-        print(f"Updated name for chat {chat_id} to '{effective_name}'")
+        logger.info(f"Updated name for chat {chat_id} to '{effective_name}'")
         return True
     except sqlite3.Error as e:
-        print(f"Database error saving chat name for {chat_id}: {e}")
+        logger.info(f"Database error saving chat name for {chat_id}: {e}")
         return False
 
 def update_chat_model(chat_id, model_name):
@@ -181,10 +186,10 @@ def update_chat_model(chat_id, model_name):
         cursor.execute("UPDATE chats SET model_name = ?, last_updated_at = ? WHERE id = ?",
                        (model_name, datetime.now(), chat_id))
         db.commit()
-        print(f"Updated model for chat {chat_id} to '{model_name}'")
+        logger.info(f"Updated model for chat {chat_id} to '{model_name}'")
         return True
     except sqlite3.Error as e:
-        print(f"Database error updating model for chat {chat_id}: {e}")
+        logger.info(f"Database error updating model for chat {chat_id}: {e}")
         return False
 
 def delete_chat_from_db(chat_id):
@@ -194,10 +199,10 @@ def delete_chat_from_db(chat_id):
         cursor = db.cursor()
         cursor.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
         db.commit()
-        print(f"Deleted chat with ID: {chat_id}")
+        logger.info(f"Deleted chat with ID: {chat_id}")
         return True
     except sqlite3.Error as e:
-        print(f"Database error deleting chat {chat_id}: {e}")
+        logger.info(f"Database error deleting chat {chat_id}: {e}")
         return False
 
 # Messages
@@ -212,7 +217,7 @@ def add_message_to_db(chat_id, role, content):
         update_chat_timestamp(chat_id)
         return True
     except sqlite3.Error as e:
-        print(f"Database error adding message: {e}")
+        logger.info(f"Database error adding message: {e}")
         return False
 
 def get_chat_history_from_db(chat_id, limit=100):
@@ -225,7 +230,7 @@ def get_chat_history_from_db(chat_id, limit=100):
         history = cursor.fetchall()
         return [dict(row) for row in history]
     except sqlite3.Error as e:
-        print(f"Database error getting history for chat {chat_id}: {e}")
+        logger.info(f"Database error getting history for chat {chat_id}: {e}")
         return []
 
 # Files
@@ -238,10 +243,10 @@ def save_file_record_to_db(filename, content_blob, mimetype, filesize):
                        (filename, content_blob, mimetype, filesize))
         db.commit()
         file_id = cursor.lastrowid
-        print(f"Saved file record & BLOB: ID {file_id}, Name '{filename}', Type '{mimetype}', Size {filesize}")
+        logger.info(f"Saved file record & BLOB: ID {file_id}, Name '{filename}', Type '{mimetype}', Size {filesize}")
         return file_id
     except sqlite3.Error as e:
-        print(f"Database error saving file record/BLOB for '{filename}': {e}")
+        logger.info(f"Database error saving file record/BLOB for '{filename}': {e}")
         return None
 
 def get_uploaded_files_from_db():
@@ -253,7 +258,7 @@ def get_uploaded_files_from_db():
         files = cursor.fetchall()
         return [dict(row) for row in files]
     except sqlite3.Error as e:
-        print(f"Database error getting file list: {e}")
+        logger.info(f"Database error getting file list: {e}")
         return []
 
 def get_file_details_from_db(file_id, include_content=False):
@@ -268,7 +273,7 @@ def get_file_details_from_db(file_id, include_content=False):
         file_data = cursor.fetchone()
         return dict(file_data) if file_data else None
     except sqlite3.Error as e:
-        print(f"Database error getting details for file {file_id}: {e}")
+        logger.info(f"Database error getting details for file {file_id}: {e}")
         return None
 
 def get_summary_from_db(file_id):
@@ -280,7 +285,7 @@ def get_summary_from_db(file_id):
         result = cursor.fetchone()
         return result['summary'] if result and result['summary'] else None
     except sqlite3.Error as e:
-        print(f"Database error getting summary for file {file_id}: {e}")
+        logger.info(f"Database error getting summary for file {file_id}: {e}")
         return None
 
 def save_summary_in_db(file_id, summary):
@@ -290,10 +295,10 @@ def save_summary_in_db(file_id, summary):
         cursor = db.cursor()
         cursor.execute("UPDATE uploaded_files SET summary = ? WHERE id = ?", (summary, file_id))
         db.commit()
-        print(f"Saved summary for file ID: {file_id}")
+        logger.info(f"Saved summary for file ID: {file_id}")
         return True
     except sqlite3.Error as e:
-        print(f"Database error saving summary for file {file_id}: {e}")
+        logger.info(f"Database error saving summary for file {file_id}: {e}")
         return False
 
 def delete_file_record_from_db(file_id):
@@ -305,11 +310,12 @@ def delete_file_record_from_db(file_id):
         deleted_count = cursor.rowcount # Check how many rows were affected
         db.commit()
         if deleted_count > 0:
-            print(f"Deleted file record with ID: {file_id}")
+            logger.info(f"Deleted file record with ID: {file_id}")
             return True
         else:
-            print(f"No file record found with ID: {file_id} to delete.")
+            logger.info(f"No file record found with ID: {file_id} to delete.")
             return False # Indicate file not found
     except sqlite3.Error as e:
-        print(f"Database error deleting file record {file_id}: {e}")
+        logger.info(f"Database error deleting file record {file_id}: {e}")
         return False
+
