@@ -216,6 +216,7 @@
         <div id="input-area">
              <div id="selected-files-container" class="hidden"></div>
              <div id="input-controls">
+	 
 	       <div id="file-upload-session-container" class="hidden">
     <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/<em>,audio/</em>,application/pdf">
     <label class="btn btn-secondary btn-sm p-1 flex-shrink-0" id="file-upload-session-label" for="file-upload-session-input">
@@ -416,6 +417,45 @@
         function setPluginSectionCollapsed(headerElement, contentElement, collapsed, storageKey) { const icon = headerElement.querySelector('.toggle-icon'); if (collapsed) { headerElement.classList.add('collapsed'); contentElement.classList.add('hidden'); if (icon) { icon.classList.remove('fa-chevron-down'); icon.classList.add('fa-chevron-up'); } localStorage.setItem(storageKey, 'true'); } else { headerElement.classList.remove('collapsed'); contentElement.classList.remove('hidden'); if (icon) { icon.classList.remove('fa-chevron-up'); icon.classList.add('fa-chevron-down'); } localStorage.setItem(storageKey, 'false'); } }
         function toggleFilePlugin() { const isCollapsed = filePluginContent.classList.contains('hidden'); setPluginSectionCollapsed(filePluginHeader, filePluginContent, !isCollapsed, FILE_PLUGIN_COLLAPSED_KEY); }
       function toggleCalendarPlugin() { const isCollapsed = calendarPluginContent.classList.contains('hidden'); setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, !isCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY); }
+
+
+      /// uploads in the main chat location
+      
+const fileUploadSessionInput = document.getElementById('file-upload-session-input');
+const fileUploadSessionLabel = document.getElementById('file-upload-session-label');
+const sessionFileDisplay = document.getElementById('session-file-display');
+let sessionFile = null; // Variable to store selected session file
+
+// Show the file upload container
+fileUploadSessionLabel.addEventListener('click', () => {
+    fileUploadSessionContainer.classList.remove('hidden');
+    fileUploadSessionInput.click(); // Simulate click to open file dialog.
+});
+
+// Event Listener for Session File Input
+fileUploadSessionInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return; //No file selected
+
+    sessionFile = file;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        // Update display
+        sessionFileDisplay.innerHTML = `<span class="selected-file-tag">
+                                            <span class="filename truncate" title="${file.name}">${file.name}</span>
+                                            <button title="Remove Attachment">&times;</button>
+                                        </span>`;
+        sessionFileDisplay.querySelector('button').onclick = () => {
+            sessionFile = null; // Clear the selected file on removal.
+            sessionFileDisplay.innerHTML = '';
+        };
+    }
+    reader.readAsDataURL(file); // Read file as data URL (Base64)
+});
+
+
+
+
       
 // Assume 'marked' is available globally or imported
 // Make sure you have 
@@ -673,11 +713,12 @@ async function loadUploadedFiles() {
             updateStatus("Sending message...");
 
             // --- Prepare payload for backend ---
-            const payload = {
-                message: message, // Send original message text
-                attached_files: selectedFiles,
-                calendar_context: (isCalendarContextActive && calendarContext) ? calendarContext : null
-            };
+	    const payload = {
+		message: message,
+		attached_files: selectedFiles,
+		calendar_context: (isCalendarContextActive && calendarContext) ? calendarContext : null,
+		session_files: sessionFile ? [{ filename: sessionFile.name, content: reader.result, mimetype: sessionFile.type }] : [] //Send Session File
+	    };
 
             try {
                 const response = await fetch(`/api/chat/${currentChatId}/message`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
