@@ -61,7 +61,7 @@ def save_chat_name(chat_id):
     else:
         # Log error? DB function already prints
         return jsonify({"error": "Failed to update chat name"}), 500
-a
+
 
 @bp.route("/chat/<int:chat_id>/model", methods=["PUT"])
 def save_chat_model(chat_id):

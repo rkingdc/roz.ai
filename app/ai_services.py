@@ -3,6 +3,7 @@ import google.generativeai as genai
 from flask import current_app
 import tempfile
 import os
+import re
 import base64  # Needed for decoding session file content
 from . import database  # Use relative import
 from .plugins.web_search import perform_web_search
@@ -216,8 +217,9 @@ Search Query:"""
                     "LLM response contained no parts."
                 )  # Raise error to trigger retry
 
-            generated_query = response.text.strip()
 
+            generated_query = response.text.strip()
+            logger.info(f"Raw query:{generated_query}")
             # Further cleaning: Remove potential surrounding quotes if the LLM added them
             generated_query = re.sub(r'^"|"$', "", generated_query)
             # Remove potential markdown list markers or similar artifacts
@@ -447,12 +449,12 @@ def generate_chat_response(
             try:
                 search_query = generate_search_query(
                     user_message
-                )  # Note: search_query isn't used below, consider removing if not needed elsewhere
+                )  
                 logger.info(
                     f"Web search enabled, searching for: '{search_query}'"
                 )  # Using user_message for search now
                 search_results = perform_web_search(
-                    user_message
+                    search_query
                 )  # Call the new function
                 if search_results:
                     # Check if the first result indicates a system error from the search function
