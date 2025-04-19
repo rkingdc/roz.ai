@@ -11,7 +11,7 @@ if __name__ == '__main__':
     # Get config values safely after app creation
     db_name = app.config.get('DB_NAME', 'unknown_db')
     host = os.environ.get('FLASK_RUN_HOST', '127.0.0.1')
-    port = int(os.environ.get('FLASK_RUN_PORT', 5000))
+    port = int(os.environ.get('FLASK_RUN_PORT', 5678))
     debug = app.config.get('DEBUG', False)
 
     print(f"Starting Flask server on http://{host}:{port} (DB: {db_name})")
