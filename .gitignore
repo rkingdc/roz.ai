@@ -3,9 +3,12 @@ __pycache__/
 *__pycache__/
 *.py[cod]
 *$py.class
-
+.env
 # C extensions
 *.so
+token.json
+credentials.json
+*.db
 
 # Distribution / packaging
 .Python
