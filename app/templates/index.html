@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>roz.ai</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖖</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">  <!-- Link to your external CSS file -->
+    <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>    <!-- Link to your external JavaScript file -->
+    <script src="https://cdn.tailwindcss.com"></script>  <!-- Keep the Tailwind CDN link -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body class="bg-gray-100">
+
+    <button id="sidebar-toggle-btn" class="toggle-btn" title="Toggle Chat List">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+
+    <aside id="sidebar">
+        <h2 class="text-xl font-semibold mb-4 whitespace-nowrap">Chat Sessions</h2>
+        <button id="new-chat-btn" class="btn btn-primary w-full mb-4 flex-shrink-0">
+            <i class="fas fa-plus"></i> New Chat
+        </button>
+        <div class="mb-4 p-3 bg-rz-frame rounded-lg border border-rz-sidebar-border shadow-sm flex-shrink-0">
+            <label for="current-chat-name" class="block text-sm font-medium text-rz-sidebar-text mb-1 whitespace-nowrap">Current Chat:</label>
+            <div class="flex gap-2 items-center">
+                 <input type="text" id="current-chat-name" class="chat-name-input flex-grow text-sm min-w-0" placeholder="Name this chat...">
+                 <button id="save-chat-name-btn" class="btn btn-outline p-1.5 flex-shrink-0" title="Save Name">
+                     <i class="fas fa-save text-sm"></i>
+                 </button>
+            </div>
+            <div id="current-chat-id-display" class="text-xs text-rz-tab-background-text mt-1 whitespace-nowrap">ID: -</div>
+        </div>
+        <div class="flex flex-col min-h-0 flex-grow sidebar-section-container">
+            <h3 class="text-lg font-medium mb-1 border-t border-rz-sidebar-border pt-3 flex-shrink-0 whitespace-nowrap">Saved Chats</h3>
+            <div id="saved-chats-list" class="sidebar-list">
+                <p class="text-rz-sidebar-text opacity-75 text-sm p-1">Loading chats...</p>
+            </div>
+        </div>
+    </aside>
+
+    <main id="main-content">
+        <div id="main-header">
+            <label for="model-selector" class="text-sm font-medium">Model:</label>
+            <select id="model-selector" class="model-selector">
+                {% for model in available_models %}
+                    <option value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div id="chat-area">
+            <!-- Area to display the currently attached session file (MOVED BELOW) -->
+            <div id="chatbox">
+                <div class="system-msg p-4">Initializing chat...</div>
+            </div>
+        </div>
+        <div id="input-area">
+             <!-- Container for ALL attached files (session + plugin) -->
+             <div id="selected-files-container" class="hidden"></div>
+             <div id="input-controls">
+                <!-- File upload trigger moved here -->
+                <label class="btn btn-secondary btn-sm p-1 flex-shrink-0 self-end mb-1 me-1" id="file-upload-session-label" for="file-upload-session-input" title="Attach file to message" style="height: 42px; line-height: 1.5rem;">
+                    <i class="fas fa-paperclip"></i>
+                </label>
+	       <div id="file-upload-session-container" class="hidden">
+    <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf">
+    <!-- Label moved to input-controls div -->
+    <!-- <div id="session-file-display"></div> --> <!-- This div is no longer used -->
+</div>
+                <textarea id="message-input" rows="2" class="flex-grow p-2 rounded-lg focus:outline-none resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
+                <div class="flex flex-col items-center self-end flex-shrink-0"> <!-- Container for button and checkbox -->
+                    <label class="toggle-switch text-xs mb-1" title="Include web search results in the AI's context">
+                        <input type="checkbox" id="web-search-toggle">
+                        <span class="toggle-slider"></span>
+                        Web Search
+                    </label>
+                    <button id="send-button" class="btn btn-primary w-full" style="height: 42px;">
+                        <i class="fas fa-paper-plane"></i> Send
+                    </button>
+                </div>
+            </div>
+        </div>
+         <div id="status-bar" class="text-xs px-4 py-1 flex-shrink-0">Status: Idle</div>
+    </main>
+
+    <aside id="plugins-sidebar">
+        <h2 class="text-xl font-semibold mb-4 whitespace-nowrap">Plugins</h2>
+        <div class="plugin-section flex flex-col" id="file-plugin-section">
+            <div class="plugin-header flex-shrink-0" id="file-plugin-header">
+                <span><i class="fas fa-file-alt mr-2"></i> Files</span>
+                <i class="fas fa-chevron-down toggle-icon"></i>
+            </div>
+            <div class="plugin-content flex flex-col p-2" id="file-plugin-content">
+                <input type="file" id="file-upload-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf" multiple>
+                <label for="file-upload-input" id="file-upload-label" class="btn btn-secondary btn-sm w-full mb-2 flex-shrink-0">
+                    <i class="fas fa-upload"></i> Add New File(s)
+                </label>
+                <h4 class="text-sm font-medium text-rz-sidebar-text mb-1 flex-shrink-0">Available Files:</h4>
+                 <div class="sidebar-section-container flex-grow mb-2 max-h-60">
+                   <div id="uploaded-files-list" class="sidebar-list border border-rz-sidebar-border rounded p-1 bg-rz-sidebar-bg">
+		     
+                        <p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading files...</p>
+                    </div>
+                </div>
+                <div class="flex gap-2 flex-shrink-0">
+                    <button id="attach-full-btn" class="btn btn-outline btn-sm flex-grow">
+                        <i class="fas fa-book-open"></i> Attach Full
+                    </button>
+                     <button id="attach-summary-btn" class="btn btn-outline btn-sm flex-grow">
+                        <i class="fas fa-list-alt"></i> Attach Summary
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="plugin-section flex-shrink-0" id="calendar-plugin-section">
+             <div class="plugin-header flex-shrink-0" id="calendar-plugin-header">
+                 <span><i class="fas fa-calendar-alt mr-2"></i> Google Calendar</span>
+                 <i class="fas fa-chevron-down toggle-icon"></i>
+            </div>
+            <div class="plugin-content p-2 hidden" id="calendar-plugin-content">
+                <button id="load-calendar-btn" class="btn btn-secondary btn-sm w-full mb-2">
+                    <i class="fas fa-calendar-days"></i> Load Upcoming Events
+                </button>
+                <button id="view-calendar-btn" class="btn btn-outline btn-sm w-full mb-2 hidden">
+                    <i class="fas fa-eye"></i> View Loaded Events
+                </button>
+                <label class="toggle-switch text-sm mt-1">
+                    <input type="checkbox" id="calendar-toggle">
+                    <span class="toggle-slider"></span>
+                    Include Context
+                </label>
+                <p id="calendar-status" class="text-xs text-rz-tab-background-text mt-2">Status: Not loaded</p>
+            </div>
+        </div>
+    </aside>
+
+    <button id="plugins-toggle-btn" class="toggle-btn" title="Toggle Plugins">
+        <i class="fas fa-chevron-right"></i>
+    </button>
+
+    <div id="summary-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">File Summary</h3>
+                <button class="close-btn" id="close-summary-modal" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm mb-2">Filename: <strong id="summary-modal-filename"></strong></p>
+                <textarea id="summary-textarea" placeholder="Loading or generating summary..."></textarea>
+                <p id="summary-status" class="text-xs mt-1"></p>
+            </div>
+            <div class="modal-footer">
+                <button id="save-summary-btn" class="btn btn-primary btn-sm">
+                    <i class="fas fa-save mr-1"></i> Save Summary
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="calendar-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Loaded Calendar Events</h3>
+                <button class="close-btn" id="close-calendar-modal" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="calendar-modal-content" class="text-xs bg-white p-2 border border-rz-tab-line rounded"></pre>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

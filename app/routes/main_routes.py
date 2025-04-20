@@ -11,7 +11,7 @@ def index():
     available_models = current_app.config.get('AVAILABLE_MODELS', [])
     default_model = current_app.config.get('DEFAULT_MODEL', '')
     return render_template(
-        'main.html',
+        'index.html',
         available_models=available_models,
         default_model=default_model
     )

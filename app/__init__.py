@@ -10,7 +10,11 @@ logger = logging.getLogger(__name__)
 
 def create_app(test_config=None):
     """Create and configure an instance of the Flask application."""
-    app = Flask(__name__, instance_relative_config=True)
+    app = Flask(
+        __name__,
+        template_folder='templates',
+        static_folder='static',
+        instance_relative_config=True)
 
     # Load Configuration
     app.config.from_object('app.config.Config')
