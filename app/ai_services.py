@@ -213,7 +213,6 @@ Search Query:"""
                     "LLM response contained no parts."
                 )  # Raise error to trigger retry
 
-
             generated_query = response.text.strip()
             logger.info(f"Raw query:{generated_query}")
             # Further cleaning: Remove potential surrounding quotes if the LLM added them
@@ -393,32 +392,48 @@ def generate_chat_response(
                         )
                         summary = get_or_generate_summary(file_id)
                         if summary.startswith("[Error"):
-                             # Add error marker to history if summary generation/retrieval failed
-                             files_info_for_history.append(f"[Error retrieving summary: '{filename}']") # Error case 1
-                             gemini_parts.append(f"[System: Error retrieving summary for file '{filename}'. {summary}]")
+                            # Add error marker to history if summary generation/retrieval failed
+                            files_info_for_history.append(
+                                f"[Error retrieving summary: '{filename}']"
+                            )  # Error case 1
+                            gemini_parts.append(
+                                f"[System: Error retrieving summary for file '{filename}'. {summary}]"
+                            )
                         else:
                             # Add summary content to parts and success marker to history
                             gemini_parts.append(
                                 f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"
                             )
-                            files_info_for_history.append(history_marker) # Success case
+                            files_info_for_history.append(
+                                history_marker
+                            )  # Success case
                     except Exception as summary_err:
-                         # Add error marker to history ONLY if an unexpected exception occurred
-                         logger.info(f"Unexpected error getting summary for file ID {file_id} ('{filename}'): {summary_err}")
-                         files_info_for_history.append(f"[Error retrieving summary: '{filename}']") # Error case 2
-                         gemini_parts.append(f"[System: Error retrieving summary for file '{filename}'.]")
+                        # Add error marker to history ONLY if an unexpected exception occurred
+                        logger.info(
+                            f"Unexpected error getting summary for file ID {file_id} ('{filename}'): {summary_err}"
+                        )
+                        files_info_for_history.append(
+                            f"[Error retrieving summary: '{filename}']"
+                        )  # Error case 2
+                        gemini_parts.append(
+                            f"[System: Error retrieving summary for file '{filename}'.]"
+                        )
 
                 elif attach_type == "full":
                     # Process full file content within the try/except block
                     try:
                         # Now fetch content only if needed
-                        full_file_details = database.get_file_details_from_db(file_id, include_content=True)
+                        full_file_details = database.get_file_details_from_db(
+                            file_id, include_content=True
+                        )
                         if not full_file_details or "content" not in full_file_details:
-                             files_info_for_history.append(
+                            files_info_for_history.append(
                                 f"[Error: Content for File ID {file_id} ('{filename}') missing]"
                             )
-                             gemini_parts.append(f"[System: Error processing file '{filename}'. Content missing.]")
-                             continue # Skip to next file
+                            gemini_parts.append(
+                                f"[System: Error processing file '{filename}'. Content missing.]"
+                            )
+                            continue  # Skip to next file
 
                         content_blob = full_file_details["content"]
                         from werkzeug.utils import secure_filename
@@ -429,9 +444,9 @@ def generate_chat_response(
                             temp_file.write(content_blob)
                             temp_filepath = temp_file.name
                             temp_files_to_clean.append(temp_filepath)
-                        logger.info(
-                            f"Uploading temp file '{temp_filepath}' for '{filename}' via API..."
-                        )
+                            logger.info(
+                                f"Uploading temp file '{temp_filepath}' for '{filename}' via API..."
+                            )
                         try:
                             uploaded_file = genai.upload_file(
                                 path=temp_filepath,
@@ -442,7 +457,9 @@ def generate_chat_response(
                             logger.info(
                                 f"File '{filename}' uploaded, URI: {uploaded_file.uri}"
                             )
-                            files_info_for_history.append(history_marker) # Add success marker
+                            files_info_for_history.append(
+                                history_marker
+                            )  # Add success marker
                         except Exception as api_upload_err:
                             logger.info(
                                 f"Error uploading file '{filename}' to Gemini API: {api_upload_err}"
@@ -453,28 +470,26 @@ def generate_chat_response(
                             gemini_parts.append(
                                 f"[System: Error processing file '{filename}'. Upload failed.]"
                             )
-                    # Summary type is handled above, outside this try/except
+                        # Summary type is handled above, outside this try/except
                     except Exception as processing_err:
-                         # This now only catches errors specific to 'full' file processing
-                         logger.info(
+                        # This now only catches errors specific to 'full' file processing
+                        logger.info(
                             f"Error processing file ID {file_id} ('{filename}') for Gemini: {processing_err}"
-                         )
-                         # Add error marker ONLY if an exception occurred during 'full' processing
-                         files_info_for_history.append(
-                             f"[Error processing file: '{filename}' (ID: {file_id})]"
-                         )
-                         gemini_parts.append(
-                             f"[System: Error processing file '{filename}'.]"
-                         )
+                        )
+                        # Add error marker ONLY if an exception occurred during 'full' processing
+                        files_info_for_history.append(
+                            f"[Error processing file: '{filename}' (ID: {file_id})]"
+                        )
+                        gemini_parts.append(
+                            f"[System: Error processing file '{filename}'.]"
+                        )
 
         web_search_error_for_user = (
             None  # Initialize variable to hold user-facing errors
         )
         if enable_web_search:
             try:
-                search_query = generate_search_query(
-                    user_message
-                )  
+                search_query = generate_search_query(user_message)
                 logger.info(
                     f"Web search enabled, searching for: '{search_query}'"
                 )  # Using user_message for search now
