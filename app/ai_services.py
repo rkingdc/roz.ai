@@ -458,13 +458,14 @@ def generate_chat_response(
                          # This now only catches errors specific to 'full' file processing
                          logger.info(
                             f"Error processing file ID {file_id} ('{filename}') for Gemini: {processing_err}"
-                    )
-                    files_info_for_history.append(
-                        f"[Error processing file: '{filename}' (ID: {file_id})]"
-                    )
-                    gemini_parts.append(
-                        f"[System: Error processing file '{filename}'.]"
-                    )
+                         )
+                         # Add error marker ONLY if an exception occurred during 'full' processing
+                         files_info_for_history.append(
+                             f"[Error processing file: '{filename}' (ID: {file_id})]"
+                         )
+                         gemini_parts.append(
+                             f"[System: Error processing file '{filename}'.]"
+                         )
 
         web_search_error_for_user = (
             None  # Initialize variable to hold user-facing errors
