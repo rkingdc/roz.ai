@@ -90,11 +90,7 @@ def generate_summary(file_id):
                     f"File '{filename}' uploaded for summary, URI: {uploaded_file.uri}"
                 )
             except Exception as upload_err:
-                if temp_file_to_clean and os.path.exists(temp_file_to_clean):
-                    try:
-                        os.remove(temp_file_to_clean)
-                    except OSError:
-                        pass
+                # Let the finally block handle cleanup
                 return f"[Error preparing file for summary: {upload_err}]"
         else:
             return "[Summary generation not supported for this file type]"

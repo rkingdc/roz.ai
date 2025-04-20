@@ -621,8 +621,15 @@ def test_generate_chat_response_with_permanent_file_summary(app_context, mock_ge
     result = ai_services.generate_chat_response(chat_id, user_message, attached_files, None, [])
 
     assert result == "Summary Response"
-    # Check get_file_details was called for summary retrieval
-    mock_db.get_file_details_from_db.assert_called_once_with(file_id)
+    # Check get_file_details was called correctly by get_or_generate_summary (without content)
+    # It might also be called by generate_chat_response *before* the summary check (without content)
+    # So we check it was called AT LEAST once with just the file_id
+    mock_db.get_file_details_from_db.assert_any_call(file_id)
+    # Ensure it wasn't called with include_content=True unnecessarily
+    for call_args in mock_db.get_file_details_from_db.call_args_list:
+        if call_args == call(file_id, include_content=True):
+             pytest.fail(f"get_file_details_from_db called with include_content=True for summary type file ID {file_id}")
+
     # Check DB save (user message SHOULD contain permanent file marker)
     expected_user_history = "[Attached File: 'report.docx' (ID: 11, Type: summary)]\nWhat does the summary say?"
     mock_db.add_message_to_db.assert_has_calls([
