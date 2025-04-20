@@ -347,10 +347,11 @@ def test_generate_search_query_success(app_context, mock_genai):
     assert generate_call.call_count == 1
     # Check prompt contains user message
     assert user_message in generate_call.call_args[0][0]
-    # Check generation config
-    gen_config = generate_call.call_args[1]['generation_config']
-    assert gen_config.max_output_tokens == 50
-    assert gen_config.temperature == 0.2
+    # Check generation config passed to the mock
+    assert 'generation_config' in generate_call.call_args[1]
+    gen_config_arg = generate_call.call_args[1]['generation_config']
+    assert gen_config_arg.max_output_tokens == 50
+    assert gen_config_arg.temperature == 0.2
 
 def test_generate_search_query_cleaning(app_context, mock_genai):
     """Test cleaning of LLM output for search query."""
