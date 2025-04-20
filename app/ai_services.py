@@ -376,20 +376,31 @@ def generate_chat_response(
                 attach_type = file_info.get("type", "full")
                 if not file_id:
                     continue
-                file_details = database.get_file_details_from_db(
-                    file_id, include_content=True
-                )
-                if not file_details or "content" not in file_details:
+
+                # Fetch basic details first (no content yet)
+                basic_file_details = database.get_file_details_from_db(file_id)
+                if not basic_file_details:
                     files_info_for_history.append(
-                        f"[Error: File ID {file_id} not found or content missing]"
+                        f"[Error: File ID {file_id} not found]"
                     )
                     continue
-                filename = file_details["filename"]
-                mimetype = file_details["mimetype"]
-                content_blob = file_details["content"]
+
+                filename = basic_file_details["filename"]
+                mimetype = basic_file_details["mimetype"]
                 history_marker = f"[Attached File: '{filename}' (ID: {file_id}, Type: {attach_type})]"  # Marker for DB history
+
                 try:
                     if attach_type == "full":
+                        # Now fetch content only if needed
+                        full_file_details = database.get_file_details_from_db(file_id, include_content=True)
+                        if not full_file_details or "content" not in full_file_details:
+                             files_info_for_history.append(
+                                f"[Error: Content for File ID {file_id} ('{filename}') missing]"
+                            )
+                             gemini_parts.append(f"[System: Error processing file '{filename}'. Content missing.]")
+                             continue # Skip to next file
+
+                        content_blob = full_file_details["content"]
                         from werkzeug.utils import secure_filename
 
                         with tempfile.NamedTemporaryFile(
