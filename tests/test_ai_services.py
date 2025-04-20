@@ -357,7 +357,8 @@ def test_generate_search_query_success(app_context, mock_genai):
     # We can't easily assert the *values* it was created with in this setup without
     # more complex patching or checking the call to GenerationConfig *before* generate_content.
     # For now, we verify *a* config object was passed.
-    assert isinstance(gen_config_arg, MagicMock) # Check it's a mock object as expected
+    # The mock created by autospec for GenerationConfig is likely NonCallable
+    assert isinstance(gen_config_arg, unittest.mock.NonCallableMagicMock) # Check it's the correct mock type
     # A more specific check if genai.types wasn't fully mocked:
     # assert isinstance(gen_config_arg, genai.types.GenerationConfig)
 
