@@ -385,8 +385,29 @@ def generate_chat_response(
                 mimetype = basic_file_details["mimetype"]
                 history_marker = f"[Attached File: '{filename}' (ID: {file_id}, Type: {attach_type})]"  # Marker for DB history
 
-                try:
-                    if attach_type == "full":
+                if attach_type == "summary":
+                    # Handle summary retrieval/generation separately
+                    try:
+                        logger.info(
+                            f"Getting/Generating summary for '{filename}' (ID: {file_id})"
+                        )
+                        summary = get_or_generate_summary(file_id)
+                        if summary.startswith("[Error"):
+                             files_info_for_history.append(f"[Error retrieving summary: '{filename}']")
+                             gemini_parts.append(f"[System: Error retrieving summary for file '{filename}'. {summary}]")
+                        else:
+                            gemini_parts.append(
+                                f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"
+                            )
+                            files_info_for_history.append(history_marker) # Add success marker
+                    except Exception as summary_err:
+                         logger.info(f"Unexpected error getting summary for file ID {file_id} ('{filename}'): {summary_err}")
+                         files_info_for_history.append(f"[Error retrieving summary: '{filename}']")
+                         gemini_parts.append(f"[System: Error retrieving summary for file '{filename}'.]")
+
+                elif attach_type == "full":
+                    # Process full file content within the try/except block
+                    try:
                         # Now fetch content only if needed
                         full_file_details = database.get_file_details_from_db(file_id, include_content=True)
                         if not full_file_details or "content" not in full_file_details:
@@ -418,7 +439,7 @@ def generate_chat_response(
                             logger.info(
                                 f"File '{filename}' uploaded, URI: {uploaded_file.uri}"
                             )
-                            files_info_for_history.append(history_marker)
+                            files_info_for_history.append(history_marker) # Add success marker
                         except Exception as api_upload_err:
                             logger.info(
                                 f"Error uploading file '{filename}' to Gemini API: {api_upload_err}"
@@ -429,18 +450,11 @@ def generate_chat_response(
                             gemini_parts.append(
                                 f"[System: Error processing file '{filename}'. Upload failed.]"
                             )
-                    elif attach_type == "summary":
-                        logger.info(
-                            f"Getting/Generating summary for '{filename}' (ID: {file_id})"
-                        )
-                        summary = get_or_generate_summary(file_id)
-                        gemini_parts.append(
-                            f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"
-                        )
-                        files_info_for_history.append(history_marker)
-                except Exception as processing_err:
-                    logger.info(
-                        f"Error processing file ID {file_id} ('{filename}') for Gemini: {processing_err}"
+                    # Summary type is handled above, outside this try/except
+                    except Exception as processing_err:
+                         # This now only catches errors specific to 'full' file processing
+                         logger.info(
+                            f"Error processing file ID {file_id} ('{filename}') for Gemini: {processing_err}"
                     )
                     files_info_for_history.append(
                         f"[Error processing file: '{filename}' (ID: {file_id})]"

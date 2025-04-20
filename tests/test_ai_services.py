@@ -347,11 +347,23 @@ def test_generate_search_query_success(app_context, mock_genai):
     assert generate_call.call_count == 1
     # Check prompt contains user message
     assert user_message in generate_call.call_args[0][0]
-    # Check generation config passed to the mock
-    assert 'generation_config' in generate_call.call_args[1]
-    gen_config_arg = generate_call.call_args[1]['generation_config']
-    assert gen_config_arg.max_output_tokens == 50
-    assert gen_config_arg.temperature == 0.2
+
+    # Check generation config by patching GenerationConfig itself
+    with patch('app.ai_services.genai.types.GenerationConfig', autospec=True) as mock_gen_config_class:
+        # Re-run the function call that triggers the config creation
+        ai_services.generate_search_query(user_message)
+        # Assert GenerationConfig was called with the expected parameters
+        mock_gen_config_class.assert_called_with(
+            max_output_tokens=50,
+            temperature=0.2
+        )
+        # Ensure the created config object was passed to generate_content
+        generate_call.assert_called_with(
+            unittest.mock.ANY, # The prompt
+            generation_config=mock_gen_config_class.return_value,
+            # safety_settings=unittest.mock.ANY # Add if safety settings are used
+        )
+
 
 def test_generate_search_query_cleaning(app_context, mock_genai):
     """Test cleaning of LLM output for search query."""
@@ -741,3 +753,6 @@ def test_generate_chat_response_api_error(app_context, mock_genai, mock_db):
 # Add more tests for specific error types (429, blocked, timeout, etc.) if needed
 # Add tests for file processing errors within generate_chat_response
 # Add tests for model fallback logic
+
+# Need this import for the updated test_generate_search_query_success
+import unittest.mock
