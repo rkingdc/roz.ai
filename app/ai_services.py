@@ -393,14 +393,17 @@ def generate_chat_response(
                         )
                         summary = get_or_generate_summary(file_id)
                         if summary.startswith("[Error"):
+                             # Add error marker to history if summary generation/retrieval failed
                              files_info_for_history.append(f"[Error retrieving summary: '{filename}']")
                              gemini_parts.append(f"[System: Error retrieving summary for file '{filename}'. {summary}]")
                         else:
+                            # Add summary content to parts and success marker to history
                             gemini_parts.append(
                                 f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"
                             )
                             files_info_for_history.append(history_marker) # Add success marker
                     except Exception as summary_err:
+                         # Add error marker to history if an unexpected exception occurred
                          logger.info(f"Unexpected error getting summary for file ID {file_id} ('{filename}'): {summary_err}")
                          files_info_for_history.append(f"[Error retrieving summary: '{filename}']")
                          gemini_parts.append(f"[System: Error retrieving summary for file '{filename}'.]")
