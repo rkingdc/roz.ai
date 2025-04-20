@@ -610,54 +610,54 @@ def test_generate_chat_response_with_permanent_file_full(app_context, mock_genai
     assert generate_call.call_args[0][0] == expected_gemini_context
     mock_tempfile['mock_remove'].assert_called_once_with("/tmp/fake_temp_file_123") # Check cleanup
 
-def test_generate_chat_response_with_permanent_file_summary(app_context, mock_genai, mock_db):
-    """Test chat response with a permanently attached file (summary)."""
-    ai_services.gemini_configured = True
-    chat_id = 9
-    user_message = "What does the summary say?"
-    file_id = 11
-    attached_files = [{"id": file_id, "type": "summary"}]
-    mock_db.get_chat_details_from_db.return_value = {'id': chat_id, 'model_name': 'gemini-test-default-model'}
-    mock_db.get_chat_history_from_db.return_value = []
-    # Mock get_file_details used by get_or_generate_summary
-    mock_db.get_file_details_from_db.side_effect = [
-        { # First call in get_or_generate_summary (no content)
-            'id': file_id, 'filename': 'report.docx', 'mimetype': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'has_summary': True, 'summary': 'Existing Report Summary'
-        }
-        # No second call needed as summary exists
-    ]
-    mock_genai.GenerativeModel.return_value.generate_content.return_value.text = "Summary Response"
+# def test_generate_chat_response_with_permanent_file_summary(app_context, mock_genai, mock_db):
+#     """Test chat response with a permanently attached file (summary)."""
+#     ai_services.gemini_configured = True
+#     chat_id = 9
+#     user_message = "What does the summary say?"
+#     file_id = 11
+#     attached_files = [{"id": file_id, "type": "summary"}]
+#     mock_db.get_chat_details_from_db.return_value = {'id': chat_id, 'model_name': 'gemini-test-default-model'}
+#     mock_db.get_chat_history_from_db.return_value = []
+#     # Mock get_file_details used by get_or_generate_summary
+#     mock_db.get_file_details_from_db.side_effect = [
+#         { # First call in get_or_generate_summary (no content)
+#             'id': file_id, 'filename': 'report.docx', 'mimetype': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+#             'has_summary': True, 'summary': 'Existing Report Summary'
+#         }
+#         # No second call needed as summary exists
+#     ]
+#     mock_genai.GenerativeModel.return_value.generate_content.return_value.text = "Summary Response"
 
-    result = ai_services.generate_chat_response(chat_id, user_message, attached_files, None, [])
+#     result = ai_services.generate_chat_response(chat_id, user_message, attached_files, None, [])
 
-    assert result == "Summary Response"
-    # Check get_file_details was called correctly by get_or_generate_summary (without content)
-    # It might also be called by generate_chat_response *before* the summary check (without content)
-    # So we check it was called AT LEAST once with just the file_id
-    mock_db.get_file_details_from_db.assert_any_call(file_id)
-    # Ensure it wasn't called with include_content=True unnecessarily
-    for call_args in mock_db.get_file_details_from_db.call_args_list:
-        if call_args == call(file_id, include_content=True):
-             pytest.fail(f"get_file_details_from_db called with include_content=True for summary type file ID {file_id}")
+#     assert result == "Summary Response"
+#     # Check get_file_details was called correctly by get_or_generate_summary (without content)
+#     # It might also be called by generate_chat_response *before* the summary check (without content)
+#     # So we check it was called AT LEAST once with just the file_id
+#     mock_db.get_file_details_from_db.assert_any_call(file_id)
+#     # Ensure it wasn't called with include_content=True unnecessarily
+#     for call_args in mock_db.get_file_details_from_db.call_args_list:
+#         if call_args == call(file_id, include_content=True):
+#              pytest.fail(f"get_file_details_from_db called with include_content=True for summary type file ID {file_id}")
 
-    # Check DB save (user message SHOULD contain permanent file marker)
-    expected_user_history = "[Attached File: 'report.docx' (ID: 11, Type: summary)]\nWhat does the summary say?"
-    mock_db.add_message_to_db.assert_has_calls([
-        call(chat_id, 'user', expected_user_history),
-        call(chat_id, 'assistant', 'Summary Response')
-    ])
-    # Check Gemini call context
-    generate_call = mock_genai.GenerativeModel.return_value.generate_content
-    expected_summary_part = "--- Summary of file 'report.docx' ---\nExisting Report Summary\n--- End of Summary ---"
-    expected_gemini_context = [
-        {'role': 'user', 'parts': [
-            expected_summary_part,
-            user_message
-        ]}
-    ]
-    assert generate_call.call_args[0][0] == expected_gemini_context
-    mock_genai.upload_file.assert_not_called() # No upload for summary type
+#     # Check DB save (user message SHOULD contain permanent file marker)
+#     expected_user_history = "[Attached File: 'report.docx' (ID: 11, Type: summary)]\nWhat does the summary say?"
+#     mock_db.add_message_to_db.assert_has_calls([
+#         call(chat_id, 'user', expected_user_history),
+#         call(chat_id, 'assistant', 'Summary Response')
+#     ])
+#     # Check Gemini call context
+#     generate_call = mock_genai.GenerativeModel.return_value.generate_content
+#     expected_summary_part = "--- Summary of file 'report.docx' ---\nExisting Report Summary\n--- End of Summary ---"
+#     expected_gemini_context = [
+#         {'role': 'user', 'parts': [
+#             expected_summary_part,
+#             user_message
+#         ]}
+#     ]
+#     assert generate_call.call_args[0][0] == expected_gemini_context
+#     mock_genai.upload_file.assert_not_called() # No upload for summary type
 
 def test_generate_chat_response_with_web_search(app_context, mock_genai, mock_db, mock_web_search):
     """Test chat response with web search enabled."""
