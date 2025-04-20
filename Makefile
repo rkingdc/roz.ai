@@ -22,7 +22,7 @@ test:
 .PHONY: stop
 stop:
 	@echo "Stopping application..."
-	@pkill -f $(PROCESS_PATTERN) || echo "No process found or error stopping process."
+	@-pkill -f $(PROCESS_PATTERN) || echo "Ignoring pkill exit status. Check manually if process persists."
 
 # Target to start the application
 .PHONY: start
