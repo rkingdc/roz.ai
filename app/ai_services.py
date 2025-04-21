@@ -556,7 +556,7 @@ def generate_chat_response(
     attached_files=None, # Renamed from session_file_ids, expects list of {id, filename, type}
     session_files=None, # New parameter, expects list of {filename, mimetype, content}
     calendar_context=None,
-    web_search_enabled=False,
+    web_search_enabled=False, # Added this parameter
 ):
     """
     Generates a chat response using the Gemini API via the client,
@@ -662,9 +662,11 @@ def generate_chat_response(
                             current_turn_parts.append(Part(text=f"[System: Error uploading attached file '{filename}'. {type(upload_err).__name__}]"))
                             if "api key not valid" in str(upload_err).lower():
                                  g.gemini_api_key_invalid = True # Mark key invalid
-                        else:
-                            logger.warning(f"Full content attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}.")
-                            current_turn_parts.append(Part(text=f"[System: Full content attachment not supported for file '{filename}' ({mimetype}).]"))
+                        # Removed the 'else' block here that warned about unsupported types for 'full'
+                        # The check is now done implicitly by the 'if mimetype.startswith(...)'
+                    else:
+                        logger.warning(f"Full content attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}.")
+                        current_turn_parts.append(Part(text=f"[System: Full content attachment not supported for file '{filename}' ({mimetype}).]"))
                 else:
                     logger.warning(f"Unknown attachment type '{attachment_type}' for file '{filename}' in chat {chat_id}.")
                     current_turn_parts.append(Part(text=f"[System: Unknown attachment type '{attachment_type}' for file '{filename}'.]"))
@@ -729,7 +731,7 @@ def generate_chat_response(
 
     # 4. Perform Web Search (if enabled and seems appropriate)
     search_results = None
-    if web_search_enabled:
+    if web_search_enabled: # Use the new parameter name
         logger.info(f"Web search enabled for chat {chat_id}. Generating query...")
         search_query = generate_search_query(user_message) # Uses its own decorator/client
         if search_query:
