@@ -39,6 +39,7 @@ class Config:
         'gemini-1.5-pro-latest',
         'gemini-2.0-flash',
         'gemini-2.0-flash-thinking-exp-01-21',
+        'gemini-2.5-flash-preview-04-17',
         'gemini-2.5-pro-exp-03-25'
         # Add other valid models as needed
     ]

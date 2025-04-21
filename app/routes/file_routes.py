@@ -6,6 +6,7 @@ from datetime import datetime
 from .. import database as db # Use relative import for database module
 from .. import ai_services # Use relative import for ai services
 from .. import file_utils # Use relative import for file utils
+from ..plugins import web_search
 import validators # Import validators library for URL validation
 
 # Configure logging
@@ -106,8 +107,9 @@ def add_file_from_url_route():
     try:
         # Fetch content from the URL
         # fetch_web_content returns (content, title) or (None, None) on failure
-        content, title = file_utils.fetch_web_content(url)
-
+        content = web_search.fetch_web_content(url)
+        title = url
+        
         if content is None:
              # fetch_web_content logs its own errors, just return a generic failure
              return jsonify({"error": f"Failed to fetch content from URL: {url}"}), 500
