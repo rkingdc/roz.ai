@@ -247,7 +247,7 @@ async def test_generate_summary_unsupported_type(app, mock_db, app_context):
         assert result == "[Summary generation not supported for this file type]"
 
 
-async def test_generate_summary_upload_error(app, mock_genai, mock_db, mock_tempfile):
+async def test_generate_summary_upload_error(app, mock_genai, mock_db, mock_tempfile, app_context):
     """Test handling of errors during file upload for summary."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
