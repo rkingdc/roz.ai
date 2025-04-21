@@ -129,7 +129,12 @@ def ai_ready_required(f):
                 logger.warning(
                     f"AI function '{f.__name__}' called but API key was missing at startup."
                 )
-                return "[Error: AI Service API Key not configured]"
+                # Return a string error message for non-streaming, or yield for streaming
+                if kwargs.get('streaming_enabled', False):
+                     yield "[Error: AI Service API Key not configured]"
+                     return # Stop generator
+                else:
+                     return "[Error: AI Service API Key not configured]"
 
             # Check if we have a valid request context (needed for g and current_app)
             _ = (
@@ -143,12 +148,19 @@ def ai_ready_required(f):
                     logger.warning(
                         f"AI function '{f.__name__}' called but API key was found invalid in this request."
                     )
-                    return "[Error: Invalid Gemini API Key]"
+                    error_msg = "[Error: Invalid Gemini API Key]"
                 else:
                     logger.error(
                         f"AI function '{f.__name__}' called but failed to get Gemini client."
                     )
-                    return "[Error: Failed to initialize AI client]"
+                    error_msg = "[Error: Failed to initialize AI client]"
+
+                # Return error message based on streaming preference
+                if kwargs.get('streaming_enabled', False):
+                    yield error_msg
+                    return # Stop generator
+                else:
+                    return error_msg
 
             # If client is obtained, proceed with the function
             return f(*args, **kwargs)
@@ -156,7 +168,13 @@ def ai_ready_required(f):
             logger.error(
                 f"AI function '{f.__name__}' called outside of active Flask request context."
             )
-            return "[Error: AI Service called outside request context]"
+            error_msg = "[Error: AI Service called outside request context]"
+            if kwargs.get('streaming_enabled', False):
+                 yield error_msg
+                 return # Stop generator
+            else:
+                 return error_msg
+
 
     return decorated_function
 
@@ -272,9 +290,11 @@ def generate_summary(file_id):
         logger.info(f"Calling generate_content with model '{summary_model_name}'.")
 
         # Use the client.models attribute to generate content
+        # Summary generation is NOT streamed, always get full response
         response = client.models.generate_content(
             model=summary_model_name,
             contents=content_parts,  # Pass the constructed parts/contents
+            stream=False # Summary generation is not streamed
         )
         summary = response.text
         logger.info(f"Summary generated successfully for '{filename}'.")
@@ -440,9 +460,11 @@ Search Query:"""
         response = None  # Initialize response to None
         try:
             # Use the client.models attribute to generate content
+            # Query generation is NOT streamed
             response = client.models.generate_content(
                 model=model_name,
                 contents=prompt,  # Prompt is just text, passed directly
+                stream=False # Query generation is not streamed
             )
 
             # Check for blocked prompt before accessing text
@@ -552,16 +574,26 @@ def generate_chat_response(
     session_files=None,  # New parameter, expects list of {filename, mimetype, content}
     calendar_context=None,
     web_search_enabled=False,  # Added this parameter
+    streaming_enabled=False, # Added this parameter
 ):
     """
     Generates a chat response using the Gemini API via the client,
     incorporating history, context, file summaries, and optional web search.
     Handles potential errors gracefully.
     Uses the NEW google.genai library structure (client-based).
+    Supports streaming responses if streaming_enabled is True.
     """
     client = get_gemini_client()
     if not client:
-        return "[Error: Failed to initialize AI client - Check Logs]"
+        # Decorator should handle this and return/yield error message
+        # If it somehow fails here, return/yield a generic error
+        error_msg = "[Error: Failed to initialize AI client - Check Logs]"
+        if streaming_enabled:
+            yield error_msg
+            return # Stop generator
+        else:
+            return error_msg
+
 
     # --- Determine Model ---
     # Use primary model by default, check for override if needed
@@ -589,19 +621,44 @@ def generate_chat_response(
             history.append(Content(role=msg["role"], parts=[Part(text=msg["content"])]))
         logger.info(f"Fetched {len(history)} history turns for chat {chat_id}.")
 
+        # Ensure history starts with 'user' role for the API
+        # The API expects alternating user/model turns starting with user.
+        # If the last message in history was 'user', the new turn is 'model'.
+        # If the last message was 'model', the new turn is 'user'.
+        # The API handles the current turn's role implicitly based on history.
+        # We just need to ensure the history itself is valid (starts with user, alternates).
+        # The DB query orders by timestamp, so the last item is the most recent.
+        # If the history is not empty and the last message is 'user', the next turn is 'model'.
+        # If the history is not empty and the last message is 'assistant', the next turn is 'user'.
+        # If history is empty, the first turn is 'user'.
+        # The genai SDK's chat.send_message handles this state internally based on the history provided.
+        # We just need to ensure the history list itself is correctly formatted (alternating roles).
+        # The DB query should return history in chronological order.
+        # The SDK expects history in chronological order, starting with the first user turn.
+        # If the very first message in the DB is 'assistant', something is wrong with the history.
+        # Let's add a check for the first message role if history is not empty.
         if history and history[0].role != "user":
-            _ = history.lpop(0)
-            logger.error(
-                f"Chat history for {chat_id} does not start with a user turn. First role: {history[0].role}"
-            )
-        elif not history:
-            logger.info(f"Chat {chat_id} has no prior history.")
-            # The client.chats.create call might handle an empty history list correctly,
-            # but you could explicitly handle it if needed.
+             logger.error(
+                 f"Chat history for {chat_id} does not start with a user turn. First role: {history[0].role}. Attempting to correct by removing first message."
+             )
+             # Remove the first message if it's not a user message
+             # This is a heuristic fix; ideally, history should be correct from the start.
+             history.pop(0)
+             if history:
+                 logger.warning(f"History for chat {chat_id} now starts with role: {history[0].role}")
+             else:
+                 logger.warning(f"History for chat {chat_id} is now empty after correction attempt.")
+
 
     except Exception as e:
         logger.error(f"Failed to fetch history for chat {chat_id}: {e}", exc_info=True)
-        return "[Error: Could not load chat history]"
+        error_msg = "[Error: Could not load chat history]"
+        if streaming_enabled:
+            yield error_msg
+            return # Stop generator
+        else:
+            return error_msg
+
 
     # --- Prepare Current Turn Parts ---
     # This list will hold all components (text, files) for the *current* user message turn
@@ -627,7 +684,7 @@ def generate_chat_response(
         )
         for (
             file_detail
-        ) in attached_files:  # Iterate over the list of objects {id, filename, type}
+        in attached_files):  # Iterate over the list of objects {id, filename, type}
             file_id = file_detail.get("id")
             attachment_type = file_detail.get("type")  # 'full' or 'summary'
             frontend_filename = file_detail.get(
@@ -837,16 +894,15 @@ def generate_chat_response(
     search_results = None
     if web_search_enabled:  # Use the new parameter name
         logger.info(f"Web search enabled for chat {chat_id}. Generating query...")
-        search_query = generate_search_query(
-            user_message
-        )  # Uses its own decorator/client
+        # Pass streaming_enabled=False to generate_search_query as it's not streamed
+        search_query = generate_search_query(user_message, streaming_enabled=False)
         if search_query:
             logger.info(
                 f"Performing web search for chat {chat_id} with query: '{search_query}'"
             )
             search_results = perform_web_search(
                 search_query
-            )  # Assumes this returns a string or None
+            )  # Assumes this returns a list of strings or None
             if search_results:
                 logger.info(f"Adding web search results to chat {chat_id} prompt.")
                 # MODIFIED: Wrap search results in Part()
@@ -893,11 +949,13 @@ def generate_chat_response(
             )
 
     # --- Call Gemini API ---
-    assistant_reply = "[AI Error: No response generated]"  # Default error
-    response = None  # Initialize response
+    # The return type depends on streaming_enabled
+    # If streaming_enabled is True, return a generator
+    # If streaming_enabled is False, return a string
+
     try:
         logger.info(
-            f"Sending request to Gemini for chat {chat_id} with {len(history)} history turns and {len(current_turn_parts)} current parts."
+            f"Sending request to Gemini for chat {chat_id} with {len(history)} history turns and {len(current_turn_parts)} current parts. Streaming: {streaming_enabled}"
         )
 
         # Create the ChatSession object using the client
@@ -907,29 +965,52 @@ def generate_chat_response(
         # The 'parts' are the content of the *current* user message turn
         response = chat_session.send_message(
             message=current_turn_parts,  # Pass the constructed list of Parts/Files
+            stream=streaming_enabled # Use the streaming flag here
         )
 
-        assistant_reply = response.text
-        logger.info(f"Successfully received response for chat {chat_id}.")
+        if streaming_enabled:
+            # Return the generator directly
+            logger.info(f"Returning streaming response generator for chat {chat_id}.")
+            return (chunk.text for chunk in response) # Yield text from each chunk
+        else:
+            # Return the full text response
+            assistant_reply = response.text
+            logger.info(f"Successfully received full response for chat {chat_id}.")
+            # Saving to DB is handled by the route for both streaming and non-streaming
+            return assistant_reply
 
     # --- Specific Error Handling ---
+    # These exceptions need to be caught here and returned/yielded as error messages
+    # The route handler will catch any exceptions *not* caught here.
     except ValidationError as e:
-        # Catch the specific pydantic validation error from the original problem report
         logger.error(
             f"Data validation error calling Gemini API for chat {chat_id} with model {model_to_use}: {e}",
-            exc_info=True,  # Include traceback for validation errors
+            exc_info=True,
         )
-        assistant_reply = f"[AI Error: Internal data format error. Please check logs. ({e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}')]"  # Provide more specific Pydantic error info
+        error_msg = f"[AI Error: Internal data format error. Please check logs. ({e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}')]"
+        if streaming_enabled:
+            yield error_msg
+            return
+        else:
+            return error_msg
     except DeadlineExceeded:
         logger.error(f"Gemini API call timed out for chat {chat_id}.")
-        assistant_reply = "[AI Error: The request timed out. Please try again.]"
+        error_msg = "[AI Error: The request timed out. Please try again.]"
+        if streaming_enabled:
+            yield error_msg
+            return
+        else:
+            return error_msg
     except NotFound as e:
         logger.error(
             f"Model '{model_to_use}' not found or inaccessible for chat {chat_id}: {e}"
         )
-        assistant_reply = (
-            f"[AI Error: Model '{raw_model_name}' not found or access denied.]"
-        )
+        error_msg = f"[AI Error: Model '{raw_model_name}' not found or access denied.]"
+        if streaming_enabled:
+            yield error_msg
+            return
+        else:
+            return error_msg
     except GoogleAPIError as e:
         logger.error(f"Google API error for chat {chat_id}: {e}")
         err_str = str(e).lower()
@@ -941,21 +1022,18 @@ def generate_chat_response(
         elif "prompt was blocked" in err_str or "SAFETY" in str(e):
             feedback_reason = "N/A"
             try:
-                if (
-                    response  # Check if response object exists from the try block
-                    and hasattr(response, "prompt_feedback")
-                    and response.prompt_feedback
-                ):
+                # Check if response object exists from the try block
+                # For streaming, response is the generator itself, need to check its properties if available
+                # For non-streaming, response is the result object
+                if not streaming_enabled and response and hasattr(response, "prompt_feedback") and response.prompt_feedback:
                     feedback_reason = response.prompt_feedback.block_reason
-                # Check candidate finish reason if prompt feedback isn't the cause
-                elif (
-                    response
-                    and response.candidates
-                    and response.candidates[0].finish_reason == 3
-                ):
-                    feedback_reason = "Response Content Safety"
+                # Check candidate finish reason if prompt feedback isn't the cause (more common in streaming)
+                elif streaming_enabled and hasattr(e, 'response') and e.response and e.response.candidates and e.response.candidates[0].finish_reason == 3:
+                     feedback_reason = "Response Content Safety"
+                elif hasattr(e, 'response') and e.response and hasattr(e.response, 'prompt_feedback') and e.response.prompt_feedback:
+                     feedback_reason = e.response.prompt_feedback.block_reason # Sometimes feedback is on the exception object
             except Exception:
-                pass
+                pass # Ignore errors getting feedback reason
             logger.warning(
                 f"API error indicates safety block for chat {chat_id}. Reason: {feedback_reason}"
             )
@@ -972,39 +1050,44 @@ def generate_chat_response(
             error_message = "[AI Error: The AI service encountered an internal error. Please try again later.]"
         # Add other specific GoogleAPIError checks here if needed
 
-        assistant_reply = error_message  # Use the generated error message
+        if streaming_enabled:
+            yield error_message
+            return
+        else:
+            return error_message
 
     except Exception as e:
         logger.error(
             f"Unexpected error calling Gemini API for chat {chat_id} with model {model_to_use}: {e}",
             exc_info=True,
         )
-        assistant_reply = f"[Unexpected AI Error: {type(e).__name__}]"
+        error_msg = f"[Unexpected AI Error: {type(e).__name__}]"
+        if streaming_enabled:
+            yield error_msg
+            return
+        else:
+            return error_msg
 
-    # --- Save Assistant Reply ---
-    # Ensure we save even if it's an error message
-    if not database.add_message_to_db(chat_id, "assistant", assistant_reply):
-        logger.warning(f"Failed to save assistant message for chat {chat_id}.")
-
-    # --- Clean up temporary files ---
-    if temp_files_to_clean:
-        logger.info(
-            f"Cleaning up {len(temp_files_to_clean)} temporary files for chat {chat_id}..."
-        )
-        for temp_path in temp_files_to_clean:
-            try:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-                    logger.debug(
-                        f"Removed temp file: {temp_path}"
-                    )  # Debug level for successful cleanup
-                else:
-                    logger.debug(f"Temp file not found, already removed? {temp_path}")
-            except OSError as e:
-                logger.warning(f"Error removing temp file {temp_path}: {e}")
-
-    # The return statement should be the last thing after potential cleanup
-    return assistant_reply
+    finally:
+        # --- Clean up temporary files ---
+        # This block runs regardless of whether an exception occurred,
+        # but only after the try/except/return/yield block is exited.
+        # For streaming, this runs *after* the generator is exhausted or an exception occurs during iteration.
+        if temp_files_to_clean:
+            logger.info(
+                f"Cleaning up {len(temp_files_to_clean)} temporary files for chat {chat_id}..."
+            )
+            for temp_path in temp_files_to_clean:
+                try:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                        logger.debug(
+                            f"Removed temp file: {temp_path}"
+                        )  # Debug level for successful cleanup
+                    else:
+                        logger.debug(f"Temp file not found, already removed? {temp_path}")
+                except OSError as e:
+                    logger.warning(f"Error removing temp file {temp_path}: {e}")
 
 
 # --- Standalone Text Generation (Example) ---
@@ -1033,9 +1116,11 @@ def generate_text(prompt: str, model_name: str = None) -> str:
     response = None  # Initialize
     try:
         # Use the client.models attribute for simple generation
+        # Standalone text generation is NOT streamed
         response = client.models.generate_content(
             model=model_to_use,
             contents=prompt,  # Simple text prompt
+            stream=False # Not streamed
         )
         return response.text
 

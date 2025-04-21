@@ -1,5 +1,5 @@
 # app/routes/chat_routes.py
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, Response, stream_with_context
 from .. import database as db  # Use relative import for database module
 from .. import ai_services  # Use relative import for ai services
 
@@ -107,6 +107,9 @@ def send_message_route(chat_id):
     enable_web_search = data.get(
         "enable_web_search", False
     )  # Get web search flag, default to False
+    enable_streaming = data.get(
+        "enable_streaming", False
+    ) # Get streaming flag, default to False
 
     # Check if there's any actual input to process
     # Allow sending if web search is enabled, even without user message, if that's desired behavior
@@ -123,39 +126,86 @@ def send_message_route(chat_id):
     try:
         # Call the AI service function to handle the core logic
         # Pass attached_files and session_files directly to the service function
-        assistant_reply = ai_services.generate_chat_response(
+        # Pass the streaming flag
+        assistant_response = ai_services.generate_chat_response(
             chat_id=chat_id,
             user_message=user_message,
             attached_files=attached_files, # Pass the list of {id, filename, type}
             session_files=session_files,  # Pass the list of {filename, mimetype, content}
             calendar_context=calendar_context,  # Pass calendar context
             web_search_enabled=enable_web_search,  # Pass web search flag
+            streaming_enabled=enable_streaming, # Pass streaming flag
         )
-        # Check if the reply indicates an internal error occurred
-        if isinstance(assistant_reply, str) and assistant_reply.startswith("[Error:"):
-            # Determine appropriate status code based on error message if possible
-            status_code = 500  # Default to internal server error
-            if "not found" in assistant_reply.lower():
-                status_code = 404
-            elif (
-                "quota exceeded" in assistant_reply.lower()
-                or "too many requests" in assistant_reply.lower()
-            ):
-                status_code = 429
-            elif "invalid api key" in assistant_reply.lower():
-                status_code = 503  # Service unavailable due to config
-            elif "request too large" in assistant_reply.lower():
-                status_code = 413  # Payload too large
-            elif "timed out" in assistant_reply.lower(): # Added timeout check
-                 status_code = 504 # Gateway Timeout
-            # Note: Other specific errors from ai_services might also warrant different codes
 
-            return jsonify({"reply": assistant_reply}), status_code
-        elif isinstance(assistant_reply, str) and assistant_reply.startswith("[Unexpected AI Error:"):
-             # Catch the specific unexpected error message
-             return jsonify({"reply": assistant_reply}), 500
+        if enable_streaming:
+            # If streaming is enabled, assistant_response is a generator
+            def stream_generator():
+                full_reply = ""
+                try:
+                    for chunk in assistant_response:
+                        full_reply += chunk
+                        yield chunk
+                except Exception as e:
+                    # Log error during streaming
+                    logger.error(f"Error during streaming for chat {chat_id}: {e}", exc_info=True)
+                    # Yield an error message chunk to the client
+                    yield f"\n[Streaming Error: {e}]"
+                    full_reply += f"\n[Streaming Error: {e}]" # Append to full reply for saving
+                finally:
+                    # Save the full accumulated reply to the database after streaming finishes or errors
+                    if full_reply:
+                        if not db.add_message_to_db(chat_id, "assistant", full_reply):
+                            logger.warning(f"Failed to save full streamed assistant message for chat {chat_id}.")
+                    else:
+                         # Handle case where generator yielded nothing (e.g., immediate error)
+                         logger.warning(f"Streaming generator for chat {chat_id} yielded no content.")
+                         # Optionally save a placeholder error if nothing was yielded
+                         # if not db.add_message_to_db(chat_id, "assistant", "[No content streamed]"):
+                         #     logger.warning(f"Failed to save empty streamed message placeholder for chat {chat_id}.")
+
+
+            # Return a streaming response
+            return Response(stream_with_context(stream_generator()), mimetype='text/plain')
+
         else:
-            return jsonify({"reply": assistant_reply})
+            # If streaming is disabled, assistant_response is the full string reply
+            assistant_reply = assistant_response
+
+            # Check if the reply indicates an internal error occurred (for non-streaming)
+            if isinstance(assistant_reply, str) and assistant_reply.startswith("[Error:"):
+                # Determine appropriate status code based on error message if possible
+                status_code = 500  # Default to internal server error
+                if "not found" in assistant_reply.lower():
+                    status_code = 404
+                elif (
+                    "quota exceeded" in assistant_reply.lower()
+                    or "too many requests" in assistant_reply.lower()
+                ):
+                    status_code = 429
+                elif "invalid api key" in assistant_reply.lower():
+                    status_code = 503  # Service unavailable due to config
+                elif "request too large" in assistant_reply.lower():
+                    status_code = 413  # Payload too large
+                elif "timed out" in assistant_reply.lower(): # Added timeout check
+                     status_code = 504 # Gateway Timeout
+                # Note: Other specific errors from ai_services might also warrant different codes
+
+                # Save the error message to the database
+                if not db.add_message_to_db(chat_id, "assistant", assistant_reply):
+                     logger.warning(f"Failed to save non-streaming error message for chat {chat_id}.")
+
+                return jsonify({"reply": assistant_reply}), status_code
+            elif isinstance(assistant_reply, str) and assistant_reply.startswith("[Unexpected AI Error:"):
+                 # Catch the specific unexpected error message
+                 # Save the error message to the database
+                 if not db.add_message_to_db(chat_id, "assistant", assistant_reply):
+                      logger.warning(f"Failed to save non-streaming unexpected error message for chat {chat_id}.")
+                 return jsonify({"reply": assistant_reply}), 500
+            else:
+                # Save the successful non-streaming reply to the database
+                if not db.add_message_to_db(chat_id, "assistant", assistant_reply):
+                     logger.warning(f"Failed to save non-streaming assistant message for chat {chat_id}.")
+                return jsonify({"reply": assistant_reply})
 
     except Exception as e:
         # Catch unexpected errors *within this route handler* before calling ai_services
@@ -164,7 +214,12 @@ def send_message_route(chat_id):
             f"Unexpected error in send_message route for chat {chat_id}: {e}",
             exc_info=True,
         )
+        error_reply = f"[Unexpected Server Error in route: {e}]"
+        # Attempt to save the unexpected error message
+        if not db.add_message_to_db(chat_id, "assistant", error_reply):
+             logger.warning(f"Failed to save unexpected route error message for chat {chat_id}.")
+
         return (
-            jsonify({"reply": f"[Unexpected Server Error in route: {e}]"}), # More specific error message
+            jsonify({"reply": error_reply}), # More specific error message
             500,
         )

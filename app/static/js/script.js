@@ -349,22 +349,24 @@ fileUploadSessionInput.addEventListener('change', async (e) => {
 const renderer = new marked.Renderer();
 
 // Helper function for basic HTML escaping within code
-function escapeHtml(html) {
-    return html
+function escapeHtml = (html) => {
+    // Ensure input is a string
+    const strHtml = String(html);
+    return strHtml
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-}
+};
 
 renderer.code = function(code, language) {
     // Ensure the input 'code' is treated as a string and escape its content
-    const escapedCode = escapeHtml(String(code.text));
+    const escapedCode = escapeHtml(code);
     return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapedCode}</code></pre>`;
 };
 
 renderer.codespan = function(text) {
     // Ensure the input 'text' is treated as a string and escape its content
-    const escapedText = escapeHtml(String(text.text));
+    const escapedText = escapeHtml(text);
 
     // Return the HTML string with your desired classes
     return `<code class="bg-gray-200 px-1 rounded text-sm font-mono">${escapedText}</code>`;
@@ -378,31 +380,90 @@ const markedOptions = {
     breaks: true
 };
 
+// Text Decoder for streaming
+const textDecoder = new TextDecoder();
 
-function addMessage(role, content, isError = false) {
-    const messageDiv = document.createElement('div');
-    if (role === 'system') {
-        messageDiv.classList.add('system-msg');
+
+/**
+ * Adds a message to the chatbox.
+ * @param {string} role - 'user', 'assistant', or 'system'.
+ * @param {string} content - The message content (can include UI markers).
+ * @param {boolean} [isError=false] - Whether the message represents an error.
+ * @param {HTMLElement} [targetElement=null] - Optional: An existing element to append content to (for streaming).
+ * @returns {HTMLElement} The created or updated message element.
+ */
+function addMessage(role, content, isError = false, targetElement = null) {
+    let messageDiv;
+    if (targetElement) {
+        // If targetElement is provided, append content to it
+        messageDiv = targetElement;
+        // Append content directly for streaming, markdown will be applied later
+        // Escape HTML content before appending to prevent script injection or unwanted HTML rendering during streaming
+        messageDiv.innerHTML += escapeHtml(content); // Append escaped text
     } else {
-        messageDiv.classList.add('message');
-        if (isError) messageDiv.classList.add('error-msg');
-        else messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg');
+        // Create a new message element
+        messageDiv = document.createElement('div');
+        if (role === 'system') {
+            messageDiv.classList.add('system-msg');
+        } else {
+            messageDiv.classList.add('message');
+            if (isError) messageDiv.classList.add('error-msg');
+            else messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg');
+        }
+
+        // Process UI markers only when creating the initial message or final content
+        let processedContent = content;
+        processedContent = processedContent.replace(/\[UI-MARKER:file:(.*?):(.*?)\]/g, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`).replace(/\[UI-MARKER:calendar\]/g, `<span class="attachment-icon" title="Calendar Context Active"><i class="fas fa-calendar-check"></i> Calendar</span>`).replace(/\[UI-MARKER:error:(.*?)\]/g, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`);
+
+        // Apply markdown parsing only when creating a new message (non-streaming initial content)
+        // For streaming, markdown is applied *after* the stream finishes.
+        if (!targetElement) {
+             messageDiv.innerHTML = marked.parse(processedContent, markedOptions);
+        } else {
+             // For streaming, the initial content might just be placeholders or empty
+             // We append escaped text chunks during streaming, and parse markdown at the end
+             messageDiv.innerHTML = processedContent; // Add initial content/placeholders without parsing
+        }
+
+
+        // Assuming 'chatbox' is a pre-existing element in your DOM
+        const chatbox = document.getElementById('chatbox');
+
+        if (chatbox) {
+            chatbox.appendChild(messageDiv);
+        } else {
+            console.error("Chatbox element with ID 'chatbox' not found.");
+        }
     }
-    let processedContent = content;
+
+    // Always scroll to the bottom after adding/updating content
+    chatbox.scrollTop = chatbox.scrollHeight;
+
+    return messageDiv; // Return the element for potential future updates (streaming)
+}
+
+/**
+ * Applies markdown parsing to the content of a given message element.
+ * This is typically used after streaming is complete.
+ * @param {HTMLElement} messageElement - The message element to parse.
+ */
+function applyMarkdownToMessage(messageElement) {
+    if (!messageElement) return;
+    const rawContent = messageElement.innerHTML; // Get the accumulated raw text (which was escaped)
+
+    // Unescape HTML entities before parsing markdown
+    const unescapedContent = rawContent
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>');
+
+    // Re-process UI markers before final markdown parse
+    let processedContent = unescapedContent;
     processedContent = processedContent.replace(/\[UI-MARKER:file:(.*?):(.*?)\]/g, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`).replace(/\[UI-MARKER:calendar\]/g, `<span class="attachment-icon" title="Calendar Context Active"><i class="fas fa-calendar-check"></i> Calendar</span>`).replace(/\[UI-MARKER:error:(.*?)\]/g, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`);
-    const htmlContent = marked.parse(processedContent, markedOptions);
 
-    messageDiv.innerHTML = htmlContent;
 
-    // Assuming 'chatbox' is a pre-existing element in your DOM
-    const chatbox = document.getElementById('chatbox');
-
-    if (chatbox) {
-        chatbox.appendChild(messageDiv);
-        chatbox.scrollTop = chatbox.scrollHeight;
-    } else {
-        console.error("Chatbox element with ID 'chatbox' not found.");
-    }
+    // Apply markdown parsing to the unescaped content
+    messageElement.innerHTML = marked.parse(processedContent, markedOptions);
 }
 
 
@@ -1110,7 +1171,17 @@ async function loadChat(chatId) {
         if (data.history.length === 0) {
             addMessage('system', 'This chat is empty. Start typing!');
         } else {
-            data.history.forEach(msg => addMessage(msg.role, msg.content));
+            // Add historical messages, applying markdown immediately
+            data.history.forEach(msg => {
+                const msgElement = addMessage(msg.role, msg.content);
+                // Re-apply markdown to ensure correct rendering of saved history
+                // This is important because saved history might not have the UI markers processed
+                // or the markdown might need re-rendering based on current markedOptions.
+                // However, addMessage already applies markdown for non-streaming.
+                // Let's ensure UI markers are processed correctly on load.
+                // The current addMessage processes markers and applies markdown for non-streaming.
+                // So, just calling addMessage is sufficient for history.
+            });
         }
         updateActiveChatListItem();
         updateStatus(`Chat ${chatId} loaded.`);
@@ -1155,13 +1226,13 @@ async function sendMessage() {
     // Filter selectedFiles to only include those marked for attachment (type !== 'pending')
     const filesToAttach = selectedFiles.filter(f => f.type !== 'pending');
 
-    if (!message && filesToAttach.length === 0 && (!isCalendarContextActive || !calendarContext) && !sessionFile) { // Added sessionFile check
-        updateStatus("Cannot send: Type a message or attach file(s)/active context.", true);
+    if (!message && filesToAttach.length === 0 && (!isCalendarContextActive || !calendarContext) && !sessionFile && !webSearchToggle.checked) { // Added sessionFile and webSearchToggle check
+        updateStatus("Cannot send: Type a message or attach file(s)/active context/enable web search.", true);
         return;
     }
 
     // --- Display user message + UI markers immediately ---
-    let displayMessage = message || ((filesToAttach.length > 0 || (isCalendarContextActive && calendarContext) || sessionFile) ? "(Context attached)" : ""); // Added sessionFile check
+    let displayMessage = message || ((filesToAttach.length > 0 || (isCalendarContextActive && calendarContext) || sessionFile || webSearchToggle.checked) ? "(Context attached)" : ""); // Added sessionFile and webSearchToggle check
     let uiMarkers = "";
     if (filesToAttach.length > 0) {
         // Use non-HTML placeholder for files
@@ -1174,6 +1245,10 @@ async function sendMessage() {
         // Use non-HTML placeholder for calendar
         uiMarkers += `[UI-MARKER:calendar]`;
     }
+    if (webSearchToggle.checked) { // Add marker for web search
+        uiMarkers += `[UI-MARKER:websearch]`;
+    }
+
     // Prepend placeholders to the actual message text
     displayMessage = uiMarkers + (uiMarkers ? "\n" : "") + displayMessage; // Add newline if markers exist
     addMessage('user', displayMessage); // addMessage will handle replacing placeholders
@@ -1193,12 +1268,14 @@ async function sendMessage() {
             content: sessionFile.content,
             mimetype: sessionFile.mimetype
         }] : [],
-        enable_web_search: webSearchToggle.checked // Add the web search flag
-        // Note: Streaming preference is handled client-side for now, not sent in payload
+        enable_web_search: webSearchToggle.checked, // Add the web search flag
+        enable_streaming: isStreamingEnabled // Add the streaming flag
     };
 
     // Store session file temporarily to clear it in finally block
     const sentSessionFile = sessionFile;
+
+    let assistantMessageElement = null; // Element to append streamed content to
 
     try {
         const response = await fetch(`/api/chat/${currentChatId}/message`, {
@@ -1208,14 +1285,49 @@ async function sendMessage() {
             },
             body: JSON.stringify(payload)
         });
+
         if (!response.ok) {
+            // Handle non-streaming errors (e.g., 400, 500)
             const errorData = await response.json();
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
-        const data = await response.json();
-        addMessage('assistant', data.reply);
-        updateStatus("Assistant replied.");
-        await loadSavedChats();
+
+        if (isStreamingEnabled && response.headers.get('Content-Type')?.includes('text/plain')) {
+             // --- Handle Streaming Response ---
+             assistantMessageElement = addMessage('assistant', ''); // Add an empty message element to start
+             const reader = response.body.getReader();
+             const decoder = new TextDecoder();
+             let receivedText = '';
+
+             while (true) {
+                 const { done, value } = await reader.read();
+                 if (done) {
+                     break;
+                 }
+                 const chunk = decoder.decode(value, { stream: true });
+                 receivedText += chunk;
+                 // Append chunk to the message element
+                 addMessage('assistant', chunk, false, assistantMessageElement);
+             }
+
+             // After streaming is done, apply markdown to the full received text
+             // Note: The backend saves the full message, so we don't need to save here.
+             // We just need to render the final markdown.
+             // The addMessage function with targetElement appends escaped text.
+             // We need to get the full text from the element and re-render with markdown.
+             applyMarkdownToMessage(assistantMessageElement);
+
+             updateStatus("Assistant replied (streaming finished).");
+
+        } else {
+            // --- Handle Non-Streaming Response ---
+            const data = await response.json();
+            addMessage('assistant', data.reply);
+            updateStatus("Assistant replied.");
+        }
+
+        await loadSavedChats(); // Reload chats to update timestamp
+
         // Clear ALL selected files (both 'pending' and attached types) after sending
         selectedFiles = [];
         renderSelectedFiles(); // Update the display below the message input
@@ -1234,7 +1346,15 @@ async function sendMessage() {
 
     } catch (error) {
         console.error('Error sending message:', error);
-        addMessage('assistant', `[Error: ${error.message}]`, true);
+        const errorMessage = `[Error: ${error.message}]`;
+        // If streaming started, append error to the existing element
+        if (assistantMessageElement) {
+             addMessage('assistant', errorMessage, true, assistantMessageElement);
+             applyMarkdownToMessage(assistantMessageElement); // Apply markdown to the final state
+        } else {
+             // If streaming didn't start or it was non-streaming, add a new error message
+             addMessage('assistant', errorMessage, true);
+        }
         updateStatus("Error sending message.", true);
     } finally {
         // Clear the session file state and its tag if it was the one sent
@@ -1376,7 +1496,7 @@ function closeSettingsModal() {
 function handleStreamingToggle() {
     isStreamingEnabled = streamingToggle.checked;
     localStorage.setItem(STREAMING_ENABLED_KEY, isStreamingEnabled); // Persist toggle state
-    updateStatus(`Streaming responses ${isStreamingEnabled ? 'enabled' : 'disabled'}. (Note: This setting is currently client-side only and does not affect backend behavior.)`);
+    updateStatus(`Streaming responses ${isStreamingEnabled ? 'enabled' : 'disabled'}.`);
 }
 
 
@@ -1481,6 +1601,7 @@ async function initializeApp() {
 
     // Load streaming toggle state (default to true if not found)
     const storedStreamingState = localStorage.getItem(STREAMING_ENABLED_KEY);
+    // localStorage stores strings, convert 'true'/'false' to boolean
     isStreamingEnabled = storedStreamingState === null ? true : storedStreamingState === 'true';
     streamingToggle.checked = isStreamingEnabled;
 
