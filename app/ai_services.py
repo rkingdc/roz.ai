@@ -123,7 +123,7 @@ def ai_ready_required(f):
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        logger.debug(f"Decorator '{f.__name__}': Entering decorator.") # <-- Added log
+        logger.debug(f"Decorator '{f.__name__}': Entering decorator.")
         try:
             # Check if configure_gemini found the key initially
             if not gemini_api_key_present:
@@ -141,7 +141,7 @@ def ai_ready_required(f):
             # Check if we have a valid request context (needed for g and current_app)
             try:
                  _ = current_app.config # Simple check that raises RuntimeError if no context
-                 logger.debug(f"Decorator '{f.__name__}': Flask request context is active.") # <-- Added log
+                 logger.debug(f"Decorator '{f.__name__}': Flask request context is active.")
             except RuntimeError:
                  logger.error(
                      f"Decorator '{f.__name__}': AI function called outside of active Flask request context.",
@@ -177,9 +177,9 @@ def ai_ready_required(f):
                     return error_msg
 
             # If client is obtained, proceed with the function
-            logger.debug(f"Decorator '{f.__name__}': AI readiness check passed. Calling wrapped function.") # <-- Added log
+            logger.debug(f"Decorator '{f.__name__}': AI readiness check passed. Calling wrapped function.")
             result = f(*args, **kwargs)
-            logger.debug(f"Decorator '{f.__name__}': Wrapped function call returned/yielded.") # <-- Added log
+            logger.debug(f"Decorator '{f.__name__}': Wrapped function call returned/yielded.")
             return result
 
         except Exception as e:
@@ -604,10 +604,10 @@ def generate_chat_response(
     Supports streaming responses if streaming_enabled is True.
     """
     logger.info(
-        f"Entering generate_chat_response for chat {chat_id}. Streaming: {streaming_enabled}"
+        f"Entering generate_chat_response (generator body starts here) for chat {chat_id}. Streaming: {streaming_enabled}"
     )
     client = get_gemini_client()
-    logger.info(f"Client obtained in generate_chat_response: {client}")
+    logger.info(f"Client obtained inside generate_chat_response: {client}")
     if not client:
         # Decorator should handle this and return/yield error message
         # If it somehow fails here, return/yield a generic error
@@ -619,144 +619,257 @@ def generate_chat_response(
         else:
             return error_msg
 
-    # --- Determine Model ---
-    raw_model_name = current_app.config.get(
-        "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
-    )
-    model_to_use = (
-        f"models/{raw_model_name}"
-        if not raw_model_name.startswith("models/")
-        else raw_model_name
-    )
-    logger.info(f"Primary model for chat {chat_id} response: '{model_to_use}'.")
-
-    # --- Fetch History ---
-    logger.info(f"Fetching history for chat {chat_id}...")
-    history = []
+    # Add a try...except block around the main logic to catch early errors
     try:
-        history_data = database.get_chat_history_from_db(chat_id)
-        history = []  # Re-initialize history list
-        for msg in history_data:
-            # Ensure roles are 'user' or 'model' for the API
-            # The API expects 'user' and 'model' roles, not 'assistant'
-            role = "user" if msg["role"] == "user" else "model"
-            history.append(Content(role=role, parts=[Part(text=msg["content"])]))
-        logger.info(f"Fetched {len(history)} history turns for chat {chat_id}.")
-        logger.info(f"History prepared for API: {history}")
+        # --- Determine Model ---
+        raw_model_name = current_app.config.get(
+            "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
+        )
+        model_to_use = (
+            f"models/{raw_model_name}"
+            if not raw_model_name.startswith("models/")
+            else raw_model_name
+        )
+        logger.info(f"Primary model for chat {chat_id} response: '{model_to_use}'.")
 
-        # Ensure history starts with 'user' role for the API
-        # The API expects alternating user/model turns starting with user.
-        # If the history is not empty and the first message is not 'user',
-        # it indicates an issue with the history structure for the API.
-        # The SDK's chat.send_message handles the current turn's role implicitly
-        # based on the history provided. We just need to ensure the history list
-        # itself is correctly formatted (alternating roles, starting with user).
-        # The DB query should return history in chronological order.
-        # If the very first message in the DB is 'assistant', something is wrong.
-        # Let's check the *first* message role.
-        if history and history[0].role != "user":
+        # --- Fetch History ---
+        logger.info(f"Fetching history for chat {chat_id}...")
+        history = []
+        try:
+            history_data = database.get_chat_history_from_db(chat_id)
+            history = []  # Re-initialize history list
+            for msg in history_data:
+                # Ensure roles are 'user' or 'model' for the API
+                # The API expects 'user' and 'model' roles, not 'assistant'
+                role = "user" if msg["role"] == "user" else "model"
+                history.append(Content(role=role, parts=[Part(text=msg["content"])]))
+            logger.info(f"Fetched {len(history)} history turns for chat {chat_id}.")
+            logger.info(f"History prepared for API: {history}")
+
+            # Ensure history starts with 'user' role for the API
+            # The API expects alternating user/model turns starting with user.
+            # If the history is not empty and the first message is not 'user',
+            # it indicates an issue with the history structure for the API.
+            # The SDK's chat.send_message handles the current turn's role implicitly
+            # based on the history provided. We just need to ensure the history list
+            # itself is correctly formatted (alternating roles, starting with user).
+            # The DB query should return history in chronological order.
+            # If the very first message in the DB is 'assistant', something is wrong.
+            # Let's check the *first* message role.
+            if history and history[0].role != "user":
+                logger.error(
+                    f"Chat history for {chat_id} does not start with a user turn. First role: {history[0].role}. This may cause API errors."
+                )
+                # We won't attempt to fix the history here, as it might corrupt the chat.
+                # The API call might fail, which will be caught below.
+
+        except Exception as e:
             logger.error(
-                f"Chat history for {chat_id} does not start with a user turn. First role: {history[0].role}. This may cause API errors."
+                f"Failed to fetch history for chat {chat_id}: {e}", exc_info=True
             )
-            # We won't attempt to fix the history here, as it might corrupt the chat.
-            # The API call might fail, which will be caught below.
+            error_msg = "[Error: Could not load chat history]"
+            if streaming_enabled:
+                yield error_msg
+                return  # Stop generator
+            else:
+                return error_msg
 
-    except Exception as e:
-        logger.error(f"Failed to fetch history for chat {chat_id}: {e}", exc_info=True)
-        error_msg = "[Error: Could not load chat history]"
-        if streaming_enabled:
-            yield error_msg
-            return  # Stop generator
-        else:
-            return error_msg
+        # --- Prepare Current Turn Parts ---
+        current_turn_parts = []
+        temp_files_to_clean = []
 
-    # --- Prepare Current Turn Parts ---
-    current_turn_parts = []
-    temp_files_to_clean = []
-
-    # Use a try...finally block for temp file cleanup *around* the main logic
-    try:
-        logger.info(
-            f"Preparing current turn parts for chat {chat_id}..."
-        )  # <-- Added this log
-        # 1. Add Calendar Context (if provided)
-        if calendar_context:
-            logger.info(f"Adding calendar context to chat {chat_id} prompt.")
-            current_turn_parts.extend(
-                [
-                    Part(text="--- Start Calendar Context ---"),
-                    Part(text=calendar_context),
-                    Part(text="--- End Calendar Context ---"),
-                ]
-            )
+        # Use a try...finally block for temp file cleanup *around* the main logic
+        try:
             logger.info(
-                f"Added calendar context. Current parts count: {len(current_turn_parts)}"
-            )  # <-- Added this log
-
-        # 2. Process Attached Files (from DB by ID, with type)
-        if attached_files:
-            logger.info(
-                f"Processing {len(attached_files)} attached files (from DB) for chat {chat_id}."
+                f"Preparing current turn parts for chat {chat_id}..."
             )
-            for file_detail in attached_files:
-                file_id = file_detail.get("id")
-                attachment_type = file_detail.get("type")
-                frontend_filename = file_detail.get("filename", "Unknown File")
-
+            # 1. Add Calendar Context (if provided)
+            if calendar_context:
+                logger.info(f"Adding calendar context to chat {chat_id} prompt.")
+                current_turn_parts.extend(
+                    [
+                        Part(text="--- Start Calendar Context ---"),
+                        Part(text=calendar_context),
+                        Part(text="--- End Calendar Context ---"),
+                    ]
+                )
                 logger.info(
-                    f"Processing attached file: {file_detail}"
-                )  # <-- Added this log
+                    f"Added calendar context. Current parts count: {len(current_turn_parts)}"
+                )
 
-                if file_id is None or attachment_type is None:
-                    logger.warning(
-                        f"Skipping invalid attached file detail: {file_detail}"
-                    )
-                    current_turn_parts.append(
-                        Part(text=f"[System: Skipped invalid attached file detail.]")
-                    )
-                    continue
+            # 2. Process Attached Files (from DB by ID, with type)
+            if attached_files:
+                logger.info(
+                    f"Processing {len(attached_files)} attached files (from DB) for chat {chat_id}."
+                )
+                for file_detail in attached_files:
+                    file_id = file_detail.get("id")
+                    attachment_type = file_detail.get("type")
+                    frontend_filename = file_detail.get("filename", "Unknown File")
 
-                try:
-                    db_file_details = database.get_file_details_from_db(
-                        file_id, include_content=True
+                    logger.info(
+                        f"Processing attached file: {file_detail}"
                     )
-                    if not db_file_details or not db_file_details.get("content"):
+
+                    if file_id is None or attachment_type is None:
                         logger.warning(
-                            f"Could not get details/content for attached file_id {file_id} in chat {chat_id}."
+                            f"Skipping invalid attached file detail: {file_detail}"
                         )
                         current_turn_parts.append(
-                            Part(
-                                text=f"[System: Error retrieving attached file details for ID {file_id}]"
-                            )
+                            Part(text=f"[System: Skipped invalid attached file detail.]")
                         )
                         continue
 
-                    filename = db_file_details["filename"]
-                    mimetype = db_file_details["mimetype"]
-                    content_blob = db_file_details["content"]
+                    try:
+                        db_file_details = database.get_file_details_from_db(
+                            file_id, include_content=True
+                        )
+                        if not db_file_details or not db_file_details.get("content"):
+                            logger.warning(
+                                f"Could not get details/content for attached file_id {file_id} in chat {chat_id}."
+                            )
+                            current_turn_parts.append(
+                                Part(
+                                    text=f"[System: Error retrieving attached file details for ID {file_id}]"
+                                )
+                            )
+                            continue
 
-                    if attachment_type == "summary":
-                        logger.info(
-                            f"Getting summary for file {file_id} ('{filename}')."
-                        )  # <-- Added this log
-                        summary = get_or_generate_summary(file_id)
+                        filename = db_file_details["filename"]
+                        mimetype = db_file_details["mimetype"]
+                        content_blob = db_file_details["content"]
+
+                        if attachment_type == "summary":
+                            logger.info(
+                                f"Getting summary for file {file_id} ('{filename}')."
+                            )
+                            summary = get_or_generate_summary(file_id)
+                            current_turn_parts.append(
+                                Part(
+                                    text=f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"
+                                )
+                            )
+                            logger.info(
+                                f"Added summary for file {file_id}. Current parts count: {len(current_turn_parts)}"
+                            )
+                        elif attachment_type == "full":
+                            logger.info(
+                                f"Attaching full content for file {file_id} ('{filename}')."
+                            )
+                            if mimetype.startswith(
+                                ("image/", "audio/", "video/", "application/pdf", "text/")
+                            ):
+                                logger.info(
+                                    f"Attaching full content for '{filename}' ({mimetype}) for chat {chat_id}."
+                                )
+                                try:
+                                    with tempfile.NamedTemporaryFile(
+                                        delete=False, suffix=f"_{secure_filename(filename)}"
+                                    ) as temp_file:
+                                        temp_file.write(content_blob)
+                                        temp_filepath = temp_file.name
+                                        temp_files_to_clean.append(temp_filepath)
+                                    logger.info(
+                                        f"Created temp file: {temp_filepath}"
+                                    )
+
+                                    uploaded_file = client.files.upload(
+                                        file=temp_filepath,
+                                        config={"display_name": filename},
+                                    )
+                                    current_turn_parts.append(uploaded_file)
+                                    logger.info(
+                                        f"Successfully uploaded '{filename}' (URI: {uploaded_file.uri}) for chat {chat_id}."
+                                    )
+                                    logger.info(
+                                        f"Added uploaded file {uploaded_file.uri}. Current parts count: {len(current_turn_parts)}"
+                                    )
+                                except Exception as upload_err:
+                                    logger.error(
+                                        f"Failed to upload attached file '{filename}' for chat {chat_id}: {upload_err}",
+                                        exc_info=True,
+                                    )
+                                    current_turn_parts.append(
+                                        Part(
+                                            text=f"[System: Error uploading attached file '{filename}'. {type(upload_err).__name__}]"
+                                        )
+                                    )
+                                    if "api key not valid" in str(upload_err).lower():
+                                        g.gemini_api_key_invalid = True
+                            else:
+                                logger.warning(
+                                    f"Full content attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}."
+                                )
+                                current_turn_parts.append(
+                                    Part(
+                                        text=f"[System: Full content attachment not supported for file '{filename}' ({mimetype}).]"
+                                    )
+                                )
+                        else:
+                            logger.warning(
+                                f"Unknown attachment type '{attachment_type}' for file '{filename}' in chat {chat_id}."
+                            )
+                            current_turn_parts.append(
+                                Part(
+                                    text=f"[System: Unknown attachment type '{attachment_type}' for file '{filename}'.]"
+                                )
+                            )
+
+                    except Exception as file_proc_err:
+                        logger.error(
+                            f"Error processing attached file_id {file_id} for chat {chat_id}: {file_proc_err}",
+                            exc_info=True,
+                        )
                         current_turn_parts.append(
                             Part(
-                                text=f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"
+                                text=f"[System: Error processing attached file ID {file_id}. {type(file_proc_err).__name__}]"
                             )
                         )
+                logger.info(
+                    f"Finished processing attached files. Total parts: {len(current_turn_parts)}"
+                )
+
+            # 3. Process Session Files (with content)
+            if session_files:
+                logger.info(
+                    f"Processing {len(session_files)} session files (with content) for chat {chat_id}."
+                )
+                for session_file_detail in session_files:
+                    filename = session_file_detail.get("filename", "Unknown Session File")
+                    mimetype = session_file_detail.get("mimetype")
+                    content_base64 = session_file_detail.get("content")
+
+                    logger.info(
+                        f"Processing session file: {session_file_detail.get('filename')}"
+                    )
+
+                    if not filename or not mimetype or not content_base64:
+                        logger.warning(
+                            f"Skipping invalid session file detail: {session_file_detail}"
+                        )
+                        current_turn_parts.append(
+                            Part(text=f"[System: Skipped invalid session file detail.]")
+                        )
+                        continue
+
+                    try:
+                        # Decode base64 content. Handle potential data URL prefix (e.g., "data:image/png;base64,...")
+                        if "," in content_base64:
+                            header, base64_string = content_base64.split(",", 1)
+                        else:
+                            base64_string = content_base64
+
+                        content_blob = base64.b64decode(base64_string)
                         logger.info(
-                            f"Added summary for file {file_id}. Current parts count: {len(current_turn_parts)}"
-                        )  # <-- Added this log
-                    elif attachment_type == "full":
-                        logger.info(
-                            f"Attaching full content for file {file_id} ('{filename}')."
-                        )  # <-- Added this log
+                            f"Decoded session file content for '{filename}'."
+                        )
+
+                        # Session files are always treated as 'full' content attachments
                         if mimetype.startswith(
                             ("image/", "audio/", "video/", "application/pdf", "text/")
-                        ):
+                        ):  # Include text for full upload
                             logger.info(
-                                f"Attaching full content for '{filename}' ({mimetype}) for chat {chat_id}."
+                                f"Attaching session file '{filename}' ({mimetype}) for chat {chat_id}."
                             )
                             try:
                                 with tempfile.NamedTemporaryFile(
@@ -764,10 +877,12 @@ def generate_chat_response(
                                 ) as temp_file:
                                     temp_file.write(content_blob)
                                     temp_filepath = temp_file.name
-                                    temp_files_to_clean.append(temp_filepath)
+                                    temp_files_to_clean.append(
+                                        temp_filepath
+                                    )  # Add to cleanup list
                                 logger.info(
-                                    f"Created temp file: {temp_filepath}"
-                                )  # <-- Added this log
+                                    f"Created temp file for session file: {temp_filepath}"
+                                )
 
                                 uploaded_file = client.files.upload(
                                     file=temp_filepath,
@@ -775,529 +890,432 @@ def generate_chat_response(
                                 )
                                 current_turn_parts.append(uploaded_file)
                                 logger.info(
-                                    f"Successfully uploaded '{filename}' (URI: {uploaded_file.uri}) for chat {chat_id}."
+                                    f"Successfully uploaded session file '{filename}' (URI: {uploaded_file.uri}) for chat {chat_id}."
                                 )
                                 logger.info(
-                                    f"Added uploaded file {uploaded_file.uri}. Current parts count: {len(current_turn_parts)}"
-                                )  # <-- Added this log
+                                    f"Added uploaded session file {uploaded_file.uri}. Current parts count: {len(current_turn_parts)}"
+                                )
                             except Exception as upload_err:
                                 logger.error(
-                                    f"Failed to upload attached file '{filename}' for chat {chat_id}: {upload_err}",
+                                    f"Failed to upload session file '{filename}' for chat {chat_id}: {upload_err}",
                                     exc_info=True,
                                 )
                                 current_turn_parts.append(
                                     Part(
-                                        text=f"[System: Error uploading attached file '{filename}'. {type(upload_err).__name__}]"
+                                        text=f"[System: Error uploading session file '{filename}'. {type(upload_err).__name__}]"
                                     )
                                 )
                                 if "api key not valid" in str(upload_err).lower():
-                                    g.gemini_api_key_invalid = True
+                                    g.gemini_api_key_invalid = True  # Mark key invalid
                         else:
                             logger.warning(
-                                f"Full content attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}."
+                                f"Session file attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}."
                             )
                             current_turn_parts.append(
                                 Part(
-                                    text=f"[System: Full content attachment not supported for file '{filename}' ({mimetype}).]"
+                                    text=f"[System: Session file attachment not supported for file '{filename}' ({mimetype}).]"
                                 )
                             )
-                    else:
-                        logger.warning(
-                            f"Unknown attachment type '{attachment_type}' for file '{filename}' in chat {chat_id}."
-                        )
-                        current_turn_parts.append(
-                            Part(
-                                text=f"[System: Unknown attachment type '{attachment_type}' for file '{filename}'.]"
-                            )
-                        )
 
-                except Exception as file_proc_err:
-                    logger.error(
-                        f"Error processing attached file_id {file_id} for chat {chat_id}: {file_proc_err}",
-                        exc_info=True,
-                    )
-                    current_turn_parts.append(
-                        Part(
-                            text=f"[System: Error processing attached file ID {file_id}. {type(file_proc_err).__name__}]"
-                        )
-                    )
-            logger.info(
-                f"Finished processing attached files. Total parts: {len(current_turn_parts)}"
-            )  # <-- Added this log
-
-        # 3. Process Session Files (with content)
-        if session_files:
-            logger.info(
-                f"Processing {len(session_files)} session files (with content) for chat {chat_id}."
-            )
-            for session_file_detail in session_files:
-                filename = session_file_detail.get("filename", "Unknown Session File")
-                mimetype = session_file_detail.get("mimetype")
-                content_base64 = session_file_detail.get("content")
-
-                logger.info(
-                    f"Processing session file: {session_file_detail.get('filename')}"
-                )  # <-- Added this log
-
-                if not filename or not mimetype or not content_base64:
-                    logger.warning(
-                        f"Skipping invalid session file detail: {session_file_detail}"
-                    )
-                    current_turn_parts.append(
-                        Part(text=f"[System: Skipped invalid session file detail.]")
-                    )
-                    continue
-
-                try:
-                    # Decode base64 content. Handle potential data URL prefix (e.g., "data:image/png;base64,...")
-                    if "," in content_base64:
-                        header, base64_string = content_base64.split(",", 1)
-                    else:
-                        base64_string = content_base64
-
-                    content_blob = base64.b64decode(base64_string)
-                    logger.info(
-                        f"Decoded session file content for '{filename}'."
-                    )  # <-- Added this log
-
-                    # Session files are always treated as 'full' content attachments
-                    if mimetype.startswith(
-                        ("image/", "audio/", "video/", "application/pdf", "text/")
-                    ):  # Include text for full upload
-                        logger.info(
-                            f"Attaching session file '{filename}' ({mimetype}) for chat {chat_id}."
-                        )
-                        try:
-                            with tempfile.NamedTemporaryFile(
-                                delete=False, suffix=f"_{secure_filename(filename)}"
-                            ) as temp_file:
-                                temp_file.write(content_blob)
-                                temp_filepath = temp_file.name
-                                temp_files_to_clean.append(
-                                    temp_filepath
-                                )  # Add to cleanup list
-                            logger.info(
-                                f"Created temp file for session file: {temp_filepath}"
-                            )  # <-- Added this log
-
-                            uploaded_file = client.files.upload(
-                                file=temp_filepath,
-                                config={"display_name": filename},
-                            )
-                            current_turn_parts.append(uploaded_file)
-                            logger.info(
-                                f"Successfully uploaded session file '{filename}' (URI: {uploaded_file.uri}) for chat {chat_id}."
-                            )
-                            logger.info(
-                                f"Added uploaded session file {uploaded_file.uri}. Current parts count: {len(current_turn_parts)}"
-                            )  # <-- Added this log
-                        except Exception as upload_err:
-                            logger.error(
-                                f"Failed to upload session file '{filename}' for chat {chat_id}: {upload_err}",
-                                exc_info=True,
-                            )
-                            current_turn_parts.append(
-                                Part(
-                                    text=f"[System: Error uploading session file '{filename}'. {type(upload_err).__name__}]"
-                                )
-                            )
-                            if "api key not valid" in str(upload_err).lower():
-                                g.gemini_api_key_invalid = True  # Mark key invalid
-                    else:
-                        logger.warning(
-                            f"Session file attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}."
-                        )
-                        current_turn_parts.append(
-                            Part(
-                                text=f"[System: Session file attachment not supported for file '{filename}' ({mimetype}).]"
-                            )
-                        )
-
-                except Exception as file_proc_err:
-                    logger.error(
-                        f"Error processing session file '{filename}' for chat {chat_id}: {file_proc_err}",
-                        exc_info=True,
-                    )
-                    current_turn_parts.append(
-                        Part(
-                            text=f"[System: Error processing session file '{filename}'. {type(file_proc_err).__name__}]"
-                        )
-                    )
-            logger.info(
-                f"Finished processing session files. Total parts: {len(current_turn_parts)}"
-            )  # <-- Added this log
-
-        # 4. Perform Web Search (if enabled and seems appropriate)
-        search_results = None
-        if web_search_enabled:
-            logger.info(f"Web search enabled for chat {chat_id}. Generating query...")
-            # Pass streaming_enabled=False to generate_search_query as it's not streamed
-            search_query = generate_search_query(user_message, streaming_enabled=False)
-            logger.info(
-                f"Generated search query: '{search_query}'"
-            )  # <-- Added this log
-            if search_query:
-                logger.info(
-                    f"Performing web search for chat {chat_id} with query: '{search_query}'"
-                )
-                search_results = perform_web_search(
-                    search_query
-                )  # Assumes this returns a list of strings or None
-                logger.info(
-                    f"Web search results: {search_results}"
-                )  # <-- Added this log
-                if search_results:
-                    logger.info(f"Adding web search results to chat {chat_id} prompt.")
-                    current_turn_parts.extend(
-                        [
-                            Part(text="--- Start Web Search Results ---"),
-                            *[Part(text=s) for s in search_results],
-                            Part(text="--- End Web Search Results ---"),
-                        ]
-                    )
-                    logger.info(
-                        f"Added web search results. Current parts count: {len(current_turn_parts)}"
-                    )  # <-- Added this log
-                else:
-                    logger.info(f"Web search yielded no results for chat {chat_id}.")
-                    current_turn_parts.append(
-                        Part(
-                            text="[System Note: Web search was performed but returned no results.]"
-                        )
-                    )
-            else:
-                logger.info(
-                    f"Could not generate a suitable web search query for chat {chat_id}."
-                )
-                current_turn_parts.append(
-                    Part(
-                        text="[System Note: Web search was enabled but no query could be generated.]"
-                    )
-                )
-            logger.info(
-                f"Finished processing web search. Total parts: {len(current_turn_parts)}"
-            )  # <-- Added this log
-
-        # 5. Add User's Text Message
-        if user_message:
-            logger.info(
-                f"Adding user message to parts for chat {chat_id}."
-            )  # <-- Added this log
-            current_turn_parts.append(Part(text=user_message))
-            logger.info(
-                f"Added user message. Current parts count: {len(current_turn_parts)}"
-            )  # <-- Added this log
-        else:
-            # Handle cases where maybe only files were sent?
-            # If current_turn_parts is still empty, we might need a placeholder
-            if not current_turn_parts:
-                logger.warning(
-                    f"Chat {chat_id}: User message is empty and no files/context were added."
-                )
-                current_turn_parts.append(
-                    Part(
-                        text="[User provided no text, only attached files or context.]"
-                    )
-                )
-                logger.info(
-                    f"Added placeholder for empty user message. Current parts count: {len(current_turn_parts)}"
-                )  # <-- Added this log
-
-        logger.info(f"Current turn parts prepared for API: {current_turn_parts}")
-
-        # --- Call Gemini API ---
-        logger.info(
-            f"Sending request to Gemini for chat {chat_id} with {len(history)} history turns and {len(current_turn_parts)} current parts. Streaming: {streaming_enabled}"
-        )
-
-        try:
-            logger.info(
-                f"Creating chat session with model '{model_to_use}' and history."
-            )  # <-- Added this log
-            chat_session = client.chats.create(model=model_to_use, history=history)
-            logger.info(f"Chat session created: {chat_session}")
-
-            logger.info(
-                f"Sending message to chat session with parts: {current_turn_parts}"
-            )  # <-- Added this log
-            response = chat_session.send_message(
-                message=current_turn_parts, stream=streaming_enabled
-            )
-            logger.info(f"send_message call returned.")  # <-- Added this log
-
-            # --- Debugging Logs for Response ---
-            logger.info(f"Gemini API raw response object: {response}")
-            logger.info(f"Gemini API response object type: {type(response)}")
-            if hasattr(response, "candidates"):
-                logger.info(f"Response has {len(response.candidates)} candidates.")
-                if response.candidates:
-                    logger.info(
-                        f"First candidate finish reason: {response.candidates[0].finish_reason}"
-                    )
-                    if (
-                        hasattr(response.candidates[0], "content")
-                        and response.candidates[0].content
-                    ):
-                        logger.info(
-                            f"First candidate content parts: {len(response.candidates[0].content.parts)}"
-                        )
-                        if response.candidates[0].content.parts:
-                            logger.info(
-                                f"First part type: {type(response.candidates[0].content.parts[0])}"
-                            )
-                            if hasattr(response.candidates[0].content.parts[0], "text"):
-                                logger.info(
-                                    f"First part text length: {len(response.candidates[0].content.parts[0].text)}"
-                                )
-                            else:
-                                logger.info("First part has no 'text' attribute.")
-                        else:
-                            logger.info("First candidate content has no parts.")
-                    else:
-                        logger.info(
-                            "First candidate has no 'content' or content is empty."
-                        )
-                else:
-                    logger.info("Response candidates list is empty.")
-            elif hasattr(response, "prompt_feedback"):
-                logger.info(f"Response has prompt feedback: {response.prompt_feedback}")
-            else:
-                logger.info("Response has no candidates or prompt feedback.")
-            # --- End Debugging Logs ---
-
-            if streaming_enabled:
-                # Iterate through the streaming response and yield text chunks
-                logger.info(
-                    f"Starting streaming response iteration for chat {chat_id}."
-                )
-                # Use a separate try/except for the streaming iteration itself
-                try:
-                    # Check if response is iterable (it should be for stream=True)
-                    if not hasattr(response, "__iter__"):
+                    except Exception as file_proc_err:
                         logger.error(
-                            f"Expected streaming response to be iterable, but got {type(response)}"
+                            f"Error processing session file '{filename}' for chat {chat_id}: {file_proc_err}",
+                            exc_info=True,
                         )
-                        yield "[Streaming Error: Unexpected API response format]"
-                        return
+                        current_turn_parts.append(
+                            Part(
+                                text=f"[System: Error processing session file '{filename}'. {type(file_proc_err).__name__}]"
+                            )
+                        )
+                logger.info(
+                    f"Finished processing session files. Total parts: {len(current_turn_parts)}"
+                )
 
-                    chunk_count = 0
-                    for chunk in response:
-                        chunk_count += 1
+            # 4. Perform Web Search (if enabled and seems appropriate)
+            search_results = None
+            if web_search_enabled:
+                logger.info(f"Web search enabled for chat {chat_id}. Generating query...")
+                # Pass streaming_enabled=False to generate_search_query as it's not streamed
+                search_query = generate_search_query(user_message, streaming_enabled=False)
+                logger.info(
+                    f"Generated search query: '{search_query}'"
+                )
+                if search_query:
+                    logger.info(
+                        f"Performing web search for chat {chat_id} with query: '{search_query}'"
+                    )
+                    search_results = perform_web_search(
+                        search_query
+                    )  # Assumes this returns a list of strings or None
+                    logger.info(
+                        f"Web search results: {search_results}"
+                    )
+                    if search_results:
+                        logger.info(f"Adding web search results to chat {chat_id} prompt.")
+                        current_turn_parts.extend(
+                            [
+                                Part(text="--- Start Web Search Results ---"),
+                                *[Part(text=s) for s in search_results],
+                                Part(text="--- End Web Search Results ---"),
+                            ]
+                        )
                         logger.info(
-                            f"Received chunk {chunk_count}: {chunk}"
-                        )  # <-- Changed to debug
+                            f"Added web search results. Current parts count: {len(current_turn_parts)}"
+                        )
+                    else:
+                        logger.info(f"Web search yielded no results for chat {chat_id}.")
+                        current_turn_parts.append(
+                            Part(
+                                text="[System Note: Web search was performed but returned no results.]"
+                            )
+                        )
+                else:
+                    logger.info(
+                        f"Could not generate a suitable web search query for chat {chat_id}."
+                    )
+                    current_turn_parts.append(
+                        Part(
+                            text="[System Note: Web search was enabled but no query could be generated.]"
+                        )
+                    )
+                logger.info(
+                    f"Finished processing web search. Total parts: {len(current_turn_parts)}"
+                )
+
+            # 5. Add User's Text Message
+            if user_message:
+                logger.info(
+                    f"Adding user message to parts for chat {chat_id}."
+                )
+                current_turn_parts.append(Part(text=user_message))
+                logger.info(
+                    f"Added user message. Current parts count: {len(current_turn_parts)}"
+                )
+            else:
+                # Handle cases where maybe only files were sent?
+                # If current_turn_parts is still empty, we might need a placeholder
+                if not current_turn_parts:
+                    logger.warning(
+                        f"Chat {chat_id}: User message is empty and no files/context were added."
+                    )
+                    current_turn_parts.append(
+                        Part(
+                            text="[User provided no text, only attached files or context.]"
+                        )
+                    )
+                    logger.info(
+                        f"Added placeholder for empty user message. Current parts count: {len(current_turn_parts)}"
+                    )
+
+            logger.info(f"Current turn parts prepared for API: {current_turn_parts}")
+
+            # --- Call Gemini API ---
+            logger.info(
+                f"Sending request to Gemini for chat {chat_id} with {len(history)} history turns and {len(current_turn_parts)} current parts. Streaming: {streaming_enabled}"
+            )
+
+            try:
+                logger.info(
+                    f"Creating chat session with model '{model_to_use}' and history."
+                )
+                chat_session = client.chats.create(model=model_to_use, history=history)
+                logger.info(f"Chat session created: {chat_session}")
+
+                logger.info(
+                    f"Sending message to chat session with parts: {current_turn_parts}"
+                )
+                response = chat_session.send_message(
+                    message=current_turn_parts, stream=streaming_enabled
+                )
+                logger.info(f"send_message call returned.")
+
+                # --- Debugging Logs for Response ---
+                logger.info(f"Gemini API raw response object: {response}")
+                logger.info(f"Gemini API response object type: {type(response)}")
+                if hasattr(response, "candidates"):
+                    logger.info(f"Response has {len(response.candidates)} candidates.")
+                    if response.candidates:
+                        logger.info(
+                            f"First candidate finish reason: {response.candidates[0].finish_reason}"
+                        )
                         if (
-                            hasattr(chunk, "text") and chunk.text
-                        ):  # Only yield if there is text in the chunk
+                            hasattr(response.candidates[0], "content")
+                            and response.candidates[0].content
+                        ):
                             logger.info(
-                                f"Yielding chunk text (length {len(chunk.text)})."
-                            )  # <-- Changed to debug
-                            yield chunk.text
-                        elif hasattr(chunk, "candidates") and chunk.candidates:
-                            # Sometimes chunks might contain candidates even if text is empty?
-                            logger.info(
-                                f"Chunk {chunk_count} has candidates but no text."
-                            )  # <-- Changed to debug
-                        elif hasattr(chunk, "prompt_feedback"):
-                            logger.info(
-                                f"Chunk {chunk_count} has prompt feedback: {chunk.prompt_feedback}"
-                            )  # <-- Changed to debug
-                            # Optionally yield a system message about feedback
-                            # yield f"\n[System Note: Prompt feedback received: {chunk.prompt_feedback}]"
+                                f"First candidate content parts: {len(response.candidates[0].content.parts)}"
+                            )
+                            if response.candidates[0].content.parts:
+                                logger.info(
+                                    f"First part type: {type(response.candidates[0].content.parts[0])}"
+                                )
+                                if hasattr(response.candidates[0].content.parts[0], "text"):
+                                    logger.info(
+                                        f"First part text length: {len(response.candidates[0].content.parts[0].text)}"
+                                    )
+                                else:
+                                    logger.info("First part has no 'text' attribute.")
+                            else:
+                                logger.info("First candidate content has no parts.")
                         else:
                             logger.info(
-                                f"Chunk {chunk_count} has no text, candidates, or prompt feedback."
-                            )  # <-- Changed to debug
+                                "First candidate has no 'content' or content is empty."
+                            )
+                    else:
+                        logger.info("Response candidates list is empty.")
+                elif hasattr(response, "prompt_feedback"):
+                    logger.info(f"Response has prompt feedback: {response.prompt_feedback}")
+                else:
+                    logger.info("Response has no candidates or prompt feedback.")
+                # --- End Debugging Logs ---
 
-                    if chunk_count == 0:
-                        logger.warning(
-                            f"Streaming iteration for chat {chat_id} completed but yielded no chunks."
-                        )
-                        # Yield a message if no chunks were received at all
-                        yield "[System Note: The AI did not return any content.]"
-
-                except Exception as stream_err:
-                    logger.error(
-                        f"Error during streaming iteration for chat {chat_id}: {stream_err}",
-                        exc_info=True,
-                    )
-                    yield f"\n[Streaming Error: {type(stream_err).__name__}]"
-                logger.info(f"Streaming finished for chat {chat_id}.")
-                return  # Explicitly return after yielding all chunks
-
-            else:
-                # Get the full text response for non-streaming
-                logger.info(
-                    f"Processing non-streaming response for chat {chat_id}."
-                )  # <-- Added this log
-                # Check if response has text attribute (should for stream=False)
-                if hasattr(response, "text"):
-                    assistant_reply = response.text
+                if streaming_enabled:
+                    # Iterate through the streaming response and yield text chunks
                     logger.info(
-                        f"Successfully received full response text (length {len(assistant_reply)}) for chat {chat_id}."
+                        f"Starting streaming response iteration for chat {chat_id}."
                     )
-                    if not assistant_reply.strip():
-                        logger.warning(
-                            f"Non-streaming response for chat {chat_id} was empty or whitespace."
+                    # Use a separate try/except for the streaming iteration itself
+                    try:
+                        # Check if response is iterable (it should be for stream=True)
+                        if not hasattr(response, "__iter__"):
+                            logger.error(
+                                f"Expected streaming response to be iterable, but got {type(response)}"
+                            )
+                            yield "[Streaming Error: Unexpected API response format]"
+                            return
+
+                        chunk_count = 0
+                        for chunk in response:
+                            chunk_count += 1
+                            logger.info(
+                                f"Received chunk {chunk_count}: {chunk}"
+                            )
+                            if (
+                                hasattr(chunk, "text") and chunk.text
+                            ):  # Only yield if there is text in the chunk
+                                logger.info(
+                                    f"Yielding chunk text (length {len(chunk.text)})."
+                                )
+                                yield chunk.text
+                            elif hasattr(chunk, "candidates") and chunk.candidates:
+                                # Sometimes chunks might contain candidates even if text is empty?
+                                logger.info(
+                                    f"Chunk {chunk_count} has candidates but no text."
+                                )
+                            elif hasattr(chunk, "prompt_feedback"):
+                                logger.info(
+                                    f"Chunk {chunk_count} has prompt feedback: {chunk.prompt_feedback}"
+                                )
+                                # Optionally yield a system message about feedback
+                                # yield f"\n[System Note: Prompt feedback received: {chunk.prompt_feedback}]"
+                            else:
+                                logger.info(
+                                    f"Chunk {chunk_count} has no text, candidates, or prompt feedback."
+                                )
+
+                        if chunk_count == 0:
+                            logger.warning(
+                                f"Streaming iteration for chat {chat_id} completed but yielded no chunks."
+                            )
+                            # Yield a message if no chunks were received at all
+                            yield "[System Note: The AI did not return any content.]"
+
+                    except Exception as stream_err:
+                        logger.error(
+                            f"Error during streaming iteration for chat {chat_id}: {stream_err}",
+                            exc_info=True,
                         )
-                        assistant_reply = "[System Note: The AI returned an empty response.]"  # Provide a user-friendly message
-                    return assistant_reply  # Return the string
-                elif hasattr(response, "candidates") and not response.candidates:
-                    logger.warning(
-                        f"Non-streaming response for chat {chat_id} had no candidates."
+                        yield f"\n[Streaming Error: {type(stream_err).__name__}]"
+                    logger.info(f"Streaming finished for chat {chat_id}.")
+                    return  # Explicitly return after yielding all chunks
+
+                else:
+                    # Get the full text response for non-streaming
+                    logger.info(
+                        f"Processing non-streaming response for chat {chat_id}."
                     )
-                    # Check for prompt feedback if no candidates
-                    if (
-                        hasattr(response, "prompt_feedback")
-                        and response.prompt_feedback
-                    ):
+                    # Check if response has text attribute (should for stream=False)
+                    if hasattr(response, "text"):
+                        assistant_reply = response.text
+                        logger.info(
+                            f"Successfully received full response text (length {len(assistant_reply)}) for chat {chat_id}."
+                        )
+                        if not assistant_reply.strip():
+                            logger.warning(
+                                f"Non-streaming response for chat {chat_id} was empty or whitespace."
+                            )
+                            assistant_reply = "[System Note: The AI returned an empty response.]"  # Provide a user-friendly message
+                        return assistant_reply  # Return the string
+                    elif hasattr(response, "candidates") and not response.candidates:
                         logger.warning(
-                            f"Non-streaming response had prompt feedback: {response.prompt_feedback}"
+                            f"Non-streaming response for chat {chat_id} had no candidates."
+                        )
+                        # Check for prompt feedback if no candidates
+                        if (
+                            hasattr(response, "prompt_feedback")
+                            and response.prompt_feedback
+                        ):
+                            logger.warning(
+                                f"Non-streaming response had prompt feedback: {response.prompt_feedback}"
+                            )
+                            return f"[AI Safety Error: Request blocked due to safety settings (Reason: {response.prompt_feedback.block_reason})]"
+                        else:
+                            return "[AI Error: The AI did not return any candidates.]"
+                    elif hasattr(response, "prompt_feedback"):
+                        logger.warning(
+                            f"Non-streaming response for chat {chat_id} had prompt feedback but no text/candidates."
                         )
                         return f"[AI Safety Error: Request blocked due to safety settings (Reason: {response.prompt_feedback.block_reason})]"
                     else:
-                        return "[AI Error: The AI did not return any candidates.]"
-                elif hasattr(response, "prompt_feedback"):
-                    logger.warning(
-                        f"Non-streaming response for chat {chat_id} had prompt feedback but no text/candidates."
-                    )
-                    return f"[AI Safety Error: Request blocked due to safety settings (Reason: {response.prompt_feedback.block_reason})]"
-                else:
-                    logger.error(
-                        f"Non-streaming response for chat {chat_id} had unexpected format: {type(response)}"
-                    )
-                    return "[AI Error: Unexpected API response format.]"
-
-        # --- Specific Error Handling for API Call ---
-        # These exceptions need to be caught here and returned/yielded as error messages
-        # The route handler will catch any exceptions *not* caught here.
-        except ValidationError as e:
-            logger.error(
-                f"Data validation error calling Gemini API for chat {chat_id} with model {model_to_use}: {e}",
-                exc_info=True,
-            )
-            error_msg = f"[AI Error: Internal data format error. Please check logs. ({e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}')]"
-            if streaming_enabled:
-                yield error_msg
-                return
-            else:
-                return error_msg
-        except DeadlineExceeded:
-            logger.error(f"Gemini API call timed out for chat {chat_id}.")
-            error_msg = "[AI Error: The request timed out. Please try again.]"
-            if streaming_enabled:
-                yield error_msg
-                return
-            else:
-                return error_msg
-        except NotFound as e:
-            logger.error(
-                f"Model '{model_to_use}' not found or inaccessible for chat {chat_id}: {e}"
-            )
-            error_msg = (
-                f"[AI Error: Model '{raw_model_name}' not found or access denied.]"
-            )
-            if streaming_enabled:
-                yield error_msg
-                return
-            else:
-                return error_msg
-        except GoogleAPIError as e:
-            logger.error(f"Google API error for chat {chat_id}: {e}")
-            err_str = str(e).lower()
-            error_message = f"[AI API Error: {type(e).__name__}]"
-
-            if "api key not valid" in err_str:
-                g.gemini_api_key_invalid = True
-                error_message = "[Error: Invalid Gemini API Key]"
-            elif "prompt was blocked" in err_str or "SAFETY" in str(e):
-                feedback_reason = "N/A"
-                try:
-                    # Check if response object exists from the try block
-                    # For streaming, response is the generator itself, need to check its properties if available
-                    # For non-streaming, response is the result object
-                    if (
-                        not streaming_enabled
-                        and response
-                        and hasattr(response, "prompt_feedback")
-                        and response.prompt_feedback
-                    ):
-                        feedback_reason = response.prompt_feedback.block_reason
-                    # Check candidate finish reason if prompt feedback isn't the cause (more common in streaming)
-                    elif (
-                        streaming_enabled
-                        and hasattr(e, "response")
-                        and e.response
-                        and e.response.candidates
-                        and e.response.candidates[0].finish_reason == 3
-                    ):
-                        feedback_reason = "Response Content Safety"
-                    elif (
-                        hasattr(e, "response")
-                        and e.response
-                        and hasattr(e.response, "prompt_feedback")
-                        and e.response.prompt_feedback
-                    ):
-                        feedback_reason = e.response.prompt_feedback.block_reason
-                except Exception:
-                    pass
-                logger.warning(
-                    f"API error indicates safety block for chat {chat_id}. Reason: {feedback_reason}"
-                )
-                error_message = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: {feedback_reason})]"
-            elif "resource has been exhausted" in err_str or "429" in err_str:
-                logger.warning(f"Quota/Rate limit hit for chat {chat_id}.")
-                error_message = "[AI Error: API quota or rate limit exceeded. Please try again later.]"
-            elif "internal error" in err_str or "500" in str(e):
-                logger.error(
-                    f"Internal server error from Gemini API for chat {chat_id}: {e}"
-                )
-                error_message = "[AI Error: The AI service encountered an internal error. Please try again later.]"
-
-            if streaming_enabled:
-                yield error_message
-                return
-            else:
-                return error_message
-
-        except Exception as e:
-            logger.error(
-                f"Unexpected error calling Gemini API for chat {chat_id} with model {model_to_use}: {e}",
-                exc_info=True,
-            )
-            error_msg = f"[Unexpected AI Error: {type(e).__name__}]"
-            if streaming_enabled:
-                yield error_msg
-                return
-            else:
-                return error_msg
-
-    finally:
-        # --- Clean up temporary files ---
-        # This block runs regardless of whether an exception occurred,
-        # but only after the try block is exited (either by return, yield, or exception).
-        # For a generator, this runs when the generator is exhausted or closed.
-        logger.info(
-            f"Executing finally block for chat {chat_id}. Cleaning up temp files."
-        )  # <-- Added this log
-        if temp_files_to_clean:
-            logger.info(
-                f"Cleaning up {len(temp_files_to_clean)} temporary files for chat {chat_id}..."
-            )
-            for temp_path in temp_files_to_clean:
-                try:
-                    if os.path.exists(temp_path):
-                        os.remove(temp_path)
-                        logger.info(f"Removed temp file: {temp_path}")
-                    else:
-                        logger.info(
-                            f"Temp file not found, already removed? {temp_path}"
+                        logger.error(
+                            f"Non-streaming response for chat {chat_id} had unexpected format: {type(response)}"
                         )
-                except OSError as e:
-                    logger.warning(f"Error removing temp file {temp_path}: {e}")
-        logger.info(
-            f"Finished executing finally block for chat {chat_id}."
-        )  # <-- Added this log
+                        return "[AI Error: Unexpected API response format.]"
+
+            # --- Specific Error Handling for API Call ---
+            # These exceptions need to be caught here and returned/yielded as error messages
+            # The route handler will catch any exceptions *not* caught here.
+            except ValidationError as e:
+                logger.error(
+                    f"Data validation error calling Gemini API for chat {chat_id} with model {model_to_use}: {e}",
+                    exc_info=True,
+                )
+                error_msg = f"[AI Error: Internal data format error. Please check logs. ({e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}')]"
+                if streaming_enabled:
+                    yield error_msg
+                    return
+                else:
+                    return error_msg
+            except DeadlineExceeded:
+                logger.error(f"Gemini API call timed out for chat {chat_id}.")
+                error_msg = "[AI Error: The request timed out. Please try again.]"
+                if streaming_enabled:
+                    yield error_msg
+                    return
+                else:
+                    return error_msg
+            except NotFound as e:
+                logger.error(
+                    f"Model '{model_to_use}' not found or inaccessible for chat {chat_id}: {e}"
+                )
+                error_msg = (
+                    f"[AI Error: Model '{raw_model_name}' not found or access denied.]"
+                )
+                if streaming_enabled:
+                    yield error_msg
+                    return
+                else:
+                    return error_msg
+            except GoogleAPIError as e:
+                logger.error(f"Google API error for chat {chat_id}: {e}")
+                err_str = str(e).lower()
+                error_message = f"[AI API Error: {type(e).__name__}]"
+
+                if "api key not valid" in err_str:
+                    g.gemini_api_key_invalid = True
+                    error_message = "[Error: Invalid Gemini API Key]"
+                elif "prompt was blocked" in err_str or "SAFETY" in str(e):
+                    feedback_reason = "N/A"
+                    try:
+                        # Check if response object exists from the try block
+                        # For streaming, response is the generator itself, need to check its properties if available
+                        # For non-streaming, response is the result object
+                        if (
+                            not streaming_enabled
+                            and response
+                            and hasattr(response, "prompt_feedback")
+                            and response.prompt_feedback
+                        ):
+                            feedback_reason = response.prompt_feedback.block_reason
+                        # Check candidate finish reason if prompt feedback isn't the cause (more common in streaming)
+                        elif (
+                            streaming_enabled
+                            and hasattr(e, "response")
+                            and e.response
+                            and e.response.candidates
+                            and e.response.candidates[0].finish_reason == 3
+                        ):
+                            feedback_reason = "Response Content Safety"
+                        elif (
+                            hasattr(e, "response")
+                            and e.response
+                            and hasattr(e.response, "prompt_feedback")
+                            and e.response.prompt_feedback
+                        ):
+                            feedback_reason = e.response.prompt_feedback.block_reason
+                    except Exception:
+                        pass
+                    logger.warning(
+                        f"API error indicates safety block for chat {chat_id}. Reason: {feedback_reason}"
+                    )
+                    error_message = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: {feedback_reason})]"
+                elif "resource has been exhausted" in err_str or "429" in err_str:
+                    logger.warning(f"Quota/Rate limit hit for chat {chat_id}.")
+                    error_message = "[AI Error: API quota or rate limit exceeded. Please try again later.]"
+                elif "internal error" in err_str or "500" in str(e):
+                    logger.error(
+                        f"Internal server error from Gemini API for chat {chat_id}: {e}"
+                    )
+                    error_message = "[AI Error: The AI service encountered an internal error. Please try again later.]"
+
+                if streaming_enabled:
+                    yield error_message
+                    return
+                else:
+                    return error_message
+
+            except Exception as e:
+                logger.error(
+                    f"Unexpected error calling Gemini API for chat {chat_id} with model {model_to_use}: {e}",
+                    exc_info=True,
+                )
+                error_msg = f"[Unexpected AI Error: {type(e).__name__}]"
+                if streaming_enabled:
+                    yield error_msg
+                    return
+                else:
+                    return error_msg
+
+        finally:
+            # --- Clean up temporary files ---
+            # This block runs regardless of whether an exception occurred,
+            # but only after the try block is exited (either by return, yield, or exception).
+            # For a generator, this runs when the generator is exhausted or closed.
+            logger.info(
+                f"Executing finally block for chat {chat_id}. Cleaning up temp files."
+            )
+            if temp_files_to_clean:
+                logger.info(
+                    f"Cleaning up {len(temp_files_to_clean)} temporary files for chat {chat_id}..."
+                )
+                for temp_path in temp_files_to_clean:
+                    try:
+                        if os.path.exists(temp_path):
+                            os.remove(temp_path)
+                            logger.info(f"Removed temp file: {temp_path}")
+                        else:
+                            logger.info(
+                                f"Temp file not found, already removed? {temp_path}"
+                            )
+                    except OSError as e:
+                        logger.warning(f"Error removing temp file {temp_path}: {e}")
+            logger.info(
+                f"Finished executing finally block for chat {chat_id}."
+            )
+
+    except Exception as e:
+        # This outer catch block handles exceptions that occur *before* the inner try/finally
+        # or exceptions that escape the inner blocks.
+        logger.error(
+            f"generate_chat_response (outer catch): Unexpected error for chat {chat_id}: {type(e).__name__} - {e}",
+            exc_info=True,
+        )
+        error_msg = f"[Unexpected AI Service Error: {type(e).__name__}]"
+        if streaming_enabled:
+            yield error_msg
+            return # Stop generator
+        else:
+            return error_msg
 
 
 # --- Standalone Text Generation (Example) ---
