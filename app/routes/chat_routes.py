@@ -133,14 +133,35 @@ def send_message_route(chat_id):
                 full_reply = ""
                 try:
                     for chunk in assistant_response_generator: # Iterate the generator
-                        full_reply += chunk
-                        yield chunk # Yield to the Flask stream
+                        # *** FIX: Access the .text attribute of the chunk ***
+                        chunk_text = ""
+                        if hasattr(chunk, 'text'):
+                            chunk_text = chunk.text
+                            # Removed the debug log that iterated over the chunk,
+                            # keeping only the log for the extracted text.
+                            logger.debug(f"Streaming chunk text: {chunk_text}")
+                        elif hasattr(chunk, 'candidates') and chunk.candidates:
+                             # Log if a chunk has candidates but no text (might indicate issues)
+                             logger.debug(f"Streaming chunk has candidates but no text: {chunk}")
+                        elif hasattr(chunk, 'prompt_feedback'):
+                             # Log prompt feedback received during streaming
+                             logger.debug(f"Streaming chunk has prompt feedback: {chunk.prompt_feedback}")
+                             # Optionally yield a system message about feedback if needed
+                             # yield f"\n[System Note: Prompt feedback received: {chunk.prompt_feedback}]"
+                        else:
+                             logger.debug(f"Streaming chunk has no text, candidates, or feedback: {chunk}")
+
+
+                        full_reply += chunk_text
+                        yield chunk_text # Yield the text content to the Flask stream
+
                 except Exception as e:
                     # Log error during streaming
-                    logger.error(f"Error during streaming for chat {chat_id}: {e}", exc_info=True)
+                    logger.error(f"Error during streaming iteration for chat {chat_id}: {e}", exc_info=True)
                     # Yield an error message chunk to the client
-                    yield f"\n[Streaming Error: {e}]"
-                    full_reply += f"\n[Streaming Error: {e}]" # Append to full reply for saving
+                    error_chunk = f"\n[Streaming Error: {type(e).__name__}]"
+                    yield error_chunk
+                    full_reply += error_chunk # Append to full reply for saving
                 finally:
                     # Save the full accumulated reply to the database after streaming finishes or errors
                     if full_reply:
@@ -163,7 +184,19 @@ def send_message_route(chat_id):
             full_reply = ""
             try:
                 for chunk in assistant_response_generator: # Iterate the generator
-                    full_reply += chunk
+                    # *** FIX: Access the .text attribute of the chunk for non-streaming accumulation ***
+                    chunk_text = ""
+                    if hasattr(chunk, 'text'):
+                         chunk_text = chunk.text
+                    elif hasattr(chunk, 'candidates') and chunk.candidates:
+                         logger.debug(f"Non-streaming chunk has candidates but no text: {chunk}")
+                    elif hasattr(chunk, 'prompt_feedback'):
+                         logger.debug(f"Non-streaming chunk has prompt feedback: {chunk.prompt_feedback}")
+                    else:
+                         logger.debug(f"Non-streaming chunk has no text, candidates, or feedback: {chunk}")
+
+                    full_reply += chunk_text
+
             except Exception as e:
                  # Handle errors during non-streaming iteration
                  logger.error(f"Error during non-streaming iteration for chat {chat_id}: {e}", exc_info=True)
@@ -174,7 +207,7 @@ def send_message_route(chat_id):
             # Check if the reply indicates an internal error occurred
             # Use a default status code of 200 unless an error is detected
             status_code = 200
-            if isinstance(assistant_reply, str) and (assistant_reply.startswith("[Error:") or assistant_reply.startswith("[Unexpected AI Error:")):
+            if isinstance(assistant_reply, str) and (assistant_reply.startswith("[Error:") or assistant_reply.startswith("[Unexpected AI Error:") or assistant_reply.startswith("[CRITICAL Unexpected AI Service Error:")):
                 # Determine appropriate status code based on error message if possible
                 status_code = 500  # Default to internal server error for AI errors
                 if "not found" in assistant_reply.lower():
@@ -210,7 +243,7 @@ def send_message_route(chat_id):
             f"Unexpected error in send_message route for chat {chat_id}: {e}",
             exc_info=True,
         )
-        error_reply = f"[Unexpected Server Error in route: {e}]"
+        error_reply = f"[Unexpected Server Error in route: {type(e).__name__}]" # More specific error message
         # Attempt to save the unexpected error message
         if not db.add_message_to_db(chat_id, "assistant", error_reply):
              logger.warning(f"Failed to save unexpected route error message for chat {chat_id}.")
