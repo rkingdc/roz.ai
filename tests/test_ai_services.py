@@ -158,16 +158,15 @@ async def test_generate_summary_not_configured(app):
         assert result == "[Error: AI model not configured]"
 
 
-async def test_generate_summary_file_not_found(mock_db, app):
+async def test_generate_summary_file_not_found(mock_db, app, app_context):
     """Test generate_summary when file details are not found."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = None
-    with app.app_context():
-        result = await ai_services.generate_summary(1)
-        assert result == "[Error: File content not found]"
-        mock_db.get_file_details_from_db.assert_called_once_with(
-            1, include_content=True
-        )
+    result = await ai_services.generate_summary(1)
+    assert result == "[Error: File content not found]"
+    mock_db.get_file_details_from_db.assert_called_once_with(
+        1, include_content=True
+    )
 
 
 async def test_generate_summary_text_file(app, mock_genai, mock_db):
