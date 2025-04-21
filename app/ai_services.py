@@ -464,8 +464,8 @@ Search Query:"""
             # Query generation is NOT streamed
             response = client.models.generate_content(
                 model=model_name,
-                contents=prompt,  # Prompt is just text, passed directly
-                stream=False # Query generation is not streamed
+                contents=prompt,  # Simple text prompt
+                stream=False # Not streamed
             )
 
             # Check for blocked prompt before accessing text
@@ -584,11 +584,14 @@ def generate_chat_response(
     Uses the NEW google.genai library structure (client-based).
     Supports streaming responses if streaming_enabled is True.
     """
+    logger.debug(f"Entering generate_chat_response for chat {chat_id}. Streaming: {streaming_enabled}") # <-- Added this log
     client = get_gemini_client()
+    logger.debug(f"Client obtained in generate_chat_response: {client}") # <-- Added this log
     if not client:
         # Decorator should handle this and return/yield error message
         # If it somehow fails here, return/yield a generic error
         error_msg = "[Error: Failed to initialize AI client - Check Logs]"
+        logger.error(error_msg) # Log the error here too
         if streaming_enabled:
             yield error_msg
             return # Stop generator
@@ -621,6 +624,7 @@ def generate_chat_response(
             role = 'user' if msg['role'] == 'user' else 'model'
             history.append(Content(role=role, parts=[Part(text=msg["content"])]))
         logger.info(f"Fetched {len(history)} history turns for chat {chat_id}.")
+        logger.debug(f"History prepared for API: {history}") # <-- Added this log
 
         # Ensure history starts with 'user' role for the API
         # The API expects alternating user/model turns starting with user.
@@ -910,6 +914,8 @@ def generate_chat_response(
                     Part(text="[User provided no text, only attached files or context.]")
                 )
 
+        logger.debug(f"Current turn parts prepared for API: {current_turn_parts}") # <-- Added this log
+
         # --- Call Gemini API ---
         logger.info(
             f"Sending request to Gemini for chat {chat_id} with {len(history)} history turns and {len(current_turn_parts)} current parts. Streaming: {streaming_enabled}"
@@ -917,6 +923,7 @@ def generate_chat_response(
 
         try:
             chat_session = client.chats.create(model=model_to_use, history=history)
+            logger.debug(f"Chat session created: {chat_session}") # <-- Added this log
 
             response = chat_session.send_message(
                 message=current_turn_parts,
@@ -924,6 +931,7 @@ def generate_chat_response(
             )
 
             # --- Debugging Logs for Response ---
+            logger.debug(f"Gemini API raw response object: {response}") # <-- Added this log
             logger.debug(f"Gemini API response object type: {type(response)}")
             if hasattr(response, 'candidates'):
                  logger.debug(f"Response has {len(response.candidates)} candidates.")
