@@ -1,7 +1,8 @@
 # Makefile for the assistant project
 
 # Define variables
-PYTHON = ~/.venv/assistant/bin/python
+VENV_DIR = ~/.venv/assistant
+PYTHON = $(VENV_DIR)/bin/python
 LOG_FILE = roz.ai.log
 # Use single quotes for the pattern to avoid shell expansion issues within Make
 PROCESS_PATTERN = '/home/roz/.venv/assistant/bin/python -m uvicorn.*run:asgi_app'
@@ -12,13 +13,22 @@ RUN_CMD = $(PYTHON) -m uvicorn run:asgi_app --host 0.0.0.0 --port 8000 --timeout
 .PHONY: default
 default: help
 
+# Target to set up the virtual environment and install dependencies
+.PHONY: install
+install:
+	@echo "Setting up virtual environment and installing dependencies..."
+	@mkdir -p $(VENV_DIR)
+	@python3 -m venv $(VENV_DIR)
+	@$(PYTHON) -m pip install --upgrade pip
+	@$(PYTHON) -m pip install -r requirements.txt
+	@echo "Installation complete. Virtual environment created at $(VENV_DIR)."
+
 # Target to run tests
 .PHONY: test
-test:
+test: install
 	@echo "Running tests..."
 	$(PYTHON) -m pytest
 
-# Target to display help (optional)
 # Target to stop the application
 .PHONY: stop
 stop:
@@ -27,7 +37,7 @@ stop:
 
 # Target to start the application
 .PHONY: start
-start: stop
+start: stop install
 	@echo "Starting application..."
 	@sleep 1 # Give a moment for the old process to terminate
 	@echo "Logging to $(LOG_FILE) and stdout."
@@ -40,11 +50,12 @@ help:
 	@echo "Makefile for the AI Assistant Application"
 	@echo "----------------------------------------------------"
 	@echo "Available targets:"
+	@echo "  make install - Creates a virtual environment at $(VENV_DIR) and installs dependencies from requirements.txt."
 	@echo "  make start   - Stops any existing process and starts the application using uvicorn."
-	@echo "                 Logs output to $(LOG_FILE) and the console."
+	@echo "                 Logs output to $(LOG_FILE) and the console. Runs 'install' first."
 	@echo "  make stop    - Attempts to stop the running application process."
-	@echo "  make test    - Runs the pytest test suite."
+	@echo "  make test    - Runs the pytest test suite. Runs 'install' first."
 	@echo "  make help    - Displays this help message."
 	@echo "----------------------------------------------------"
 
-# Add other targets as needed (e.g., install, clean)
+# Add other targets as needed (e.g., clean)
