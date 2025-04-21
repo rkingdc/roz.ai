@@ -1300,7 +1300,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     savedChatsList.appendChild(listItem);
                 });
             }
-            updateActiveChatListItem();
+            // updateActiveChatListItem(); // REMOVED: Highlighting is now handled by loadChat
             updateStatus("Saved chats loaded.");
             console.log("[DEBUG] loadSavedChats finished successfully."); // Added log
         } catch (error) {
@@ -1325,8 +1325,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const newChat = await response.json();
-            await loadChat(newChat.id);
-            await loadSavedChats(); // loadSavedChats might re-throw, but loadChat's finally will run first
+            await loadChat(newChat.id); // loadChat sets currentChatId and calls updateActiveChatListItem
+            await loadSavedChats(); // loadSavedChats populates the list, but doesn't highlight anymore
             updateStatus(`New chat created (ID: ${newChat.id}).`);
             setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar');
 
@@ -1443,7 +1443,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Update chat list highlighting AFTER everything else is loaded/rendered
-            updateActiveChatListItem();
+            updateActiveChatListItem(); // <-- Keep this call here
             console.log(`[DEBUG] updateActiveChatListItem called for chat ${chatId}.`); // Added log
 
 
@@ -1744,6 +1744,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateActiveChatListItem() {
         console.log(`[DEBUG] updateActiveChatListItem called. currentChatId: ${currentChatId}`); // Added log
         const chatListItems = document.querySelectorAll('.chat-list-item');
+        console.log(`[DEBUG] Found ${chatListItems.length} chat list items.`); // Added log
 
         chatListItems.forEach(item => {
             const chatId = parseInt(item.dataset.chatId);
@@ -2028,10 +2029,11 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log("[DEBUG] Plugin UI visibility updated."); // Added log
             // Now update calendar status based on loaded context and plugin state
             updateCalendarStatus();
-            console.log("[DEBUG] Calendar status updated."); // Added log
+            console.log("[DEBUG] Calendar status updated.");
 
 
             console.log("[DEBUG] Calling loadSavedChats..."); // Added log
+            // loadSavedChats populates the list but no longer highlights
             await loadSavedChats(); // This will now re-throw if it fails
             console.log("[DEBUG] loadSavedChats completed."); // Added log
 
@@ -2042,10 +2044,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (firstChatElement) {
                 const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
                 console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`); // Added log
+                // loadChat sets currentChatId, loads history/files, and calls updateActiveChatListItem
                 await loadChat(mostRecentChatId); // This will now re-throw if it fails (including file loading)
                 console.log(`[DEBUG] loadChat(${mostRecentChatId}) completed.`); // Added log
             } else {
                 console.log("[DEBUG] No saved chats found, starting new chat."); // Added log
+                // startNewChat calls loadChat internally, which sets currentChatId, loads files, and calls updateActiveChatListItem
                 await startNewChat(); // This calls loadChat internally and will re-throw if it fails
                 console.log("[DEBUG] startNewChat completed."); // Added log
             }
@@ -2053,13 +2057,17 @@ document.addEventListener('DOMContentLoaded', () => {
             // After loadChat/startNewChat completes, currentChatId should be set
             console.log(`[DEBUG] initializeApp finished chat loading. Final currentChatId: ${currentChatId}`); // Added log
 
+            // REMOVED: updateActiveChatListItem is now called within loadChat
+            // console.log("[DEBUG] Calling updateActiveChatListItem after chat load.");
+            // updateActiveChatListItem(); // <-- REMOVED THIS LINE
+
             renderSelectedFiles(); // Render any initially selected files (though none on fresh load)
-            console.log("[DEBUG] Selected files rendered."); // Added log
+            console.log("[DEBUG] Selected files rendered.");
 
 
             // Final status update on successful initialization
             updateStatus("Application initialized.");
-            console.log("[DEBUG] initializeApp finished successfully."); // Added log
+            console.log("[DEBUG] initializeApp finished successfully.");
 
 
         } catch (error) {
@@ -2068,7 +2076,7 @@ document.addEventListener('DOMContentLoaded', () => {
             addMessage('system', `[Fatal Error during initialization: ${error.message}. Please check console for details.]`, true);
             // Update status bar with error
             updateStatus("Initialization failed.", true);
-            console.log("[DEBUG] initializeApp caught an error."); // Added log
+            console.log("[DEBUG] initializeApp caught an error.");
             // The finally block will now run because the error is caught here
         } finally {
             console.log("[DEBUG] initializeApp finally block entered."); // Added log
