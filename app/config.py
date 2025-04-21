@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 
 # Configure logging
-import logging        
+import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -18,9 +18,18 @@ class Config:
     DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true' # Enable debug mode via env var
 
     # Database
-    DB_NAME = os.environ.get('DATABASE_NAME', 'assistant_chat_v7.db')  # Database filename
     TEST_DATABASE = os.environ.get('TEST_DATABASE', 'FALSE').lower() == 'true'
-    DATABASE_URI = 'dev.db' if TEST_DATABASE else DB_NAME
+    # Use a temporary file path for the database if TEST_DATABASE is true
+    if TEST_DATABASE:
+        DB_NAME = '/tmp/assistant_dev_db.sqlite' # Use a fixed temporary file path
+        logger.info(f"Using temporary file database for development: {DB_NAME}")
+    else:
+        DB_NAME = os.environ.get('DATABASE_NAME', 'assistant_chat_v7.db')  # Default database filename
+
+    # DATABASE_URI is not strictly needed if DB_NAME holds the full path
+    # Keeping it for potential compatibility, but DB_NAME is the source of truth for sqlite3.connect
+    DATABASE_URI = DB_NAME
+
 
     # File Uploads (Using BLOB storage now, UPLOAD_FOLDER not needed)
     # Define allowed extensions for frontend validation and potential backend checks
