@@ -170,7 +170,7 @@ def test_configure_gemini_api_error(app, mock_genai):
 async def test_generate_summary_not_configured(app_context):
     """Test generate_summary when Gemini is not configured."""
     ai_services.gemini_configured = False
-    result = await ai_services.generate(summary(1))
+    result = await ai_services.generate_summary(1)
     assert result == "[Error: AI model not configured]"
 
 
@@ -178,7 +178,7 @@ async def test_generate_summary_file_not_found(app_context, mock_db):
     """Test generate_summary when file details are not found."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = None
-    result = await ai_services.generate(summary(1))
+    result = await ai_services.generate_summary(1)
     assert result == "[Error: File content not found]"
     mock_db.get_file_details_from_db.assert_called_once_with(1, include_content=True)
 
@@ -195,7 +195,7 @@ async def test_generate_summary_text_file(app_context, mock_genai, mock_db):
         "Text Summary"
     )
 
-    result = await ai_services.generate(summary(1))
+    result = await ai_services.generate_summary(1)
 
     assert result == "Text Summary"
     mock_db.get_file_details_from_db.assert_called_once_with(1, include_content=True)
@@ -223,7 +223,7 @@ async def test_generate_summary_image_file(
     mock_uploaded_file = MagicMock(uri="mock://image/uri")
     mock_genai.upload_file.return_value = mock_uploaded_file
 
-    result = await ai_services.generate(summary(1))
+    result = await ai_services.generate_summary(1)
 
     assert result == "Image Summary"
     mock_db.get_file_details_from_db.assert_called_once_with(1, include_content=True)
@@ -252,7 +252,7 @@ async def test_generate_summary_unsupported_type(app_context, mock_db):
         "mimetype": "application/zip",
         "content": b"zipdata",
     }
-    result = await ai_services.generate(summary(1))
+    result = await ai_services.generate_summary(1)
     assert result == "[Summary generation not supported for this file type]"
 
 
@@ -268,7 +268,7 @@ async def test_generate_summary_upload_error(
     }
     mock_genai.upload_file.side_effect = Exception("Upload Failed")
 
-    result = await ai_services.generate(summary(1))
+    result = await ai_services.generate_summary(1)
 
     assert result.startswith("[Error preparing file for summary: Upload Failed]")
     mock_tempfile["mock_ntf"].assert_called_once()
@@ -291,7 +291,7 @@ async def test_generate_summary_api_error(app_context, mock_genai, mock_db):
         "API Call Failed"
     )
 
-    result = await ai_services.generate(summary(1))
+    result = await ai_services.generate_summary(1)
     assert result == "[Error generating summary via API: API Call Failed]"
 
 
@@ -308,7 +308,7 @@ async def test_generate_summary_api_blocked(app_context, mock_genai, mock_db):
         "prompt was blocked due to safety"
     )
 
-    result = await ai_services.generate(summary(1))
+    result = await ai_services.generate_summary(1)
     assert result == "[Error: Summary generation blocked due to safety settings]"
 
 
