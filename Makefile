@@ -4,7 +4,7 @@
 PYTHON = ~/.venv/assistant/bin/python
 LOG_FILE = roz.ai.log
 # Use single quotes for the pattern to avoid shell expansion issues within Make
-PROCESS_PATTERN = '/home/roz/.venv/assistant/bin/python -m gunicorn.*run:app'
+PROCESS_PATTERN = 'icorn.*run'
 # Increase timeout to 120 seconds for potentially long AI operations
 GUNICORN_CMD = $(PYTHON) -m gunicorn --workers 3 --bind 0.0.0.0:8000 --timeout 120 run:app
 
@@ -23,7 +23,7 @@ test:
 .PHONY: stop
 stop:
 	@echo "Stopping application..."
-	@-pkill -f $(PROCESS_PATTERN) || echo "Ignoring pkill exit status. Check manually if process persists."
+	@-ps -aux | grep [a]ssistant | grep python | grep gunicorn  | awk "{print $2}" | xargs kill 2> /dev/null
 
 # Target to start the application
 .PHONY: start
