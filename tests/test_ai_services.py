@@ -284,7 +284,7 @@ async def test_generate_summary_api_error(app, mock_genai, mock_db, app_context)
         assert result == "[Error generating summary via API: API Call Failed]"
 
 
-async def test_generate_summary_api_blocked(app, mock_genai, mock_db):
+async def test_generate_summary_api_blocked(app, mock_genai, mock_db, app_context):
     """Test handling of API blocking errors during summary generation."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
