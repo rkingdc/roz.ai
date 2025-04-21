@@ -268,7 +268,7 @@ async def test_generate_summary_upload_error(app, mock_genai, mock_db, mock_temp
         )  # Ensure cleanup still happens
 
 
-async def test_generate_summary_api_error(app, mock_genai, mock_db):
+async def test_generate_summary_api_error(app, mock_genai, mock_db, app_context):
     """Test handling of API errors during summary generation."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
