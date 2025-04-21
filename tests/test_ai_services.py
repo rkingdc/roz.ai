@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import patch, MagicMock, mock_open, call
 import os
 import base64
+import unittest.mock # Need this import for the updated test_generate_search_query_success
 
 # Import the module to test AFTER potentially patching builtins if needed
 # For now, direct import is fine.
@@ -35,18 +36,6 @@ def app():
         }
     )
     return app
-
-
-@pytest.fixture
-def client(app):
-    """A test client for the app."""
-    return app.test_client()
-
-
-@pytest.fixture
-def runner(app):
-    """A test runner for the app's Click commands."""
-    return app.test_cli_runner()
 
 
 @pytest.fixture
@@ -151,14 +140,16 @@ def test_configure_gemini_api_error(app, mock_genai):
 
 
 # == Test generate_summary ==
+@pytest.mark.asyncio
 async def test_generate_summary_not_configured(app):
     """Test generate_summary when Gemini is not configured."""
     ai_services.gemini_configured = False
-    with app.contex():
+    with app.app_context(): # Corrected from app.contex()
         result = await ai_services.generate_summary(1)
         assert result == "[Error: AI model not configured]"
 
 
+@pytest.mark.asyncio
 async def test_generate_summary_file_not_found(mock_db, app, app_context):
     """Test generate_summary when file details are not found."""
     ai_services.gemini_configured = True
@@ -170,6 +161,7 @@ async def test_generate_summary_file_not_found(mock_db, app, app_context):
     )
 
 
+@pytest.mark.asyncio
 async def test_generate_summary_text_file(app, mock_genai, mock_db, app_context):
     """Test summary generation for a text file."""
     ai_services.gemini_configured = True
@@ -196,6 +188,7 @@ async def test_generate_summary_text_file(app, mock_genai, mock_db, app_context)
         mock_genai.upload_file.assert_not_called()  # Should not upload for text
 
 
+@pytest.mark.asyncio
 async def test_generate_summary_image_file(app, mock_genai, mock_db, mock_tempfile, app_context):
     """Test summary generation for an image file (requires upload)."""
     ai_services.gemini_configured = True
@@ -235,6 +228,7 @@ async def test_generate_summary_image_file(app, mock_genai, mock_db, mock_tempfi
         )  # Check temp file removed
 
 
+@pytest.mark.asyncio
 async def test_generate_summary_unsupported_type(app, mock_db, app_context):
     """Test summary generation for an unsupported file type."""
     ai_services.gemini_configured = True
@@ -248,6 +242,7 @@ async def test_generate_summary_unsupported_type(app, mock_db, app_context):
         assert result == "[Summary generation not supported for this file type]"
 
 
+@pytest.mark.asyncio
 async def test_generate_summary_upload_error(app, mock_genai, mock_db, mock_tempfile, app_context):
     """Test handling of errors during file upload for summary."""
     ai_services.gemini_configured = True
@@ -269,6 +264,7 @@ async def test_generate_summary_upload_error(app, mock_genai, mock_db, mock_temp
         )  # Ensure cleanup still happens
 
 
+@pytest.mark.asyncio
 async def test_generate_summary_api_error(app, mock_genai, mock_db, app_context):
     """Test handling of API errors during summary generation."""
     ai_services.gemini_configured = True
@@ -285,6 +281,7 @@ async def test_generate_summary_api_error(app, mock_genai, mock_db, app_context)
         assert result == "[Error generating summary via API: API Call Failed]"
 
 
+@pytest.mark.asyncio
 async def test_generate_summary_api_blocked(app, mock_genai, mock_db, app_context):
     """Test handling of API blocking errors during summary generation."""
     ai_services.gemini_configured = True
@@ -304,6 +301,7 @@ async def test_generate_summary_api_blocked(app, mock_genai, mock_db, app_contex
 
 
 # == Test get_or_generate_summary ==
+@pytest.mark.asyncio
 async def test_get_or_generate_summary_exists(app, mock_db, mock_genai, app_context):
     """Test retrieving an existing valid summary."""
     ai_services.gemini_configured = True  # Needed if generation fallback occurs
@@ -325,6 +323,7 @@ async def test_get_or_generate_summary_exists(app, mock_db, mock_genai, app_cont
         mock_db.save_summary_in_db.assert_not_called()  # Should not save
 
 
+@pytest.mark.asyncio
 async def test_get_or_generate_summary_generate_new(app, mock_db, mock_genai, app_context):
     """Test generating a new summary when none exists."""
     ai_services.gemini_configured = True
@@ -364,6 +363,7 @@ async def test_get_or_generate_summary_generate_new(app, mock_db, mock_genai, ap
         )  # Saved the new summary
 
 
+@pytest.mark.asyncio
 async def test_get_or_generate_summary_generate_new_save_fails(
     app, mock_db, mock_genai, app_context
 ):
@@ -399,6 +399,7 @@ async def test_get_or_generate_summary_generate_new_save_fails(
         mock_db.save_summary_in_db.assert_called_once_with(1, "Generated But Not Saved")
 
 
+@pytest.mark.asyncio
 async def test_get_or_generate_summary_file_not_found(app, mock_db, app_context):
     """Test get_or_generate_summary when file details are not found initially."""
     mock_db.get_file_details_from_db.return_value = None
@@ -408,6 +409,7 @@ async def test_get_or_generate_summary_file_not_found(app, mock_db, app_context)
 
 
 # == Test generate_search_query ==
+@pytest.mark.asyncio
 async def test_generate_search_query_success(app, mock_genai):
     """Test successful generation of a search query."""
     ai_services.gemini_configured = True
@@ -444,6 +446,7 @@ async def test_generate_search_query_success(app, mock_genai):
         # assert isinstance(gen_config_arg, genai.types.GenerationConfig)
 
 
+@pytest.mark.asyncio
 async def test_generate_search_query_cleaning(app_context, mock_genai):
     """Test cleaning of LLM output for search query."""
     ai_services.gemini_configured = True
@@ -477,6 +480,7 @@ async def test_generate_search_query_cleaning(app_context, mock_genai):
         assert result == expected_results[i], f"Failed on case: {messy_output}"
 
 
+@pytest.mark.asyncio
 async def test_generate_search_query_not_configured(app_context):
     """Test generate_search_query when not configured."""
     ai_services.gemini_configured = False
@@ -484,6 +488,7 @@ async def test_generate_search_query_not_configured(app_context):
     assert result is None
 
 
+@pytest.mark.asyncio
 async def test_generate_search_query_empty_message(app_context):
     """Test generate_search_query with an empty user message."""
     ai_services.gemini_configured = True
@@ -493,6 +498,7 @@ async def test_generate_search_query_empty_message(app_context):
     assert result is None
 
 
+@pytest.mark.asyncio
 async def test_generate_search_query_api_error(app_context, mock_genai):
     """Test generate_search_query handling API errors."""
     ai_services.gemini_configured = True
@@ -505,6 +511,7 @@ async def test_generate_search_query_api_error(app_context, mock_genai):
     assert mock_genai.GenerativeModel.return_value.generate_content.call_count == 2
 
 
+@pytest.mark.asyncio
 async def test_generate_search_query_blocked(app_context, mock_genai):
     """Test generate_search_query when the prompt is blocked."""
     ai_services.gemini_configured = True
@@ -522,6 +529,7 @@ async def test_generate_search_query_blocked(app_context, mock_genai):
     assert mock_genai.GenerativeModel.return_value.generate_content.call_count == 1
 
 
+@pytest.mark.asyncio
 async def test_generate_search_query_empty_response(app_context, mock_genai):
     """Test generate_search_query when the LLM returns an empty string."""
     ai_services.gemini_configured = True
@@ -550,6 +558,7 @@ def create_mock_session_file(
     }
 
 
+@pytest.mark.asyncio
 async def test_generate_chat_response_not_configured(app_context):
     """Test chat response when Gemini is not configured."""
     ai_services.gemini_configured = False
@@ -557,6 +566,7 @@ async def test_generate_chat_response_not_configured(app_context):
     assert result == "[Error: Gemini API Key not configured]"
 
 
+@pytest.mark.asyncio
 async def test_generate_chat_response_chat_not_found(app_context, mock_db):
     """Test chat response when chat details are not found."""
     ai_services.gemini_configured = True
@@ -566,6 +576,7 @@ async def test_generate_chat_response_chat_not_found(app_context, mock_db):
     mock_db.get_chat_details_from_db.assert_called_once_with(99)
 
 
+@pytest.mark.asyncio
 async def test_generate_chat_response_basic(app_context, mock_genai, mock_db):
     """Test basic chat response generation."""
     ai_services.gemini_configured = True
@@ -610,6 +621,7 @@ async def test_generate_chat_response_basic(app_context, mock_genai, mock_db):
     assert generate_call.call_args[1]["request_options"] == {"timeout": 10}
 
 
+@pytest.mark.asyncio
 async def test_generate_chat_response_with_calendar(app_context, mock_genai, mock_db):
     """Test chat response with calendar context."""
     ai_services.gemini_configured = True
@@ -652,6 +664,7 @@ async def test_generate_chat_response_with_calendar(app_context, mock_genai, moc
     assert generate_call.call_args[0][0] == expected_gemini_context
 
 
+@pytest.mark.asyncio
 async def test_generate_chat_response_with_session_file(
     app_context, mock_genai, mock_db, mock_tempfile
 ):
@@ -709,6 +722,7 @@ async def test_generate_chat_response_with_session_file(
     )  # Check cleanup
 
 
+@pytest.mark.asyncio
 async def test_generate_chat_response_with_permanent_file_full(
     app_context, mock_genai, mock_db, mock_tempfile
 ):
@@ -774,6 +788,7 @@ async def test_generate_chat_response_with_permanent_file_full(
     )  # Check cleanup
 
 
+@pytest.mark.asyncio
 async def test_generate_chat_response_with_permanent_file_summary(
     app_context, mock_genai, mock_db
 ):
@@ -841,6 +856,7 @@ async def test_generate_chat_response_with_permanent_file_summary(
     )  # Keep any_order=False as the order matters here
 
 
+@pytest.mark.asyncio
 async def test_generate_chat_response_with_web_search(
     app_context, mock_genai, mock_db, mock_web_search
 ):
@@ -894,6 +910,7 @@ async def test_generate_chat_response_with_web_search(
     assert chat_generate_call[0][0] == expected_gemini_context
 
 
+@pytest.mark.asyncio
 async def test_generate_chat_response_web_search_fails(
     app_context, mock_genai, mock_db, mock_web_search
 ):
@@ -944,6 +961,7 @@ async def test_generate_chat_response_web_search_fails(
     assert chat_generate_call[0][0] == expected_gemini_context
 
 
+@pytest.mark.asyncio
 async def test_generate_chat_response_api_error(app_context, mock_genai, mock_db):
     """Test handling of API errors during chat response generation."""
     ai_services.gemini_configured = True
@@ -974,6 +992,3 @@ async def test_generate_chat_response_api_error(app_context, mock_genai, mock_db
 # Add more tests for specific error types (429, blocked, timeout, etc.) if needed
 # Add tests for file processing errors within generate_chat_response
 # Add tests for model fallback logic
-
-# Need this import for the updated test_generate_search_query_success
-import unittest.mock
