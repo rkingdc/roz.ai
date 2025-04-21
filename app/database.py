@@ -1,5 +1,5 @@
 # Configure logging
-import logging        
+import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,7 @@ def init_db():
     logger.info(f"Initializing database schema for {current_app.config['DB_NAME']}...")
 
     cursor.execute("DROP TABLE IF EXISTS messages")
-    cursor.execute("DROP TABLE IF EXISTS uploaded_files")
+    cursor.execute("DROP TABLE IF EXISTS files") # Changed from uploaded_files
     cursor.execute("DROP TABLE IF EXISTS chats")
     logger.info("Dropped existing tables (if any).")
 
@@ -76,9 +76,9 @@ def init_db():
     cursor.execute('CREATE INDEX idx_messages_chat_id ON messages (chat_id)')
     logger.info("Created 'messages' table and index.")
 
-    # Create uploaded_files table (with BLOB)
+    # Create files table (with BLOB) - Changed from uploaded_files
     cursor.execute('''
-        CREATE TABLE uploaded_files (
+        CREATE TABLE files (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             filename TEXT NOT NULL,
             content BLOB NOT NULL,
@@ -88,8 +88,8 @@ def init_db():
             uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    cursor.execute('CREATE INDEX idx_files_filename ON uploaded_files (filename)')
-    logger.info("Created 'uploaded_files' table and index.")
+    cursor.execute('CREATE INDEX idx_files_filename ON files (filename)') # Changed from uploaded_files
+    logger.info("Created 'files' table and index.") # Changed from uploaded_files
 
     db.commit()
     logger.info("Database schema initialized successfully.")
@@ -239,7 +239,7 @@ def save_file_record_to_db(filename, content_blob, mimetype, filesize):
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("INSERT INTO uploaded_files (filename, content, mimetype, filesize, summary) VALUES (?, ?, ?, ?, NULL)",
+        cursor.execute("INSERT INTO files (filename, content, mimetype, filesize, summary) VALUES (?, ?, ?, ?, NULL)", # Changed from uploaded_files
                        (filename, content_blob, mimetype, filesize))
         db.commit()
         file_id = cursor.lastrowid
@@ -254,7 +254,7 @@ def get_uploaded_files_from_db():
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute(" SELECT id, filename, mimetype, filesize, uploaded_at, (summary IS NOT NULL) as has_summary FROM uploaded_files ORDER BY uploaded_at DESC ")
+        cursor.execute(" SELECT id, filename, mimetype, filesize, uploaded_at, (summary IS NOT NULL) as has_summary FROM files ORDER BY uploaded_at DESC ") # Changed from uploaded_files
         files = cursor.fetchall()
         return [dict(row) for row in files]
     except sqlite3.Error as e:
@@ -269,7 +269,7 @@ def get_file_details_from_db(file_id, include_content=False):
         columns = "id, filename, mimetype, filesize, summary, (summary IS NOT NULL) as has_summary"
         if include_content:
             columns += ", content"
-        cursor.execute(f"SELECT {columns} FROM uploaded_files WHERE id = ?", (file_id,))
+        cursor.execute(f"SELECT {columns} FROM files WHERE id = ?", (file_id,)) # Changed from uploaded_files
         file_data = cursor.fetchone()
         return dict(file_data) if file_data else None
     except sqlite3.Error as e:
@@ -281,7 +281,7 @@ def get_summary_from_db(file_id):
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("SELECT summary FROM uploaded_files WHERE id = ?", (file_id,))
+        cursor.execute("SELECT summary FROM files WHERE id = ?", (file_id,)) # Changed from uploaded_files
         result = cursor.fetchone()
         return result['summary'] if result and result['summary'] else None
     except sqlite3.Error as e:
@@ -293,7 +293,7 @@ def save_summary_in_db(file_id, summary):
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("UPDATE uploaded_files SET summary = ? WHERE id = ?", (summary, file_id))
+        cursor.execute("UPDATE files SET summary = ? WHERE id = ?", (summary, file_id)) # Changed from uploaded_files
         db.commit()
         logger.info(f"Saved summary for file ID: {file_id}")
         return True
@@ -306,7 +306,7 @@ def delete_file_record_from_db(file_id):
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("DELETE FROM uploaded_files WHERE id = ?", (file_id,))
+        cursor.execute("DELETE FROM files WHERE id = ?", (file_id,)) # Changed from uploaded_files
         deleted_count = cursor.rowcount # Check how many rows were affected
         db.commit()
         if deleted_count > 0:
@@ -318,4 +318,3 @@ def delete_file_record_from_db(file_id):
     except sqlite3.Error as e:
         logger.info(f"Database error deleting file record {file_id}: {e}")
         return False
-
