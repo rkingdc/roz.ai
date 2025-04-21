@@ -1,1 +1,13 @@
-@$(PYTHON) -m pip install -r requirements.txt
+Flask
+uvicorn
+python-dotenv
+pytest
+pytest-asyncio
+google-generativeai
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+requests
+beautifulsoup4
+click
+gunicorn # Often used in production, good to include
