@@ -2,9 +2,8 @@
 import os
 from dotenv import load_dotenv
 
-# Configure logging
+# Configure logging - Removed basicConfig here
 import logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file if it exists
@@ -15,7 +14,14 @@ class Config:
 
     # General Config
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'a-default-secret-key-for-dev' # Change in production!
-    DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true' # Enable debug mode via env var
+    # DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true' # Enable debug mode via env var
+    # Let Flask's --debug flag control debug mode when using flask run
+    # Keep this setting for other contexts if needed, but it's less critical with --debug
+    # For consistency, let's rely on the FLASK_DEBUG env var or the --debug flag.
+    # If you want DEBUG=True always in dev, keep this line. If you want --debug to control it, remove it.
+    # Let's keep it for now, as it's harmless when --debug is also used.
+    DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+
 
     # Database
     TEST_DATABASE = os.environ.get('TEST_DATABASE', 'FALSE').lower() == 'true' # Keep this flag separate for other logic
