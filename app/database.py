@@ -21,9 +21,11 @@ def get_db():
     if 'db' not in g:
         try:
             db_name = current_app.config['DB_NAME']
+            # Use uri=True to allow file: URIs for absolute paths
             g.db = sqlite3.connect(
                 db_name,
-                detect_types=sqlite3.PARSE_DECLTYPES
+                detect_types=sqlite3.PARSE_DECLTYPES,
+                uri=True # Added uri=True
             )
             g.db.row_factory = sqlite3.Row
             logger.info(f"Database connection opened: {db_name} in process {os.getpid()}")
@@ -44,12 +46,14 @@ def get_db():
                         logger.info(f"In-memory database '{db_name}' is empty in process {os.getpid()}. Applying schema...")
                         # Execute the schema creation SQL directly using executescript
                         schema_sql = f'''
+                            PRAGMA foreign_keys = ON; -- Ensure foreign keys are enforced
+
                             CREATE TABLE IF NOT EXISTS chats (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 name TEXT NOT NULL,
                                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                                 last_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                model_name TEXT DEFAULT '{current_app.config["DEFAULT_MODEL"]}'
+                                model_name TEXT DEFAULT '{current_app.config.get("DEFAULT_MODEL", "gemini-pro")}'
                             );
 
                             CREATE TABLE IF NOT EXISTS messages (
@@ -78,17 +82,20 @@ def get_db():
                         g.db.commit()
                         logger.info(f"Schema applied to in-memory database in process {os.getpid()}.")
                 except sqlite3.Error as schema_e:
-                     logger.error(f"Error applying schema to in-memory database in process {os.getpid()}: {schema_e}")
+                     logger.error(f"Error applying schema to in-memory database in process {os.getpid()}: {schema_e}", exc_info=True)
                      # Depending on desired behavior, you might want to raise here
                      # or handle it differently. For now, log and let the original
                      # error (if any) propagate.
 
-            # --- End Schema Initialization for In-Memory DB ---
+            # Ensure foreign keys are enabled for this connection
+            g.db.execute("PRAGMA foreign_keys = ON;")
 
 
         except sqlite3.Error as e:
-            logger.info(f"Error connecting to database '{current_app.config['DB_NAME']}' in process {os.getpid()}: {e}")
+            logger.error(f"Error connecting to database '{current_app.config['DB_NAME']}' in process {os.getpid()}: {e}", exc_info=True)
             raise # Re-raise the error after logging
+    else:
+        logger.debug(f"Using existing database connection for '{current_app.config['DB_NAME']}' in process {os.getpid()}")
     return g.db
 
 def close_db(e=None):
@@ -109,55 +116,62 @@ def init_db():
     db_name = current_app.config['DB_NAME']
     logger.info(f"Initializing database schema for {db_name}...")
 
-    # Drop tables (safe for :memory: or file db init)
-    cursor.execute("DROP TABLE IF EXISTS messages")
-    cursor.execute("DROP TABLE IF EXISTS files")
-    cursor.execute("DROP TABLE IF EXISTS chats")
-    logger.info("Dropped existing tables (if any).")
+    try:
+        # Drop tables (safe for :memory: or file db init)
+        cursor.execute("DROP TABLE IF EXISTS messages")
+        cursor.execute("DROP TABLE IF EXISTS files")
+        cursor.execute("DROP TABLE IF EXISTS chats")
+        logger.info("Dropped existing tables (if any).")
 
-    # Create chats table - Added IF NOT EXISTS
-    cursor.execute(f'''
-        CREATE TABLE IF NOT EXISTS chats (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            last_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            model_name TEXT DEFAULT '{current_app.config["DEFAULT_MODEL"]}'
-        )
-    ''')
-    logger.info("Created 'chats' table.")
+        # Ensure foreign keys are enforced during schema creation
+        cursor.execute("PRAGMA foreign_keys = ON;")
 
-    # Create messages table - Added IF NOT EXISTS
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            chat_id INTEGER NOT NULL,
-            role TEXT NOT NULL,
-            content TEXT NOT NULL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
-        )
-    ''')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id)') # Added IF NOT EXISTS
-    logger.info("Created 'messages' table and index.")
+        # Create chats table - Added IF NOT EXISTS
+        cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS chats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                model_name TEXT DEFAULT '{current_app.config.get("DEFAULT_MODEL", "gemini-pro")}'
+            )
+        ''')
+        logger.info("Created 'chats' table.")
 
-    # Create files table (with BLOB) - Added IF NOT EXISTS
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS files (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            filename TEXT NOT NULL,
-            content BLOB NOT NULL,
-            mimetype TEXT NOT NULL,
-            filesize INTEGER NOT NULL,
-            summary TEXT,
-            uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    cursor.execute('CREATE INDEX IF NOT EXISTS idx_files_filename ON files (filename)') # Added IF NOT EXISTS
-    logger.info("Created 'files' table and index.")
+        # Create messages table - Added IF NOT EXISTS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id)') # Added IF NOT EXISTS
+        logger.info("Created 'messages' table and index.")
 
-    db.commit()
-    logger.info("Database schema initialized successfully.")
+        # Create files table (with BLOB) - Added IF NOT EXISTS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS files (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                content BLOB NOT NULL,
+                mimetype TEXT NOT NULL,
+                filesize INTEGER NOT NULL,
+                summary TEXT,
+                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_files_filename ON files (filename)') # Added IF NOT EXISTS
+        logger.info("Created 'files' table and index.")
+
+        db.commit()
+        logger.info("Database schema initialized successfully.")
+    except sqlite3.Error as e:
+        logger.error(f"Error during database schema initialization for {db_name}: {e}", exc_info=True)
+        raise # Re-raise the error
 
 
 # --- CLI Command for DB Initialization ---
@@ -187,23 +201,22 @@ def create_new_chat_entry():
     # Format: Fri Apr 18, 03:27 PM (example)
     formatted_time = now.strftime("%a %b %d, %I:%M %p")
     default_chat_name = f"Chat on {formatted_time}"
-    default_model = current_app.config['DEFAULT_MODEL']
+    default_model = current_app.config.get('DEFAULT_MODEL', 'gemini-pro') # Use .get with default
 
-    # Insert explicit name along with other defaults/values
-    cursor.execute("INSERT INTO chats (name, created_at, last_updated_at, model_name) VALUES (?, ?, ?, ?)",
-                   (default_chat_name, now, now, default_model))
-    db.commit()
-    new_chat_id = cursor.lastrowid
-    logger.info(f"Created new chat with ID: {new_chat_id}, Name: '{default_chat_name}', Model: {default_model}")
-    return new_chat_id
+    try:
+        logger.debug(f"Attempting to create new chat entry...")
+        # Insert explicit name along with other defaults/values
+        cursor.execute("INSERT INTO chats (name, created_at, last_updated_at, model_name) VALUES (?, ?, ?, ?)",
+                       (default_chat_name, now, now, default_model))
+        new_chat_id = cursor.lastrowid
+        db.commit()
+        logger.info(f"Successfully created new chat with ID: {new_chat_id}, Name: '{default_chat_name}', Model: {default_model}")
+        return new_chat_id
+    except sqlite3.Error as e:
+        logger.error(f"Database error creating new chat entry: {e}", exc_info=True)
+        # No commit needed on error, transaction is rolled back by default
+        return None # Indicate failure
 
-def update_chat_timestamp(chat_id):
-    """Updates the last_updated_at timestamp for a given chat."""
-    db = get_db()
-    cursor = db.cursor()
-    now = datetime.now()
-    cursor.execute("UPDATE chats SET last_updated_at = ? WHERE id = ?", (now, chat_id))
-    db.commit()
 
 def get_chat_details_from_db(chat_id):
     """Retrieves details (including model_name) for a specific chat_id."""
@@ -214,7 +227,7 @@ def get_chat_details_from_db(chat_id):
         chat_details = cursor.fetchone()
         return dict(chat_details) if chat_details else None
     except sqlite3.Error as e:
-        logger.info(f"Database error getting details for chat {chat_id}: {e}")
+        logger.error(f"Database error getting details for chat {chat_id}: {e}", exc_info=True)
         return None
 
 def get_saved_chats_from_db():
@@ -226,7 +239,7 @@ def get_saved_chats_from_db():
         chats = cursor.fetchall()
         return [dict(row) for row in chats]
     except sqlite3.Error as e:
-        logger.info(f"Database error getting saved chats: {e}")
+        logger.error(f"Database error getting saved chats: {e}", exc_info=True)
         return []
 
 def save_chat_name_in_db(chat_id, name):
@@ -236,12 +249,13 @@ def save_chat_name_in_db(chat_id, name):
         cursor = db.cursor()
         # Ensure name is not empty, fallback if necessary (though UI might prevent empty)
         effective_name = name.strip() if name and name.strip() else f"Chat {chat_id}" # Fallback if empty
+        logger.debug(f"Attempting to save name for chat {chat_id} to '{effective_name}'...")
         cursor.execute("UPDATE chats SET name = ?, last_updated_at = ? WHERE id = ?", (effective_name, datetime.now(), chat_id))
         db.commit()
-        logger.info(f"Updated name for chat {chat_id} to '{effective_name}'")
+        logger.info(f"Successfully updated name for chat {chat_id} to '{effective_name}'")
         return True
     except sqlite3.Error as e:
-        logger.info(f"Database error saving chat name for {chat_id}: {e}")
+        logger.error(f"Database error saving chat name for {chat_id}: {e}", exc_info=True)
         return False
 
 def update_chat_model(chat_id, model_name):
@@ -249,13 +263,14 @@ def update_chat_model(chat_id, model_name):
     try:
         db = get_db()
         cursor = db.cursor()
+        logger.debug(f"Attempting to update model for chat {chat_id} to '{model_name}'...")
         cursor.execute("UPDATE chats SET model_name = ?, last_updated_at = ? WHERE id = ?",
                        (model_name, datetime.now(), chat_id))
         db.commit()
-        logger.info(f"Updated model for chat {chat_id} to '{model_name}'")
+        logger.info(f"Successfully updated model for chat {chat_id} to '{model_name}'")
         return True
     except sqlite3.Error as e:
-        logger.info(f"Database error updating model for chat {chat_id}: {e}")
+        logger.error(f"Database error updating model for chat {chat_id}: {e}", exc_info=True)
         return False
 
 def delete_chat_from_db(chat_id):
@@ -263,40 +278,65 @@ def delete_chat_from_db(chat_id):
     try:
         db = get_db()
         cursor = db.cursor()
+        logger.debug(f"Attempting to delete chat with ID: {chat_id}...")
         cursor.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
+        deleted_count = cursor.rowcount # Check how many rows were affected
         db.commit()
-        logger.info(f"Deleted chat with ID: {chat_id}")
-        return True
+        if deleted_count > 0:
+            logger.info(f"Successfully deleted chat with ID: {chat_id}")
+            return True
+        else:
+            logger.warning(f"No chat record found with ID: {chat_id} to delete.")
+            return False # Indicate chat not found
     except sqlite3.Error as e:
-        logger.info(f"Database error deleting chat {chat_id}: {e}")
-        return False
+        logger.error(f"Database error deleting chat {chat_id}: {e}", exc_info=True)
+        return False # Indicate failure
 
 # Messages
 def add_message_to_db(chat_id, role, content):
-    """Adds a message to the messages table for a specific chat."""
+    """Adds a message to the messages table for a specific chat and updates chat timestamp."""
+    logger.debug(f"--> Entering add_message_to_db for chat {chat_id}, role '{role}'.") # Added log
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)",
-                       (chat_id, role, content))
+        now = datetime.now()
+
+        logger.debug(f"Attempting to add '{role}' message to chat {chat_id} and update timestamp...")
+
+        # Insert the message
+        logger.debug(f"Executing INSERT into messages for chat {chat_id}, role '{role}'.")
+        cursor.execute("INSERT INTO messages (chat_id, role, content, timestamp) VALUES (?, ?, ?, ?)",
+                       (chat_id, role, content, now))
+        logger.debug(f"Message INSERT executed successfully for chat {chat_id}.")
+
+        # Update the chat timestamp in the same transaction
+        logger.debug(f"Executing UPDATE chats timestamp for chat {chat_id}.")
+        cursor.execute("UPDATE chats SET last_updated_at = ? WHERE id = ?", (now, chat_id))
+        logger.debug(f"Chat timestamp UPDATE executed successfully for chat {chat_id}.")
+
+        # Commit both operations
+        logger.debug(f"Attempting to commit transaction for chat {chat_id}.")
         db.commit()
-        update_chat_timestamp(chat_id)
+        logger.info(f"Successfully added '{role}' message to chat {chat_id} and updated timestamp.")
         return True
     except sqlite3.Error as e:
-        logger.info(f"Database error adding message: {e}")
-        return False
+        # Rollback the transaction on error (automatic with default BEGIN DEFERRED)
+        # db.rollback() # Explicit rollback is good practice even with default
+        logger.error(f"Database error adding message to chat {chat_id}: {e}", exc_info=True)
+        return False # Indicate failure
 
 def get_chat_history_from_db(chat_id, limit=100):
     """Retrieves messages for a specific chat_id."""
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("SELECT role, content, timestamp FROM messages WHERE chat_id = ? AND role <> 'assistant' ORDER BY timestamp ASC LIMIT ?",
+        # Include 'assistant' role messages now, as they are part of the history
+        cursor.execute("SELECT role, content, timestamp FROM messages WHERE chat_id = ? ORDER BY timestamp ASC LIMIT ?",
                        (chat_id, limit))
         history = cursor.fetchall()
         return [dict(row) for row in history]
     except sqlite3.Error as e:
-        logger.info(f"Database error getting history for chat {chat_id}: {e}")
+        logger.error(f"Database error getting history for chat {chat_id}: {e}", exc_info=True)
         return []
 
 # Files
@@ -305,15 +345,16 @@ def save_file_record_to_db(filename, content_blob, mimetype, filesize):
     try:
         db = get_db()
         cursor = db.cursor()
+        logger.debug(f"Attempting to save file record for '{filename}'...")
         cursor.execute("INSERT INTO files (filename, content, mimetype, filesize, summary) VALUES (?, ?, ?, ?, NULL)",
                        (filename, content_blob, mimetype, filesize))
-        db.commit()
         file_id = cursor.lastrowid
-        logger.info(f"Saved file record & BLOB: ID {file_id}, Name '{filename}', Type '{mimetype}', Size {filesize}")
+        db.commit()
+        logger.info(f"Successfully saved file record & BLOB: ID {file_id}, Name '{filename}', Type '{mimetype}', Size {filesize}")
         return file_id
     except sqlite3.Error as e:
-        logger.info(f"Database error saving file record/BLOB for '{filename}': {e}")
-        return None
+        logger.error(f"Database error saving file record/BLOB for '{filename}': {e}", exc_info=True)
+        return None # Indicate failure
 
 def get_uploaded_files_from_db():
     """Retrieves metadata for all uploaded files (excluding BLOB)."""
@@ -324,7 +365,7 @@ def get_uploaded_files_from_db():
         files = cursor.fetchall()
         return [dict(row) for row in files]
     except sqlite3.Error as e:
-        logger.info(f"Database error getting file list: {e}")
+        logger.error(f"Database error getting file list: {e}", exc_info=True)
         return []
 
 def get_file_details_from_db(file_id, include_content=False):
@@ -339,7 +380,7 @@ def get_file_details_from_db(file_id, include_content=False):
         file_data = cursor.fetchone()
         return dict(file_data) if file_data else None
     except sqlite3.Error as e:
-        logger.info(f"Database error getting details for file {file_id}: {e}")
+        logger.error(f"Database error getting details for file {file_id}: {e}", exc_info=True)
         return None
 
 def get_summary_from_db(file_id):
@@ -351,7 +392,7 @@ def get_summary_from_db(file_id):
         result = cursor.fetchone()
         return result['summary'] if result and result['summary'] else None
     except sqlite3.Error as e:
-        logger.info(f"Database error getting summary for file {file_id}: {e}")
+        logger.error(f"Database error getting summary for file {file_id}: {e}", exc_info=True)
         return None
 
 def save_summary_in_db(file_id, summary):
@@ -359,28 +400,30 @@ def save_summary_in_db(file_id, summary):
     try:
         db = get_db()
         cursor = db.cursor()
+        logger.debug(f"Attempting to save summary for file ID: {file_id}...")
         cursor.execute("UPDATE files SET summary = ? WHERE id = ?", (summary, file_id))
         db.commit()
-        logger.info(f"Saved summary for file ID: {file_id}")
+        logger.info(f"Successfully saved summary for file ID: {file_id}")
         return True
     except sqlite3.Error as e:
-        logger.info(f"Database error saving summary for file {file_id}: {e}")
-        return False
+        logger.error(f"Database error saving summary for file {file_id}: {e}", exc_info=True)
+        return False # Indicate failure
 
 def delete_file_record_from_db(file_id):
     """Deletes a file record (and its BLOB) from the database."""
     try:
         db = get_db()
         cursor = db.cursor()
+        logger.debug(f"Attempting to delete file record with ID: {file_id}...")
         cursor.execute("DELETE FROM files WHERE id = ?", (file_id,))
         deleted_count = cursor.rowcount # Check how many rows were affected
         db.commit()
         if deleted_count > 0:
-            logger.info(f"Deleted file record with ID: {file_id}")
+            logger.info(f"Successfully deleted file record with ID: {file_id}")
             return True
         else:
-            logger.info(f"No file record found with ID: {file_id} to delete.")
+            logger.warning(f"No file record found with ID: {file_id} to delete.")
             return False # Indicate file not found
     except sqlite3.Error as e:
-        logger.info(f"Database error deleting file record {file_id}: {e}")
-        return False
+        logger.error(f"Database error deleting file record {file_id}: {e}", exc_info=True)
+        return False # Indicate failure
