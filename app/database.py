@@ -15,15 +15,80 @@ def get_db():
     """Connects to the application's configured database. The connection
     is unique for each request and will be reused if this is called
     again.
+    Also ensures the schema is applied for in-memory databases if needed.
     """
     if 'db' not in g:
         try:
+            db_name = current_app.config['DB_NAME']
             g.db = sqlite3.connect(
-                current_app.config['DB_NAME'],
+                db_name,
                 detect_types=sqlite3.PARSE_DECLTYPES
             )
             g.db.row_factory = sqlite3.Row
-            logger.info(f"Database connection opened: {current_app.config['DB_NAME']}")
+            logger.info(f"Database connection opened: {db_name}")
+
+            # --- Schema Initialization for In-Memory DB ---
+            # For in-memory databases, the schema needs to be applied
+            # per connection/worker if it hasn't been already.
+            # Check if the 'chats' table exists as a proxy for schema presence.
+            if db_name == ':memory:':
+                cursor = g.db.cursor()
+                try:
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='chats';")
+                    table_exists = cursor.fetchone()
+
+                    if not table_exists:
+                        logger.info(f"In-memory database '{db_name}' is empty. Applying schema...")
+                        # Execute the schema creation SQL directly
+                        # Create chats table
+                        cursor.execute(f'''
+                            CREATE TABLE chats (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                name TEXT NOT NULL,
+                                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                last_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                model_name TEXT DEFAULT '{current_app.config["DEFAULT_MODEL"]}'
+                            )
+                        ''')
+
+                        # Create messages table
+                        cursor.execute('''
+                            CREATE TABLE messages (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                chat_id INTEGER NOT NULL,
+                                role TEXT NOT NULL,
+                                content TEXT NOT NULL,
+                                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
+                            )
+                        ''')
+                        cursor.execute('CREATE INDEX idx_messages_chat_id ON messages (chat_id)')
+
+                        # Create files table (with BLOB)
+                        cursor.execute('''
+                            CREATE TABLE files (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                filename TEXT NOT NULL,
+                                content BLOB NOT NULL,
+                                mimetype TEXT NOT NULL,
+                                filesize INTEGER NOT NULL,
+                                summary TEXT,
+                                uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
+                        cursor.execute('CREATE INDEX idx_files_filename ON files (filename)')
+
+                        g.db.commit()
+                        logger.info("Schema applied to in-memory database.")
+                except sqlite3.Error as schema_e:
+                     logger.error(f"Error applying schema to in-memory database: {schema_e}")
+                     # Depending on desired behavior, you might want to raise here
+                     # or handle it differently. For now, log and let the original
+                     # error (if any) propagate.
+
+            # --- End Schema Initialization for In-Memory DB ---
+
+
         except sqlite3.Error as e:
             logger.info(f"Error connecting to database '{current_app.config['DB_NAME']}': {e}")
             raise # Re-raise the error after logging
@@ -40,13 +105,15 @@ def close_db(e=None):
 
 def init_db():
     """Clears existing data and creates new tables."""
-    db = get_db()
+    db = get_db() # Use get_db to ensure connection is open
     cursor = db.cursor()
 
-    logger.info(f"Initializing database schema for {current_app.config['DB_NAME']}...")
+    db_name = current_app.config['DB_NAME']
+    logger.info(f"Initializing database schema for {db_name}...")
 
+    # Drop tables (safe for :memory: or file db init)
     cursor.execute("DROP TABLE IF EXISTS messages")
-    cursor.execute("DROP TABLE IF EXISTS files") # Changed from uploaded_files
+    cursor.execute("DROP TABLE IF EXISTS files")
     cursor.execute("DROP TABLE IF EXISTS chats")
     logger.info("Dropped existing tables (if any).")
 
@@ -93,6 +160,7 @@ def init_db():
 
     db.commit()
     logger.info("Database schema initialized successfully.")
+
 
 # --- CLI Command for DB Initialization ---
 
