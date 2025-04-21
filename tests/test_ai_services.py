@@ -166,23 +166,23 @@ def test_configure_gemini_api_error(app, mock_genai):
 
 
 # == Test generate_summary ==
-def test_generate_summary_not_configured(app_context):
+async def test_generate_summary_not_configured(app_context):
     """Test generate_summary when Gemini is not configured."""
     ai_services.gemini_configured = False
-    result = ai_services.generate_summary(1)
+    result = await ai_services.generate(summary(1))
     assert result == "[Error: AI model not configured]"
 
 
-def test_generate_summary_file_not_found(app_context, mock_db):
+async def test_generate_summary_file_not_found(app_context, mock_db):
     """Test generate_summary when file details are not found."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = None
-    result = ai_services.generate_summary(1)
+    result = await ai_services.generate(summary(1))
     assert result == "[Error: File content not found]"
     mock_db.get_file_details_from_db.assert_called_once_with(1, include_content=True)
 
 
-def test_generate_summary_text_file(app_context, mock_genai, mock_db):
+async def test_generate_summary_text_file(app_context, mock_genai, mock_db):
     """Test summary generation for a text file."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
@@ -194,7 +194,7 @@ def test_generate_summary_text_file(app_context, mock_genai, mock_db):
         "Text Summary"
     )
 
-    result = ai_services.generate_summary(1)
+    result = await ai_services.generate(summary(1))
 
     assert result == "Text Summary"
     mock_db.get_file_details_from_db.assert_called_once_with(1, include_content=True)
@@ -206,7 +206,9 @@ def test_generate_summary_text_file(app_context, mock_genai, mock_db):
     mock_genai.upload_file.assert_not_called()  # Should not upload for text
 
 
-def test_generate_summary_image_file(app_context, mock_genai, mock_db, mock_tempfile):
+async def test_generate_summary_image_file(
+    app_context, mock_genai, mock_db, mock_tempfile
+):
     """Test summary generation for an image file (requires upload)."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
@@ -220,7 +222,7 @@ def test_generate_summary_image_file(app_context, mock_genai, mock_db, mock_temp
     mock_uploaded_file = MagicMock(uri="mock://image/uri")
     mock_genai.upload_file.return_value = mock_uploaded_file
 
-    result = ai_services.generate_summary(1)
+    result = await ai_services.generate(summary(1))
 
     assert result == "Image Summary"
     mock_db.get_file_details_from_db.assert_called_once_with(1, include_content=True)
@@ -241,7 +243,7 @@ def test_generate_summary_image_file(app_context, mock_genai, mock_db, mock_temp
     )  # Check temp file removed
 
 
-def test_generate_summary_unsupported_type(app_context, mock_db):
+async def test_generate_summary_unsupported_type(app_context, mock_db):
     """Test summary generation for an unsupported file type."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
@@ -249,11 +251,13 @@ def test_generate_summary_unsupported_type(app_context, mock_db):
         "mimetype": "application/zip",
         "content": b"zipdata",
     }
-    result = ai_services.generate_summary(1)
+    result = await ai_services.generate(summary(1))
     assert result == "[Summary generation not supported for this file type]"
 
 
-def test_generate_summary_upload_error(app_context, mock_genai, mock_db, mock_tempfile):
+async def test_generate_summary_upload_error(
+    app_context, mock_genai, mock_db, mock_tempfile
+):
     """Test handling of errors during file upload for summary."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
@@ -263,7 +267,7 @@ def test_generate_summary_upload_error(app_context, mock_genai, mock_db, mock_te
     }
     mock_genai.upload_file.side_effect = Exception("Upload Failed")
 
-    result = ai_services.generate_summary(1)
+    result = await ai_services.generate(summary(1))
 
     assert result.startswith("[Error preparing file for summary: Upload Failed]")
     mock_tempfile["mock_ntf"].assert_called_once()
@@ -274,7 +278,7 @@ def test_generate_summary_upload_error(app_context, mock_genai, mock_db, mock_te
     )  # Ensure cleanup still happens
 
 
-def test_generate_summary_api_error(app_context, mock_genai, mock_db):
+async def test_generate_summary_api_error(app_context, mock_genai, mock_db):
     """Test handling of API errors during summary generation."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
@@ -286,11 +290,11 @@ def test_generate_summary_api_error(app_context, mock_genai, mock_db):
         "API Call Failed"
     )
 
-    result = ai_services.generate_summary(1)
+    result = await ai_services.generate(summary(1))
     assert result == "[Error generating summary via API: API Call Failed]"
 
 
-def test_generate_summary_api_blocked(app_context, mock_genai, mock_db):
+async def test_generate_summary_api_blocked(app_context, mock_genai, mock_db):
     """Test handling of API blocking errors during summary generation."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
@@ -303,12 +307,12 @@ def test_generate_summary_api_blocked(app_context, mock_genai, mock_db):
         "prompt was blocked due to safety"
     )
 
-    result = ai_services.generate_summary(1)
+    result = await ai_services.generate(summary(1))
     assert result == "[Error: Summary generation blocked due to safety settings]"
 
 
 # == Test get_or_generate_summary ==
-def test_get_or_generate_summary_exists(app_context, mock_db, mock_genai):
+async def test_get_or_generate_summary_exists(app_context, mock_db, mock_genai):
     """Test retrieving an existing valid summary."""
     ai_services.gemini_configured = True  # Needed if generation fallback occurs
     mock_db.get_file_details_from_db.return_value = {
@@ -319,7 +323,7 @@ def test_get_or_generate_summary_exists(app_context, mock_db, mock_genai):
         "summary": "Existing Summary Text",
         # No content needed if summary exists
     }
-    result = ai_services.get_or_generate_summary(1)
+    result = await ai_services.get_or_generate_summary(1)
     assert result == "Existing Summary Text"
     mock_db.get_file_details_from_db.assert_called_once_with(
         1
@@ -328,7 +332,7 @@ def test_get_or_generate_summary_exists(app_context, mock_db, mock_genai):
     mock_db.save_summary_in_db.assert_not_called()  # Should not save
 
 
-def test_get_or_generate_summary_generate_new(app_context, mock_db, mock_genai):
+async def test_get_or_generate_summary_generate_new(app_context, mock_db, mock_genai):
     """Test generating a new summary when none exists."""
     ai_services.gemini_configured = True
     # First call to get_file_details (no content)
@@ -354,7 +358,7 @@ def test_get_or_generate_summary_generate_new(app_context, mock_db, mock_genai):
         "Newly Generated Summary"
     )
 
-    result = ai_services.get_or_generate_summary(1)
+    result = await ai_services.get_or_generate_summary(1)
 
     assert result == "Newly Generated Summary"
     assert mock_db.get_file_details_from_db.call_count == 2
@@ -367,7 +371,7 @@ def test_get_or_generate_summary_generate_new(app_context, mock_db, mock_genai):
     )  # Saved the new summary
 
 
-def test_get_or_generate_summary_generate_new_save_fails(
+async def test_get_or_generate_summary_generate_new_save_fails(
     app_context, mock_db, mock_genai
 ):
     """Test generating a new summary when saving it fails."""
@@ -394,7 +398,7 @@ def test_get_or_generate_summary_generate_new_save_fails(
     )
     mock_db.save_summary_in_db.return_value = False  # Simulate save failure
 
-    result = ai_services.get_or_generate_summary(1)
+    result = await ai_services.get_or_generate_summary(1)
 
     assert (
         result == "Generated But Not Saved"
@@ -402,16 +406,16 @@ def test_get_or_generate_summary_generate_new_save_fails(
     mock_db.save_summary_in_db.assert_called_once_with(1, "Generated But Not Saved")
 
 
-def test_get_or_generate_summary_file_not_found(app_context, mock_db):
+async def test_get_or_generate_summary_file_not_found(app_context, mock_db):
     """Test get_or_generate_summary when file details are not found initially."""
     mock_db.get_file_details_from_db.return_value = None
-    result = ai_services.get_or_generate_summary(99)
+    result = await ai_services.get_or_generate_summary(99)
     assert result == "[Error: File details not found]"
     mock_db.get_file_details_from_db.assert_called_once_with(99)
 
 
 # == Test generate_search_query ==
-def test_generate_search_query_success(app_context, mock_genai):
+async def test_generate_search_query_success(app_context, mock_genai):
     """Test successful generation of a search query."""
     ai_services.gemini_configured = True
     user_message = "Tell me about the weather in London tomorrow."
@@ -419,7 +423,7 @@ def test_generate_search_query_success(app_context, mock_genai):
         " London weather forecast tomorrow "  # With extra spaces
     )
 
-    result = ai_services.generate_search_query(user_message)
+    result = await ai_services.generate_search_query(user_message)
 
     assert result == "London weather forecast tomorrow"  # Check cleaning
     mock_genai.GenerativeModel.assert_called_once_with(
@@ -447,7 +451,7 @@ def test_generate_search_query_success(app_context, mock_genai):
     # assert isinstance(gen_config_arg, genai.types.GenerationConfig)
 
 
-def test_generate_search_query_cleaning(app_context, mock_genai):
+async def test_generate_search_query_cleaning(app_context, mock_genai):
     """Test cleaning of LLM output for search query."""
     ai_services.gemini_configured = True
     user_message = "Search query test"
@@ -476,39 +480,39 @@ def test_generate_search_query_cleaning(app_context, mock_genai):
         mock_genai.GenerativeModel.return_value.generate_content.return_value.text = (
             messy_output
         )
-        result = ai_services.generate_search_query(user_message)
+        result = await ai_services.generate_search_query(user_message)
         assert result == expected_results[i], f"Failed on case: {messy_output}"
 
 
-def test_generate_search_query_not_configured(app_context):
+async def test_generate_search_query_not_configured(app_context):
     """Test generate_search_query when not configured."""
     ai_services.gemini_configured = False
-    result = ai_services.generate_search_query("Any message")
+    result = await ai_services.generate_search_query("Any message")
     assert result is None
 
 
-def test_generate_search_query_empty_message(app_context):
+async def test_generate_search_query_empty_message(app_context):
     """Test generate_search_query with an empty user message."""
     ai_services.gemini_configured = True
-    result = ai_services.generate_search_query("")
+    result = await ai_services.generate_search_query("")
     assert result is None
-    result = ai_services.generate_search_query("   ")
+    result = await ai_services.generate_search_query("   ")
     assert result is None
 
 
-def test_generate_search_query_api_error(app_context, mock_genai):
+async def test_generate_search_query_api_error(app_context, mock_genai):
     """Test generate_search_query handling API errors."""
     ai_services.gemini_configured = True
     mock_genai.GenerativeModel.return_value.generate_content.side_effect = Exception(
         "API Error"
     )
-    result = ai_services.generate_search_query("A message", max_retries=1)
+    result = await ai_services.generate_search_query("A message", max_retries=1)
     assert result is None
     # Called once for initial try, once for retry
     assert mock_genai.GenerativeModel.return_value.generate_content.call_count == 2
 
 
-def test_generate_search_query_blocked(app_context, mock_genai):
+async def test_generate_search_query_blocked(app_context, mock_genai):
     """Test generate_search_query when the prompt is blocked."""
     ai_services.gemini_configured = True
     mock_response = MagicMock()
@@ -519,20 +523,20 @@ def test_generate_search_query_blocked(app_context, mock_genai):
         mock_response
     )
 
-    result = ai_services.generate_search_query("Risky message", max_retries=1)
+    result = await ai_services.generate_search_query("Risky message", max_retries=1)
     assert result is None
     # Should not retry if blocked
     assert mock_genai.GenerativeModel.return_value.generate_content.call_count == 1
 
 
-def test_generate_search_query_empty_response(app_context, mock_genai):
+async def test_generate_search_query_empty_response(app_context, mock_genai):
     """Test generate_search_query when the LLM returns an empty string."""
     ai_services.gemini_configured = True
     mock_genai.GenerativeModel.return_value.generate_content.return_value.text = (
         "  "  # Empty after strip
     )
 
-    result = ai_services.generate_search_query("A message", max_retries=1)
+    result = await ai_services.generate_search_query("A message", max_retries=1)
     assert result is None
     # Should not retry if LLM returns empty
     assert mock_genai.GenerativeModel.return_value.generate_content.call_count == 1
@@ -553,23 +557,23 @@ def create_mock_session_file(
     }
 
 
-def test_generate_chat_response_not_configured(app_context):
+async def test_generate_chat_response_not_configured(app_context):
     """Test chat response when Gemini is not configured."""
     ai_services.gemini_configured = False
-    result = ai_services.generate_chat_response(1, "Hello", [], None, [])
+    result = await ai_services.generate_chat_response(1, "Hello", [], None, [])
     assert result == "[Error: Gemini API Key not configured]"
 
 
-def test_generate_chat_response_chat_not_found(app_context, mock_db):
+async def test_generate_chat_response_chat_not_found(app_context, mock_db):
     """Test chat response when chat details are not found."""
     ai_services.gemini_configured = True
     mock_db.get_chat_details_from_db.return_value = None
-    result = ai_services.generate_chat_response(99, "Hello", [], None, [])
+    result = await ai_services.generate_chat_response(99, "Hello", [], None, [])
     assert result == "[Error: Chat session not found]"
     mock_db.get_chat_details_from_db.assert_called_once_with(99)
 
 
-def test_generate_chat_response_basic(app_context, mock_genai, mock_db):
+async def test_generate_chat_response_basic(app_context, mock_genai, mock_db):
     """Test basic chat response generation."""
     ai_services.gemini_configured = True
     chat_id = 5
@@ -586,7 +590,7 @@ def test_generate_chat_response_basic(app_context, mock_genai, mock_db):
         "Hello there!"
     )
 
-    result = ai_services.generate_chat_response(chat_id, user_message, [], None, [])
+    result = await ai_services.generate_chat_response(chat_id, user_message, [], None, [])
 
     assert result == "Hello there!"
     # Check DB interactions
@@ -611,7 +615,7 @@ def test_generate_chat_response_basic(app_context, mock_genai, mock_db):
     assert generate_call.call_args[1]["request_options"] == {"timeout": 10}
 
 
-def test_generate_chat_response_with_calendar(app_context, mock_genai, mock_db):
+async def test_generate_chat_response_with_calendar(app_context, mock_genai, mock_db):
     """Test chat response with calendar context."""
     ai_services.gemini_configured = True
     chat_id = 6
@@ -626,7 +630,7 @@ def test_generate_chat_response_with_calendar(app_context, mock_genai, mock_db):
         "You have a meeting."
     )
 
-    result = ai_services.generate_chat_response(
+    result = await ai_services.generate_chat_response(
         chat_id, user_message, [], calendar_context, []
     )
 
@@ -653,7 +657,7 @@ def test_generate_chat_response_with_calendar(app_context, mock_genai, mock_db):
     assert generate_call.call_args[0][0] == expected_gemini_context
 
 
-def test_generate_chat_response_with_session_file(
+async def test_generate_chat_response_with_session_file(
     app_context, mock_genai, mock_db, mock_tempfile
 ):
     """Test chat response with a session file."""
@@ -674,7 +678,7 @@ def test_generate_chat_response_with_session_file(
     mock_uploaded_file = MagicMock(uri="mock://session/uri")
     mock_genai.upload_file.return_value = mock_uploaded_file
 
-    result = ai_services.generate_chat_response(
+    result = await ai_services.generate_chat_response(
         chat_id, user_message, [], None, [session_file_data]
     )
 
@@ -710,7 +714,7 @@ def test_generate_chat_response_with_session_file(
     )  # Check cleanup
 
 
-def test_generate_chat_response_with_permanent_file_full(
+async def test_generate_chat_response_with_permanent_file_full(
     app_context, mock_genai, mock_db, mock_tempfile
 ):
     """Test chat response with a permanently attached file (full content)."""
@@ -738,7 +742,7 @@ def test_generate_chat_response_with_permanent_file_full(
     mock_uploaded_file = MagicMock(uri="mock://permanent/uri")
     mock_genai.upload_file.return_value = mock_uploaded_file
 
-    result = ai_services.generate_chat_response(
+    result = await ai_services.generate_chat_response(
         chat_id, user_message, attached_files, None, []
     )
 
@@ -775,7 +779,7 @@ def test_generate_chat_response_with_permanent_file_full(
     )  # Check cleanup
 
 
-def test_generate_chat_response_with_permanent_file_summary(
+async def test_generate_chat_response_with_permanent_file_summary(
     app_context, mock_genai, mock_db
 ):
     """Test chat response with a permanently attached file (summary)."""
@@ -807,7 +811,7 @@ def test_generate_chat_response_with_permanent_file_summary(
         "Summary Response"
     )
 
-    result = ai_services.generate_chat_response(
+    result = await ai_services.generate_chat_response(
         chat_id, user_message, attached_files, None, []
     )
 
@@ -842,7 +846,7 @@ def test_generate_chat_response_with_permanent_file_summary(
     )  # Keep any_order=False as the order matters here
 
 
-def test_generate_chat_response_with_web_search(
+async def test_generate_chat_response_with_web_search(
     app_context, mock_genai, mock_db, mock_web_search
 ):
     """Test chat response with web search enabled."""
@@ -860,7 +864,7 @@ def test_generate_chat_response_with_web_search(
     ]
     mock_web_search.return_value = ["AI News Result 1", "AI News Result 2"]
 
-    result = ai_services.generate_chat_response(
+    result = await ai_services.generate_chat_response(
         chat_id, user_message, [], None, [], enable_web_search=True
     )
 
@@ -895,7 +899,7 @@ def test_generate_chat_response_with_web_search(
     assert chat_generate_call[0][0] == expected_gemini_context
 
 
-def test_generate_chat_response_web_search_fails(
+async def test_generate_chat_response_web_search_fails(
     app_context, mock_genai, mock_db, mock_web_search
 ):
     """Test chat response when web search itself fails."""
@@ -915,7 +919,7 @@ def test_generate_chat_response_web_search_fails(
         "[System Error: Search API timed out]"
     ]  # Simulate error from search function
 
-    result = ai_services.generate_chat_response(
+    result = await ai_services.generate_chat_response(
         chat_id, user_message, [], None, [], enable_web_search=True
     )
 
@@ -945,7 +949,7 @@ def test_generate_chat_response_web_search_fails(
     assert chat_generate_call[0][0] == expected_gemini_context
 
 
-def test_generate_chat_response_api_error(app_context, mock_genai, mock_db):
+async def test_generate_chat_response_api_error(app_context, mock_genai, mock_db):
     """Test handling of API errors during chat response generation."""
     ai_services.gemini_configured = True
     chat_id = 12
@@ -959,7 +963,7 @@ def test_generate_chat_response_api_error(app_context, mock_genai, mock_db):
         "Chat API Failed"
     )
 
-    result = ai_services.generate_chat_response(chat_id, user_message, [], None, [])
+    result = await ai_services.generate_chat_response(chat_id, user_message, [], None, [])
 
     assert result == "[Error communicating with AI: Chat API Failed]"
     # Check user message still saved
