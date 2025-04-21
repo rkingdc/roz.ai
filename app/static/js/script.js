@@ -225,6 +225,41 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Functions that access DOM elements (MUST be inside DOMContentLoaded or called from here) ---
 
+    /** Deletes a file from the backend and updates the UI lists. */
+    async function deleteFile(fileId) {
+        if (isLoading) return;
+        if (!confirm("Are you sure you want to delete this file? This action cannot be undone.")) {
+            return;
+        }
+
+        setLoadingState(true, "Deleting File");
+        updateStatus(`Deleting file ${fileId}...`);
+
+        try {
+            const response = await fetch(`/api/files/${fileId}`, {
+                method: 'DELETE'
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`${errorData.error || `HTTP error! status: ${response.status}`}`);
+            }
+
+            updateStatus(`File ${fileId} deleted.`);
+            await loadUploadedFiles(); // Reload *both* file lists
+
+            // Remove from selected files if it's selected
+            selectedFiles = selectedFiles.filter(f => f.id !== fileId);
+            renderSelectedFiles(); // Update the attached files display
+
+        } catch (error) {
+            console.error('Error deleting file:', error);
+            updateStatus(`Error deleting file: ${error.message}`, true);
+        } finally {
+            setLoadingState(false);
+        }
+    }
+
+
     function setLoadingState(loading, operation = "Processing") {
         isLoading = loading;
         messageInput.disabled = loading;
@@ -733,7 +768,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     deleteBtn.title = "Delete File";
                     deleteBtn.onclick = (e) => {
                         e.stopPropagation();
-                        deleteFile(file.id);
+                        deleteFile(file.id); // This is the call that was failing
                     };
                     modalActionsDiv.appendChild(deleteBtn);
 
