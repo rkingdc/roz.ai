@@ -36,10 +36,15 @@ start: stop
 # Target to display help
 .PHONY: help
 help:
+	@echo "----------------------------------------------------"
+	@echo "Makefile for the AI Assistant Application"
+	@echo "----------------------------------------------------"
 	@echo "Available targets:"
-	@echo "  make start   - Start the application"
-	@echo "  make stop    - Stop the application"
-	@echo "  make test    - Run unit tests"
-	@echo "  make help    - Show this help message"
+	@echo "  make start   - Stops any existing process and starts the application using uvicorn."
+	@echo "                 Logs output to $(LOG_FILE) and the console."
+	@echo "  make stop    - Attempts to stop the running application process."
+	@echo "  make test    - Runs the pytest test suite."
+	@echo "  make help    - Displays this help message."
+	@echo "----------------------------------------------------"
 
 # Add other targets as needed (e.g., install, clean)
