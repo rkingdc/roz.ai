@@ -487,7 +487,14 @@ function applyMarkdownToMessage(messageElement) {
 
 
     // Apply markdown parsing to the unescaped content
-    contentElement.innerHTML = marked.parse(processedContent, markedOptions);
+    const parsedContent = marked.parse(processedContent, markedOptions);
+
+    // --- Added Logging ---
+    console.log(`marked.parse result type=${typeof parsedContent}, value=`, parsedContent);
+    // --- End Added Logging ---
+
+    // Ensure the result is a string before setting innerHTML
+    contentElement.innerHTML = String(parsedContent);
 }
 
 
@@ -1165,7 +1172,7 @@ async function startNewChat() {
         modelSelector.value = defaultModel;
         webSearchToggle.checked = false; // Reset web search toggle
         // Ensure file list in modal is cleared/reloaded if modal is open
-        // loadUploadedFiles() is called by loadChat, which is called here
+        // loadUploadedFiles() is now called by loadChat, which is called here
     } catch (error) {
         console.error('Error starting new chat:', error);
         addMessage('system', `[Error creating new chat: ${error.message}]`, true);
