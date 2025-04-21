@@ -7,6 +7,8 @@ import re
 import base64  # Needed for decoding session file content
 from . import database  # Use relative import
 from .plugins.web_search import perform_web_search
+from google.api_core.exceptions import GoogleAPIError, DeadlineExceeded # Import specific exceptions
+import grpc # Import grpc for potential RpcError handling
 
 # Configure logging
 import logging
@@ -71,6 +73,7 @@ def generate_summary(file_id):
                 prompt = f"Please provide a concise summary of the following text content from the file named '{filename}':\n\n{text_content}"
                 parts = [prompt]
             except Exception as decode_err:
+                logger.error(f"Error decoding text content for summary: {decode_err}")
                 return "[Error: Could not decode text content for summary]"
         elif mimetype.startswith(("image/", "audio/", "video/", "application/pdf")):
             try:
@@ -95,6 +98,7 @@ def generate_summary(file_id):
                 )
             except Exception as upload_err:
                 # Let the finally block handle cleanup
+                logger.error(f"Error preparing file for summary upload: {upload_err}")
                 return f"[Error preparing file for summary: {upload_err}]"
         else:
             return "[Summary generation not supported for this file type]"
@@ -107,11 +111,17 @@ def generate_summary(file_id):
         summary = response.text
         logger.info(f"Summary generated successfully for '{filename}'.")
         return summary
-    except Exception as e:
-        logger.error(f"Error during summary generation API call for '{filename}': {e}")
+    except DeadlineExceeded:
+        logger.error(f"Summary generation timed out for '{filename}'.")
+        return "[Error: Summary generation timed out.]"
+    except GoogleAPIError as e:
+        logger.error(f"Google API error during summary generation for '{filename}': {e}")
         if "prompt was blocked" in str(e).lower():
             return "[Error: Summary generation blocked due to safety settings]"
         return f"[Error generating summary via API: {e}]"
+    except Exception as e:
+        logger.error(f"Unexpected error during summary generation for '{filename}': {e}", exc_info=True)
+        return f"[Error generating summary: An unexpected error occurred.]"
     finally:
         if temp_file_to_clean:
             try:
@@ -138,16 +148,17 @@ def get_or_generate_summary(file_id):
     else:
         logger.info(f"Generating summary for file ID: {file_id}...")
         new_summary = generate_summary(file_id)
+        # Even if summary generation returned an error string, save it so we don't retry immediately
         if database.save_summary_in_db(file_id, new_summary):
             return new_summary
         else:
             logger.info(
                 f"Error: Failed to save newly generated summary for file ID: {file_id}"
             )
+            # Return the generated summary/error message even if saving failed
             return new_summary
 
 
-# --- Chat Response Generation (MODIFIED Signature) ---
 def generate_search_query(user_message: str, max_retries=1) -> str | None:
     """
     Uses the default LLM to generate a concise web search query based on the user's message.
@@ -169,7 +180,7 @@ def generate_search_query(user_message: str, max_retries=1) -> str | None:
         logger.info("INFO: Cannot generate search query from empty user message.")
         return None
 
-    model_name = current_app.config.get("SUMMARY_MODEL")
+    model_name = current_app.config.get("SUMMARY_MODEL") # Using SUMMARY_MODEL for query generation
     logger.info(f"Attempting to generate search query using model '{model_name}'...")
 
     # Construct the prompt for the LLM
@@ -198,6 +209,7 @@ Search Query:"""
                     max_output_tokens=50,  # Limit output tokens significantly for just a query
                     temperature=0.2,  # Lower temperature for more focused, less creative query
                 ),
+                request_options={"timeout": current_app.config.get("GEMINI_REQUEST_TIMEOUT", 300)} # Add timeout
             )
 
             # --- Response Cleaning ---
@@ -239,13 +251,31 @@ Search Query:"""
                 # Don't retry if the LLM deliberately returned empty, treat as failure
                 return None
 
+        except DeadlineExceeded:
+            logger.info(f"Search query generation timed out (Attempt {retries+1}/{max_retries+1}).")
+            retries += 1
+            if retries > max_retries:
+                logger.info("Max retries reached for search query generation due to timeout.")
+                return None
+            # Optional: Add a small delay before retrying
+            # import time
+            # time.sleep(1)
+        except GoogleAPIError as e:
+            logger.info(f"Google API error during search query generation (Attempt {retries+1}/{max_retries+1}): {e}")
+            retries += 1
+            if retries > max_retries:
+                logger.info("Max retries reached for search query generation due to API error.")
+                return None
+            # Optional: Add a small delay before retrying
+            # import time
+            # time.sleep(1)
         except Exception as e:
             retries += 1
             logger.info(
-                f"Error generating search query (Attempt {retries}/{max_retries+1}): {e}"
+                f"Unexpected error generating search query (Attempt {retries}/{max_retries+1}): {e}", exc_info=True
             )
             if retries > max_retries:
-                logger.info("Max retries reached for search query generation.")
+                logger.info("Max retries reached for search query generation due to unexpected error.")
                 return None
             # Optional: Add a small delay before retrying
             # import time
@@ -490,40 +520,50 @@ def generate_chat_response(
                         )
 
         web_search_error_for_user = (
-            None  # Initialize variable to hold user-facing errors
-        )
+            None
+        )  # Initialize variable to hold user-facing errors
         if enable_web_search:
             try:
                 search_query = generate_search_query(user_message)
-                logger.info(
-                    f"Web search enabled, searching for: '{search_query}'"
-                )  # Using user_message for search now
-                search_results = perform_web_search(
-                    search_query
-                )  # Call the new function
-                if search_results:
-                    # Check if the first result indicates a system error from the search function
-                    if search_results[0].startswith("[System Error:"):
-                        gemini_parts.append(
-                            search_results[0]
-                        )  # Pass the error message to Gemini
-                        files_info_for_history.append("[Web search failed]")
+                if search_query:
+                    logger.info(
+                        f"Web search enabled, searching for: '{search_query}'"
+                    )  # Using user_message for search now
+                    search_results = perform_web_search(
+                        search_query
+                    )  # Call the new function
+                    if search_results:
+                        # Check if the first result indicates a system error from the search function
+                        if search_results[0].startswith("[System Error:"):
+                            gemini_parts.append(
+                                search_results[0]
+                            )  # Pass the error message to Gemini
+                            files_info_for_history.append("[Web search failed]")
+                        else:
+                            gemini_parts.extend(
+                                [
+                                    "--- Start Web Search Results ---",
+                                    "The following information was retrieved from a web search and may contain inaccuracies. Please verify the information before relying on it.",
+                                    "\n".join(search_results),
+                                    "--- End Web Search Results ---",
+                                ]
+                            )
+                            files_info_for_history.append("[Web search performed]")
                     else:
-                        gemini_parts.extend(
-                            [
-                                "--- Start Web Search Results ---",
-                                "The following information was retrieved from a web search and may contain inaccuracies. Please verify the information before relying on it.",
-                                "\n".join(search_results),
-                                "--- End Web Search Results ---",
-                            ]
+                        # This now correctly handles the case where perform_web_search returns an empty list (no results found)
+                        gemini_parts.append(
+                            "[System Note: Web search returned no relevant results.]"
                         )
-                        files_info_for_history.append("[Web search performed]")
+                        files_info_for_history.append(
+                            "[Web search attempted, no results]"
+                        )
                 else:
-                    # This now correctly handles the case where perform_web_search returns an empty list (no results found)
-                    gemini_parts.append(
-                        "[System Note: Web search returned no relevant results.]"
+                     logger.info("Web search enabled but query generation failed or returned empty.")
+                     gemini_parts.append(
+                        "[System Note: Could not generate a suitable web search query.]"
                     )
-                    files_info_for_history.append("[Web search attempted, no results]")
+                     files_info_for_history.append("[Web search query generation failed]")
+
             except Exception as search_err:
                 # This outer catch might catch errors *calling* perform_web_search, though most errors should be handled *inside* it.
                 logger.info(f"Error during web search integration logic: {search_err}")
@@ -548,7 +588,8 @@ def generate_chat_response(
             logger.info(
                 f"Warning: Failed to save user message for chat {chat_id} after processing files."
             )
-            return "[Error: Failed to save user message to history]"
+            # Decide if this should be a hard error or just a warning.
+            # For now, let's proceed with the AI call but log the DB failure.
 
         assistant_reply = "[AI response error occurred]"  # Default error state
 
@@ -561,7 +602,9 @@ def generate_chat_response(
                     f"Error initializing model '{model_name}': {model_init_error}. Falling back to default '{current_app.config['DEFAULT_MODEL']}'."
                 )
                 chat_model = genai.GenerativeModel(current_app.config["DEFAULT_MODEL"])
-                assistant_reply = f"[System: Model '{model_name}' not found, using default '{current_app.config['DEFAULT_MODEL']}'.] "
+                # Prepend a system message about the model fallback
+                gemini_parts.insert(0, f"[System: Model '{model_name}' not found, using default '{current_app.config['DEFAULT_MODEL']}'.]")
+
 
             history_for_gemini_raw = database.get_chat_history_from_db(
                 chat_id, limit=20
@@ -570,38 +613,63 @@ def generate_chat_response(
             for msg in history_for_gemini_raw:
                 role = "model" if msg["role"] == "assistant" else "user"
                 gemini_context.append({"role": role, "parts": [msg["content"]]})
+            # Ensure history ends with a model turn if possible, or remove the last user turn
             if gemini_context and gemini_context[-1]["role"] == "user":
-                gemini_context.pop()
+                 # If the last message in history is from the user, remove it
+                 # because the current user message is being added separately.
+                 # This prevents duplicate user messages in the context.
+                 gemini_context.pop()
+
 
             logger.info(
                 f"--- Sending to Gemini (Chat ID: {chat_id}, Model: {model_name}) ---"
             )
-            logger.info(
-                f"Content Parts: {[str(p)[:100]+'...' if isinstance(p, str) else type(p) for p in gemini_parts]}"
-            )
+            # Log parts carefully to avoid flooding logs with large file content
+            logged_parts = []
+            for p in gemini_parts:
+                if isinstance(p, str):
+                    logged_parts.append(p[:200] + '...' if len(p) > 200 else p)
+                elif isinstance(p, genai.types.file_types.File):
+                     logged_parts.append(f"<File: {p.display_name} URI: {p.uri}>")
+                else:
+                    logged_parts.append(type(p))
+            logger.info(f"Content Parts: {logged_parts}")
+
+            logged_context = []
+            for msg in gemini_context:
+                 content_preview = msg['parts'][0][:200] + '...' if msg['parts'] and isinstance(msg['parts'][0], str) and len(msg['parts'][0]) > 200 else msg['parts']
+                 logged_context.append({"role": msg['role'], "parts": content_preview})
+            logger.info(f"History Context: {logged_context}")
             logger.info("--- End Gemini Send ---")
+
 
             full_request_content = gemini_context + [
                 {"role": "user", "parts": gemini_parts}
             ]
             timeout = current_app.config.get("GEMINI_REQUEST_TIMEOUT", 300)
+
+            # --- Actual API Call ---
             response = chat_model.generate_content(
                 full_request_content, request_options={"timeout": timeout}
             )
+            # --- End Actual API Call ---
+
 
             current_reply = response.text
-            if assistant_reply != "[AI response error occurred]":
-                assistant_reply += current_reply
+            # If model fallback message was prepended, include it in the reply
+            if gemini_parts and isinstance(gemini_parts[0], str) and gemini_parts[0].startswith("[System: Model"):
+                 assistant_reply = gemini_parts[0] + "\n" + current_reply
             else:
-                assistant_reply = current_reply
+                 assistant_reply = current_reply
+
             logger.info(f"Gemini Response: {assistant_reply[:100]}...")
 
-        except Exception as e:
-            logger.info(
-                f"Error calling Gemini API for chat {chat_id} with model {model_name}: {e}"
-            )
+        except DeadlineExceeded:
+            logger.error(f"Gemini API request timed out for chat {chat_id} with model {model_name}.")
+            assistant_reply = "[Error: AI request timed out. The operation took too long.]"
+        except GoogleAPIError as e:
+            logger.error(f"Google API error during chat generation for chat {chat_id} with model {model_name}: {e}")
             error_message = f"[Error communicating with AI: {e}]"
-            # (Error handling details omitted for brevity - same as before)
             if "API key not valid" in str(e):
                 error_message = "[Error: Invalid Gemini API Key.]"
             elif (
@@ -618,18 +686,32 @@ def generate_chat_response(
                 error_message = "[Error: API quota exceeded. Please try again later.]"
             elif "429" in str(e):
                 error_message = "[Error: Too many requests. Please try again later.]"
-            elif "Deadline Exceeded" in str(e):
-                error_message = (
-                    "[Error: Request timed out. The operation took too long.]"
-                )
+            # Add other specific Google API errors if needed
 
-            if assistant_reply != "[AI response error occurred]":
-                assistant_reply += "\n" + error_message
+            # If a model fallback message was already added, append the API error
+            if assistant_reply != "[AI response error occurred]" and assistant_reply.startswith("[System: Model"):
+                 assistant_reply += "\n" + error_message
             else:
-                assistant_reply = error_message
+                 assistant_reply = error_message # Otherwise, just set the error message
+
+        except Exception as e:
+            # Catch any other unexpected errors during the API call or response processing
+            logger.error(
+                f"Unexpected error calling Gemini API for chat {chat_id} with model {model_name}: {e}", exc_info=True
+            )
+            # If a model fallback message was already added, append the unexpected error
+            if assistant_reply != "[AI response error occurred]" and assistant_reply.startswith("[System: Model"):
+                 assistant_reply += "\n" + f"[Unexpected AI Error: {e}]"
+            else:
+                 assistant_reply = f"[Unexpected AI Error: {e}]"
+
 
         # Add assistant reply to DB
-        database.add_message_to_db(chat_id, "assistant", assistant_reply)
+        # Note: If the DB save of the user message failed earlier, this will still attempt to save the assistant reply.
+        # This is acceptable behavior.
+        if not database.add_message_to_db(chat_id, "assistant", assistant_reply):
+             logger.info(f"Warning: Failed to save assistant message for chat {chat_id}.")
+
         return assistant_reply  # Return the final reply string
 
     finally:
@@ -637,7 +719,12 @@ def generate_chat_response(
         logger.info(f"Cleaning up {len(temp_files_to_clean)} temporary files...")
         for temp_path in temp_files_to_clean:
             try:
-                os.remove(temp_path)
-                logger.info(f"Removed temp file: {temp_path}")
+                # Check if file exists before trying to remove
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    logger.info(f"Removed temp file: {temp_path}")
+                else:
+                    logger.info(f"Temp file not found, already removed? {temp_path}")
             except OSError as e:
                 logger.info(f"Error removing temp file {temp_path}: {e}")
+

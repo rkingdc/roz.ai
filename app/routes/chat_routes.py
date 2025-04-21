@@ -76,7 +76,7 @@ def save_chat_model(chat_id):
     # Optional: Strict validation against available models
     if new_model_name not in available_models:
         logger.warning(
-            f"Warning: Saving potentially unknown model '{new_model_name}' for chat {chat_id}."
+            f"Warning: Saving potentially unknown model '{new_model_name}' for chat {chat_id}. Available: {', '.join(available_models)}"
         )
         # Depending on requirements, you might return an error here:
         # return jsonify({"error": f"Invalid model name specified. Choose from: {', '.join(available_models)}"}), 400
@@ -109,16 +109,16 @@ def send_message_route(chat_id):
     )  # Get web search flag, default to False
 
     # Check if there's any actual input to process
+    # Allow sending if web search is enabled, even without user message, if that's desired behavior
+    # The AI service function handles the case where user_message is empty but context/files are present.
     if (
         not user_message
         and not attached_files
         and not calendar_context
         and not session_files
+        and not enable_web_search # Added check for web search
     ):
-        # Note: We might still want to allow sending if only web search is enabled,
-        # but currently the AI function likely needs *some* user input.
-        # Keeping the original check for now.
-        return jsonify({"error": "No message, files, or context provided"}), 400
+        return jsonify({"error": "No message, files, context, or search request provided"}), 400
 
     try:
         # Call the AI service function to handle the core logic
@@ -145,17 +145,25 @@ def send_message_route(chat_id):
                 status_code = 503  # Service unavailable due to config
             elif "request too large" in assistant_reply.lower():
                 status_code = 413  # Payload too large
+            elif "timed out" in assistant_reply.lower(): # Added timeout check
+                 status_code = 504 # Gateway Timeout
+            # Note: Other specific errors from ai_services might also warrant different codes
+
             return jsonify({"reply": assistant_reply}), status_code
+        elif isinstance(assistant_reply, str) and assistant_reply.startswith("[Unexpected AI Error:"):
+             # Catch the specific unexpected error message
+             return jsonify({"reply": assistant_reply}), 500
         else:
             return jsonify({"reply": assistant_reply})
 
     except Exception as e:
-        # Catch unexpected errors during the process
+        # Catch unexpected errors *within this route handler* before calling ai_services
+        # or if ai_services raises an exception not caught internally (less likely now)
         logger.error(
             f"Unexpected error in send_message route for chat {chat_id}: {e}",
             exc_info=True,
         )
         return (
-            jsonify({"reply": f"[Unexpected Server Error: Check logs for details.]"}),
+            jsonify({"reply": f"[Unexpected Server Error in route: {e}]"}), # More specific error message
             500,
         )
