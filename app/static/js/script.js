@@ -12,7 +12,7 @@ let isCalendarPluginEnabled = true; // Track Calendar plugin enabled state (defa
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
 const PLUGINS_COLLAPSED_KEY = 'pluginsCollapsed';
 const FILE_PLUGIN_COLLAPSED_KEY = 'filePluginCollapsed';
-const CALENDAR_PLUGIN_COLLAPSED_KEY = 'calendarPluginCollapsed';
+const CALENDAR_PLUGIN_COLLAPSED_KEY = 'calendarPluginCollapsed'; // Corrected typo here
 const STREAMING_ENABLED_KEY = 'streamingEnabled'; // New localStorage key for streaming
 const FILES_PLUGIN_ENABLED_KEY = 'filesPluginEnabled'; // New localStorage key for Files plugin
 const CALENDAR_PLUGIN_ENABLED_KEY = 'calendarPluginEnabled'; // New localStorage key for Calendar plugin
@@ -1592,7 +1592,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!response.ok) {
-                // Handle non-streaming errors (e.g., 400, 500)
+                // Handle non-streaming errors (e.e., 400, 500)
                 const errorData = await response.json();
                 throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
             }
@@ -1987,11 +1987,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const chatSidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
             const pluginSidebarCollapsed = localStorage.getItem(PLUGINS_COLLAPSED_KEY) === 'true';
             const filePluginCollapsed = localStorage.getItem(FILE_PLUGIN_COLLAPSED_KEY) === 'true';
+            // Corrected typo here: CALENDAR_PLUGIN_COLLABSED_KEY -> CALENDAR_PLUGIN_COLLAPSED_KEY
             const calendarPluginCollapsed = localStorage.getItem(CALENDAR_PLUGIN_COLLAPSED_KEY) === 'true';
             setSidebarCollapsed(sidebar, sidebarToggleButton, chatSidebarCollapsed, SIDEBAR_COLLAPSED_KEY, 'sidebar');
             setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, pluginSidebarCollapsed, PLUGINS_COLLAPSED_KEY, 'plugins');
             setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
-            setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLABSED_KEY);
+            setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY); // Corrected typo here
             console.log("[DEBUG] Sidebar/Plugin collapse states loaded and applied."); // Added log
 
 
