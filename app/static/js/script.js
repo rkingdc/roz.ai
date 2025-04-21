@@ -359,12 +359,18 @@ function escapeHtml(html) {
 }
 
 renderer.code = function(code, language) {
+    // --- Added Logging ---
+    console.log(`renderer.code called: code type=${typeof code}, code value=`, code);
+    // --- End Added Logging ---
     // Ensure the input 'code' is treated as a string and escape its content
     const escapedCode = escapeHtml(code);
     return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapedCode}</code></pre>`;
 };
 
 renderer.codespan = function(text) {
+    // --- Added Logging ---
+    console.log(`renderer.codespan called: text type=${typeof text}, text value=`, text);
+    // --- End Added Logging ---
     // Ensure the input 'text' is treated as a string and escape its content
     const escapedText = escapeHtml(text);
 
@@ -1163,7 +1169,7 @@ async function startNewChat() {
         const existingSessionTag = selectedFilesContainer.querySelector('.session-file-tag');
         if (existingSessionTag) existingSessionTag.remove();
         renderSelectedFiles(); // Render (clears plugin files and updates visibility)
-        fileUploadSessionInput.value = ''; // Reset session file input
+        fileUploadSessionInput.value = ''; // Reset file input
         calendarContext = null;
         isCalendarContextActive = false;
         calendarToggle.checked = false;
