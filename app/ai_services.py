@@ -395,7 +395,8 @@ async def generate_chat_response(
                         logger.info(
                             f"Getting/Generating summary for '{filename}' (ID: {file_id})"
                         )
-                        summary = get_or_generate_summary(file_id)
+                        # ADDED await here
+                        summary = await get_or_generate_summary(file_id)
                         if summary.startswith("[Error"):
                             # Add error marker to history if summary generation/retrieval failed
                             files_info_for_history.append(
