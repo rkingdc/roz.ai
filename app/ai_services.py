@@ -193,7 +193,6 @@ def generate_summary(file_id):
         response = client.models.generate_content(
             model=summary_model_name,
             contents=content_parts,  # Pass the constructed parts/contents
-            stream=False,  # Summary generation is not streamed
         )
         summary = response.text
         logger.info(f"Summary generated successfully for '{filename}'.")
@@ -398,8 +397,7 @@ Search Query:"""
             # Query generation is NOT streamed
             response = client.models.generate_content(
                 model=model_name,
-                contents=prompt,  # Simple text prompt
-                stream=False,  # Not streamed
+                contents=prompt,  # Simple text promp
             )
 
             # Check for blocked prompt before accessing text
@@ -990,8 +988,8 @@ def generate_chat_response(
                 logger.info(
                     f"Sending message to chat session with parts: {current_turn_parts}"
                 )
-                response = chat_session.send_message(
-                    message=current_turn_parts, stream=streaming_enabled
+                response = chat_session.send_message_stream(
+                    message=current_turn_parts
                 )
                 logger.info(f"send_message call returned.")
 
@@ -1350,7 +1348,6 @@ def generate_text(prompt: str, model_name: str = None) -> str:
         response = client.models.generate_content(
             model=model_to_use,
             contents=prompt,  # Simple text prompt
-            stream=False,  # Not streamed
         )
         return response.text
 
