@@ -185,10 +185,10 @@ def ai_ready_required(f):
         except Exception as e:
             # Catch any unexpected exceptions that weren't caught inside the wrapped function
             logger.error(
-                f"Decorator '{f.__name__}': Unexpected exception caught during execution: {type(e).__name__} - {e}", # Include exception type and message
+                f"Decorator '{f.__name__}': CRITICAL UNEXPECTED EXCEPTION: {type(e).__name__} - {e}", # Make log message more prominent
                 exc_info=True, # Log traceback
             )
-            error_msg = f"[Unexpected Error in AI Service Decorator: {type(e).__name__}]"
+            error_msg = f"[CRITICAL Unexpected Error in AI Service Decorator: {type(e).__name__}]" # Make error message more prominent
             if kwargs.get("streaming_enabled", False):
                 yield error_msg
                 return # Stop generator
@@ -1307,10 +1307,10 @@ def generate_chat_response(
         # This outer catch block handles exceptions that occur *before* the inner try/finally
         # or exceptions that escape the inner blocks.
         logger.error(
-            f"generate_chat_response (outer catch): Unexpected error for chat {chat_id}: {type(e).__name__} - {e}",
+            f"generate_chat_response (outer catch): CRITICAL UNEXPECTED ERROR for chat {chat_id}: {type(e).__name__} - {e}", # Make log message more prominent
             exc_info=True,
         )
-        error_msg = f"[Unexpected AI Service Error: {type(e).__name__}]"
+        error_msg = f"[CRITICAL Unexpected AI Service Error: {type(e).__name__}]" # Make error message more prominent
         if streaming_enabled:
             yield error_msg
             return # Stop generator
