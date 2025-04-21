@@ -36,7 +36,7 @@ start: stop
 
 # Target to start the application in development mode with a temporary file database
 .PHONY: start-dev
-start-dev: stop
+start-dev:
 	@echo "Starting application in development mode with temporary file database on port 5000..."
 	@sleep 1 # Give a moment for the old process to terminate
 	# Clean up previous temporary file database
