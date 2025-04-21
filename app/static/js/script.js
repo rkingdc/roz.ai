@@ -519,10 +519,10 @@ async function loadUploadedFiles() {
                 detailsDiv.classList.add('col-span-4', 'flex', 'flex-col', 'min-w-0'); // Span 4 columns, flex column layout
 
                 const uploadDateSpan = document.createElement('span');
-                let dateString = file.upload_date;
+                let dateString = file.uploaded_at; // *** FIX: Use uploaded_at ***
 
-                // --- Keep logging here for now ---
-                console.log(`Processing file ID ${file.id}, filename "${file.filename}". Raw upload_date: "${dateString}"`);
+                // --- Remove logging ---
+                // console.log(`Processing file ID ${file.id}, filename "${file.filename}". Raw upload_date: "${dateString}"`);
 
                 let formattedDate = 'Date N/A'; // Default if date is missing or invalid
 
@@ -531,17 +531,17 @@ async function loadUploadedFiles() {
                      // This assumes a format like 'YYYY-MM-DD HH:MM:SS' or similar
                      if (dateString.includes(' ')) {
                          dateString = dateString.replace(' ', 'T');
-                         console.log(`Modified date string for parsing: "${dateString}"`);
+                         // console.log(`Modified date string for parsing: "${dateString}"`); // Remove logging
                      }
                      const date = new Date(dateString);
                      if (!isNaN(date.getTime())) { // Check if the date is valid using getTime()
                          formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-                          console.log(`Parsed and formatted date: "${formattedDate}"`);
+                          // console.log(`Parsed and formatted date: "${formattedDate}"`); // Remove logging
                      } else {
-                          console.log(`Date parsing failed for string: "${dateString}"`);
+                          // console.log(`Date parsing failed for string: "${dateString}"`); // Remove logging
                      }
                 } else {
-                    console.log(`upload_date is missing or not a string for file ID ${file.id}`);
+                    // console.log(`uploaded_at is missing or not a string for file ID ${file.id}`); // Remove logging
                 }
 
 
