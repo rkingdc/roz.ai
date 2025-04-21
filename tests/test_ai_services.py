@@ -195,7 +195,7 @@ async def test_generate_summary_text_file(app, mock_genai, mock_db, app_context)
         mock_genai.upload_file.assert_not_called()  # Should not upload for text
 
 
-async def test_generate_summary_image_file(app, mock_genai, mock_db, mock_tempfile):
+async def test_generate_summary_image_file(app, mock_genai, mock_db, mock_tempfile, app_context):
     """Test summary generation for an image file (requires upload)."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
