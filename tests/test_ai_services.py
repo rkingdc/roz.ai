@@ -50,9 +50,9 @@ def runner(app):
 
 
 @pytest.fixture
-def app_context(app):
+async def app_context(app):
     """Provides the Flask application context."""
-    with app.app_context():
+    async with app.app_context():
         yield
 
 
