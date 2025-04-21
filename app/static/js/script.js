@@ -359,10 +359,6 @@ function escapeHtml(html) {
 }
 
 renderer.code = function(code, language) {
-    // --- Added Logging ---
-    console.log(`renderer.code called: code type=${typeof code}, code value=`, code);
-    // --- End Added Logging ---
-
     // Attempt to get the string content if 'code' is an object
     let codeString = typeof code === 'object' && code !== null && typeof code.text === 'string' ? code.text : String(code);
 
@@ -372,10 +368,6 @@ renderer.code = function(code, language) {
 };
 
 renderer.codespan = function(text) {
-    // --- Added Logging ---
-    console.log(`renderer.codespan called: text type=${typeof text}, text value=`, text);
-    // --- End Added Logging ---
-
     // Attempt to get the string content if 'text' is an object
     let textString = typeof text === 'object' && text !== null && typeof text.text === 'string' ? text.text : String(text);
 
@@ -407,10 +399,6 @@ const textDecoder = new TextDecoder();
  * @returns {HTMLElement|null} The created or updated message element, or null if chatbox not found.
  */
 function addMessage(role, content, isError = false, targetElement = null) {
-    // --- Added Logging ---
-    console.log(`addMessage called: role=${role}, content type=${typeof content}, content value=`, content);
-    // --- End Added Logging ---
-
     const chatboxElement = document.getElementById('chatbox'); // Get chatbox here
 
     if (!chatboxElement) {
@@ -502,10 +490,6 @@ function applyMarkdownToMessage(messageElement) {
 
     // Apply markdown parsing to the unescaped content
     const parsedContent = marked.parse(processedContent, markedOptions);
-
-    // --- Added Logging ---
-    console.log(`marked.parse result type=${typeof parsedContent}, value=`, parsedContent);
-    // --- End Added Logging ---
 
     // Ensure the result is a string before setting innerHTML
     contentElement.innerHTML = String(parsedContent);
