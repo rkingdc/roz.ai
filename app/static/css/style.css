@@ -310,6 +310,37 @@
      border-top-left-radius: 0;
      border-bottom-left-radius: 0;
 }
+
+/* Settings Button (NEW) */
+ #settings-btn {
+     position: fixed; /* Use fixed to keep it in the viewport */
+     bottom: 1rem; /* Position from the bottom */
+     left: 1rem; /* Position from the left */
+     z-index: 50; /* Ensure it's above other content */
+     background-color: var(--rz-sidebar-bg);
+     border: 1px solid var(--rz-sidebar-border);
+     border-radius: 0.375rem; /* Rounded corners */
+     padding: 0.75rem; /* Padding */
+     cursor: pointer;
+     transition: background-color 0.2s ease-in-out;
+     box-shadow: 0px 0px 5px rgba(0,0,0,0.1);
+     display: flex; /* Use flex to center icon */
+     align-items: center;
+     justify-content: center;
+}
+ #settings-btn i {
+     color: var(--rz-sidebar-text);
+     font-size: 1.2rem; /* Adjust icon size */
+}
+ #settings-btn:hover {
+     background-color: var(--rz-sidebar-hover-bg);
+}
+ #settings-btn:disabled {
+     opacity: 0.6;
+     cursor: not-allowed;
+}
+
+
 /* Message Styling */
  .message {
      padding: 0.75rem;
@@ -769,4 +800,4 @@
  input:checked + .toggle-slider::before {
      transform: translateX(14px);
 }
- 
+

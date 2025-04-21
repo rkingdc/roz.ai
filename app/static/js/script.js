@@ -54,19 +54,27 @@ const fileUploadModalInput = document.getElementById('file-upload-modal-input');
 const fileUploadModalLabel = document.getElementById('file-upload-modal-label'); // Label for the file input inside the modal
 const addUrlModalButton = document.getElementById('add-url-modal-btn'); // Button inside modal to trigger URL modal
 
+// New DOM Element References for Settings Modal
+const settingsButton = document.getElementById('settings-btn'); // The new gear button
+const settingsModal = document.getElementById('settings-modal'); // The new settings modal
+const closeSettingsModalButton = document.getElementById('close-settings-modal'); // Close button for settings modal
+const streamingToggle = document.getElementById('streaming-toggle'); // The streaming toggle input
 
-// Application State (Added Calendar state)
+
+// Application State (Added Calendar state and Streaming state)
 let currentChatId = null;
 let isLoading = false;
 let selectedFiles = []; // Files selected for attachment (from the modal list)
 let currentEditingFileId = null;
 let calendarContext = null; // Store loaded calendar events text
-let isCalendarContextActive = false; // Track toggle state
+let isCalendarContextActive = false; // Track calendar toggle state
+let isStreamingEnabled = true; // Track streaming toggle state (default to true)
 const defaultModel = modelSelector.value;
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
 const PLUGINS_COLLAPSED_KEY = 'pluginsCollapsed';
 const FILE_PLUGIN_COLLAPSED_KEY = 'filePluginCollapsed';
 const CALENDAR_PLUGIN_COLLAPSED_KEY = 'calendarPluginCollapsed';
+const STREAMING_ENABLED_KEY = 'streamingEnabled'; // New localStorage key for streaming
 const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
@@ -135,6 +143,10 @@ function setLoadingState(loading, operation = "Processing") {
     calendarToggle.disabled = loading;
     viewCalendarButton.disabled = loading || !calendarContext;
     webSearchToggle.disabled = loading;
+    settingsButton.disabled = loading; // Disable settings button when loading
+    streamingToggle.disabled = loading; // Disable streaming toggle when loading
+
+
     // Disable/Enable elements in the Manage Files Modal
     manageFilesButton.disabled = loading; // Disable the button that opens the modal
     fileUploadModalInput.disabled = loading;
@@ -159,7 +171,7 @@ function setLoadingState(loading, operation = "Processing") {
     } else {
         updateStatus("Idle");
         // Only focus if no modals are open
-        if (manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+        if (manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
              messageInput.focus();
         }
     }
@@ -186,7 +198,7 @@ function setSidebarCollapsed(sidebarElement, toggleButton, collapsed, storageKey
         localStorage.setItem(storageKey, 'false');
     }
     // Only focus if no modals are open
-    if (!collapsed && !isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block') {
+    if (!collapsed && !isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block') {
         setTimeout(() => messageInput.focus(), 350);
     }
 }
@@ -408,7 +420,7 @@ async function showManageFilesModal() {
 function closeManageFilesModal() {
     manageFilesModal.style.display = "none";
     // Ensure focus returns to message input if no other modals are open
-     if (urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+     if (urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
          messageInput.focus();
      }
 }
@@ -868,12 +880,18 @@ function closeModal(modalElement) {
          // No specific element to focus in the manage files modal, maybe just ensure it's interactive
      } else if (modalElement === manageFilesModal) {
          // If the manage files modal was closed, ensure focus returns to message input
-         if (!isLoading && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+         if (!isLoading && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
              messageInput.focus();
          }
-     } else {
-         // Default case, focus message input if no modals are open
+     } else if (modalElement === settingsModal) {
+         // If the settings modal was closed, ensure focus returns to message input
          if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+             messageInput.focus();
+         }
+     }
+     else {
+         // Default case, focus message input if no modals are open
+         if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
              messageInput.focus();
          }
      }
@@ -1176,6 +1194,7 @@ async function sendMessage() {
             mimetype: sessionFile.mimetype
         }] : [],
         enable_web_search: webSearchToggle.checked // Add the web search flag
+        // Note: Streaming preference is handled client-side for now, not sent in payload
     };
 
     // Store session file temporarily to clear it in finally block
@@ -1338,6 +1357,28 @@ async function handleModelChange() {
     }
 }
 
+// --- Settings Modal Functions ---
+
+/** Shows the Settings modal. */
+function showSettingsModal() {
+    if (isLoading) return;
+    settingsModal.style.display = "block";
+    // Ensure toggle state matches current state when opening
+    streamingToggle.checked = isStreamingEnabled;
+}
+
+/** Closes the Settings modal. */
+function closeSettingsModal() {
+    closeModal(settingsModal); // Use generic close modal function
+}
+
+/** Handles changes to the streaming toggle switch. */
+function handleStreamingToggle() {
+    isStreamingEnabled = streamingToggle.checked;
+    localStorage.setItem(STREAMING_ENABLED_KEY, isStreamingEnabled); // Persist toggle state
+    updateStatus(`Streaming responses ${isStreamingEnabled ? 'enabled' : 'disabled'}. (Note: This setting is currently client-side only and does not affect backend behavior.)`);
+}
+
 
 // --- Event Listeners Setup ---
 sendButton.addEventListener('click', sendMessage);
@@ -1406,6 +1447,16 @@ summaryModal.addEventListener('click', (event) => {
     }
 });
 
+// Settings Modal Listeners (NEW)
+settingsButton.addEventListener('click', showSettingsModal);
+closeSettingsModalButton.addEventListener('click', () => closeModal(settingsModal));
+settingsModal.addEventListener('click', (event) => {
+    if (event.target === settingsModal) {
+        closeModal(settingsModal);
+    }
+});
+streamingToggle.addEventListener('change', handleStreamingToggle); // Listen to streaming toggle change
+
 
 // Model Selector Listener
 modelSelector.addEventListener('change', handleModelChange);
@@ -1422,10 +1473,18 @@ async function initializeApp() {
     setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, pluginSidebarCollapsed, PLUGINS_COLLAPSED_KEY, 'plugins');
     setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
     setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY);
-    // Set initial toggle state from localStorage
+
+    // Load and set initial toggle states from localStorage
     isCalendarContextActive = localStorage.getItem('calendarContextActive') === 'true';
     calendarToggle.checked = isCalendarContextActive;
     updateCalendarStatus(); // Initial status update
+
+    // Load streaming toggle state (default to true if not found)
+    const storedStreamingState = localStorage.getItem(STREAMING_ENABLED_KEY);
+    isStreamingEnabled = storedStreamingState === null ? true : storedStreamingState === 'true';
+    streamingToggle.checked = isStreamingEnabled;
+
+
     await loadSavedChats();
     // loadUploadedFiles() is now called by loadChat
     const firstChatElement = savedChatsList.querySelector('.list-item');
