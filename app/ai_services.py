@@ -989,20 +989,22 @@ def generate_chat_response(
                     f"Sending message to chat session with parts: {current_turn_parts}"
                 )
                 if streaming_enabled:
+                    # Call the streaming method
                     response = chat_session.send_message_stream(
                         message=current_turn_parts
                     )
+                    logger.info(f"send_message_stream call returned.")
                 else:
+                    # Call the non-streaming method
                     response = chat_session.send_message(
                         message=current_turn_parts
                     )
-    
-                logger.info(f"send_message call returned.")
+                    logger.info(f"send_message call returned.")
 
                 # --- Debugging Logs for Response ---
-                logger.info(f"Gemini API raw response object: {response}")
-                logger.info(f"Gemini API response object type: {type(response)}")
-                if hasattr(response, "candidates"):
+                # Log the type of response, but do NOT iterate over it here if streaming
+                logger.info(f"Gemini API raw response object type: {type(response)}")
+                if not streaming_enabled and hasattr(response, "candidates"):
                     logger.info(f"Response has {len(response.candidates)} candidates.")
                     if response.candidates:
                         logger.info(
@@ -1033,71 +1035,21 @@ def generate_chat_response(
                             )
                     else:
                         logger.info("Response candidates list is empty.")
-                elif hasattr(response, "prompt_feedback"):
+                elif not streaming_enabled and hasattr(response, "prompt_feedback"):
                     logger.info(f"Response has prompt feedback: {response.prompt_feedback}")
+                elif streaming_enabled:
+                     logger.info("Response is a generator (streaming). Will be iterated in route handler.")
                 else:
-                    logger.info("Response has no candidates or prompt feedback.")
+                    logger.info("Response has no candidates or prompt feedback (non-streaming).")
                 # --- End Debugging Logs ---
 
+
                 if streaming_enabled:
-                    # Iterate through the streaming response and yield text chunks
+                    # Return the generator directly. The route handler will iterate and yield.
                     logger.info(
-                        f"Starting streaming response iteration for chat {chat_id}."
+                        f"Returning streaming generator for chat {chat_id}."
                     )
-                    # Use a separate try/except for the streaming iteration itself
-                    try:
-                        # Check if response is iterable (it should be for stream=True)
-                        if not hasattr(response, "__iter__"):
-                            logger.error(
-                                f"Expected streaming response to be iterable, but got {type(response)}"
-                            )
-                            yield "[Streaming Error: Unexpected API response format]"
-                            return
-
-                        chunk_count = 0
-                        for chunk in response:
-                            chunk_count += 1
-                            logger.info(
-                                f"Received chunk {chunk_count}: {chunk}"
-                            )
-                            if (
-                                hasattr(chunk, "text") and chunk.text
-                            ):  # Only yield if there is text in the chunk
-                                logger.info(
-                                    f"Yielding chunk text (length {len(chunk.text)})."
-                                )
-                                yield chunk.text
-                            elif hasattr(chunk, "candidates") and chunk.candidates:
-                                # Sometimes chunks might contain candidates even if text is empty?
-                                logger.info(
-                                    f"Chunk {chunk_count} has candidates but no text."
-                                )
-                            elif hasattr(chunk, "prompt_feedback"):
-                                logger.info(
-                                    f"Chunk {chunk_count} has prompt feedback: {chunk.prompt_feedback}"
-                                )
-                                # Optionally yield a system message about feedback
-                                # yield f"\n[System Note: Prompt feedback received: {chunk.prompt_feedback}]"
-                            else:
-                                logger.info(
-                                    f"Chunk {chunk_count} has no text, candidates, or prompt feedback."
-                                )
-
-                        if chunk_count == 0:
-                            logger.warning(
-                                f"Streaming iteration for chat {chat_id} completed but yielded no chunks."
-                            )
-                            # Yield a message if no chunks were received at all
-                            yield "[System Note: The AI did not return any content.]"
-
-                    except Exception as stream_err:
-                        logger.error(
-                            f"Error during streaming iteration for chat {chat_id}: {stream_err}",
-                            exc_info=True,
-                        )
-                        yield f"\n[Streaming Error: {type(stream_err).__name__}]"
-                    logger.info(f"Streaming finished for chat {chat_id}.")
-                    return  # Explicitly return after yielding all chunks
+                    return response # Return the generator object
 
                 else:
                     # Get the full text response for non-streaming
@@ -1152,9 +1104,11 @@ def generate_chat_response(
                 )
                 error_msg = f"[AI Error: Internal data format error. Please check logs. ({e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}')]"
                 if streaming_enabled:
+                    # If streaming, yield the error message and stop
                     yield error_msg
                     return
                 else:
+                    # If not streaming, return the error message string
                     return error_msg
             except DeadlineExceeded:
                 logger.error(f"Gemini API call timed out for chat {chat_id}.")
