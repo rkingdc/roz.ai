@@ -289,35 +289,35 @@ fileUploadSessionInput.addEventListener('change', async (e) => {
 
 
     const reader = new FileReader();
-    reader.onload = function(event) {
-        // Remove loading tag
-        loadingTag.remove();
-        // Store file details AND content
-        sessionFile = {
-            filename: file.name,
-            mimetype: file.type,
-            content: event.target.result // Store the Base64 content
-        };
+reader.onload = function(event) {
+    // Remove loading tag
+    loadingTag.remove();
+    // Store file details AND content
+    sessionFile = {
+        filename: file.name,
+        mimetype: file.type,
+        content: event.target.result // Store the Base64 content
+    };
 
-        // Update display in the shared container
-        selectedFilesContainer.classList.remove('hidden'); // Ensure container is visible
-        const tag = document.createElement('span');
-        tag.classList.add('selected-file-tag', 'session-file-tag'); // Add session-file-tag class
-        tag.innerHTML = `
+    // Update display in the shared container
+    selectedFilesContainer.classList.remove('hidden'); // Ensure container is visible
+    const tag = document.createElement('span');
+    tag.classList.add('selected-file-tag', 'session-file-tag'); // Add session-file-tag class
+    tag.innerHTML = `
     <i class="fas fa-paperclip mr-1 text-xs"></i> <!-- Icon for session file -->
     <span class="filename truncate" title="${file.name}">${file.name}</span>
     <span class="file-type">SESSION</span> <!-- Differentiate session file -->
     <button title="Remove Attachment" class="ml-2">&times;</button>
 `;
-        tag.querySelector('button').onclick = () => {
-            sessionFile = null; // Clear the selected file state.
-            tag.remove(); // Remove the tag itself.
-            renderSelectedFiles(); // Re-render to potentially hide container if empty
-            fileUploadSessionInput.value = ''; // Reset file input
-        };
-        // Prepend session file tag for visual distinction or append, user preference? Let's prepend.
-        selectedFilesContainer.prepend(tag);
-    }
+    tag.querySelector('button').onclick = () => {
+        sessionFile = null; // Clear the selected file state.
+        tag.remove(); // Remove the tag itself.
+        renderSelectedFiles(); // Re-render to potentially hide container if empty
+        fileUploadSessionInput.value = ''; // Reset file input
+    };
+    // Prepend session file tag for visual distinction or append, user preference? Let's prepend.
+    selectedFilesContainer.prepend(tag);
+}
     reader.onerror = function(error) {
         // Remove loading tag if it exists
         loadingTag.remove();
@@ -349,14 +349,14 @@ fileUploadSessionInput.addEventListener('change', async (e) => {
 const renderer = new marked.Renderer();
 
 // Helper function for basic HTML escaping within code
-function escapeHtml = (html) => {
+function escapeHtml(html) {
     // Ensure input is a string
     const strHtml = String(html);
     return strHtml
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-};
+}
 
 renderer.code = function(code, language) {
     // Ensure the input 'code' is treated as a string and escape its content
@@ -1585,37 +1585,60 @@ modelSelector.addEventListener('change', handleModelChange);
 // --- Initial Application Load ---
 /** Initializes the application on page load. */
 async function initializeApp() {
-    const chatSidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
-    const pluginSidebarCollapsed = localStorage.getItem(PLUGINS_COLLAPSED_KEY) === 'true';
-    const filePluginCollapsed = localStorage.getItem(FILE_PLUGIN_COLLAPSED_KEY) === 'true';
-    const calendarPluginCollapsed = localStorage.getItem(CALENDAR_PLUGIN_COLLAPSED_KEY) === 'true';
-    setSidebarCollapsed(sidebar, sidebarToggleButton, chatSidebarCollapsed, SIDEBAR_COLLAPSED_KEY, 'sidebar');
-    setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, pluginSidebarCollapsed, PLUGINS_COLLAPSED_KEY, 'plugins');
-    setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
-    setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY);
+    // Set initial status
+    updateStatus("Initializing application...");
 
-    // Load and set initial toggle states from localStorage
-    isCalendarContextActive = localStorage.getItem('calendarContextActive') === 'true';
-    calendarToggle.checked = isCalendarContextActive;
-    updateCalendarStatus(); // Initial status update
+    try {
+        // Load and set initial toggle states from localStorage
+        const chatSidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
+        const pluginSidebarCollapsed = localStorage.getItem(PLUGINS_COLLAPSED_KEY) === 'true';
+        const filePluginCollapsed = localStorage.getItem(FILE_PLUGIN_COLLAPSED_KEY) === 'true';
+        const calendarPluginCollapsed = localStorage.getItem(CALENDAR_PLUGIN_COLLAPSED_KEY) === 'true';
+        setSidebarCollapsed(sidebar, sidebarToggleButton, chatSidebarCollapsed, SIDEBAR_COLLAPSED_KEY, 'sidebar');
+        setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, pluginSidebarCollapsed, PLUGINS_COLLAPSED_KEY, 'plugins');
+        setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
+        setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY);
 
-    // Load streaming toggle state (default to true if not found)
-    const storedStreamingState = localStorage.getItem(STREAMING_ENABLED_KEY);
-    // localStorage stores strings, convert 'true'/'false' to boolean
-    isStreamingEnabled = storedStreamingState === null ? true : storedStreamingState === 'true';
-    streamingToggle.checked = isStreamingEnabled;
+        isCalendarContextActive = localStorage.getItem('calendarContextActive') === 'true';
+        calendarToggle.checked = isCalendarContextActive;
+        updateCalendarStatus(); // Initial status update
+
+        // Load streaming toggle state (default to true if not found)
+        const storedStreamingState = localStorage.getItem(STREAMING_ENABLED_KEY);
+        // localStorage stores strings, convert 'true'/'false' to boolean
+        isStreamingEnabled = storedStreamingState === null ? true : storedStreamingState === 'true';
+        streamingToggle.checked = isStreamingEnabled;
 
 
-    await loadSavedChats();
-    // loadUploadedFiles() is now called by loadChat
-    const firstChatElement = savedChatsList.querySelector('.list-item');
-    if (firstChatElement) {
-        const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
-        await loadChat(mostRecentChatId);
-    } else {
-        await startNewChat();
+        await loadSavedChats();
+        // loadUploadedFiles() is now called by loadChat
+        const firstChatElement = savedChatsList.querySelector('.list-item');
+        if (firstChatElement) {
+            const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
+            await loadChat(mostRecentChatId);
+        } else {
+            await startNewChat();
+        }
+        renderSelectedFiles(); // Render any initially selected files (though none on fresh load)
+
+        // Final status update on successful initialization
+        updateStatus("Application initialized.");
+
+    } catch (error) {
+        console.error('Error during application initialization:', error);
+        // Display a prominent error message in the chatbox
+        addMessage('system', `[Fatal Error during initialization: ${error.message}. Please check console for details.]`, true);
+        // Update status bar with error
+        updateStatus("Initialization failed.", true);
+        // Keep loading state true to prevent interaction if initialization failed severely
+        // setLoadingState(true, "Initialization Failed"); // Keep disabled on fatal error
+        // Or, set to false but show error status? Let's set to false to allow *some* interaction if possible.
+        setLoadingState(false); // Allow interaction even after error
+    } finally {
+        // Ensure loading state is false even if an error occurred
+        // This is crucial to unlock the UI
+        setLoadingState(false);
     }
-    renderSelectedFiles(); // Render any initially selected files (though none on fresh load)
 }
 
 // Start the application initialization process
