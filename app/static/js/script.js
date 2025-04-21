@@ -519,8 +519,18 @@ async function loadUploadedFiles() {
                 detailsDiv.classList.add('col-span-4', 'flex', 'flex-col', 'min-w-0'); // Span 4 columns, flex column layout
 
                 const uploadDateSpan = document.createElement('span');
-                const date = new Date(file.upload_date);
-                const formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                let dateString = file.upload_date;
+                // Attempt to make the date string more reliably parseable by replacing space with 'T'
+                // This assumes a format like 'YYYY-MM-DD HH:MM:SS' or similar
+                if (dateString && typeof dateString === 'string' && dateString.includes(' ')) {
+                    dateString = dateString.replace(' ', 'T');
+                }
+                const date = new Date(dateString);
+                let formattedDate = 'Invalid Date'; // Default in case parsing still fails
+                if (!isNaN(date.getTime())) { // Check if the date is valid using getTime()
+                    formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                }
+
                 uploadDateSpan.textContent = `Uploaded: ${formattedDate}`;
                 uploadDateSpan.classList.add('text-xs', 'text-gray-500');
 
@@ -750,7 +760,7 @@ function removeSelectedFile(fileId) {
         sidebarCheckbox.checked = false;
         sidebarCheckbox.closest('.file-list-item').classList.remove('active-selection');
     }
-    // If the manage files modal is open, remove the active-selection class (no checkbox to uncheck)
+    // If the manage files modal is open, remove the active-selection class (no checkboxes there)
     if (manageFilesModal.style.display === 'block') {
         const modalItem = manageFilesList.querySelector(`.file-list-item[data-file-id="${fileId}"]`);
         if (modalItem) {
