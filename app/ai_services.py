@@ -553,7 +553,8 @@ Search Query:"""
 def generate_chat_response(
     chat_id,
     user_message,
-    session_file_ids=None,
+    attached_files=None, # Renamed from session_file_ids, expects list of {id, filename, type}
+    session_files=None, # New parameter, expects list of {filename, mimetype, content}
     calendar_context=None,
     web_search_enabled=False,
 ):
@@ -582,7 +583,7 @@ def generate_chat_response(
     # --- Fetch History ---
     logger.info(f"Fetching history for chat {chat_id}...")
     try:
-        history_data = database.get_chat_history(chat_id)
+        history_data = database.get_chat_history_from_db(chat_id) # Use the correct DB function name
         # Convert DB history to list of genai.types.Content objects
         history = []
         for msg in history_data:
@@ -609,33 +610,95 @@ def generate_chat_response(
             Part(text="--- End Calendar Context ---"),
         ])
 
-    # 2. Process Session Files (Summaries or Uploads)
-    if session_file_ids:
-        logger.info(f"Processing {len(session_file_ids)} session files for chat {chat_id}.")
-        for file_id in session_file_ids:
+    # 2. Process Attached Files (from DB by ID, with type)
+    if attached_files: # Use the new parameter name
+        logger.info(f"Processing {len(attached_files)} attached files (from DB) for chat {chat_id}.")
+        for file_detail in attached_files: # Iterate over the list of objects {id, filename, type}
+            file_id = file_detail.get('id')
+            attachment_type = file_detail.get('type') # 'full' or 'summary'
+            frontend_filename = file_detail.get('filename', 'Unknown File') # Get filename from frontend list
+
+            if file_id is None or attachment_type is None:
+                logger.warning(f"Skipping invalid attached file detail: {file_detail}")
+                current_turn_parts.append(Part(text=f"[System: Skipped invalid attached file detail.]"))
+                continue
+
             try:
-                file_details = database.get_file_details_from_db(file_id, include_content=True)
-                if not file_details or not file_details.get("content"):
-                    logger.warning(f"Could not get details/content for file_id {file_id} in chat {chat_id}.")
-                    # MODIFIED: Wrap error message in Part()
-                    current_turn_parts.append(Part(text=f"[System: Error retrieving file details for ID {file_id}]"))
+                # Fetch file details from DB using the ID
+                db_file_details = database.get_file_details_from_db(file_id, include_content=True)
+                if not db_file_details or not db_file_details.get("content"):
+                    logger.warning(f"Could not get details/content for attached file_id {file_id} in chat {chat_id}.")
+                    current_turn_parts.append(Part(text=f"[System: Error retrieving attached file details for ID {file_id}]"))
                     continue
 
-                filename = file_details["filename"]
-                mimetype = file_details["mimetype"]
-                content_blob = file_details["content"]
+                filename = db_file_details["filename"] # Use DB filename
+                mimetype = db_file_details["mimetype"]
+                content_blob = db_file_details["content"]
 
-                # Option 1: Use existing summary if available
-                if file_details.get("has_summary") and file_details.get("summary"):
-                    summary = file_details["summary"]
-                    logger.info(f"Using existing summary for '{filename}' in chat {chat_id}.")
-                    # MODIFIED: Wrap summary info in Part()
-                    current_turn_parts.append(
-                        Part(text=f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---")
-                    )
-                # Option 2: Upload file if no summary and suitable type
-                elif mimetype.startswith(("image/", "audio/", "video/", "application/pdf", "text/")): # Include text/* for direct upload if no summary
-                    logger.info(f"No summary for '{filename}' ({mimetype}), attempting upload for chat {chat_id}.")
+                if attachment_type == 'summary':
+                    # Use existing summary or generate if needed
+                    summary = get_or_generate_summary(file_id) # This function handles DB fetch/save/gen
+                    current_turn_parts.append(Part(text=f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"))
+                elif attachment_type == 'full':
+                    # Upload the full content if supported
+                    if mimetype.startswith(("image/", "audio/", "video/", "application/pdf", "text/")): # Include text for full upload
+                        logger.info(f"Attaching full content for '{filename}' ({mimetype}) for chat {chat_id}.")
+                        try:
+                            with tempfile.NamedTemporaryFile(
+                                delete=False, suffix=f"_{secure_filename(filename)}"
+                            ) as temp_file:
+                                temp_file.write(content_blob)
+                                temp_filepath = temp_file.name
+                                temp_files_to_clean.append(temp_filepath) # Add to cleanup list
+
+                            uploaded_file = client.files.upload(
+                                path=temp_filepath,
+                                display_name=filename,
+                            )
+                            current_turn_parts.append(uploaded_file)
+                            logger.info(f"Successfully uploaded '{filename}' (URI: {uploaded_file.uri}) for chat {chat_id}.")
+                        except Exception as upload_err:
+                            logger.error(f"Failed to upload attached file '{filename}' for chat {chat_id}: {upload_err}", exc_info=True)
+                            current_turn_parts.append(Part(text=f"[System: Error uploading attached file '{filename}'. {type(upload_err).__name__}]"))
+                            if "api key not valid" in str(upload_err).lower():
+                                 g.gemini_api_key_invalid = True # Mark key invalid
+                        else:
+                            logger.warning(f"Full content attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}.")
+                            current_turn_parts.append(Part(text=f"[System: Full content attachment not supported for file '{filename}' ({mimetype}).]"))
+                else:
+                    logger.warning(f"Unknown attachment type '{attachment_type}' for file '{filename}' in chat {chat_id}.")
+                    current_turn_parts.append(Part(text=f"[System: Unknown attachment type '{attachment_type}' for file '{filename}'.]"))
+
+            except Exception as file_proc_err:
+                logger.error(f"Error processing attached file_id {file_id} for chat {chat_id}: {file_proc_err}", exc_info=True)
+                current_turn_parts.append(Part(text=f"[System: Error processing attached file ID {file_id}. {type(file_proc_err).__name__}]"))
+
+
+    # 3. Process Session Files (with content)
+    if session_files: # Use the new parameter name
+        logger.info(f"Processing {len(session_files)} session files (with content) for chat {chat_id}.")
+        for session_file_detail in session_files: # Iterate over the list of objects {filename, mimetype, content}
+            filename = session_file_detail.get('filename', 'Unknown Session File')
+            mimetype = session_file_detail.get('mimetype')
+            content_base64 = session_file_detail.get('content') # This is base64 encoded
+
+            if not filename or not mimetype or not content_base64:
+                 logger.warning(f"Skipping invalid session file detail: {session_file_detail}")
+                 current_turn_parts.append(Part(text=f"[System: Skipped invalid session file detail.]"))
+                 continue
+
+            try:
+                # Decode base64 content. Handle potential data URL prefix (e.g., "data:image/png;base64,...")
+                if ',' in content_base64:
+                    header, base64_string = content_base64.split(',', 1)
+                else:
+                    base64_string = content_base64
+
+                content_blob = base64.b64decode(base64_string)
+
+                # Session files are always treated as 'full' content attachments
+                if mimetype.startswith(("image/", "audio/", "video/", "application/pdf", "text/")): # Include text for full upload
+                    logger.info(f"Attaching session file '{filename}' ({mimetype}) for chat {chat_id}.")
                     try:
                         with tempfile.NamedTemporaryFile(
                             delete=False, suffix=f"_{secure_filename(filename)}"
@@ -648,33 +711,23 @@ def generate_chat_response(
                             path=temp_filepath,
                             display_name=filename,
                         )
-                        # Add the uploaded file object directly to parts
                         current_turn_parts.append(uploaded_file)
-                        logger.info(f"Successfully uploaded '{filename}' (URI: {uploaded_file.uri}) for chat {chat_id}.")
+                        logger.info(f"Successfully uploaded session file '{filename}' (URI: {uploaded_file.uri}) for chat {chat_id}.")
                     except Exception as upload_err:
-                        logger.error(f"Failed to upload file '{filename}' for chat {chat_id}: {upload_err}", exc_info=True)
-                        # MODIFIED: Wrap error message in Part()
-                        current_turn_parts.append(Part(text=f"[System: Error uploading file '{filename}'. {type(upload_err).__name__}]"))
+                        logger.error(f"Failed to upload session file '{filename}' for chat {chat_id}: {upload_err}", exc_info=True)
+                        current_turn_parts.append(Part(text=f"[System: Error uploading session file '{filename}'. {type(upload_err).__name__}]"))
                         if "api key not valid" in str(upload_err).lower():
                              g.gemini_api_key_invalid = True # Mark key invalid
-                # Option 3: Generate summary on-the-fly if needed (e.g., text file without summary)
-                # Note: This could add latency. Consider if Option 1 should be preferred.
-                # elif mimetype.startswith("text/"): # Example: Generate summary if text and no existing summary
-                #     logger.info(f"Generating summary on-the-fly for text file '{filename}' in chat {chat_id}.")
-                #     summary = generate_summary(file_id) # Calls the function which handles errors
-                #     current_turn_parts.append(Part(text=f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"))
-
                 else:
-                    logger.warning(f"File '{filename}' ({mimetype}) has no summary and is not directly uploadable for chat {chat_id}.")
-                    # MODIFIED: Wrap system note in Part()
-                    current_turn_parts.append(Part(text=f"[System: File '{filename}' ({mimetype}) is not directly usable in this turn.]"))
+                    logger.warning(f"Session file attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}.")
+                    current_turn_parts.append(Part(text=f"[System: Session file attachment not supported for file '{filename}' ({mimetype}).]"))
 
             except Exception as file_proc_err:
-                logger.error(f"Error processing file_id {file_id} for chat {chat_id}: {file_proc_err}", exc_info=True)
-                # MODIFIED: Wrap error message in Part()
-                current_turn_parts.append(Part(text=f"[System: Error processing file ID {file_id}. {type(file_proc_err).__name__}]"))
+                logger.error(f"Error processing session file '{filename}' for chat {chat_id}: {file_proc_err}", exc_info=True)
+                current_turn_parts.append(Part(text=f"[System: Error processing session file '{filename}'. {type(file_proc_err).__name__}]"))
 
-    # 3. Perform Web Search (if enabled and seems appropriate)
+
+    # 4. Perform Web Search (if enabled and seems appropriate)
     search_results = None
     if web_search_enabled:
         logger.info(f"Web search enabled for chat {chat_id}. Generating query...")
@@ -699,7 +752,7 @@ def generate_chat_response(
             # MODIFIED: Wrap system note in Part()
             current_turn_parts.append(Part(text="[System Note: Web search was enabled but no query could be generated.]"))
 
-    # 4. Add User's Text Message
+    # 5. Add User's Text Message
     if user_message:
         # MODIFIED: Wrap user message in Part()
         current_turn_parts.append(Part(text=user_message))
@@ -846,18 +899,7 @@ def generate_chat_response(
     if not database.add_message_to_db(chat_id, "assistant", assistant_reply):
         logger.warning(f"Failed to save assistant message for chat {chat_id}.")
 
-    return assistant_reply
-
     # --- Clean up temporary files ---
-    # NOTE: The finally block was incorrectly placed inside the try block.
-    # It needs to be at the same indentation level as the try/except block
-    # to ensure it always runs. However, since the function returns within
-    # the try/except blocks, cleanup needs to happen *before* returning
-    # or the function needs restructuring.
-
-    # --- Corrected Cleanup Placement (Conceptual) ---
-    # For simplicity, cleanup is moved *before* the final return.
-    # A more robust solution might involve restructuring or context managers.
     if temp_files_to_clean:
         logger.info(
             f"Cleaning up {len(temp_files_to_clean)} temporary files for chat {chat_id}..."
@@ -877,7 +919,7 @@ def generate_chat_response(
                 logger.warning(f"Error removing temp file {temp_path}: {e}")
 
     # The return statement should be the last thing after potential cleanup
-    # return assistant_reply # This is now handled within the try/except blocks
+    return assistant_reply
 
 
 # --- Standalone Text Generation (Example) ---
@@ -930,4 +972,3 @@ def generate_text(prompt: str, model_name: str = None) -> str:
     except Exception as e:
         logger.error(f"Unexpected error during text generation: {e}", exc_info=True)
         return f"[Unexpected AI Error: {type(e).__name__}]"
-

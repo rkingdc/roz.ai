@@ -101,9 +101,9 @@ def send_message_route(chat_id):
     """API endpoint to handle user messages, potentially with attached files/calendar context, and get assistant responses."""
     data = request.json
     user_message = data.get("message", "")
-    attached_files = data.get("attached_files", [])
+    attached_files = data.get("attached_files", []) # List of {id, filename, type}
     calendar_context = data.get("calendar_context")  # Get calendar context from request
-    session_files = data.get("session_files", [])  # Get session files from request
+    session_files = data.get("session_files", [])  # Get session files from request, list of {filename, mimetype, content}
     enable_web_search = data.get(
         "enable_web_search", False
     )  # Get web search flag, default to False
@@ -122,12 +122,13 @@ def send_message_route(chat_id):
 
     try:
         # Call the AI service function to handle the core logic
+        # Pass attached_files and session_files directly to the service function
         assistant_reply = ai_services.generate_chat_response(
             chat_id=chat_id,
             user_message=user_message,
-            attached_files=attached_files,
+            attached_files=attached_files, # Pass the list of {id, filename, type}
+            session_files=session_files,  # Pass the list of {filename, mimetype, content}
             calendar_context=calendar_context,  # Pass calendar context
-            session_files=session_files,  # Pass session files
             enable_web_search=enable_web_search,  # Pass web search flag
         )
         # Check if the reply indicates an internal error occurred
