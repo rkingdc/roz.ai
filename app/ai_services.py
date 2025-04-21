@@ -25,7 +25,6 @@ from werkzeug.utils import secure_filename  # Moved import here for clarity
 # Configure logging - Removed basicConfig and setLevel here
 logger = logging.getLogger(__name__)
 
-
 # --- Configuration Check ---
 
 gemini_api_key_present = False
@@ -79,17 +78,17 @@ def get_gemini_client():
     # Check if client already exists in the current request context
     # Also check if the key was previously found invalid in this request
     if g.get("gemini_api_key_invalid", False):
-        logger.debug(
+        logger.info(
             "Skipping client creation, API key marked invalid for this request."
         )
         return None
     if "gemini_client" in g:
         # Return cached client if it's not None (i.e., wasn't a cached failure)
         if g.gemini_client is not None:
-            logger.debug("Returning cached genai.Client for this request.")
+            logger.info("Returning cached genai.Client for this request.")
             return g.gemini_client
         else:
-            logger.debug("Cached client state was None (failure), skipping.")
+            logger.info("Cached client state was None (failure), skipping.")
             return None  # Explicitly return None if cached state is failure
 
     api_key = _get_api_key()
@@ -105,7 +104,7 @@ def get_gemini_client():
         # Optional: Perform a lightweight check to validate the key early
         # client.models.list() # Example check using the models attribute
         g.gemini_client = client  # Cache successful client in request context
-        logger.debug("Successfully created and cached genai.Client for this request.")
+        logger.info("Successfully created and cached genai.Client for this request.")
         return client
     except (GoogleAPIError, ClientError, ValueError, Exception) as e:
         logger.error(f"Failed to initialize genai.Client: {e}", exc_info=True)
@@ -584,9 +583,9 @@ def generate_chat_response(
     Uses the NEW google.genai library structure (client-based).
     Supports streaming responses if streaming_enabled is True.
     """
-    logger.debug(f"Entering generate_chat_response for chat {chat_id}. Streaming: {streaming_enabled}") # <-- Added this log
+    logger.info(f"Entering generate_chat_response for chat {chat_id}. Streaming: {streaming_enabled}") # <-- Added this log
     client = get_gemini_client()
-    logger.debug(f"Client obtained in generate_chat_response: {client}") # <-- Added this log
+    logger.info(f"Client obtained in generate_chat_response: {client}") # <-- Added this log
     if not client:
         # Decorator should handle this and return/yield error message
         # If it somehow fails here, return/yield a generic error
@@ -624,7 +623,7 @@ def generate_chat_response(
             role = 'user' if msg['role'] == 'user' else 'model'
             history.append(Content(role=role, parts=[Part(text=msg["content"])]))
         logger.info(f"Fetched {len(history)} history turns for chat {chat_id}.")
-        logger.debug(f"History prepared for API: {history}") # <-- Added this log
+        logger.info(f"History prepared for API: {history}") # <-- Added this log
 
         # Ensure history starts with 'user' role for the API
         # The API expects alternating user/model turns starting with user.
@@ -914,7 +913,7 @@ def generate_chat_response(
                     Part(text="[User provided no text, only attached files or context.]")
                 )
 
-        logger.debug(f"Current turn parts prepared for API: {current_turn_parts}") # <-- Added this log
+        logger.info(f"Current turn parts prepared for API: {current_turn_parts}") # <-- Added this log
 
         # --- Call Gemini API ---
         logger.info(
@@ -923,7 +922,7 @@ def generate_chat_response(
 
         try:
             chat_session = client.chats.create(model=model_to_use, history=history)
-            logger.debug(f"Chat session created: {chat_session}") # <-- Added this log
+            logger.info(f"Chat session created: {chat_session}") # <-- Added this log
 
             response = chat_session.send_message(
                 message=current_turn_parts,
@@ -931,30 +930,30 @@ def generate_chat_response(
             )
 
             # --- Debugging Logs for Response ---
-            logger.debug(f"Gemini API raw response object: {response}") # <-- Added this log
-            logger.debug(f"Gemini API response object type: {type(response)}")
+            logger.info(f"Gemini API raw response object: {response}") # <-- Added this log
+            logger.info(f"Gemini API response object type: {type(response)}")
             if hasattr(response, 'candidates'):
-                 logger.debug(f"Response has {len(response.candidates)} candidates.")
+                 logger.info(f"Response has {len(response.candidates)} candidates.")
                  if response.candidates:
-                      logger.debug(f"First candidate finish reason: {response.candidates[0].finish_reason}")
+                      logger.info(f"First candidate finish reason: {response.candidates[0].finish_reason}")
                       if hasattr(response.candidates[0], 'content') and response.candidates[0].content:
-                           logger.debug(f"First candidate content parts: {len(response.candidates[0].content.parts)}")
+                           logger.info(f"First candidate content parts: {len(response.candidates[0].content.parts)}")
                            if response.candidates[0].content.parts:
-                                logger.debug(f"First part type: {type(response.candidates[0].content.parts[0])}")
+                                logger.info(f"First part type: {type(response.candidates[0].content.parts[0])}")
                                 if hasattr(response.candidates[0].content.parts[0], 'text'):
-                                     logger.debug(f"First part text length: {len(response.candidates[0].content.parts[0].text)}")
+                                     logger.info(f"First part text length: {len(response.candidates[0].content.parts[0].text)}")
                                 else:
-                                     logger.debug("First part has no 'text' attribute.")
+                                     logger.info("First part has no 'text' attribute.")
                            else:
-                                logger.debug("First candidate content has no parts.")
+                                logger.info("First candidate content has no parts.")
                       else:
-                           logger.debug("First candidate has no 'content' or content is empty.")
+                           logger.info("First candidate has no 'content' or content is empty.")
                  else:
-                      logger.debug("Response candidates list is empty.")
+                      logger.info("Response candidates list is empty.")
             elif hasattr(response, 'prompt_feedback'):
-                 logger.debug(f"Response has prompt feedback: {response.prompt_feedback}")
+                 logger.info(f"Response has prompt feedback: {response.prompt_feedback}")
             else:
-                 logger.debug("Response has no candidates or prompt feedback.")
+                 logger.info("Response has no candidates or prompt feedback.")
             # --- End Debugging Logs ---
 
 
@@ -972,19 +971,19 @@ def generate_chat_response(
                     chunk_count = 0
                     for chunk in response:
                         chunk_count += 1
-                        logger.debug(f"Received chunk {chunk_count}: {chunk}")
+                        logger.info(f"Received chunk {chunk_count}: {chunk}")
                         if hasattr(chunk, 'text') and chunk.text: # Only yield if there is text in the chunk
-                            logger.debug(f"Yielding chunk text (length {len(chunk.text)}).")
+                            logger.info(f"Yielding chunk text (length {len(chunk.text)}).")
                             yield chunk.text
                         elif hasattr(chunk, 'candidates') and chunk.candidates:
                              # Sometimes chunks might contain candidates even if text is empty?
-                             logger.debug(f"Chunk {chunk_count} has candidates but no text.")
+                             logger.info(f"Chunk {chunk_count} has candidates but no text.")
                         elif hasattr(chunk, 'prompt_feedback'):
-                             logger.debug(f"Chunk {chunk_count} has prompt feedback: {chunk.prompt_feedback}")
+                             logger.info(f"Chunk {chunk_count} has prompt feedback: {chunk.prompt_feedback}")
                              # Optionally yield a system message about feedback
                              # yield f"\n[System Note: Prompt feedback received: {chunk.prompt_feedback}]"
                         else:
-                             logger.debug(f"Chunk {chunk_count} has no text, candidates, or prompt feedback.")
+                             logger.info(f"Chunk {chunk_count} has no text, candidates, or prompt feedback.")
 
 
                     if chunk_count == 0:
@@ -1126,11 +1125,11 @@ def generate_chat_response(
                 try:
                     if os.path.exists(temp_path):
                         os.remove(temp_path)
-                        logger.debug(
+                        logger.info(
                             f"Removed temp file: {temp_path}"
                         )
                     else:
-                        logger.debug(f"Temp file not found, already removed? {temp_path}")
+                        logger.info(f"Temp file not found, already removed? {temp_path}")
                 except OSError as e:
                     logger.warning(f"Error removing temp file {temp_path}: {e}")
 
