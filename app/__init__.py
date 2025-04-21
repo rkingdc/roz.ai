@@ -5,9 +5,7 @@ import google.generativeai as genai
 
 # Configure logging FIRST, at the application entry point
 import logging
-# Set the root logger level to DEBUG to see all messages from all loggers
-# This should be done as early as possible.
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.info("Root logger configured to DEBUG level via basicConfig.")
 
@@ -27,12 +25,6 @@ def create_app(test_config=None):
         app.config.from_pyfile('config.py', silent=True)
     else:
         app.config.from_mapping(test_config)
-
-    # Explicitly set logger levels after app creation, just in case Flask's dev server
-    # or other imports have modified them.
-    logging.getLogger().setLevel(logging.DEBUG) # Set root logger again
-    app.logger.setLevel(logging.DEBUG) # Set Flask app logger
-    logger.info("Logger levels explicitly set to DEBUG after app creation.")
 
 
     # Ensure instance folder exists

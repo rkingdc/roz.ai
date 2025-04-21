@@ -95,7 +95,7 @@ def get_db():
             logger.error(f"Error connecting to database '{current_app.config['DB_NAME']}' in process {os.getpid()}: {e}", exc_info=True)
             raise # Re-raise the error after logging
     else:
-        logger.debug(f"Using existing database connection for '{current_app.config['DB_NAME']}' in process {os.getpid()}")
+        logger.info(f"Using existing database connection for '{current_app.config['DB_NAME']}' in process {os.getpid()}")
     return g.db
 
 def close_db(e=None):
@@ -204,7 +204,7 @@ def create_new_chat_entry():
     default_model = current_app.config.get('DEFAULT_MODEL', 'gemini-pro') # Use .get with default
 
     try:
-        logger.debug(f"Attempting to create new chat entry...")
+        logger.info(f"Attempting to create new chat entry...")
         # Insert explicit name along with other defaults/values
         cursor.execute("INSERT INTO chats (name, created_at, last_updated_at, model_name) VALUES (?, ?, ?, ?)",
                        (default_chat_name, now, now, default_model))
@@ -249,7 +249,7 @@ def save_chat_name_in_db(chat_id, name):
         cursor = db.cursor()
         # Ensure name is not empty, fallback if necessary (though UI might prevent empty)
         effective_name = name.strip() if name and name.strip() else f"Chat {chat_id}" # Fallback if empty
-        logger.debug(f"Attempting to save name for chat {chat_id} to '{effective_name}'...")
+        logger.info(f"Attempting to save name for chat {chat_id} to '{effective_name}'...")
         cursor.execute("UPDATE chats SET name = ?, last_updated_at = ? WHERE id = ?", (effective_name, datetime.now(), chat_id))
         db.commit()
         logger.info(f"Successfully updated name for chat {chat_id} to '{effective_name}'")
@@ -263,7 +263,7 @@ def update_chat_model(chat_id, model_name):
     try:
         db = get_db()
         cursor = db.cursor()
-        logger.debug(f"Attempting to update model for chat {chat_id} to '{model_name}'...")
+        logger.info(f"Attempting to update model for chat {chat_id} to '{model_name}'...")
         cursor.execute("UPDATE chats SET model_name = ?, last_updated_at = ? WHERE id = ?",
                        (model_name, datetime.now(), chat_id))
         db.commit()
@@ -278,7 +278,7 @@ def delete_chat_from_db(chat_id):
     try:
         db = get_db()
         cursor = db.cursor()
-        logger.debug(f"Attempting to delete chat with ID: {chat_id}...")
+        logger.info(f"Attempting to delete chat with ID: {chat_id}...")
         cursor.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
         deleted_count = cursor.rowcount # Check how many rows were affected
         db.commit()
@@ -295,27 +295,27 @@ def delete_chat_from_db(chat_id):
 # Messages
 def add_message_to_db(chat_id, role, content):
     """Adds a message to the messages table for a specific chat and updates chat timestamp."""
-    logger.debug(f"--> Entering add_message_to_db for chat {chat_id}, role '{role}'.") # Added log
+    logger.info(f"--> Entering add_message_to_db for chat {chat_id}, role '{role}'.") # Added log
     try:
         db = get_db()
         cursor = db.cursor()
         now = datetime.now()
 
-        logger.debug(f"Attempting to add '{role}' message to chat {chat_id} and update timestamp...")
+        logger.info(f"Attempting to add '{role}' message to chat {chat_id} and update timestamp...")
 
         # Insert the message
-        logger.debug(f"Executing INSERT into messages for chat {chat_id}, role '{role}'.")
+        logger.info(f"Executing INSERT into messages for chat {chat_id}, role '{role}'.")
         cursor.execute("INSERT INTO messages (chat_id, role, content, timestamp) VALUES (?, ?, ?, ?)",
                        (chat_id, role, content, now))
-        logger.debug(f"Message INSERT executed successfully for chat {chat_id}.")
+        logger.info(f"Message INSERT executed successfully for chat {chat_id}.")
 
         # Update the chat timestamp in the same transaction
-        logger.debug(f"Executing UPDATE chats timestamp for chat {chat_id}.")
+        logger.info(f"Executing UPDATE chats timestamp for chat {chat_id}.")
         cursor.execute("UPDATE chats SET last_updated_at = ? WHERE id = ?", (now, chat_id))
-        logger.debug(f"Chat timestamp UPDATE executed successfully for chat {chat_id}.")
+        logger.info(f"Chat timestamp UPDATE executed successfully for chat {chat_id}.")
 
         # Commit both operations
-        logger.debug(f"Attempting to commit transaction for chat {chat_id}.")
+        logger.info(f"Attempting to commit transaction for chat {chat_id}.")
         db.commit()
         logger.info(f"Successfully added '{role}' message to chat {chat_id} and updated timestamp.")
         return True
@@ -345,7 +345,7 @@ def save_file_record_to_db(filename, content_blob, mimetype, filesize):
     try:
         db = get_db()
         cursor = db.cursor()
-        logger.debug(f"Attempting to save file record for '{filename}'...")
+        logger.info(f"Attempting to save file record for '{filename}'...")
         cursor.execute("INSERT INTO files (filename, content, mimetype, filesize, summary) VALUES (?, ?, ?, ?, NULL)",
                        (filename, content_blob, mimetype, filesize))
         file_id = cursor.lastrowid
@@ -400,7 +400,7 @@ def save_summary_in_db(file_id, summary):
     try:
         db = get_db()
         cursor = db.cursor()
-        logger.debug(f"Attempting to save summary for file ID: {file_id}...")
+        logger.info(f"Attempting to save summary for file ID: {file_id}...")
         cursor.execute("UPDATE files SET summary = ? WHERE id = ?", (summary, file_id))
         db.commit()
         logger.info(f"Successfully saved summary for file ID: {file_id}")
@@ -414,7 +414,7 @@ def delete_file_record_from_db(file_id):
     try:
         db = get_db()
         cursor = db.cursor()
-        logger.debug(f"Attempting to delete file record with ID: {file_id}...")
+        logger.info(f"Attempting to delete file record with ID: {file_id}...")
         cursor.execute("DELETE FROM files WHERE id = ?", (file_id,))
         deleted_count = cursor.rowcount # Check how many rows were affected
         db.commit()
