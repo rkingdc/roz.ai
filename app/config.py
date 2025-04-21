@@ -19,6 +19,7 @@ class Config:
 
     # Database
     TEST_DATABASE = os.environ.get('TEST_DATABASE', 'FALSE').lower() == 'true' # Keep this flag separate for other logic
+    IS_DEV_SERVER = os.environ.get('IS_DEV_SERVER', 'FALSE').lower() == 'true' # New flag for dev server
     # Always read DB_NAME from environment variable, default to file name
     DB_NAME = os.environ.get('DATABASE_NAME', 'assistant_chat_v7.db')
     logger.info(f"Database name configured as: {DB_NAME} (from DATABASE_NAME env var or default)")

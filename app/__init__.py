@@ -4,7 +4,7 @@ from flask import Flask
 import google.generativeai as genai
 
 # Configure logging
-import logging        
+import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -38,21 +38,31 @@ def create_app(test_config=None):
     # Initialize Database
     from . import database
     # Override DB_NAME with DATABASE_URI from config
+    # This line seems redundant as DB_NAME is already set from DATABASE_NAME env var in config.py
+    # Keeping it for now, but it might be unnecessary.
     app.config['DB_NAME'] = app.config['DATABASE_URI']
 
     database.init_app(app)
 
     # Initialize the database if using TEST_DATABASE
-    if app.config['TEST_DATABASE']:
-        # Register function to delete the database file when the app context is torn down
-        @app.teardown_appcontext
-        def close_db_and_remove_db_file(e=None):
-            database.close_db()  # Close the database connection
-            try:
-                os.remove(app.config['DATABASE_URI'])
-                logger.info(f"Deleted database file: {app.config['DATABASE_URI']}")
-            except OSError as e:
-                logger.warning(f"Failed to delete database file {app.config['DATABASE_URI']}: {e}")
+    # Register function to delete the database file when the app context is torn down
+    # ONLY delete the file if TEST_DATABASE is true AND it's NOT the development server
+    @app.teardown_appcontext
+    def close_db_and_remove_db_file(e=None):
+        database.close_db()  # Close the database connection
+        # Check if TEST_DATABASE is true AND IS_DEV_SERVER is false
+        if app.config.get('TEST_DATABASE', False) and not app.config.get('IS_DEV_SERVER', False):
+            db_path = app.config.get('DATABASE_URI') # Use DATABASE_URI as it holds the path
+            if db_path and db_path != ':memory:': # Ensure it's a file path, not in-memory
+                try:
+                    os.remove(db_path)
+                    logger.info(f"Deleted database file: {db_path}")
+                except FileNotFoundError:
+                    # File might have already been deleted by another teardown in debug mode
+                    logger.debug(f"Database file not found during deletion attempt: {db_path}")
+                except OSError as e:
+                    logger.warning(f"Failed to delete database file {db_path}: {e}")
+
 
     # Register Blueprints
     from .routes import main_routes, chat_routes, file_routes
