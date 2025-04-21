@@ -5,7 +5,8 @@ VENV_DIR = ~/.venv/assistant
 PYTHON = $(VENV_DIR)/bin/python
 LOG_FILE = roz.ai.log
 # Use single quotes for the pattern to avoid shell expansion issues within Make
-PROCESS_PATTERN = '/home/roz/.venv/assistant/bin/python -m uvicorn.*run:asgi_app'
+# Updated PROCESS_PATTERN to use VENV_DIR
+PROCESS_PATTERN = '$(VENV_DIR)/bin/python -m uvicorn.*run:asgi_app'
 # Increase timeout to 120 seconds for potentially long AI operations
 RUN_CMD = $(PYTHON) -m uvicorn run:asgi_app --host 0.0.0.0 --port 8000 --timeout-keep-alive 120
 
@@ -57,7 +58,7 @@ help:
 	@echo "                 and creates a .env file from .env.example if it doesn't exist."
 	@echo "  make start   - Stops any existing process and starts the application using uvicorn."
 	@echo "                 Logs output to $(LOG_FILE) and the console. Runs 'install' first."
-	@echo "  make stop    - Attempts to stop the running application process."
+	@echo "  make stop    - Attempts to stop the running application process based on the virtual environment path."
 	@echo "  make test    - Runs the pytest test suite. Runs 'install' first."
 	@echo "  make help    - Displays this help message."
 	@echo "----------------------------------------------------"
