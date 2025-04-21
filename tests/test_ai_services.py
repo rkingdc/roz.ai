@@ -85,24 +85,24 @@ def mock_genai():
 @pytest.fixture
 def mock_db(app_context):
     """Mocks the app.database module functions."""
-    with patch("app.ai_services.database", autospec=True) as mock_db_module:
-        # Setup default return values for commonly used functions
-        mock_db_module.get_file_details_from_db.return_value = {
-            "id": 1,
-            "filename": "test.txt",
-            "mimetype": "text/plain",
-            "content": b"Test file content",
-            "has_summary": False,
-            "summary": None,
-        }
-        mock_db_module.get_chat_details_from_db.return_value = {
-            "id": 1,
-            "model_name": "gemini-test-default-model",
-        }
-        mock_db_module.get_chat_history_from_db.return_value = []
-        mock_db_module.save_summary_in_db.return_value = True
-        mock_db_module.add_message_to_db.return_value = True
-        with app_context:
+    with app_context:
+        with patch("app.ai_services.database", autospec=True) as mock_db_module:
+            # Setup default return values for commonly used functions
+            mock_db_module.get_file_details_from_db.return_value = {
+                "id": 1,
+                "filename": "test.txt",
+                "mimetype": "text/plain",
+                "content": b"Test file content",
+                "has_summary": False,
+                "summary": None,
+            }
+            mock_db_module.get_chat_details_from_db.return_value = {
+                "id": 1,
+                "model_name": "gemini-test-default-model",
+            }
+            mock_db_module.get_chat_history_from_db.return_value = []
+            mock_db_module.save_summary_in_db.return_value = True
+            mock_db_module.add_message_to_db.return_value = True
             yield mock_db_module
 
 
