@@ -131,15 +131,18 @@ def send_message_route(chat_id):
             # If streaming is enabled, iterate the generator and yield chunks to the client
             def stream_generator():
                 full_reply = ""
+                logger.debug(f"Starting iteration over streaming generator for chat {chat_id}.") # Add log before loop
                 try:
                     for chunk in assistant_response_generator: # Iterate the generator
                         chunk_to_send = "" # What we will send to the client for this chunk
                         log_message = f"Processing chunk: {chunk}" # Default log
 
                         # *** FIX: Extract text or system message from chunk ***
+                        # Prioritize text content
                         if hasattr(chunk, 'text') and chunk.text:
                             chunk_to_send = chunk.text
                             log_message = f"Streaming chunk text (length {len(chunk_to_send)}): {chunk_to_send[:100]}..." # Log start of text
+                        # Check for prompt feedback if no text
                         elif hasattr(chunk, 'prompt_feedback') and chunk.prompt_feedback:
                             feedback_reason = "N/A"
                             try:
@@ -149,12 +152,11 @@ def send_message_route(chat_id):
                                 pass
                             chunk_to_send = f"\n[AI Safety Error: Request or response blocked due to safety settings (Reason: {feedback_reason})]"
                             log_message = f"Streaming chunk has prompt feedback: {chunk.prompt_feedback}. Yielding system message."
+                        # Log other types of chunks without yielding
                         elif hasattr(chunk, 'candidates') and chunk.candidates:
                              log_message = f"Streaming chunk has candidates but no text: {chunk}"
-                             # Don't yield anything for this type of chunk unless we want a placeholder
                         else:
                              log_message = f"Streaming chunk has no text, candidates, or feedback: {chunk}"
-                             # Don't yield anything for empty chunks
 
                         logger.debug(log_message)
 
@@ -162,6 +164,7 @@ def send_message_route(chat_id):
                             full_reply += chunk_to_send
                             yield chunk_to_send
 
+                    logger.debug(f"Finished iteration over streaming generator for chat {chat_id}.") # Add log after loop
                     # After the loop finishes, check if any content was yielded
                     if not full_reply:
                          logger.warning(f"Streaming generator for chat {chat_id} yielded no content.")
@@ -180,8 +183,16 @@ def send_message_route(chat_id):
                     full_reply += error_chunk # Append to full reply for saving
                 finally:
                     # Save the full accumulated reply to the database after streaming finishes or errors
+                    # *** FIX: Always attempt to save the reply, even if empty ***
+                    # Ensure the role is 'assistant' when saving the final message
+                    if not full_reply:
+                         # If no content was yielded, save a placeholder or the warning message
+                         # Use a specific placeholder that indicates no content was received
+                         full_reply = "[System Note: The AI did not return any content.]"
+                         logger.warning(f"Streaming generator for chat {chat_id} yielded no content. Saving placeholder.")
+
+                    # Only save if full_reply is not None or empty after processing
                     if full_reply:
-                        # Ensure the role is 'assistant' when saving the final message
                         if not db.add_message_to_db(chat_id, "assistant", full_reply):
                             logger.warning(f"Failed to save full streamed assistant message for chat {chat_id}.")
                     # Removed the else block that logged "yielded no content" here,
