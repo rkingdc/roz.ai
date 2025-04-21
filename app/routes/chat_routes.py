@@ -134,6 +134,22 @@ def send_message_route(chat_id):
                 logger.info(f"Starting iteration over streaming generator for chat {chat_id}.") # Add log before loop
                 try:
                     for chunk in assistant_response_generator: # Iterate the generator
+                        # *** ADDED LOGGING FOR CHUNK INSPECTION ***
+                        logger.debug(f"Received chunk type: {type(chunk)}")
+                        try:
+                            # Attempt to log chunk contents, handle potential errors
+                            if hasattr(chunk, '__dict__'):
+                                logger.debug(f"Chunk __dict__: {chunk.__dict__}")
+                            elif hasattr(chunk, '__slots__'):
+                                slot_data = {slot: getattr(chunk, slot) for slot in chunk.__slots__ if hasattr(chunk, slot)}
+                                logger.debug(f"Chunk __slots__ data: {slot_data}")
+                            else:
+                                logger.debug(f"Chunk representation: {chunk!r}") # Use !r for representation
+                        except Exception as log_e:
+                            logger.error(f"Error logging chunk details: {log_e}", exc_info=True)
+                        # *** END ADDED LOGGING ***
+
+
                         chunk_to_send = "" # What we will send to the client for this chunk
                         log_message = f"Processing chunk: {chunk}" # Default log
 
