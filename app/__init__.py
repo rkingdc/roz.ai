@@ -42,6 +42,11 @@ def create_app(test_config=None):
 
     database.init_app(app)
 
+    # Initialize the database if using an in-memory database
+    if app.config['TEST_DATABASE']:
+        with app.app_context():
+            database.init_db()
+
     # Register Blueprints
     from .routes import main_routes, chat_routes, file_routes
     app.register_blueprint(main_routes.bp)
