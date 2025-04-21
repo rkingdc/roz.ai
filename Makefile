@@ -46,7 +46,7 @@ start-dev:
 	@DATABASE_NAME=$(DEV_DB_PATH) $(PYTHON) -m flask --app run init-db
 	@echo "Starting Flask development server..."
 	# Start flask run with the temporary database name, TEST_DATABASE flag, and IS_DEV_SERVER flag
-	@DATABASE_NAME=$(DEV_DB_PATH) TEST_DATABASE=TRUE IS_DEV_SERVER=TRUE $(PYTHON) -m flask --app run run --debug --port 5000
+	@DATABASE_NAME=$(DEV_DB_PATH) TEST_DATABASE=TRUE IS_DEV_SERVER=TRUE $(PYTHON) -m flask --app run run  --port 5000
 
 # Target to display help
 .PHONY: help
