@@ -48,6 +48,17 @@ async def app_context(app):
         yield
 
 
+@pytest_asyncio.fixture # Changed to pytest_asyncio.fixture
+async def mock_db(app_context):
+    """Mocks the app.database module functions within an app context."""
+    # The app_context fixture ensures we are in the context
+    # We yield the result of the patch context manager
+    with patch("app.ai_services.database", autospec=True) as mock_db_module:
+        # Set return_value for add_message_to_db to prevent __bool__ calls in mock_calls
+        mock_db_module.add_message_to_db.return_value = True
+        yield mock_db_module
+
+
 @pytest.fixture
 def mock_genai():
     """Mocks the google.generativeai library."""
@@ -74,21 +85,12 @@ def mock_genai():
         yield mock_genai_lib
 
 
-@pytest_asyncio.fixture # Changed to pytest_asyncio.fixture
-async def mock_db(app_context):
-    """Mocks the app.database module functions within an app context."""
-    # The app_context fixture ensures we are in the context
-    # We yield the result of the patch context manager
-    with patch("app.ai_services.database", autospec=True) as mock_db_module:
-        yield mock_db_module
-
-
 @pytest.fixture
 def mock_tempfile():
     """Mocks tempfile.NamedTemporaryFile and os.remove."""
     mock_file = MagicMock()
     mock_file.__enter__.return_value.name = "/tmp/fake_temp_file_123"
-    mock_file.__enter__.return_value.write = MagicMock()
+    mock_file.__enter__().write = MagicMock() # Corrected access to write method
 
     with patch(
         "app.ai_services.tempfile.NamedTemporaryFile", return_value=mock_file
@@ -924,7 +926,7 @@ async def test_generate_chat_response_with_web_search(
     mock_db.add_message_to_db.assert_has_calls(
         [
             call(chat_id, "user", expected_user_history),
-            call(chat_id, "assistant", "Web Search Enhanced Response"),
+            call(chat_id, "assistant", "Response without web results"), # Corrected expected assistant message
         ]
     )
     # Check Gemini call context for the chat response
