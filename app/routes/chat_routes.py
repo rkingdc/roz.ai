@@ -46,11 +46,35 @@ def create_new_chat():
 @bp.route("/chat/<int:chat_id>", methods=["GET", "DELETE"])
 def get_chat(chat_id):
     """API endpoint to get details and history for a specific chat."""
-    details = db.get_chat_details_from_db(chat_id)
-    if not details:
-        return jsonify({"error": "Chat not found"}), 404
-    history = db.get_chat_history_from_db(chat_id)
-    return jsonify({"details": details, "history": history})
+    if request.method == "GET":
+        details = db.get_chat_details_from_db(chat_id)
+        if not details:
+            return jsonify({"error": "Chat not found"}), 404
+        history = db.get_chat_history_from_db(chat_id)
+        return jsonify({"details": details, "history": history})
+    elif request.method == "DELETE":
+        # Handle DELETE request
+        logger.info(f"Received DELETE request for chat {chat_id}")
+        if db.delete_chat_from_db(chat_id):
+            logger.info(f"Chat {chat_id} deleted successfully.")
+            return jsonify({"message": f"Chat {chat_id} deleted."}), 200
+        else:
+            # delete_chat_from_db returns False if chat not found or db error
+            # We can't distinguish easily here, assume not found for 404
+            logger.warning(f"Failed to delete chat {chat_id} (possibly not found or DB error).")
+            # Check if chat exists before returning 404
+            if db.get_chat_details_from_db(chat_id):
+                 # Chat exists but delete failed - likely DB error
+                 logger.error(f"Database error occurred while trying to delete chat {chat_id}.")
+                 return jsonify({"error": f"Failed to delete chat {chat_id} due to a database error."}), 500
+            else:
+                 # Chat did not exist
+                 logger.warning(f"Attempted to delete non-existent chat {chat_id}.")
+                 return jsonify({"error": f"Chat {chat_id} not found"}), 404
+    else:
+        # This case should technically not be reached due to methods=["GET", "DELETE"]
+        # but included for robustness.
+        return jsonify({"error": "Method not allowed"}), 405
 
 
 @bp.route("/chat/<int:chat_id>/name", methods=["PUT"])
