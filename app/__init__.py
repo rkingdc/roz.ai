@@ -92,4 +92,3 @@ def create_app(test_config=None):
 
     logger.info("Flask app created and configured.")
     return app
-
