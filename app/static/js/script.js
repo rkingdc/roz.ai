@@ -1,4 +1,4 @@
-// DOM Element References (Unchanged)
+// DOM Element References
 const chatbox = document.getElementById('chatbox');
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
@@ -12,8 +12,7 @@ const statusBar = document.getElementById('status-bar');
 const sidebarToggleButton = document.getElementById('sidebar-toggle-btn');
 const pluginsSidebar = document.getElementById('plugins-sidebar');
 const pluginsToggleButton = document.getElementById('plugins-toggle-btn');
-const fileUploadInput = document.getElementById('file-upload-input');
-const uploadedFilesList = document.getElementById('uploaded-files-list');
+// Removed fileUploadInput and uploadedFilesList from sidebar
 const selectedFilesContainer = document.getElementById('selected-files-container');
 const bodyElement = document.body;
 const filePluginHeader = document.getElementById('file-plugin-header');
@@ -36,21 +35,29 @@ const viewCalendarButton = document.getElementById('view-calendar-btn');
 const calendarModal = document.getElementById('calendar-modal');
 const closeCalendarModalButton = document.getElementById('close-calendar-modal');
 const calendarModalContent = document.getElementById('calendar-modal-content');
-const webSearchToggle = document.getElementById('web-search-toggle'); // Added web search toggle
+const webSearchToggle = document.getElementById('web-search-toggle');
 
-// New DOM Element References for URL feature
-const addUrlButton = document.getElementById('add-url-btn');
+// New DOM Element References for URL feature (kept as is, triggered differently)
 const urlModal = document.getElementById('url-modal');
 const closeUrlModalButton = document.getElementById('close-url-modal');
 const urlInput = document.getElementById('url-input');
 const fetchUrlButton = document.getElementById('fetch-url-btn');
 const urlStatus = document.getElementById('url-status');
 
+// New DOM Element References for Manage Files Modal
+const manageFilesButton = document.getElementById('manage-files-btn'); // New button in sidebar
+const manageFilesModal = document.getElementById('manage-files-modal'); // The new modal
+const closeManageFilesModalButton = document.getElementById('close-manage-files-modal'); // Close button for the new modal
+const manageFilesList = document.getElementById('manage-files-list'); // Area inside modal to list files
+const fileUploadModalInput = document.getElementById('file-upload-modal-input'); // File input inside the modal
+const fileUploadModalLabel = document.getElementById('file-upload-modal-label'); // Label for the file input inside the modal
+const addUrlModalButton = document.getElementById('add-url-modal-btn'); // Button inside modal to trigger URL modal
+
 
 // Application State (Added Calendar state)
 let currentChatId = null;
 let isLoading = false;
-let selectedFiles = [];
+let selectedFiles = []; // Files selected for attachment (from the modal list)
 let currentEditingFileId = null;
 let calendarContext = null; // Store loaded calendar events text
 let isCalendarContextActive = false; // Track toggle state
@@ -62,12 +69,21 @@ const CALENDAR_PLUGIN_COLLAPSED_KEY = 'calendarPluginCollapsed';
 const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
-// --- Utility Functions (Unchanged) ---
+// --- Utility Functions ---
 function updateStatus(message, isError = false) {
     statusBar.textContent = `Status: ${message}`;
     statusBar.className = `text-xs px-4 py-1 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50 border-t border-red-200' : 'text-rz-status-bar-text bg-rz-status-bar-bg border-t border-rz-frame'}`;
     console.log(`Status Update: ${message}`);
 }
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 async function deleteFile(fileId) {
     if (isLoading) return;
     if (!confirm("Are you sure you want to delete this file? This action cannot be undone.")) {
@@ -87,11 +103,11 @@ async function deleteFile(fileId) {
         }
 
         updateStatus(`File ${fileId} deleted.`);
-        await loadUploadedFiles(); // Reload the file list
+        await loadUploadedFiles(); // Reload the file list in the modal
 
         // Remove from selected files if it's selected
         selectedFiles = selectedFiles.filter(f => f.id !== fileId);
-        renderSelectedFiles();
+        renderSelectedFiles(); // Update the attached files display
 
     } catch (error) {
         console.error('Error deleting file:', error);
@@ -109,7 +125,7 @@ function setLoadingState(loading, operation = "Processing") {
     saveChatNameButton.disabled = loading;
     sidebarToggleButton.disabled = loading;
     pluginsToggleButton.disabled = loading;
-    fileUploadInput.disabled = loading;
+    // fileUploadInput.disabled = loading; // Removed old sidebar input
     attachFullButton.disabled = loading;
     attachSummaryButton.disabled = loading;
     saveSummaryButton.disabled = loading;
@@ -117,20 +133,30 @@ function setLoadingState(loading, operation = "Processing") {
     loadCalendarButton.disabled = loading;
     calendarToggle.disabled = loading;
     viewCalendarButton.disabled = loading || !calendarContext;
-    webSearchToggle.disabled = loading; // Disable web search toggle
-    addUrlButton.disabled = loading; // Disable new Add URL button
-    fetchUrlButton.disabled = loading; // Disable Fetch URL button in modal
-    urlInput.disabled = loading; // Disable URL input in modal
+    webSearchToggle.disabled = loading;
+    // Disable/Enable elements in the Manage Files Modal
+    manageFilesButton.disabled = loading; // Disable the button that opens the modal
+    fileUploadModalInput.disabled = loading;
+    fileUploadModalLabel.disabled = loading; // Disable the label too
+    addUrlModalButton.disabled = loading;
+    // Disable/Enable elements in the URL Modal if it's open
+    if (urlModal.style.display === 'block') {
+         urlInput.disabled = loading;
+         fetchUrlButton.disabled = loading;
+    }
 
-    uploadedFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading);
+
+    // Disable/Enable checkboxes and buttons within the file list in the modal
+    manageFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading);
     selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading);
     sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send';
     if (loading) {
         updateStatus(`${operation}...`);
     } else {
         updateStatus("Idle");
-        if (!bodyElement.classList.contains('sidebar-collapsed')) {
-            messageInput.focus();
+        // Only focus if no modals are open
+        if (manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+             messageInput.focus();
         }
     }
 }
@@ -155,7 +181,8 @@ function setSidebarCollapsed(sidebarElement, toggleButton, collapsed, storageKey
         toggleButton.title = `Collapse ${isLeft ? 'Chat List' : 'Plugins'}`;
         localStorage.setItem(storageKey, 'false');
     }
-    if (!collapsed && !isLoading) {
+    // Only focus if no modals are open
+    if (!collapsed && !isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block') {
         setTimeout(() => messageInput.focus(), 350);
     }
 }
@@ -204,12 +231,10 @@ function toggleCalendarPlugin() {
 
 const fileUploadSessionInput = document.getElementById('file-upload-session-input');
 const fileUploadSessionLabel = document.getElementById('file-upload-session-label');
-// const sessionFileDisplayArea = document.getElementById('session-file-display-area'); // Removed
 let sessionFile = null; // Variable to store selected session file
 
 // Show the file upload container
 fileUploadSessionLabel.addEventListener('click', () => {
-    // fileUploadSessionContainer.classList.remove('hidden'); // This container is now always visible but input is hidden
     fileUploadSessionInput.click(); // Simulate click to open file dialog.
 });
 
@@ -227,6 +252,15 @@ fileUploadSessionInput.addEventListener('change', async (e) => {
         renderSelectedFiles(); // Re-render to ensure container visibility is correct
         return;
     }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+         alert(`Skipping "${file.name}": File is too large (${formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`);
+         sessionFile = null;
+         fileUploadSessionInput.value = ''; // Reset file input
+         renderSelectedFiles();
+         return;
+    }
+
 
     // Reset sessionFile before reading the new one
     sessionFile = null;
@@ -309,7 +343,6 @@ function escapeHtml(html) {
 renderer.code = function(code, language) {
     // Ensure the input 'code' is treated as a string and escape its content
     const escapedCode = escapeHtml(String(code.text));
-    console.log(escapedCode)
     return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapedCode}</code></pre>`;
 };
 
@@ -339,12 +372,8 @@ function addMessage(role, content, isError = false) {
         if (isError) messageDiv.classList.add('error-msg');
         else messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg');
     }
-    console.log("content")
-    console.log(content)
     let processedContent = content;
     processedContent = processedContent.replace(/\[UI-MARKER:file:(.*?):(.*?)\]/g, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`).replace(/\[UI-MARKER:calendar\]/g, `<span class="attachment-icon" title="Calendar Context Active"><i class="fas fa-calendar-check"></i> Calendar</span>`).replace(/\[UI-MARKER:error:(.*?)\]/g, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`);
-    console.log("processed Content")
-    console.log(processedContent)
     const htmlContent = marked.parse(processedContent, markedOptions);
 
     messageDiv.innerHTML = htmlContent;
@@ -360,90 +389,124 @@ function addMessage(role, content, isError = false) {
     }
 }
 
-// Example usage (assuming chatbox element exists in your HTML):
-// addMessage('user', 'Hello **world**!');
-// addMessage('assistant', 'Here is some `inline code` and a ```javascript\nconsole.log("block");\n```');
-// addMessage('assistant', 'Attached file: [UI-MARKER:file:report.pdf:application/pdf]');
-// addMessage('system', 'System message here.');
-// addMessage('assistant', 'Error during attach: [UI-MARKER:error:image.jpg]', true);
 
+// --- Manage Files Modal Functions ---
 
+/** Shows the Manage Files modal and loads the file list. */
+async function showManageFilesModal() {
+    if (isLoading) return;
+    manageFilesModal.style.display = "block";
+    // Load files when the modal is shown
+    await loadUploadedFiles();
+}
 
+/** Closes the Manage Files modal. */
+function closeManageFilesModal() {
+    manageFilesModal.style.display = "none";
+    // Ensure focus returns to message input if no other modals are open
+     if (urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+         messageInput.focus();
+     }
+}
 
+/** Loads uploaded files and populates the list inside the Manage Files modal. */
 async function loadUploadedFiles() {
     updateStatus("Loading uploaded files...");
-    uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`;
+    manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Loading...</p>`; // Use gray text for modal list
     try {
         const response = await fetch('/api/files');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const files = await response.json();
-        uploadedFilesList.innerHTML = '';
+        manageFilesList.innerHTML = '';
         if (files.length === 0) {
-            uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`;
+            manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">No files uploaded yet.</p>`;
         } else {
             files.forEach(file => {
                 const itemDiv = document.createElement('div');
-                itemDiv.classList.add('file-list-item');
+                itemDiv.classList.add('file-list-item', 'flex', 'items-center', 'justify-between', 'p-1', 'border-b', 'border-gray-200', 'last:border-b-0'); // Added flex and styling classes
                 itemDiv.dataset.fileId = file.id;
                 itemDiv.dataset.filename = file.filename;
                 itemDiv.dataset.hasSummary = file.has_summary;
+
+                const leftSection = document.createElement('div');
+                leftSection.classList.add('flex', 'items-center', 'flex-grow', 'min-w-0', 'mr-2'); // Added flex, flex-grow, min-w-0, mr-2
+
                 const checkbox = document.createElement('input');
                 checkbox.type = 'checkbox';
                 checkbox.value = file.id;
-                checkbox.classList.add('file-checkbox');
-                checkbox.title = "Select file";
+                checkbox.classList.add('file-checkbox', 'mr-2'); // Added mr-2
+                checkbox.title = "Select file for attachment";
+                 // Check if this file is already selected for attachment and set checkbox state
+                const isSelected = selectedFiles.some(f => f.id === file.id);
+                checkbox.checked = isSelected;
+                if (isSelected) itemDiv.classList.add('active-selection');
+
                 checkbox.addEventListener('change', (e) => {
                     if (e.target.checked) itemDiv.classList.add('active-selection');
                     else itemDiv.classList.remove('active-selection');
+                    // Note: Selection state is only updated in `selectedFiles` when Attach buttons are clicked
+                    // This checkbox state is just for visual feedback in the modal
                 });
+
                 const nameSpan = document.createElement('span');
                 nameSpan.textContent = file.filename;
-                nameSpan.classList.add('filename');
+                nameSpan.classList.add('filename', 'truncate', 'flex-grow', 'text-sm'); // Added truncate, flex-grow, text-sm
                 nameSpan.title = file.filename;
+
+                const typeSpan = document.createElement('span');
+                typeSpan.textContent = file.mimetype ? file.mimetype.split('/')[1] || file.mimetype : 'unknown'; // Display simplified type
+                typeSpan.classList.add('file-type-display', 'text-xs', 'text-gray-500', 'ml-2', 'flex-shrink-0'); // Added styling
+
+                leftSection.appendChild(checkbox);
+                leftSection.appendChild(nameSpan);
+                leftSection.appendChild(typeSpan);
+
+
                 const actionsDiv = document.createElement('div');
-                actionsDiv.classList.add('file-actions');
+                actionsDiv.classList.add('file-actions', 'flex', 'items-center', 'flex-shrink-0', 'gap-1'); // Added flex, items-center, flex-shrink-0, gap-1
+
                 const summaryBtn = document.createElement('button');
-                summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs');
+                summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1'); // Added p-1
                 summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i>';
-                summaryBtn.title = "View/Edit Summary";
-                summaryBtn.disabled = false;
+                summaryBtn.title = file.has_summary ? "View/Edit Summary" : "Generate Summary"; // Dynamic title
+                summaryBtn.disabled = false; // Enable summary button
                 summaryBtn.onclick = (e) => {
                     e.stopPropagation();
                     showSummaryModal(file.id, file.filename);
                 };
                 actionsDiv.appendChild(summaryBtn);
 
-                // --- Add Delete Button Here ---
                 const deleteBtn = document.createElement('button');
-                deleteBtn.classList.add('btn', 'btn-outline', 'btn-xs', 'delete-btn'); // Added 'delete-btn' class
+                deleteBtn.classList.add('btn', 'btn-outline', 'btn-xs', 'delete-btn', 'p-1'); // Added p-1
                 deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
                 deleteBtn.title = "Delete File";
                 deleteBtn.onclick = (e) => {
-                    e.stopPropagation(); // Stop itemDiv onclick from triggering
-                    deleteFile(file.id); // Call the deleteFile function
+                    e.stopPropagation();
+                    deleteFile(file.id);
                 };
                 actionsDiv.appendChild(deleteBtn);
-                // --- End Delete Button ---
 
-                itemDiv.appendChild(checkbox);
-                itemDiv.appendChild(nameSpan);
+                itemDiv.appendChild(leftSection);
                 itemDiv.appendChild(actionsDiv);
-                uploadedFilesList.appendChild(itemDiv);
+                manageFilesList.appendChild(itemDiv); // Append to the modal list
             });
         }
         updateStatus("Uploaded files loaded.");
     } catch (error) {
         console.error('Error loading uploaded files:', error);
-        uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
+        manageFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
         updateStatus("Error loading files.", true);
     }
 }
 
 
+/** Handles file upload triggered from the modal. */
 function handleFileUpload(event) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
     setLoadingState(true, "Uploading");
+    // updateStatus("Uploading files..."); // Status bar already updated by setLoadingState
+
     const formData = new FormData();
     let fileCount = 0;
     for (const file of files) {
@@ -456,7 +519,7 @@ function handleFileUpload(event) {
     }
     if (fileCount === 0) {
         setLoadingState(false);
-        fileUploadInput.value = '';
+        fileUploadModalInput.value = ''; // Reset modal file input
         updateStatus("No valid files selected for upload.", true);
         return;
     }
@@ -480,13 +543,13 @@ function handleFileUpload(event) {
         console.error('Error uploading files:', error);
         updateStatus(`Error uploading files: ${error.message}`, true);
     }).finally(async () => {
-        await loadUploadedFiles();
+        await loadUploadedFiles(); // Reload the list in the modal
         setLoadingState(false);
-        fileUploadInput.value = '';
+        fileUploadModalInput.value = ''; // Reset modal file input
     });
 }
 
-// New function to handle adding file from URL
+// New function to handle adding file from URL (triggered from Manage Files modal)
 async function addFileFromUrl(url) {
     if (isLoading) return;
     if (!url || !url.startsWith('http')) {
@@ -518,8 +581,8 @@ async function addFileFromUrl(url) {
         urlStatus.textContent = `Successfully added file: ${data.filename}`;
         urlStatus.classList.remove('text-red-500'); // Clear error styling
         urlInput.value = ''; // Clear input on success
-        await loadUploadedFiles(); // Reload the file list
-        closeUrlModal(); // Close the modal on success
+        await loadUploadedFiles(); // Reload the file list in the Manage Files modal
+        closeUrlModal(); // Close the URL modal
 
     } catch (error) {
         console.error('Error adding file from URL:', error);
@@ -531,9 +594,10 @@ async function addFileFromUrl(url) {
     }
 }
 
-
+/** Attaches selected files from the modal list to the current chat. */
 function attachSelectedFiles(type) {
-    const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked');
+    // Get checkboxes from the list *inside the manage files modal*
+    const checkboxes = manageFilesList.querySelectorAll('.file-checkbox:checked');
     if (checkboxes.length === 0) {
         updateStatus("No files selected to attach.", true);
         return;
@@ -543,33 +607,29 @@ function attachSelectedFiles(type) {
         const fileId = parseInt(checkbox.value);
         const listItem = checkbox.closest('.file-list-item');
         const filename = listItem.dataset.filename;
-        const alreadySelected = selectedFiles.some(f => f.id === fileId && f.type === type);
-        if (!alreadySelected) {
-            selectedFiles = selectedFiles.filter(f => !(f.id === fileId));
-            selectedFiles.push({
-                id: fileId,
-                filename: filename,
-                type: type
-            });
-            addedCount++;
-        }
-        checkbox.checked = false;
-        listItem.classList.remove('active-selection');
+        // Remove any existing attachment for this file ID before adding the new one (either full or summary)
+        selectedFiles = selectedFiles.filter(f => f.id !== fileId);
+        selectedFiles.push({
+            id: fileId,
+            filename: filename,
+            type: type
+        });
+        addedCount++;
+        // Keep checkboxes checked in the modal for visual feedback until modal is closed/reopened
+        // checkbox.checked = false; // Don't uncheck immediately
+        // listItem.classList.remove('active-selection'); // Don't remove class immediately
     });
-    renderSelectedFiles();
+    renderSelectedFiles(); // Update the display below the message input
     if (addedCount > 0) {
-        updateStatus(`${addedCount} file(s) added as ${type}.`);
+        updateStatus(`${addedCount} file(s) added as ${type} for the next message.`);
     } else {
         updateStatus(`Selected file(s) already attached as ${type}.`);
     }
+    // Optionally close the modal after attaching, or leave it open? Let's leave it open.
+    // closeManageFilesModal();
 }
 
-function removeSelectedFile(fileId, type) {
-    selectedFiles = selectedFiles.filter(f => !(f.id === fileId && f.type === type));
-    renderSelectedFiles();
-    updateStatus(`File attachment removed.`);
-}
-
+/** Renders the list of files currently selected for attachment below the message input. */
 function renderSelectedFiles() {
     // Clear only non-session file tags
     selectedFilesContainer.querySelectorAll('.selected-file-tag:not(.session-file-tag)').forEach(tag => tag.remove());
@@ -595,7 +655,23 @@ function renderSelectedFiles() {
     }
 }
 
-// --- Summary Modal Functions (Unchanged) ---
+/** Removes a file from the list of files selected for attachment. */
+function removeSelectedFile(fileId, type) {
+    selectedFiles = selectedFiles.filter(f => !(f.id === fileId && f.type === type));
+    renderSelectedFiles();
+    updateStatus(`File attachment removed.`);
+    // If the manage files modal is open, uncheck the corresponding checkbox
+    if (manageFilesModal.style.display === 'block') {
+        const checkbox = manageFilesList.querySelector(`.file-list-item[data-file-id="${fileId}"] .file-checkbox`);
+        if (checkbox) {
+            checkbox.checked = false;
+            checkbox.closest('.file-list-item').classList.remove('active-selection');
+        }
+    }
+}
+
+
+// --- Summary Modal Functions ---
 async function showSummaryModal(fileId, filename) {
     currentEditingFileId = fileId;
     summaryModalFilename.textContent = filename;
@@ -655,8 +731,8 @@ async function saveSummary() {
         }
         updateStatus("Summary saved successfully.");
         summaryStatus.textContent = "Summary saved!";
-        await loadUploadedFiles();
-        closeModal();
+        await loadUploadedFiles(); // Reload the file list in the modal to update summary status
+        closeModal(summaryModal); // Close the summary modal
     } catch (error) {
         console.error("Error saving summary:", error);
         updateStatus("Error saving summary.", true);
@@ -667,30 +743,42 @@ async function saveSummary() {
     }
 }
 
-function closeModal() {
-    summaryModal.style.display = "none";
-    currentEditingFileId = null;
+/** Generic function to close a modal. */
+function closeModal(modalElement) {
+    modalElement.style.display = "none";
+    // If the closed modal was the summary modal, clear the editing state
+    if (modalElement === summaryModal) {
+        currentEditingFileId = null;
+    }
+     // If the closed modal was the URL modal, ensure focus returns to the Manage Files modal if it's open
+     if (modalElement === urlModal && manageFilesModal.style.display === 'block') {
+         // No specific element to focus in the manage files modal, maybe just ensure it's interactive
+     } else if (modalElement === manageFilesModal) {
+         // If the manage files modal was closed, ensure focus returns to message input
+         if (!isLoading && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+             messageInput.focus();
+         }
+     } else {
+         // Default case, focus message input if no modals are open
+         if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+             messageInput.focus();
+         }
+     }
 }
 
-function closeCalendarModal() {
-    calendarModal.style.display = "none";
-}
 
-// New URL Modal Functions
+// New URL Modal Functions (Triggered from Manage Files Modal)
 function showUrlModal() {
     if (isLoading) return;
     urlInput.value = ''; // Clear previous input
     urlStatus.textContent = ''; // Clear previous status
     urlStatus.classList.remove('text-red-500');
-    urlModal.style.display = "block";
+    urlModal.style.display = "block"; // Show the URL modal on top of Manage Files modal
     setTimeout(() => urlInput.focus(), 100); // Focus input after modal is displayed
 }
 
 function closeUrlModal() {
-    urlModal.style.display = "none";
-    urlInput.value = ''; // Clear input on close
-    urlStatus.textContent = ''; // Clear status on close
-    urlStatus.classList.remove('text-red-500');
+    closeModal(urlModal); // Use generic close modal function
 }
 
 
@@ -700,7 +788,6 @@ async function loadCalendarEvents() {
     if (isLoading) return;
     setLoadingState(true, "Loading Events");
     updateStatus("Loading calendar events...");
-    // addMessage('system', 'Fetching Google Calendar events...'); // No longer add system message
 
     try {
         const response = await fetch('/api/calendar/events');
@@ -864,6 +951,10 @@ async function startNewChat() {
         viewCalendarButton.classList.add('hidden');
         modelSelector.value = defaultModel;
         webSearchToggle.checked = false; // Reset web search toggle
+        // Ensure file list in modal is cleared/reloaded if modal is open
+        if (manageFilesModal.style.display === 'block') {
+             manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">No files uploaded yet.</p>`;
+        }
     } catch (error) {
         console.error('Error starting new chat:', error);
         addMessage('system', `[Error creating new chat: ${error.message}]`, true);
@@ -908,6 +999,11 @@ async function loadChat(chatId) {
         updateCalendarStatus();
         viewCalendarButton.classList.add('hidden');
         webSearchToggle.checked = false; // Reset web search toggle
+         // Ensure file list in modal is cleared/reloaded if modal is open
+        if (manageFilesModal.style.display === 'block') {
+             manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Loading files...</p>`; // Show loading state
+             loadUploadedFiles(); // Reload the list for the new chat context (though files are global)
+        }
     } catch (error) {
         console.error('Error loading chat:', error);
         clearChatbox();
@@ -993,6 +1089,14 @@ async function sendMessage() {
         // Clear selected files, but keep calendar context loaded and active/inactive state
         selectedFiles = [];
         renderSelectedFiles();
+        // Uncheck all checkboxes in the manage files modal if it's open
+        if (manageFilesModal.style.display === 'block') {
+             manageFilesList.querySelectorAll('.file-checkbox').forEach(checkbox => {
+                 checkbox.checked = false;
+                 checkbox.closest('.file-list-item').classList.remove('active-selection');
+             });
+        }
+
     } catch (error) {
         console.error('Error sending message:', error);
         addMessage('assistant', `[Error: ${error.message}]`, true);
@@ -1138,14 +1242,25 @@ currentChatNameInput.addEventListener('keypress', (e) => {
 });
 sidebarToggleButton.addEventListener('click', toggleLeftSidebar);
 pluginsToggleButton.addEventListener('click', toggleRightSidebar);
+
 // File Plugin Listeners
 filePluginHeader.addEventListener('click', toggleFilePlugin);
-fileUploadInput.addEventListener('change', handleFileUpload);
+manageFilesButton.addEventListener('click', showManageFilesModal); // New listener for the Manage Files button
 attachFullButton.addEventListener('click', () => attachSelectedFiles('full'));
 attachSummaryButton.addEventListener('click', () => attachSelectedFiles('summary'));
-// New URL Feature Listeners
-addUrlButton.addEventListener('click', showUrlModal);
-closeUrlModalButton.addEventListener('click', closeUrlModal);
+
+// Manage Files Modal Listeners
+closeManageFilesModalButton.addEventListener('click', () => closeModal(manageFilesModal)); // Use generic close
+manageFilesModal.addEventListener('click', (event) => {
+    if (event.target === manageFilesModal) {
+        closeModal(manageFilesModal); // Use generic close
+    }
+});
+fileUploadModalInput.addEventListener('change', handleFileUpload); // Listener for file input inside modal
+addUrlModalButton.addEventListener('click', showUrlModal); // Listener for Add URL button inside modal
+
+// Existing URL Feature Listeners (Triggered from Add URL button inside Manage Files Modal)
+closeUrlModalButton.addEventListener('click', closeUrlModal); // Use generic close
 fetchUrlButton.addEventListener('click', () => addFileFromUrl(urlInput.value));
 urlInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
@@ -1155,7 +1270,7 @@ urlInput.addEventListener('keypress', (e) => {
 });
 urlModal.addEventListener('click', (event) => {
     if (event.target === urlModal) {
-        closeUrlModal();
+        closeUrlModal(); // Use generic close
     }
 });
 
@@ -1164,21 +1279,18 @@ calendarPluginHeader.addEventListener('click', toggleCalendarPlugin);
 loadCalendarButton.addEventListener('click', loadCalendarEvents);
 calendarToggle.addEventListener('change', handleCalendarToggle); // Listen to toggle change
 viewCalendarButton.addEventListener('click', showCalendarModal); // Listen to view button
-closeCalendarModalButton.addEventListener('click', closeCalendarModal); // Calendar modal close
+closeCalendarModalButton.addEventListener('click', () => closeModal(calendarModal)); // Use generic close
+
 // Summary Modal Listeners
-closeSummaryModalButton.addEventListener('click', closeModal);
+closeSummaryModalButton.addEventListener('click', () => closeModal(summaryModal)); // Use generic close
 saveSummaryButton.addEventListener('click', saveSummary);
 summaryModal.addEventListener('click', (event) => {
     if (event.target === summaryModal) {
-        closeModal();
+        closeModal(summaryModal); // Use generic close
     }
 });
-// Calendar Modal Background Close
-calendarModal.addEventListener('click', (event) => {
-    if (event.target === calendarModal) {
-        closeCalendarModal();
-    }
-});
+
+
 // Model Selector Listener
 modelSelector.addEventListener('change', handleModelChange);
 
@@ -1199,7 +1311,7 @@ async function initializeApp() {
     calendarToggle.checked = isCalendarContextActive;
     updateCalendarStatus(); // Initial status update
     await loadSavedChats();
-    await loadUploadedFiles();
+    // loadUploadedFiles() is now called when the Manage Files modal is opened
     const firstChatElement = savedChatsList.querySelector('.list-item');
     if (firstChatElement) {
         const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
@@ -1207,7 +1319,7 @@ async function initializeApp() {
     } else {
         await startNewChat();
     }
-    renderSelectedFiles();
+    renderSelectedFiles(); // Render any initially selected files (though none on fresh load)
 }
 
 // Start the application initialization process
