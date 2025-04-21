@@ -547,7 +547,7 @@ async function loadUploadedFiles() {
         uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
         manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
         updateStatus("Files plugin disabled. File list not loaded.");
-        return;
+        return; // Exit early if plugin is disabled
     }
 
     updateStatus("Loading uploaded files...");
@@ -722,6 +722,7 @@ async function loadUploadedFiles() {
         uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
         manageFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
         updateStatus("Error loading files.", true);
+        throw error; // Re-throw the error
     }
 }
 
@@ -981,6 +982,7 @@ async function showSummaryModal(fileId, filename) {
         updateStatus(`Error fetching summary for ${filename}.`, true);
         summaryStatus.textContent = `Error: ${error.message}`;
         summaryStatus.classList.add('text-red-500');
+        // No re-throw needed here as this is not part of the critical init path
     }
 }
 async function saveSummary() {
@@ -1017,6 +1019,7 @@ async function saveSummary() {
         updateStatus("Error saving summary.", true);
         summaryStatus.textContent = `Error saving: ${error.message}`;
         summaryStatus.classList.add('text-red-500');
+        // No re-throw needed here
     } finally {
         setLoadingState(false);
     }
@@ -1106,6 +1109,7 @@ async function loadCalendarEvents() {
         viewCalendarButton.disabled = true;
         addMessage('system', `[Error loading calendar events: ${error.message}]`, true); // Show error in chat
         updateStatus(`Error loading calendar events: ${error.message}`, true);
+        // No re-throw needed here as this is not part of the critical init path
     } finally {
         setLoadingState(false);
     }
@@ -1235,6 +1239,7 @@ async function loadSavedChats() {
         console.error('Error loading saved chats:', error);
         savedChatsList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading chats.</p>';
         updateStatus("Error loading saved chats.", true);
+        throw error; // Re-throw the error
     }
 }
 
@@ -1252,7 +1257,7 @@ async function startNewChat() {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const newChat = await response.json();
         await loadChat(newChat.id);
-        await loadSavedChats();
+        await loadSavedChats(); // loadSavedChats might re-throw, but loadChat's finally will run first
         updateStatus(`New chat created (ID: ${newChat.id}).`);
         setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar');
 
@@ -1282,6 +1287,7 @@ async function startNewChat() {
         console.error('Error starting new chat:', error);
         addMessage('system', `[Error creating new chat: ${error.message}]`, true);
         updateStatus("Error creating new chat.", true);
+        // No re-throw needed here, initializeApp's catch will handle it if this was the first chat
     } finally {
         setLoadingState(false);
     }
@@ -1341,7 +1347,7 @@ async function loadChat(chatId) {
         // Load files for the new chat context (files are global, but list needs refreshing)
         // Only load files if the plugin is enabled
         if (isFilePluginEnabled) {
-             await loadUploadedFiles();
+             await loadUploadedFiles(); // This might re-throw, which is caught by the catch block below
         } else {
              // If plugin is disabled, clear the lists and show disabled message
              uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
@@ -1349,7 +1355,7 @@ async function loadChat(chatId) {
         }
 
 
-    } catch (error) {
+    } catch (error) { // <-- This will now catch errors from fetch('/api/chat') AND re-thrown errors from loadUploadedFiles
         console.error('Error loading chat:', error);
         clearChatbox();
         addMessage('system', `[Error loading chat ${chatId}: ${error.message}]`, true);
@@ -1361,8 +1367,9 @@ async function loadChat(chatId) {
         updateActiveChatListItem();
         // Ensure plugin UI reflects the *current* enabled state even on error
         updatePluginUI();
+        throw error; // Re-throw the error so initializeApp's catch block can handle it if this was the initial load
     } finally {
-        setLoadingState(false);
+        setLoadingState(false); // <-- This will now run even if loadUploadedFiles re-throws
     }
 }
 
@@ -1836,6 +1843,7 @@ modelSelector.addEventListener('change', handleModelChange);
 async function initializeApp() {
     // Set initial status
     updateStatus("Initializing application...");
+    setLoadingState(true, "Initializing"); // Set loading state at the very beginning
 
     try {
         // Load and set initial toggle states from localStorage
@@ -1874,14 +1882,14 @@ async function initializeApp() {
         updateCalendarStatus();
 
 
-        await loadSavedChats();
-        // loadUploadedFiles() is now called by loadChat (conditionally based on plugin state)
+        await loadSavedChats(); // This will now re-throw if it fails
+        // If loadSavedChats succeeds, proceed to load the chat
         const firstChatElement = savedChatsList.querySelector('.list-item');
         if (firstChatElement) {
             const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
-            await loadChat(mostRecentChatId);
+            await loadChat(mostRecentChatId); // This will now re-throw if it fails (including file loading)
         } else {
-            await startNewChat();
+            await startNewChat(); // This calls loadChat internally and will re-throw if it fails
         }
         renderSelectedFiles(); // Render any initially selected files (though none on fresh load)
 
@@ -1894,14 +1902,10 @@ async function initializeApp() {
         addMessage('system', `[Fatal Error during initialization: ${error.message}. Please check console for details.]`, true);
         // Update status bar with error
         updateStatus("Initialization failed.", true);
-        // Keep loading state true to prevent interaction if initialization failed severely
-        // setLoadingState(true, "Initialization Failed"); // Keep disabled on fatal error
-        // Or, set to false but show error status? Let's set to false to allow *some* interaction if possible.
-        setLoadingState(false); // Allow interaction even after error
+        // The finally block will now run because the error is caught here
     } finally {
-        // Ensure loading state is false even if an error occurred
-        // This is crucial to unlock the UI
-        setLoadingState(false);
+        // Ensure loading state is false even if an error occurred during initialization
+        setLoadingState(false); // This is crucial to unlock the UI
     }
 }
 
