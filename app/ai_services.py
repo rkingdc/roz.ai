@@ -123,35 +123,49 @@ def ai_ready_required(f):
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        logger.debug(f"Decorator '{f.__name__}': Entering decorator.") # <-- Added log
         try:
             # Check if configure_gemini found the key initially
             if not gemini_api_key_present:
                 logger.warning(
-                    f"AI function '{f.__name__}' called but API key was missing at startup."
+                    f"Decorator '{f.__name__}': AI function called but API key was missing at startup."
                 )
+                error_msg = "[Error: AI Service API Key not configured]"
                 # Return a string error message for non-streaming, or yield for streaming
                 if kwargs.get("streaming_enabled", False):
-                    yield "[Error: AI Service API Key not configured]"
+                    yield error_msg
                     return  # Stop generator
                 else:
-                    return "[Error: AI Service API Key not configured]"
+                    return error_msg
 
             # Check if we have a valid request context (needed for g and current_app)
-            _ = (
-                current_app.config
-            )  # Simple check that raises RuntimeError if no context
+            try:
+                 _ = current_app.config # Simple check that raises RuntimeError if no context
+                 logger.debug(f"Decorator '{f.__name__}': Flask request context is active.") # <-- Added log
+            except RuntimeError:
+                 logger.error(
+                     f"Decorator '{f.__name__}': AI function called outside of active Flask request context.",
+                     exc_info=True # Log traceback
+                 )
+                 error_msg = "[Error: AI Service called outside request context]"
+                 if kwargs.get("streaming_enabled", False):
+                     yield error_msg
+                     return  # Stop generator
+                 else:
+                     return error_msg
+
 
             # Attempt to get the client (this also checks the invalid key flag in g)
             client = get_gemini_client()
             if not client:
                 if g.get("gemini_api_key_invalid", False):
                     logger.warning(
-                        f"AI function '{f.__name__}' called but API key was found invalid in this request."
+                        f"Decorator '{f.__name__}': AI function called but API key was found invalid in this request."
                     )
                     error_msg = "[Error: Invalid Gemini API Key]"
                 else:
                     logger.error(
-                        f"AI function '{f.__name__}' called but failed to get Gemini client."
+                        f"Decorator '{f.__name__}': AI function called but failed to get Gemini client."
                     )
                     error_msg = "[Error: Failed to initialize AI client]"
 
@@ -163,17 +177,24 @@ def ai_ready_required(f):
                     return error_msg
 
             # If client is obtained, proceed with the function
-            return f(*args, **kwargs)
-        except RuntimeError:
+            logger.debug(f"Decorator '{f.__name__}': AI readiness check passed. Calling wrapped function.") # <-- Added log
+            result = f(*args, **kwargs)
+            logger.debug(f"Decorator '{f.__name__}': Wrapped function call returned/yielded.") # <-- Added log
+            return result
+
+        except Exception as e:
+            # Catch any unexpected exceptions that weren't caught inside the wrapped function
             logger.error(
-                f"AI function '{f.__name__}' called outside of active Flask request context."
+                f"Decorator '{f.__name__}': Unexpected exception caught during execution: {type(e).__name__} - {e}", # Include exception type and message
+                exc_info=True, # Log traceback
             )
-            error_msg = "[Error: AI Service called outside request context]"
+            error_msg = f"[Unexpected Error in AI Service Decorator: {type(e).__name__}]"
             if kwargs.get("streaming_enabled", False):
                 yield error_msg
-                return  # Stop generator
+                return # Stop generator
             else:
                 return error_msg
+
 
     return decorated_function
 
