@@ -364,7 +364,7 @@ async def test_get_or_generate_summary_generate_new(app, mock_db, mock_genai, ap
 
 
 async def test_get_or_generate_summary_generate_new_save_fails(
-    app, mock_db, mock_genai
+    app, mock_db, mock_genai, app_context
 ):
     """Test generating a new summary when saving it fails."""
     ai_services.gemini_configured = True
@@ -398,13 +398,12 @@ async def test_get_or_generate_summary_generate_new_save_fails(
         mock_db.save_summary_in_db.assert_called_once_with(1, "Generated But Not Saved")
 
 
-async def test_get_or_generate_summary_file_not_found(app, mock_db):
+async def test_get_or_generate_summary_file_not_found(app, mock_db, app_context):
     """Test get_or_generate_summary when file details are not found initially."""
     mock_db.get_file_details_from_db.return_value = None
-    with app.app_context():
-        result = await ai_services.get_or_generate_summary(99)
-        assert result == "[Error: File details not found]"
-        mock_db.get_file_details_from_db.assert_called_once_with(99)
+    result = await ai_services.get_or_generate_summary(99)
+    assert result == "[Error: File details not found]"
+    mock_db.get_file_details_from_db.assert_called_once_with(99)
 
 
 # == Test generate_search_query ==
