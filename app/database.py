@@ -1,5 +1,6 @@
 # Configure logging
 import logging
+import os # Import os to get process ID
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def get_db():
                 detect_types=sqlite3.PARSE_DECLTYPES
             )
             g.db.row_factory = sqlite3.Row
-            logger.info(f"Database connection opened: {db_name}")
+            logger.info(f"Database connection opened: {db_name} in process {os.getpid()}")
 
             # --- Schema Initialization for In-Memory DB ---
             # For in-memory databases, the schema needs to be applied
@@ -38,35 +39,28 @@ def get_db():
                     table_exists = cursor.fetchone()
 
                     if not table_exists:
-                        logger.info(f"In-memory database '{db_name}' is empty. Applying schema...")
-                        # Execute the schema creation SQL directly
-                        # Create chats table
-                        cursor.execute(f'''
-                            CREATE TABLE chats (
+                        logger.info(f"In-memory database '{db_name}' is empty in process {os.getpid()}. Applying schema...")
+                        # Execute the schema creation SQL directly using executescript
+                        schema_sql = f'''
+                            CREATE TABLE IF NOT EXISTS chats (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 name TEXT NOT NULL,
                                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                                 last_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                                 model_name TEXT DEFAULT '{current_app.config["DEFAULT_MODEL"]}'
-                            )
-                        ''')
+                            );
 
-                        # Create messages table
-                        cursor.execute('''
-                            CREATE TABLE messages (
+                            CREATE TABLE IF NOT EXISTS messages (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 chat_id INTEGER NOT NULL,
                                 role TEXT NOT NULL,
                                 content TEXT NOT NULL,
                                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                                 FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
-                            )
-                        ''')
-                        cursor.execute('CREATE INDEX idx_messages_chat_id ON messages (chat_id)')
+                            );
+                            CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id);
 
-                        # Create files table (with BLOB)
-                        cursor.execute('''
-                            CREATE TABLE files (
+                            CREATE TABLE IF NOT EXISTS files (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 filename TEXT NOT NULL,
                                 content BLOB NOT NULL,
@@ -74,14 +68,15 @@ def get_db():
                                 filesize INTEGER NOT NULL,
                                 summary TEXT,
                                 uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                            )
-                        ''')
-                        cursor.execute('CREATE INDEX idx_files_filename ON files (filename)')
+                            );
+                            CREATE INDEX IF NOT EXISTS idx_files_filename ON files (filename);
+                        '''
+                        cursor.executescript(schema_sql)
 
                         g.db.commit()
-                        logger.info("Schema applied to in-memory database.")
+                        logger.info(f"Schema applied to in-memory database in process {os.getpid()}.")
                 except sqlite3.Error as schema_e:
-                     logger.error(f"Error applying schema to in-memory database: {schema_e}")
+                     logger.error(f"Error applying schema to in-memory database in process {os.getpid()}: {schema_e}")
                      # Depending on desired behavior, you might want to raise here
                      # or handle it differently. For now, log and let the original
                      # error (if any) propagate.
@@ -90,7 +85,7 @@ def get_db():
 
 
         except sqlite3.Error as e:
-            logger.info(f"Error connecting to database '{current_app.config['DB_NAME']}': {e}")
+            logger.info(f"Error connecting to database '{current_app.config['DB_NAME']}' in process {os.getpid()}: {e}")
             raise # Re-raise the error after logging
     return g.db
 
@@ -99,12 +94,13 @@ def close_db(e=None):
     db = g.pop('db', None)
     if db is not None:
         db.close()
-        logger.info("Database connection closed.")
+        logger.info(f"Database connection closed in process {os.getpid()}.")
 
 # --- Database Initialization ---
 
 def init_db():
     """Clears existing data and creates new tables."""
+    logger.info(f"init_db called in process {os.getpid()}") # Log process ID
     db = get_db() # Use get_db to ensure connection is open
     cursor = db.cursor()
 
@@ -117,11 +113,11 @@ def init_db():
     cursor.execute("DROP TABLE IF EXISTS chats")
     logger.info("Dropped existing tables (if any).")
 
-    # Create chats table - Removed DEFAULT for name column
+    # Create chats table - Added IF NOT EXISTS
     cursor.execute(f'''
-        CREATE TABLE chats (
+        CREATE TABLE IF NOT EXISTS chats (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL, -- Changed: Removed DEFAULT, set NOT NULL
+            name TEXT NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             last_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             model_name TEXT DEFAULT '{current_app.config["DEFAULT_MODEL"]}'
@@ -129,9 +125,9 @@ def init_db():
     ''')
     logger.info("Created 'chats' table.")
 
-    # Create messages table
+    # Create messages table - Added IF NOT EXISTS
     cursor.execute('''
-        CREATE TABLE messages (
+        CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             chat_id INTEGER NOT NULL,
             role TEXT NOT NULL,
@@ -140,12 +136,12 @@ def init_db():
             FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
         )
     ''')
-    cursor.execute('CREATE INDEX idx_messages_chat_id ON messages (chat_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id)') # Added IF NOT EXISTS
     logger.info("Created 'messages' table and index.")
 
-    # Create files table (with BLOB) - Changed from uploaded_files
+    # Create files table (with BLOB) - Added IF NOT EXISTS
     cursor.execute('''
-        CREATE TABLE files (
+        CREATE TABLE IF NOT EXISTS files (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             filename TEXT NOT NULL,
             content BLOB NOT NULL,
@@ -155,8 +151,8 @@ def init_db():
             uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    cursor.execute('CREATE INDEX idx_files_filename ON files (filename)') # Changed from uploaded_files
-    logger.info("Created 'files' table and index.") # Changed from uploaded_files
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_files_filename ON files (filename)') # Added IF NOT EXISTS
+    logger.info("Created 'files' table and index.")
 
     db.commit()
     logger.info("Database schema initialized successfully.")
@@ -307,7 +303,7 @@ def save_file_record_to_db(filename, content_blob, mimetype, filesize):
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("INSERT INTO files (filename, content, mimetype, filesize, summary) VALUES (?, ?, ?, ?, NULL)", # Changed from uploaded_files
+        cursor.execute("INSERT INTO files (filename, content, mimetype, filesize, summary) VALUES (?, ?, ?, ?, NULL)",
                        (filename, content_blob, mimetype, filesize))
         db.commit()
         file_id = cursor.lastrowid
@@ -322,7 +318,7 @@ def get_uploaded_files_from_db():
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute(" SELECT id, filename, mimetype, filesize, uploaded_at, (summary IS NOT NULL) as has_summary FROM files ORDER BY uploaded_at DESC ") # Changed from uploaded_files
+        cursor.execute(" SELECT id, filename, mimetype, filesize, uploaded_at, (summary IS NOT NULL) as has_summary FROM files ORDER BY uploaded_at DESC ")
         files = cursor.fetchall()
         return [dict(row) for row in files]
     except sqlite3.Error as e:
@@ -337,7 +333,7 @@ def get_file_details_from_db(file_id, include_content=False):
         columns = "id, filename, mimetype, filesize, summary, (summary IS NOT NULL) as has_summary"
         if include_content:
             columns += ", content"
-        cursor.execute(f"SELECT {columns} FROM files WHERE id = ?", (file_id,)) # Changed from uploaded_files
+        cursor.execute(f"SELECT {columns} FROM files WHERE id = ?", (file_id,))
         file_data = cursor.fetchone()
         return dict(file_data) if file_data else None
     except sqlite3.Error as e:
@@ -349,7 +345,7 @@ def get_summary_from_db(file_id):
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("SELECT summary FROM files WHERE id = ?", (file_id,)) # Changed from uploaded_files
+        cursor.execute("SELECT summary FROM files WHERE id = ?", (file_id,))
         result = cursor.fetchone()
         return result['summary'] if result and result['summary'] else None
     except sqlite3.Error as e:
@@ -361,7 +357,7 @@ def save_summary_in_db(file_id, summary):
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("UPDATE files SET summary = ? WHERE id = ?", (summary, file_id)) # Changed from uploaded_files
+        cursor.execute("UPDATE files SET summary = ? WHERE id = ?", (summary, file_id))
         db.commit()
         logger.info(f"Saved summary for file ID: {file_id}")
         return True
@@ -374,7 +370,7 @@ def delete_file_record_from_db(file_id):
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("DELETE FROM files WHERE id = ?", (file_id,)) # Changed from uploaded_files
+        cursor.execute("DELETE FROM files WHERE id = ?", (file_id,))
         deleted_count = cursor.rowcount # Check how many rows were affected
         db.commit()
         if deleted_count > 0:
