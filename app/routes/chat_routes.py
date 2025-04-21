@@ -43,7 +43,7 @@ def create_new_chat():
         return jsonify({"error": "Failed to create new chat"}), 500
 
 
-@bp.route("/chat/<int:chat_id>", methods=["GET"])
+@bp.route("/chat/<int:chat_id>", methods=["GET", "DELETE"])
 def get_chat(chat_id):
     """API endpoint to get details and history for a specific chat."""
     details = db.get_chat_details_from_db(chat_id)
