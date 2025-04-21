@@ -1,5 +1,5 @@
 // DOM Element References
-const chatbox = document.getElementById('chatbox');
+const chatbox = document.getElementById('chatbox'); // Defined globally
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
 const sidebar = document.getElementById('sidebar');
@@ -390,16 +390,38 @@ const textDecoder = new TextDecoder();
  * @param {string} content - The message content (can include UI markers).
  * @param {boolean} [isError=false] - Whether the message represents an error.
  * @param {HTMLElement} [targetElement=null] - Optional: An existing element to append content to (for streaming).
- * @returns {HTMLElement} The created or updated message element.
+ * @returns {HTMLElement|null} The created or updated message element, or null if chatbox not found.
  */
 function addMessage(role, content, isError = false, targetElement = null) {
+    // --- Added Logging ---
+    console.log(`addMessage called: role=${role}, content type=${typeof content}, content value=`, content);
+    // --- End Added Logging ---
+
+    const chatboxElement = document.getElementById('chatbox'); // Get chatbox here
+
+    if (!chatboxElement) {
+        console.error("Chatbox element with ID 'chatbox' not found. Cannot add message.");
+        return null; // Return null if chatbox is not found
+    }
+
     let messageDiv;
+    // Ensure content is a string before processing
+    const stringContent = String(content); // Explicitly convert to string
+
     if (targetElement) {
         // If targetElement is provided, append content to it
         messageDiv = targetElement;
         // Append content directly for streaming, markdown will be applied later
         // Escape HTML content before appending to prevent script injection or unwanted HTML rendering during streaming
-        messageDiv.innerHTML += escapeHtml(content); // Append escaped text
+        // Ensure targetElement has a .message-content span to append to
+        const contentSpan = messageDiv.querySelector('.message-content');
+        if (contentSpan) {
+             contentSpan.innerHTML += escapeHtml(stringContent); // Append escaped string content to content span
+        } else {
+             // Fallback if structure is unexpected
+             messageDiv.innerHTML += escapeHtml(stringContent);
+        }
+
     } else {
         // Create a new message element
         messageDiv = document.createElement('div');
@@ -411,33 +433,32 @@ function addMessage(role, content, isError = false, targetElement = null) {
             else messageDiv.classList.add(role === 'user' ? 'user-msg' : 'assistant-msg');
         }
 
+        const roleSpan = document.createElement('span');
+        roleSpan.classList.add('message-role');
+        roleSpan.textContent = role === 'user' ? 'You: ' : 'Assistant: ';
+        messageDiv.appendChild(roleSpan);
+
+        const contentSpan = document.createElement('span');
+        contentSpan.classList.add('message-content');
+        messageDiv.appendChild(contentSpan);
+
+
         // Process UI markers only when creating the initial message or final content
-        let processedContent = content;
+        let processedContent = stringContent; // Use the stringContent here
         processedContent = processedContent.replace(/\[UI-MARKER:file:(.*?):(.*?)\]/g, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`).replace(/\[UI-MARKER:calendar\]/g, `<span class="attachment-icon" title="Calendar Context Active"><i class="fas fa-calendar-check"></i> Calendar</span>`).replace(/\[UI-MARKER:error:(.*?)\]/g, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`);
 
         // Apply markdown parsing only when creating a new message (non-streaming initial content)
         // For streaming, markdown is applied *after* the stream finishes.
-        if (!targetElement) {
-             messageDiv.innerHTML = marked.parse(processedContent, markedOptions);
-        } else {
-             // For streaming, the initial content might just be placeholders or empty
-             // We append escaped text chunks during streaming, and parse markdown at the end
-             messageDiv.innerHTML = processedContent; // Add initial content/placeholders without parsing
-        }
+        // This branch is for non-streaming or initial message creation
+        contentSpan.innerHTML = marked.parse(escapeHtml(processedContent), markedOptions); // Escape before parsing
 
 
-        // Assuming 'chatbox' is a pre-existing element in your DOM
-        const chatbox = document.getElementById('chatbox');
-
-        if (chatbox) {
-            chatbox.appendChild(messageDiv);
-        } else {
-            console.error("Chatbox element with ID 'chatbox' not found.");
-        }
+        // Append the new message element to the chatbox
+        chatboxElement.appendChild(messageDiv);
     }
 
-    // Always scroll to the bottom after adding/updating content
-    chatbox.scrollTop = chatbox.scrollHeight;
+    // Always scroll to the bottom after adding/updating content, but only if chatbox exists
+    chatboxElement.scrollTop = chatboxElement.scrollHeight;
 
     return messageDiv; // Return the element for potential future updates (streaming)
 }
@@ -449,7 +470,10 @@ function addMessage(role, content, isError = false, targetElement = null) {
  */
 function applyMarkdownToMessage(messageElement) {
     if (!messageElement) return;
-    const rawContent = messageElement.innerHTML; // Get the accumulated raw text (which was escaped)
+    const contentElement = messageElement.querySelector('.message-content');
+    if (!contentElement) return;
+
+    const rawContent = contentElement.innerHTML; // Get the accumulated raw text (which was escaped)
 
     // Unescape HTML entities before parsing markdown
     const unescapedContent = rawContent
@@ -463,7 +487,7 @@ function applyMarkdownToMessage(messageElement) {
 
 
     // Apply markdown parsing to the unescaped content
-    messageElement.innerHTML = marked.parse(processedContent, markedOptions);
+    contentElement.innerHTML = marked.parse(processedContent, markedOptions);
 }
 
 
@@ -503,7 +527,7 @@ async function loadUploadedFiles() {
         manageFilesList.innerHTML = '';
 
         if (files.length === 0) {
-            uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`;
+            uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No files uploaded yet.</p>`;
             manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">No files uploaded yet.</p>`;
         } else {
             files.forEach(file => {
@@ -594,9 +618,6 @@ async function loadUploadedFiles() {
                 const uploadDateSpan = document.createElement('span');
                 let dateString = file.uploaded_at; // *** FIX: Use uploaded_at ***
 
-                // --- Remove logging ---
-                // console.log(`Processing file ID ${file.id}, filename "${file.filename}". Raw upload_date: "${dateString}"`);
-
                 let formattedDate = 'Date N/A'; // Default if date is missing or invalid
 
                 if (dateString && typeof dateString === 'string') {
@@ -604,17 +625,11 @@ async function loadUploadedFiles() {
                      // This assumes a format like 'YYYY-MM-DD HH:MM:SS' or similar
                      if (dateString.includes(' ')) {
                          dateString = dateString.replace(' ', 'T');
-                         // console.log(`Modified date string for parsing: "${dateString}"`); // Remove logging
                      }
                      const date = new Date(dateString);
                      if (!isNaN(date.getTime())) { // Check if the date is valid using getTime()
                          formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-                          // console.log(`Parsed and formatted date: "${formattedDate}"`); // Remove logging
-                     } else {
-                          // console.log(`Date parsing failed for string: "${dateString}"`); // Remove logging
                      }
-                } else {
-                    // console.log(`uploaded_at is missing or not a string for file ID ${file.id}`); // Remove logging
                 }
 
 
@@ -1037,7 +1052,13 @@ function showCalendarModal() {
 }
 
 function clearChatbox() {
-    chatbox.innerHTML = '';
+    // Ensure chatbox element exists before clearing
+    const chatboxElement = document.getElementById('chatbox');
+    if (chatboxElement) {
+        chatboxElement.innerHTML = '';
+    } else {
+        console.error("Chatbox element with ID 'chatbox' not found. Cannot clear chatbox.");
+    }
 }
 
 
@@ -1231,6 +1252,9 @@ async function sendMessage() {
         return;
     }
 
+    // Clear the input field immediately
+    messageInput.value = '';
+
     // --- Display user message + UI markers immediately ---
     let displayMessage = message || ((filesToAttach.length > 0 || (isCalendarContextActive && calendarContext) || sessionFile || webSearchToggle.checked) ? "(Context attached)" : ""); // Added sessionFile and webSearchToggle check
     let uiMarkers = "";
@@ -1253,12 +1277,13 @@ async function sendMessage() {
     displayMessage = uiMarkers + (uiMarkers ? "\n" : "") + displayMessage; // Add newline if markers exist
     addMessage('user', displayMessage); // addMessage will handle replacing placeholders
 
-    messageInput.value = '';
+
     setLoadingState(true, "Sending");
     updateStatus("Sending message...");
 
     // --- Prepare payload for backend ---
     const payload = {
+        chat_id: currentChatId, // Ensure chat_id is included in the payload
         message: message,
         attached_files: filesToAttach, // Send only files marked for attachment
         calendar_context: (isCalendarContextActive && calendarContext) ? calendarContext : null,
@@ -1295,6 +1320,9 @@ async function sendMessage() {
         if (isStreamingEnabled && response.headers.get('Content-Type')?.includes('text/plain')) {
              // --- Handle Streaming Response ---
              assistantMessageElement = addMessage('assistant', ''); // Add an empty message element to start
+             if (!assistantMessageElement) { // Check if addMessage failed
+                 throw new Error("Failed to create assistant message element for streaming.");
+             }
              const reader = response.body.getReader();
              const decoder = new TextDecoder();
              let receivedText = '';
@@ -1310,7 +1338,7 @@ async function sendMessage() {
                  addMessage('assistant', chunk, false, assistantMessageElement);
              }
 
-             // After streaming is done, apply markdown to the full received text
+             // After streaming is done, apply markdown to the full accumulated text
              // Note: The backend saves the full message, so we don't need to save here.
              // We just need to render the final markdown.
              // The addMessage function with targetElement appends escaped text.
