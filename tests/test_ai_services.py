@@ -169,7 +169,7 @@ async def test_generate_summary_file_not_found(mock_db, app, app_context):
     )
 
 
-async def test_generate_summary_text_file(app, mock_genai, mock_db):
+async def test_generate_summary_text_file(app, mock_genai, mock_db, app_context):
     """Test summary generation for a text file."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
