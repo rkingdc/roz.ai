@@ -42,10 +42,20 @@ def create_app(test_config=None):
 
     database.init_app(app)
 
-    # Initialize the database if using an in-memory database
+    # Initialize the database if using TEST_DATABASE
     if app.config['TEST_DATABASE']:
         with app.app_context():
             database.init_db()
+
+        # Register function to delete the database file when the app context is torn down
+        @app.teardown_appcontext
+        def close_db_and_remove_db_file(e=None):
+            database.close_db()  # Close the database connection
+            try:
+                os.remove(app.config['DATABASE_URI'])
+                logger.info(f"Deleted database file: {app.config['DATABASE_URI']}")
+            except OSError as e:
+                logger.warning(f"Failed to delete database file {app.config['DATABASE_URI']}: {e}")
 
     # Register Blueprints
     from .routes import main_routes, chat_routes, file_routes
