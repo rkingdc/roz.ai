@@ -7,6 +7,7 @@ import re
 import base64  # Needed for decoding session file content
 from . import database  # Use relative import
 from .plugins.web_search import perform_web_search
+import asyncio
 
 # Configure logging
 import logging
@@ -37,7 +38,7 @@ def configure_gemini(app):
 
 
 # --- Summary Generation ---
-def generate_summary(file_id):
+async def generate_summary(file_id):
     """
     Generates a summary for a file using a designated multi-modal model.
     Handles text directly and uses file upload API for other types.
@@ -123,7 +124,7 @@ def generate_summary(file_id):
                 )
 
 
-def get_or_generate_summary(file_id):
+async def get_or_generate_summary(file_id):
     """Gets summary from DB or generates+saves it if not present."""
     file_details = database.get_file_details_from_db(file_id)
     if not file_details:
@@ -137,7 +138,7 @@ def get_or_generate_summary(file_id):
         return file_details["summary"]
     else:
         logger.info(f"Generating summary for file ID: {file_id}...")
-        new_summary = generate_summary(file_id)
+        new_summary = await generate_summary(file_id)
         if database.save_summary_in_db(file_id, new_summary):
             return new_summary
         else:
@@ -148,7 +149,7 @@ def get_or_generate_summary(file_id):
 
 
 # --- Chat Response Generation (MODIFIED Signature) ---
-def generate_search_query(user_message: str, max_retries=1) -> str | None:
+async def generate_search_query(user_message: str, max_retries=1) -> str | None:
     """
     Uses the default LLM to generate a concise web search query based on the user's message.
 
@@ -254,7 +255,7 @@ Search Query:"""
     return None  # Should technically be unreachable if loop condition is correct, but safety return
 
 
-def generate_chat_response(
+async def generate_chat_response(
     chat_id,
     user_message,
     attached_files,
@@ -494,7 +495,7 @@ def generate_chat_response(
         )
         if enable_web_search:
             try:
-                search_query = generate_search_query(user_message)
+                search_query = await ai_services.generate_search_query(user_message)
                 logger.info(
                     f"Web search enabled, searching for: '{search_query}'"
                 )  # Using user_message for search now

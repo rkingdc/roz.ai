@@ -97,7 +97,7 @@ def delete_chat(chat_id):
 
 
 @bp.route("/chat/<int:chat_id>/message", methods=["POST"])
-def send_message_route(chat_id):
+async def send_message_route(chat_id):
     """API endpoint to handle user messages, potentially with attached files/calendar context, and get assistant responses."""
     data = request.json
     user_message = data.get("message", "")
@@ -122,7 +122,7 @@ def send_message_route(chat_id):
 
     try:
         # Call the AI service function to handle the core logic
-        assistant_reply = ai_services.generate_chat_response(
+        assistant_reply = await ai_services.generate_chat_response(
             chat_id=chat_id,
             user_message=user_message,
             attached_files=attached_files,

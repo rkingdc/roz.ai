@@ -89,10 +89,10 @@ def upload_file_route():
 
 
 @bp.route('/files/<int:file_id>/summary', methods=['GET'])
-def get_summary_route(file_id):
+async def get_summary_route(file_id):
     """Gets or generates a summary for a specific file."""
     try:
-        summary = ai_services.get_or_generate_summary(file_id)
+        summary = await ai_services.get_or_generate_summary(file_id)
         if isinstance(summary, str) and summary.startswith("[Error"): # Check if the result is an error message
             # Determine appropriate status code based on error type if possible
             status_code = 500 if "API" in summary or "generating" in summary else 404 if "not found" in summary else 400
