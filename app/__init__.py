@@ -44,9 +44,6 @@ def create_app(test_config=None):
 
     # Initialize the database if using TEST_DATABASE
     if app.config['TEST_DATABASE']:
-        with app.app_context():
-            database.init_db()
-
         # Register function to delete the database file when the app context is torn down
         @app.teardown_appcontext
         def close_db_and_remove_db_file(e=None):
