@@ -244,8 +244,8 @@ def generate_summary(file_id):
                 )
                 # Use the client's file upload method (client.files.upload)
                 uploaded_file = client.files.upload(
-                    path=temp_filepath,
-                    display_name=filename,
+                    file=temp_filepath,
+                    config={'display_name':filename},
                 )
                 # Construct parts including the prompt (as Part) and the uploaded file reference
                 content_parts = [
@@ -690,8 +690,8 @@ def generate_chat_response(
                                 )  # Add to cleanup list
 
                             uploaded_file = client.files.upload(
-                                path=temp_filepath,
-                                display_name=filename,
+                                file=temp_filepath,
+                                config={'display_name':filename},
                             )
                             current_turn_parts.append(uploaded_file)
                             logger.info(
@@ -793,8 +793,8 @@ def generate_chat_response(
                             )  # Add to cleanup list
 
                         uploaded_file = client.files.upload(
-                            path=temp_filepath,
-                            display_name=filename,
+                            file=temp_filepath,
+                            config={'display_name':filename},
                         )
                         current_turn_parts.append(uploaded_file)
                         logger.info(
