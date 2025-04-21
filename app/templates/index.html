@@ -102,8 +102,13 @@
                     <i class="fas fa-folder-open mr-1"></i> Manage Files
                 </button>
 
-                <h4 class="text-sm font-medium text-rz-sidebar-text mb-1 flex-shrink-0">Attach Selected:</h4>
-                 <!-- Removed uploaded-files-list from here -->
+                <h4 class="text-sm font-medium text-rz-sidebar-text mb-1 flex-shrink-0">Uploaded Files:</h4>
+                 <!-- Added uploaded-files-list back here -->
+                <div id="uploaded-files-list" class="sidebar-list flex-grow overflow-y-auto border border-rz-sidebar-border rounded p-1 bg-rz-frame">
+                     <p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading files...</p>
+                </div>
+
+                <h4 class="text-sm font-medium text-rz-sidebar-text mb-1 mt-2 flex-shrink-0">Attach Selected:</h4>
                 <div class="flex gap-2 flex-shrink-0">
                     <button id="attach-full-btn" class="btn btn-outline btn-sm flex-grow">
                         <i class="fas fa-book-open"></i> Attach Full

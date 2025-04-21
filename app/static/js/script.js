@@ -12,7 +12,8 @@ const statusBar = document.getElementById('status-bar');
 const sidebarToggleButton = document.getElementById('sidebar-toggle-btn');
 const pluginsSidebar = document.getElementById('plugins-sidebar');
 const pluginsToggleButton = document.getElementById('plugins-toggle-btn');
-// Removed fileUploadInput and uploadedFilesList from sidebar
+// Added uploadedFilesList back to sidebar references
+const uploadedFilesList = document.getElementById('uploaded-files-list');
 const selectedFilesContainer = document.getElementById('selected-files-container');
 const bodyElement = document.body;
 const filePluginHeader = document.getElementById('file-plugin-header');
@@ -103,7 +104,7 @@ async function deleteFile(fileId) {
         }
 
         updateStatus(`File ${fileId} deleted.`);
-        await loadUploadedFiles(); // Reload the file list in the modal
+        await loadUploadedFiles(); // Reload *both* file lists
 
         // Remove from selected files if it's selected
         selectedFiles = selectedFiles.filter(f => f.id !== fileId);
@@ -148,6 +149,9 @@ function setLoadingState(loading, operation = "Processing") {
 
     // Disable/Enable checkboxes and buttons within the file list in the modal
     manageFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading);
+     // Disable/Enable checkboxes in the sidebar file list
+    uploadedFilesList.querySelectorAll('input[type="checkbox"]').forEach(el => el.disabled = loading);
+
     selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading);
     sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send';
     if (loading) {
@@ -397,7 +401,7 @@ async function showManageFilesModal() {
     if (isLoading) return;
     manageFilesModal.style.display = "block";
     // Load files when the modal is shown
-    await loadUploadedFiles();
+    await loadUploadedFiles(); // This will now load into both lists
 }
 
 /** Closes the Manage Files modal. */
@@ -409,91 +413,172 @@ function closeManageFilesModal() {
      }
 }
 
-/** Loads uploaded files and populates the list inside the Manage Files modal. */
+/** Loads uploaded files and populates the lists in both the sidebar and the modal. */
 async function loadUploadedFiles() {
     updateStatus("Loading uploaded files...");
-    manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Loading...</p>`; // Use gray text for modal list
+    // Clear both lists and show loading state
+    uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`;
+    manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Loading...</p>`;
+
     try {
         const response = await fetch('/api/files');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const files = await response.json();
+
+        // Clear lists again before populating
+        uploadedFilesList.innerHTML = '';
         manageFilesList.innerHTML = '';
+
         if (files.length === 0) {
+            uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`;
             manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">No files uploaded yet.</p>`;
         } else {
             files.forEach(file => {
-                const itemDiv = document.createElement('div');
-                itemDiv.classList.add('file-list-item', 'flex', 'items-center', 'justify-between', 'p-1', 'border-b', 'border-gray-200', 'last:border-b-0'); // Added flex and styling classes
-                itemDiv.dataset.fileId = file.id;
-                itemDiv.dataset.filename = file.filename;
-                itemDiv.dataset.hasSummary = file.has_summary;
-
-                const leftSection = document.createElement('div');
-                leftSection.classList.add('flex', 'items-center', 'flex-grow', 'min-w-0', 'mr-2'); // Added flex, flex-grow, min-w-0, mr-2
-
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.value = file.id;
-                checkbox.classList.add('file-checkbox', 'mr-2'); // Added mr-2
-                checkbox.title = "Select file for attachment";
-                 // Check if this file is already selected for attachment and set checkbox state
                 const isSelected = selectedFiles.some(f => f.id === file.id);
-                checkbox.checked = isSelected;
-                if (isSelected) itemDiv.classList.add('active-selection');
 
-                checkbox.addEventListener('change', (e) => {
-                    if (e.target.checked) itemDiv.classList.add('active-selection');
-                    else itemDiv.classList.remove('active-selection');
-                    // Note: Selection state is only updated in `selectedFiles` when Attach buttons are clicked
-                    // This checkbox state is just for visual feedback in the modal
+                // --- Create Sidebar List Item ---
+                const sidebarItemDiv = document.createElement('div');
+                sidebarItemDiv.classList.add('file-list-item', 'flex', 'items-center', 'p-1', 'border-b', 'border-rz-sidebar-border', 'last:border-b-0');
+                sidebarItemDiv.dataset.fileId = file.id;
+                sidebarItemDiv.dataset.filename = file.filename;
+                if (isSelected) sidebarItemDiv.classList.add('active-selection');
+
+                const sidebarCheckbox = document.createElement('input');
+                sidebarCheckbox.type = 'checkbox';
+                sidebarCheckbox.value = file.id;
+                sidebarCheckbox.classList.add('file-checkbox', 'mr-2');
+                sidebarCheckbox.title = "Select file for attachment";
+                sidebarCheckbox.checked = isSelected;
+
+                const sidebarNameSpan = document.createElement('span');
+                sidebarNameSpan.textContent = file.filename;
+                sidebarNameSpan.classList.add('filename', 'truncate', 'flex-grow', 'text-sm', 'text-rz-sidebar-text');
+                sidebarNameSpan.title = file.filename;
+
+                sidebarItemDiv.appendChild(sidebarCheckbox);
+                sidebarItemDiv.appendChild(sidebarNameSpan);
+                uploadedFilesList.appendChild(sidebarItemDiv);
+
+                // Add event listener to sidebar checkbox
+                sidebarCheckbox.addEventListener('change', (e) => {
+                    const fileId = parseInt(e.target.value);
+                    const filename = e.target.closest('.file-list-item').dataset.filename;
+                    // Find the corresponding checkbox in the modal list
+                    const modalCheckbox = manageFilesList.querySelector(`.file-list-item[data-file-id="${fileId}"] .file-checkbox`);
+
+                    if (e.target.checked) {
+                        // Add to selectedFiles if not already there (handles both full/summary)
+                        // We don't know *how* it will be attached yet (full/summary), just that it's selected
+                        // The actual type is determined when attachFull/attachSummary is clicked.
+                        // For now, just mark it as selected. We'll refine `attachSelectedFiles`.
+                        if (!selectedFiles.some(f => f.id === fileId)) {
+                             // Add a placeholder entry, type will be determined later
+                             selectedFiles.push({ id: fileId, filename: filename, type: 'pending' });
+                        }
+                        sidebarItemDiv.classList.add('active-selection');
+                        if (modalCheckbox) modalCheckbox.checked = true; // Sync modal checkbox
+                        if (modalCheckbox) modalCheckbox.closest('.file-list-item').classList.add('active-selection'); // Sync modal styling
+                    } else {
+                        // Remove ALL entries for this file ID from selectedFiles
+                        selectedFiles = selectedFiles.filter(f => f.id !== fileId);
+                        sidebarItemDiv.classList.remove('active-selection');
+                        if (modalCheckbox) modalCheckbox.checked = false; // Sync modal checkbox
+                        if (modalCheckbox) modalCheckbox.closest('.file-list-item').classList.remove('active-selection'); // Sync modal styling
+                    }
+                    renderSelectedFiles(); // Update the display below the message input
                 });
 
-                const nameSpan = document.createElement('span');
-                nameSpan.textContent = file.filename;
-                nameSpan.classList.add('filename', 'truncate', 'flex-grow', 'text-sm'); // Added truncate, flex-grow, text-sm
-                nameSpan.title = file.filename;
 
-                const typeSpan = document.createElement('span');
-                typeSpan.textContent = file.mimetype ? file.mimetype.split('/')[1] || file.mimetype : 'unknown'; // Display simplified type
-                typeSpan.classList.add('file-type-display', 'text-xs', 'text-gray-500', 'ml-2', 'flex-shrink-0'); // Added styling
-
-                leftSection.appendChild(checkbox);
-                leftSection.appendChild(nameSpan);
-                leftSection.appendChild(typeSpan);
+                // --- Create Modal List Item ---
+                const modalItemDiv = document.createElement('div');
+                modalItemDiv.classList.add('file-list-item', 'flex', 'items-center', 'justify-between', 'p-1', 'border-b', 'border-gray-200', 'last:border-b-0');
+                modalItemDiv.dataset.fileId = file.id;
+                modalItemDiv.dataset.filename = file.filename;
+                modalItemDiv.dataset.hasSummary = file.has_summary;
+                 if (isSelected) modalItemDiv.classList.add('active-selection');
 
 
-                const actionsDiv = document.createElement('div');
-                actionsDiv.classList.add('file-actions', 'flex', 'items-center', 'flex-shrink-0', 'gap-1'); // Added flex, items-center, flex-shrink-0, gap-1
+                const modalLeftSection = document.createElement('div');
+                modalLeftSection.classList.add('flex', 'items-center', 'flex-grow', 'min-w-0', 'mr-2');
+
+                const modalCheckbox = document.createElement('input');
+                modalCheckbox.type = 'checkbox';
+                modalCheckbox.value = file.id;
+                modalCheckbox.classList.add('file-checkbox', 'mr-2');
+                modalCheckbox.title = "Select file for attachment";
+                modalCheckbox.checked = isSelected; // Set initial state based on selectedFiles
+
+                 // Add event listener to modal checkbox (syncs with sidebar checkbox)
+                 modalCheckbox.addEventListener('change', (e) => {
+                     const fileId = parseInt(e.target.value);
+                     const filename = e.target.closest('.file-list-item').dataset.filename;
+                     // Find the corresponding checkbox in the sidebar list
+                     const sidebarCheckbox = uploadedFilesList.querySelector(`.file-list-item[data-file-id="${fileId}"] .file-checkbox`);
+
+                     if (e.target.checked) {
+                         if (!selectedFiles.some(f => f.id === fileId)) {
+                             selectedFiles.push({ id: fileId, filename: filename, type: 'pending' });
+                         }
+                         modalItemDiv.classList.add('active-selection');
+                         if (sidebarCheckbox) sidebarCheckbox.checked = true; // Sync sidebar checkbox
+                         if (sidebarCheckbox) sidebarCheckbox.closest('.file-list-item').classList.add('active-selection'); // Sync sidebar styling
+                     } else {
+                         selectedFiles = selectedFiles.filter(f => f.id !== fileId);
+                         modalItemDiv.classList.remove('active-selection');
+                         if (sidebarCheckbox) sidebarCheckbox.checked = false; // Sync sidebar checkbox
+                         if (sidebarCheckbox) sidebarCheckbox.closest('.file-list-item').classList.remove('active-selection'); // Sync sidebar styling
+                     }
+                     renderSelectedFiles(); // Update the display below the message input
+                 });
+
+
+                const modalNameSpan = document.createElement('span');
+                modalNameSpan.textContent = file.filename;
+                modalNameSpan.classList.add('filename', 'truncate', 'flex-grow', 'text-sm');
+                modalNameSpan.title = file.filename;
+
+                const modalTypeSpan = document.createElement('span');
+                modalTypeSpan.textContent = file.mimetype ? file.mimetype.split('/')[1] || file.mimetype : 'unknown';
+                modalTypeSpan.classList.add('file-type-display', 'text-xs', 'text-gray-500', 'ml-2', 'flex-shrink-0');
+
+                modalLeftSection.appendChild(modalCheckbox);
+                modalLeftSection.appendChild(modalNameSpan);
+                modalLeftSection.appendChild(modalTypeSpan);
+
+
+                const modalActionsDiv = document.createElement('div');
+                modalActionsDiv.classList.add('file-actions', 'flex', 'items-center', 'flex-shrink-0', 'gap-1');
 
                 const summaryBtn = document.createElement('button');
-                summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1'); // Added p-1
+                summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1');
                 summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i>';
-                summaryBtn.title = file.has_summary ? "View/Edit Summary" : "Generate Summary"; // Dynamic title
-                summaryBtn.disabled = false; // Enable summary button
+                summaryBtn.title = file.has_summary ? "View/Edit Summary" : "Generate Summary";
+                summaryBtn.disabled = false;
                 summaryBtn.onclick = (e) => {
                     e.stopPropagation();
                     showSummaryModal(file.id, file.filename);
                 };
-                actionsDiv.appendChild(summaryBtn);
+                modalActionsDiv.appendChild(summaryBtn);
 
                 const deleteBtn = document.createElement('button');
-                deleteBtn.classList.add('btn', 'btn-outline', 'btn-xs', 'delete-btn', 'p-1'); // Added p-1
+                deleteBtn.classList.add('btn', 'btn-outline', 'btn-xs', 'delete-btn', 'p-1');
                 deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
                 deleteBtn.title = "Delete File";
                 deleteBtn.onclick = (e) => {
                     e.stopPropagation();
                     deleteFile(file.id);
                 };
-                actionsDiv.appendChild(deleteBtn);
+                modalActionsDiv.appendChild(deleteBtn);
 
-                itemDiv.appendChild(leftSection);
-                itemDiv.appendChild(actionsDiv);
-                manageFilesList.appendChild(itemDiv); // Append to the modal list
+                modalItemDiv.appendChild(modalLeftSection);
+                modalItemDiv.appendChild(modalActionsDiv);
+                manageFilesList.appendChild(modalItemDiv); // Append to the modal list
             });
         }
         updateStatus("Uploaded files loaded.");
     } catch (error) {
         console.error('Error loading uploaded files:', error);
+        uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
         manageFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
         updateStatus("Error loading files.", true);
     }
@@ -543,7 +628,7 @@ function handleFileUpload(event) {
         console.error('Error uploading files:', error);
         updateStatus(`Error uploading files: ${error.message}`, true);
     }).finally(async () => {
-        await loadUploadedFiles(); // Reload the list in the modal
+        await loadUploadedFiles(); // Reload *both* lists
         setLoadingState(false);
         fileUploadModalInput.value = ''; // Reset modal file input
     });
@@ -581,7 +666,7 @@ async function addFileFromUrl(url) {
         urlStatus.textContent = `Successfully added file: ${data.filename}`;
         urlStatus.classList.remove('text-red-500'); // Clear error styling
         urlInput.value = ''; // Clear input on success
-        await loadUploadedFiles(); // Reload the file list in the Manage Files modal
+        await loadUploadedFiles(); // Reload *both* file lists
         closeUrlModal(); // Close the URL modal
 
     } catch (error) {
@@ -594,10 +679,10 @@ async function addFileFromUrl(url) {
     }
 }
 
-/** Attaches selected files from the modal list to the current chat. */
+/** Attaches selected files from the sidebar list to the current chat. */
 function attachSelectedFiles(type) {
-    // Get checkboxes from the list *inside the manage files modal*
-    const checkboxes = manageFilesList.querySelectorAll('.file-checkbox:checked');
+    // Get checkboxes from the list *inside the sidebar*
+    const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked');
     if (checkboxes.length === 0) {
         updateStatus("No files selected to attach.", true);
         return;
@@ -607,26 +692,27 @@ function attachSelectedFiles(type) {
         const fileId = parseInt(checkbox.value);
         const listItem = checkbox.closest('.file-list-item');
         const filename = listItem.dataset.filename;
+
         // Remove any existing attachment for this file ID before adding the new one (either full or summary)
         selectedFiles = selectedFiles.filter(f => f.id !== fileId);
+
+        // Add the file with the specified type
         selectedFiles.push({
             id: fileId,
             filename: filename,
             type: type
         });
         addedCount++;
-        // Keep checkboxes checked in the modal for visual feedback until modal is closed/reopened
-        // checkbox.checked = false; // Don't uncheck immediately
-        // listItem.classList.remove('active-selection'); // Don't remove class immediately
+        // Keep checkboxes checked in the sidebar for visual feedback until they are manually unchecked
     });
     renderSelectedFiles(); // Update the display below the message input
     if (addedCount > 0) {
         updateStatus(`${addedCount} file(s) added as ${type} for the next message.`);
     } else {
+        // This case should ideally not happen if checkboxes.length > 0, but good for safety
         updateStatus(`Selected file(s) already attached as ${type}.`);
     }
-    // Optionally close the modal after attaching, or leave it open? Let's leave it open.
-    // closeManageFilesModal();
+    // Checkboxes remain checked in the sidebar until manually unchecked or chat changes
 }
 
 /** Renders the list of files currently selected for attachment below the message input. */
@@ -636,19 +722,25 @@ function renderSelectedFiles() {
 
     // Render plugin-selected files
     selectedFiles.forEach(file => {
-        const tag = document.createElement('span');
-        tag.classList.add('selected-file-tag'); // No session-file-tag class here
-        tag.innerHTML = `
-            <span class="filename truncate" title="${file.filename}">${file.filename}</span>
-            <span class="file-type">${file.type.toUpperCase()}</span>
-            <button title="Remove Attachment">&times;</button>
-        `;
-        tag.querySelector('button').onclick = () => removeSelectedFile(file.id, file.type);
-        selectedFilesContainer.appendChild(tag); // Append plugin files
+        // Only render tags for files that have a type assigned (i.e., attached via full/summary buttons)
+        // Files with type 'pending' are just selected in the list but not yet attached for the *next* message
+        if (file.type !== 'pending') {
+            const tag = document.createElement('span');
+            tag.classList.add('selected-file-tag'); // No session-file-tag class here
+            tag.innerHTML = `
+                <span class="filename truncate" title="${file.filename}">${file.filename}</span>
+                <span class="file-type">${file.type.toUpperCase()}</span>
+                <button title="Remove Attachment">&times;</button>
+            `;
+            // When removing, remove ALL entries for this file ID (both full/summary if somehow duplicated)
+            tag.querySelector('button').onclick = () => removeSelectedFile(file.id);
+            selectedFilesContainer.appendChild(tag); // Append plugin files
+        }
     });
 
-    // Update container visibility based on whether *any* tags exist (session or plugin)
-    if (selectedFilesContainer.children.length === 0) {
+    // Update container visibility based on whether *any* tags exist (session or plugin with type != 'pending')
+    const visibleTags = selectedFilesContainer.querySelectorAll('.selected-file-tag');
+    if (visibleTags.length === 0) {
         selectedFilesContainer.classList.add('hidden');
     } else {
         selectedFilesContainer.classList.remove('hidden');
@@ -656,16 +748,24 @@ function renderSelectedFiles() {
 }
 
 /** Removes a file from the list of files selected for attachment. */
-function removeSelectedFile(fileId, type) {
-    selectedFiles = selectedFiles.filter(f => !(f.id === fileId && f.type === type));
+function removeSelectedFile(fileId) {
+    // Remove ALL entries for this file ID (both full/summary if somehow duplicated)
+    selectedFiles = selectedFiles.filter(f => f.id !== fileId);
     renderSelectedFiles();
     updateStatus(`File attachment removed.`);
-    // If the manage files modal is open, uncheck the corresponding checkbox
+
+    // Uncheck the corresponding checkbox in the sidebar list
+    const sidebarCheckbox = uploadedFilesList.querySelector(`.file-list-item[data-file-id="${fileId}"] .file-checkbox`);
+    if (sidebarCheckbox) {
+        sidebarCheckbox.checked = false;
+        sidebarCheckbox.closest('.file-list-item').classList.remove('active-selection');
+    }
+    // If the manage files modal is open, uncheck the corresponding checkbox there too
     if (manageFilesModal.style.display === 'block') {
-        const checkbox = manageFilesList.querySelector(`.file-list-item[data-file-id="${fileId}"] .file-checkbox`);
-        if (checkbox) {
-            checkbox.checked = false;
-            checkbox.closest('.file-list-item').classList.remove('active-selection');
+        const modalCheckbox = manageFilesList.querySelector(`.file-list-item[data-file-id="${fileId}"] .file-checkbox`);
+        if (modalCheckbox) {
+            modalCheckbox.checked = false;
+            modalCheckbox.closest('.file-list-item').classList.remove('active-selection');
         }
     }
 }
@@ -731,7 +831,7 @@ async function saveSummary() {
         }
         updateStatus("Summary saved successfully.");
         summaryStatus.textContent = "Summary saved!";
-        await loadUploadedFiles(); // Reload the file list in the modal to update summary status
+        await loadUploadedFiles(); // Reload *both* file lists to update summary status
         closeModal(summaryModal); // Close the summary modal
     } catch (error) {
         console.error("Error saving summary:", error);
@@ -952,9 +1052,7 @@ async function startNewChat() {
         modelSelector.value = defaultModel;
         webSearchToggle.checked = false; // Reset web search toggle
         // Ensure file list in modal is cleared/reloaded if modal is open
-        if (manageFilesModal.style.display === 'block') {
-             manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">No files uploaded yet.</p>`;
-        }
+        // loadUploadedFiles() is called by loadChat, which is called here
     } catch (error) {
         console.error('Error starting new chat:', error);
         addMessage('system', `[Error creating new chat: ${error.message}]`, true);
@@ -999,11 +1097,8 @@ async function loadChat(chatId) {
         updateCalendarStatus();
         viewCalendarButton.classList.add('hidden');
         webSearchToggle.checked = false; // Reset web search toggle
-         // Ensure file list in modal is cleared/reloaded if modal is open
-        if (manageFilesModal.style.display === 'block') {
-             manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Loading files...</p>`; // Show loading state
-             loadUploadedFiles(); // Reload the list for the new chat context (though files are global)
-        }
+        // Load files for the new chat context (files are global, but list needs refreshing)
+        await loadUploadedFiles();
     } catch (error) {
         console.error('Error loading chat:', error);
         clearChatbox();
@@ -1026,17 +1121,20 @@ async function sendMessage() {
         return;
     }
     const message = messageInput.value.trim();
-    if (!message && selectedFiles.length === 0 && (!isCalendarContextActive || !calendarContext) && !sessionFile) { // Added sessionFile check
+    // Filter selectedFiles to only include those marked for attachment (type !== 'pending')
+    const filesToAttach = selectedFiles.filter(f => f.type !== 'pending');
+
+    if (!message && filesToAttach.length === 0 && (!isCalendarContextActive || !calendarContext) && !sessionFile) { // Added sessionFile check
         updateStatus("Cannot send: Type a message or attach file(s)/active context.", true);
         return;
     }
 
     // --- Display user message + UI markers immediately ---
-    let displayMessage = message || ((selectedFiles.length > 0 || (isCalendarContextActive && calendarContext) || sessionFile) ? "(Context attached)" : ""); // Added sessionFile check
+    let displayMessage = message || ((filesToAttach.length > 0 || (isCalendarContextActive && calendarContext) || sessionFile) ? "(Context attached)" : ""); // Added sessionFile check
     let uiMarkers = "";
-    if (selectedFiles.length > 0) {
+    if (filesToAttach.length > 0) {
         // Use non-HTML placeholder for files
-        uiMarkers = selectedFiles.map(f => `[UI-MARKER:file:${f.filename}:${f.type}]`).join('');
+        uiMarkers = filesToAttach.map(f => `[UI-MARKER:file:${f.filename}:${f.type}]`).join('');
     }
      if (sessionFile) { // Add marker for session file
         uiMarkers += `[UI-MARKER:file:${sessionFile.filename}:session]`;
@@ -1056,7 +1154,7 @@ async function sendMessage() {
     // --- Prepare payload for backend ---
     const payload = {
         message: message,
-        attached_files: selectedFiles,
+        attached_files: filesToAttach, // Send only files marked for attachment
         calendar_context: (isCalendarContextActive && calendarContext) ? calendarContext : null,
         // Use the stored sessionFile object which now includes content
         session_files: sessionFile ? [{
@@ -1086,16 +1184,21 @@ async function sendMessage() {
         addMessage('assistant', data.reply);
         updateStatus("Assistant replied.");
         await loadSavedChats();
-        // Clear selected files, but keep calendar context loaded and active/inactive state
+        // Clear ALL selected files (both 'pending' and attached types) after sending
         selectedFiles = [];
-        renderSelectedFiles();
-        // Uncheck all checkboxes in the manage files modal if it's open
-        if (manageFilesModal.style.display === 'block') {
+        renderSelectedFiles(); // Update the display below the message input
+        // Uncheck all checkboxes in both lists
+        uploadedFilesList.querySelectorAll('.file-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+            checkbox.closest('.file-list-item').classList.remove('active-selection');
+        });
+         if (manageFilesModal.style.display === 'block') {
              manageFilesList.querySelectorAll('.file-checkbox').forEach(checkbox => {
                  checkbox.checked = false;
                  checkbox.closest('.file-list-item').classList.remove('active-selection');
              });
-        }
+         }
+
 
     } catch (error) {
         console.error('Error sending message:', error);
@@ -1311,7 +1414,7 @@ async function initializeApp() {
     calendarToggle.checked = isCalendarContextActive;
     updateCalendarStatus(); // Initial status update
     await loadSavedChats();
-    // loadUploadedFiles() is now called when the Manage Files modal is opened
+    // loadUploadedFiles() is now called by loadChat
     const firstChatElement = savedChatsList.querySelector('.list-item');
     if (firstChatElement) {
         const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
