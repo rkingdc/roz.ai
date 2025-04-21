@@ -30,7 +30,7 @@ const modelSelector = document.getElementById('model-selector');
 const calendarPluginHeader = document.getElementById('calendar-plugin-header');
 const calendarPluginContent = document.getElementById('calendar-plugin-content');
 const loadCalendarButton = document.getElementById('load-calendar-btn');
-const calendarToggle = document.getElementById('calendar-toggle');
+const calendarToggle = document.getElementById('calendar-toggle'); // This is the toggle next to message input
 const calendarStatus = document.getElementById('calendar-status');
 const viewCalendarButton = document.getElementById('view-calendar-btn');
 const calendarModal = document.getElementById('calendar-modal');
@@ -60,21 +60,37 @@ const settingsModal = document.getElementById('settings-modal'); // The new sett
 const closeSettingsModalButton = document.getElementById('close-settings-modal'); // Close button for settings modal
 const streamingToggle = document.getElementById('streaming-toggle'); // The streaming toggle input
 
+// New DOM Element References for Plugin Toggles in Settings Modal
+const filesPluginToggle = document.getElementById('files-plugin-toggle'); // Files plugin toggle
+const calendarPluginToggle = document.getElementById('calendar-plugin-toggle'); // Calendar plugin toggle
 
-// Application State (Added Calendar state and Streaming state)
+// DOM Elements to hide/show based on plugin settings
+const filePluginSection = document.getElementById('file-plugin-section'); // The entire Files plugin section in sidebar
+const calendarPluginSection = document.getElementById('calendar-plugin-section'); // The entire Calendar plugin section in sidebar
+const fileUploadSessionLabel = document.getElementById('file-upload-session-label'); // The paperclip button next to message input
+const calendarToggleInputArea = calendarToggle.closest('label'); // The label containing the calendar toggle next to message input
+
+
+// Application State (Added Calendar state, Streaming state, and Plugin Enabled states)
 let currentChatId = null;
 let isLoading = false;
 let selectedFiles = []; // Files selected for attachment (from the modal list)
 let currentEditingFileId = null;
 let calendarContext = null; // Store loaded calendar events text
-let isCalendarContextActive = false; // Track calendar toggle state
+let isCalendarContextActive = false; // Track calendar toggle state (next to message input)
 let isStreamingEnabled = true; // Track streaming toggle state (default to true)
+let isFilePluginEnabled = true; // Track Files plugin enabled state (default to true)
+let isCalendarPluginEnabled = true; // Track Calendar plugin enabled state (default to true)
+
 const defaultModel = modelSelector.value;
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
 const PLUGINS_COLLAPSED_KEY = 'pluginsCollapsed';
 const FILE_PLUGIN_COLLAPSED_KEY = 'filePluginCollapsed';
 const CALENDAR_PLUGIN_COLLAPSED_KEY = 'calendarPluginCollapsed';
 const STREAMING_ENABLED_KEY = 'streamingEnabled'; // New localStorage key for streaming
+const FILES_PLUGIN_ENABLED_KEY = 'filesPluginEnabled'; // New localStorage key for Files plugin
+const CALENDAR_PLUGIN_ENABLED_KEY = 'calendarPluginEnabled'; // New localStorage key for Calendar plugin
+
 const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
@@ -145,6 +161,8 @@ function setLoadingState(loading, operation = "Processing") {
     webSearchToggle.disabled = loading;
     settingsButton.disabled = loading; // Disable settings button when loading
     streamingToggle.disabled = loading; // Disable streaming toggle when loading
+    filesPluginToggle.disabled = loading; // Disable files plugin toggle when loading
+    calendarPluginToggle.disabled = loading; // Disable calendar plugin toggle when loading
 
 
     // Disable/Enable elements in the Manage Files Modal
@@ -170,8 +188,8 @@ function setLoadingState(loading, operation = "Processing") {
         updateStatus(`${operation}...`);
     } else {
         updateStatus("Idle");
-        // Only focus if no modals are open
-        if (manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+        // Only focus if no modals are open and sidebars are not collapsed
+        if (manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
              messageInput.focus();
         }
     }
@@ -197,8 +215,8 @@ function setSidebarCollapsed(sidebarElement, toggleButton, collapsed, storageKey
         toggleButton.title = `Collapse ${isLeft ? 'Chat List' : 'Plugins'}`;
         localStorage.setItem(storageKey, 'false');
     }
-    // Only focus if no modals are open
-    if (!collapsed && !isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block') {
+    // Only focus if no modals are open and sidebars are not collapsed
+    if (!collapsed && !isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
         setTimeout(() => messageInput.focus(), 350);
     }
 }
@@ -245,13 +263,17 @@ function toggleCalendarPlugin() {
 
 /// uploads in the main chat location
 
-const fileUploadSessionInput = document.getElementById('file-upload-session-input');
-const fileUploadSessionLabel = document.getElementById('file-upload-session-label');
+// fileUploadSessionInput and fileUploadSessionLabel are now defined globally at the top
 let sessionFile = null; // Variable to store selected session file
 
 // Show the file upload container
 fileUploadSessionLabel.addEventListener('click', () => {
-    fileUploadSessionInput.click(); // Simulate click to open file dialog.
+    // Only trigger if the Files plugin is enabled
+    if (isFilePluginEnabled) {
+        fileUploadSessionInput.click(); // Simulate click to open file dialog.
+    } else {
+        updateStatus("Files plugin is disabled in settings.", true);
+    }
 });
 
 // Event Listener for Session File Input
@@ -447,7 +469,8 @@ function addMessage(role, content, isError = false, targetElement = null) {
 
         // Process UI markers only when creating the initial message or final content
         let processedContent = stringContent; // Use the stringContent here
-        processedContent = processedContent.replace(/\[UI-MARKER:file:(.*?):(.*?)\]/g, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`).replace(/\[UI-MARKER:calendar\]/g, `<span class="attachment-icon" title="Calendar Context Active"><i class="fas fa-calendar-check"></i> Calendar</span>`).replace(/\[UI-MARKER:error:(.*?)\]/g, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`);
+        processedContent = processedContent.replace(/\[UI-MARKER:file:(.*?):(.*?)\]/g, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`).replace(/\[UI-MARKER:calendar\]/g, `<span class="attachment-icon" title="Calendar Context Active"><i class="fas fa-calendar-check"></i> Calendar</span>`).replace(/\[UI-MARKER:error:(.*?)\]/g, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`).replace(/\[UI-MARKER:websearch\]/g, `<span class="attachment-icon" title="Web Search Enabled"><i class="fas fa-globe"></i> Web Search</span>`); // Added web search marker
+
 
         // Apply markdown parsing only when creating a new message (non-streaming initial content)
         // For streaming, content is appended chunk by chunk, markdown applied at the end
@@ -486,7 +509,7 @@ function applyMarkdownToMessage(messageElement) {
 
     // Re-process UI markers before final markdown parse
     let processedContent = unescapedContent;
-    processedContent = processedContent.replace(/\[UI-MARKER:file:(.*?):(.*?)\]/g, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`).replace(/\[UI-MARKER:calendar\]/g, `<span class="attachment-icon" title="Calendar Context Active"><i class="fas fa-calendar-check"></i> Calendar</span>`).replace(/\[UI-MARKER:error:(.*?)\]/g, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`);
+    processedContent = processedContent.replace(/\[UI-MARKER:file:(.*?):(.*?)\]/g, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`).replace(/\[UI-MARKER:calendar\]/g, `<span class="attachment-icon" title="Calendar Context Active"><i class="fas fa-calendar-check"></i> Calendar</span>`).replace(/\[UI-MARKER:error:(.*?)\]/g, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`).replace(/\[UI-MARKER:websearch\]/g, `<span class="attachment-icon" title="Web Search Enabled"><i class="fas fa-globe"></i> Web Search</span>`); // Added web search marker
 
 
     // Apply markdown parsing to the unescaped content
@@ -502,6 +525,11 @@ function applyMarkdownToMessage(messageElement) {
 /** Shows the Manage Files modal and loads the file list. */
 async function showManageFilesModal() {
     if (isLoading) return;
+    // Only show if Files plugin is enabled
+    if (!isFilePluginEnabled) {
+        updateStatus("Files plugin is disabled in settings.", true);
+        return;
+    }
     manageFilesModal.style.display = "block";
     // Load files when the modal is shown
     await loadUploadedFiles(); // This will now load into both lists
@@ -509,15 +537,19 @@ async function showManageFilesModal() {
 
 /** Closes the Manage Files modal. */
 function closeManageFilesModal() {
-    manageFilesModal.style.display = "none";
-    // Ensure focus returns to message input if no other modals are open
-     if (urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
-         messageInput.focus();
-     }
+    closeModal(manageFilesModal); // Use generic close modal function
 }
 
 /** Loads uploaded files and populates the lists in both the sidebar and the modal. */
 async function loadUploadedFiles() {
+    // Only load if Files plugin is enabled
+    if (!isFilePluginEnabled) {
+        uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
+        manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
+        updateStatus("Files plugin disabled. File list not loaded.");
+        return;
+    }
+
     updateStatus("Loading uploaded files...");
     // Clear both lists and show loading state
     uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`;
@@ -565,7 +597,8 @@ async function loadUploadedFiles() {
                 // Add event listener to sidebar checkbox
                 sidebarCheckbox.addEventListener('change', (e) => {
                     const fileId = parseInt(e.target.value);
-                    const filename = e.target.closest('.file-list-item').dataset.filename;
+                    const listItem = e.target.closest('.file-list-item');
+                    const filename = listItem.dataset.filename;
                     // Find the corresponding item in the modal list (no checkbox there)
                     const modalItem = manageFilesList.querySelector(`.file-list-item[data-file-id="${fileId}"]`);
 
@@ -578,12 +611,12 @@ async function loadUploadedFiles() {
                              // Add a placeholder entry, type will be determined later
                              selectedFiles.push({ id: fileId, filename: filename, type: 'pending' });
                         }
-                        sidebarItemDiv.classList.add('active-selection');
+                        listItem.classList.add('active-selection');
                         if (modalItem) modalItem.classList.add('active-selection'); // Sync modal styling
                     } else {
                         // Remove ALL entries for this file ID from selectedFiles
                         selectedFiles = selectedFiles.filter(f => f.id !== fileId);
-                        sidebarItemDiv.classList.remove('active-selection');
+                        listItem.classList.remove('active-selection');
                         if (modalItem) modalItem.classList.remove('active-selection'); // Sync modal styling
                     }
                     renderSelectedFiles(); // Update the display below the message input
@@ -695,6 +728,13 @@ async function loadUploadedFiles() {
 
 /** Handles file upload triggered from the modal. */
 function handleFileUpload(event) {
+    // Only allow if Files plugin is enabled
+    if (!isFilePluginEnabled) {
+        updateStatus("Files plugin is disabled in settings.", true);
+        fileUploadModalInput.value = ''; // Reset input
+        return;
+    }
+
     const files = event.target.files;
     if (!files || files.length === 0) return;
     setLoadingState(true, "Uploading");
@@ -745,6 +785,14 @@ function handleFileUpload(event) {
 // New function to handle adding file from URL (triggered from Manage Files Modal)
 async function addFileFromUrl(url) {
     if (isLoading) return;
+    // Only allow if Files plugin is enabled
+    if (!isFilePluginEnabled) {
+        urlStatus.textContent = "Files plugin is disabled in settings.";
+        urlStatus.classList.add('text-red-500');
+        updateStatus("Files plugin is disabled in settings.", true);
+        return;
+    }
+
     if (!url || !url.startsWith('http')) {
         urlStatus.textContent = "Please enter a valid URL (must start with http or https).";
         urlStatus.classList.add('text-red-500');
@@ -789,6 +837,12 @@ async function addFileFromUrl(url) {
 
 /** Attaches selected files from the sidebar list to the current chat. */
 function attachSelectedFiles(type) {
+    // Only allow if Files plugin is enabled
+    if (!isFilePluginEnabled) {
+        updateStatus("Files plugin is disabled in settings.", true);
+        return;
+    }
+
     // Get checkboxes from the list *inside the sidebar*
     const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked');
     if (checkboxes.length === 0) {
@@ -829,22 +883,30 @@ function renderSelectedFiles() {
     selectedFilesContainer.querySelectorAll('.selected-file-tag:not(.session-file-tag)').forEach(tag => tag.remove());
 
     // Render plugin-selected files
-    selectedFiles.forEach(file => {
-        // Only render tags for files that have a type assigned (i.e., attached via full/summary buttons)
-        // Files with type 'pending' are just selected in the list but not yet attached for the *next* message
-        if (file.type !== 'pending') {
-            const tag = document.createElement('span');
-            tag.classList.add('selected-file-tag'); // No session-file-tag class here
-            tag.innerHTML = `
-                <span class="filename truncate" title="${file.filename}">${file.filename}</span>
-                <span class="file-type">${file.type.toUpperCase()}</span>
-                <button title="Remove Attachment">&times;</button>
-            `;
-            // When removing, remove ALL entries for this file ID (both full/summary if somehow duplicated)
-            tag.querySelector('button').onclick = () => removeSelectedFile(file.id);
-            selectedFilesContainer.appendChild(tag); // Append plugin files
-        }
-    });
+    // Only render if Files plugin is enabled, otherwise clear any pending selections
+    if (isFilePluginEnabled) {
+        selectedFiles.forEach(file => {
+            // Only render tags for files that have a type assigned (i.e., attached via full/summary buttons)
+            // Files with type 'pending' are just selected in the list but not yet attached for the *next* message
+            if (file.type !== 'pending') {
+                const tag = document.createElement('span');
+                tag.classList.add('selected-file-tag'); // No session-file-tag class here
+                tag.innerHTML = `
+                    <span class="filename truncate" title="${file.filename}">${file.filename}</span>
+                    <span class="file-type">${file.type.toUpperCase()}</span>
+                    <button title="Remove Attachment">&times;</button>
+                `;
+                // When removing, remove ALL entries for this file ID (both full/summary if somehow duplicated)
+                tag.querySelector('button').onclick = () => removeSelectedFile(file.id);
+                selectedFilesContainer.appendChild(tag); // Append plugin files
+            }
+        });
+    } else {
+        // If Files plugin is disabled, clear all permanent file selections
+        selectedFiles = [];
+        // The session file tag (if any) remains because session files are handled separately
+    }
+
 
     // Update container visibility based on whether *any* tags exist (session or plugin with type != 'pending')
     const visibleTags = selectedFilesContainer.querySelectorAll('.selected-file-tag');
@@ -880,6 +942,11 @@ function removeSelectedFile(fileId) {
 
 // --- Summary Modal Functions ---
 async function showSummaryModal(fileId, filename) {
+    // Only allow if Files plugin is enabled
+    if (!isFilePluginEnabled) {
+        updateStatus("Files plugin is disabled in settings.", true);
+        return;
+    }
     currentEditingFileId = fileId;
     summaryModalFilename.textContent = filename;
     summaryTextarea.value = "";
@@ -918,6 +985,11 @@ async function showSummaryModal(fileId, filename) {
 }
 async function saveSummary() {
     if (!currentEditingFileId || isLoading) return;
+    // Only allow if Files plugin is enabled
+    if (!isFilePluginEnabled) {
+        updateStatus("Files plugin is disabled in settings.", true);
+        return;
+    }
     const updatedSummary = summaryTextarea.value;
     setLoadingState(true, "Saving Summary");
     summaryStatus.textContent = "Saving...";
@@ -962,18 +1034,18 @@ function closeModal(modalElement) {
          // No specific element to focus in the manage files modal, maybe just ensure it's interactive
      } else if (modalElement === manageFilesModal) {
          // If the manage files modal was closed, ensure focus returns to message input
-         if (!isLoading && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+         if (!isLoading && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
              messageInput.focus();
          }
      } else if (modalElement === settingsModal) {
          // If the settings modal was closed, ensure focus returns to message input
-         if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+         if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
              messageInput.focus();
          }
      }
      else {
          // Default case, focus message input if no modals are open
-         if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed')) {
+         if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
              messageInput.focus();
          }
      }
@@ -983,6 +1055,11 @@ function closeModal(modalElement) {
 // New URL Modal Functions (Triggered from Manage Files Modal)
 function showUrlModal() {
     if (isLoading) return;
+    // Only show if Files plugin is enabled
+    if (!isFilePluginEnabled) {
+        updateStatus("Files plugin is disabled in settings.", true);
+        return;
+    }
     urlInput.value = ''; // Clear previous input
     urlStatus.textContent = ''; // Clear previous status
     urlStatus.classList.remove('text-red-500');
@@ -999,6 +1076,11 @@ function closeUrlModal() {
 /** Fetches calendar events and updates state/UI. */
 async function loadCalendarEvents() {
     if (isLoading) return;
+    // Only load if Calendar plugin is enabled
+    if (!isCalendarPluginEnabled) {
+        updateStatus("Calendar plugin is disabled in settings.", true);
+        return;
+    }
     setLoadingState(true, "Loading Events");
     updateStatus("Loading calendar events...");
 
@@ -1031,17 +1113,29 @@ async function loadCalendarEvents() {
 
 /** Updates the calendar status text based on loaded context and toggle state. */
 function updateCalendarStatus() {
-    if (calendarContext) {
-        calendarStatus.textContent = `Status: Events loaded. Context: ${isCalendarContextActive ? 'Active' : 'Inactive'}`;
-        calendarStatus.classList.remove('text-red-500');
+    // Only update status if Calendar plugin is enabled
+    if (isCalendarPluginEnabled) {
+        if (calendarContext) {
+            calendarStatus.textContent = `Status: Events loaded. Context: ${isCalendarContextActive ? 'Active' : 'Inactive'}`;
+            calendarStatus.classList.remove('text-red-500');
+        } else {
+            calendarStatus.textContent = "Status: Not loaded";
+            calendarStatus.classList.remove('text-red-500');
+        }
     } else {
-        calendarStatus.textContent = "Status: Not loaded";
-        calendarStatus.classList.remove('text-red-500');
+        calendarStatus.textContent = "Status: Plugin disabled";
+        calendarStatus.classList.remove('text-red-500'); // Remove error color if it was there
     }
 }
 
-/** Handles changes to the calendar context toggle switch. */
+/** Handles changes to the calendar context toggle switch (next to message input). */
 function handleCalendarToggle() {
+    // Only allow toggle if Calendar plugin is enabled
+    if (!isCalendarPluginEnabled) {
+        calendarToggle.checked = false; // Force off if plugin disabled
+        updateStatus("Calendar plugin is disabled in settings.", true);
+        return;
+    }
     isCalendarContextActive = calendarToggle.checked;
     localStorage.setItem('calendarContextActive', isCalendarContextActive); // Persist toggle state
     updateCalendarStatus(); // Update display text
@@ -1049,6 +1143,11 @@ function handleCalendarToggle() {
 
 /** Shows the modal with the loaded calendar events. */
 function showCalendarModal() {
+    // Only show if Calendar plugin is enabled and context exists
+    if (!isCalendarPluginEnabled) {
+         updateStatus("Calendar plugin is disabled in settings.", true);
+         return;
+    }
     if (calendarContext) {
         calendarModalContent.textContent = calendarContext; // Display raw text in <pre>
         calendarModal.style.display = 'block';
@@ -1156,6 +1255,8 @@ async function startNewChat() {
         await loadSavedChats();
         updateStatus(`New chat created (ID: ${newChat.id}).`);
         setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar');
+
+        // Reset chat-specific context, but NOT plugin enabled states
         selectedFiles = []; // Clear permanent file selections
         sessionFile = null; // Clear session file state
         // Clear session file tag from container
@@ -1163,14 +1264,19 @@ async function startNewChat() {
         if (existingSessionTag) existingSessionTag.remove();
         renderSelectedFiles(); // Render (clears plugin files and updates visibility)
         fileUploadSessionInput.value = ''; // Reset file input
+
         calendarContext = null;
         isCalendarContextActive = false;
         calendarToggle.checked = false;
-        updateCalendarStatus();
+        updateCalendarStatus(); // Update status based on cleared context
+
         viewCalendarButton.classList.add('hidden');
         modelSelector.value = defaultModel;
         webSearchToggle.checked = false; // Reset web search toggle
-        // Ensure file list in modal is cleared/reloaded if modal is open
+
+        // Ensure plugin UI reflects the *current* enabled state (which wasn't reset)
+        updatePluginUI();
+
         // loadUploadedFiles() is now called by loadChat, which is called here
     } catch (error) {
         console.error('Error starting new chat:', error);
@@ -1205,14 +1311,14 @@ async function loadChat(chatId) {
                 // This is important because saved history might not have the UI markers processed
                 // or the markdown might need re-rendering based on current markedOptions.
                 // However, addMessage already applies markdown for non-streaming.
-                // Let's ensure UI markers are processed correctly on load.
-                // The current addMessage processes markers and applies markdown for non-streaming.
                 // So, just calling addMessage is sufficient for history.
             });
         }
         updateActiveChatListItem();
         updateStatus(`Chat ${chatId} loaded.`);
         setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar');
+
+        // Reset chat-specific context, but NOT plugin enabled states
         selectedFiles = []; // Clear permanent file selections
         sessionFile = null; // Clear session file state
         // Clear session file tag from container
@@ -1220,14 +1326,29 @@ async function loadChat(chatId) {
         if (existingSessionTag) existingSessionTag.remove();
         renderSelectedFiles(); // Render (clears plugin files and updates visibility)
         fileUploadSessionInput.value = ''; // Reset file input
+
         calendarContext = null;
         isCalendarContextActive = false;
         calendarToggle.checked = false;
-        updateCalendarStatus();
+        updateCalendarStatus(); // Update status based on cleared context
+
         viewCalendarButton.classList.add('hidden');
         webSearchToggle.checked = false; // Reset web search toggle
+
+        // Ensure plugin UI reflects the *current* enabled state (which wasn't reset)
+        updatePluginUI();
+
         // Load files for the new chat context (files are global, but list needs refreshing)
-        await loadUploadedFiles();
+        // Only load files if the plugin is enabled
+        if (isFilePluginEnabled) {
+             await loadUploadedFiles();
+        } else {
+             // If plugin is disabled, clear the lists and show disabled message
+             uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
+             manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
+        }
+
+
     } catch (error) {
         console.error('Error loading chat:', error);
         clearChatbox();
@@ -1238,6 +1359,8 @@ async function loadChat(chatId) {
         modelSelector.value = defaultModel;
         updateStatus(`Error loading chat ${chatId}.`, true);
         updateActiveChatListItem();
+        // Ensure plugin UI reflects the *current* enabled state even on error
+        updatePluginUI();
     } finally {
         setLoadingState(false);
     }
@@ -1250,10 +1373,22 @@ async function sendMessage() {
         return;
     }
     const message = messageInput.value.trim();
-    // Filter selectedFiles to only include those marked for attachment (type !== 'pending')
-    const filesToAttach = selectedFiles.filter(f => f.type !== 'pending');
 
-    if (!message && filesToAttach.length === 0 && (!isCalendarContextActive || !calendarContext) && !sessionFile && !webSearchToggle.checked) { // Added sessionFile and webSearchToggle check
+    // Filter selectedFiles to only include those marked for attachment (type !== 'pending')
+    // Only include permanent files if the Files plugin is enabled
+    const filesToAttach = isFilePluginEnabled ? selectedFiles.filter(f => f.type !== 'pending') : [];
+
+    // Only include session file if the Files plugin is enabled
+    const sessionFileToSend = isFilePluginEnabled ? sessionFile : null;
+
+    // Only include calendar context if the Calendar plugin is enabled AND the toggle is active AND context exists
+    const calendarContextToSend = (isCalendarPluginEnabled && isCalendarContextActive && calendarContext) ? calendarContext : null;
+
+    // Web search is independent of other plugins, but still a plugin-like feature
+    const webSearchEnabledToSend = webSearchToggle.checked;
+
+
+    if (!message && filesToAttach.length === 0 && !sessionFileToSend && !calendarContextToSend && !webSearchEnabledToSend) {
         updateStatus("Cannot send: Type a message or attach file(s)/active context/enable web search.", true);
         return;
     }
@@ -1262,20 +1397,20 @@ async function sendMessage() {
     messageInput.value = '';
 
     // --- Display user message + UI markers immediately ---
-    let displayMessage = message || ((filesToAttach.length > 0 || (isCalendarContextActive && calendarContext) || sessionFile || webSearchToggle.checked) ? "(Context attached)" : ""); // Added sessionFile and webSearchToggle check
+    let displayMessage = message || ((filesToAttach.length > 0 || sessionFileToSend || calendarContextToSend || webSearchEnabledToSend) ? "(Context attached)" : "");
     let uiMarkers = "";
     if (filesToAttach.length > 0) {
         // Use non-HTML placeholder for files
-        uiMarkers = filesToAttach.map(f => `\[UI-MARKER:file:${f.filename}:${f.type}\]`).join(''); // Escaped brackets
+        uiMarkers += filesToAttach.map(f => `\[UI-MARKER:file:${f.filename}:${f.type}\]`).join(''); // Escaped brackets
     }
-     if (sessionFile) { // Add marker for session file
-        uiMarkers += `\[UI-MARKER:file:${sessionFile.filename}:session\]`; // Escaped brackets
+     if (sessionFileToSend) { // Add marker for session file
+        uiMarkers += `\[UI-MARKER:file:${sessionFileToSend.filename}:session\]`; // Escaped brackets
     }
-    if (isCalendarContextActive && calendarContext) {
+    if (calendarContextToSend) {
         // Use non-HTML placeholder for calendar
         uiMarkers += `\[UI-MARKER:calendar\]`; // Escaped brackets
     }
-    if (webSearchToggle.checked) { // Add marker for web search
+    if (webSearchEnabledToSend) { // Add marker for web search
         uiMarkers += `\[UI-MARKER:websearch\]`; // Escaped brackets
     }
 
@@ -1291,16 +1426,19 @@ async function sendMessage() {
     const payload = {
         chat_id: currentChatId, // Ensure chat_id is included in the payload
         message: message,
-        attached_files: filesToAttach, // Send only files marked for attachment
-        calendar_context: (isCalendarContextActive && calendarContext) ? calendarContext : null,
-        // Use the stored sessionFile object which now includes content
-        session_files: sessionFile ? [{
-            filename: sessionFile.filename,
-            content: sessionFile.content,
-            mimetype: sessionFile.mimetype
+        attached_files: filesToAttach, // Send only files marked for attachment (and if plugin enabled)
+        calendar_context: calendarContextToSend, // Send context only if plugin enabled and toggle active
+        // Use the stored sessionFile object which now includes content (only if plugin enabled)
+        session_files: sessionFileToSend ? [{
+            filename: sessionFileToSend.filename,
+            content: sessionFileToSend.content,
+            mimetype: sessionFileToSend.mimetype
         }] : [],
-        enable_web_search: webSearchToggle.checked, // Add the web search flag
-        enable_streaming: isStreamingEnabled // Add the streaming flag
+        enable_web_search: webSearchEnabledToSend, // Add the web search flag
+        enable_streaming: isStreamingEnabled, // Add the streaming flag
+        // Add plugin enabled states to the payload
+        enable_files_plugin: isFilePluginEnabled,
+        enable_calendar_plugin: isCalendarPluginEnabled
     };
 
     // Store session file temporarily to clear it in finally block
@@ -1363,6 +1501,7 @@ async function sendMessage() {
         await loadSavedChats(); // Reload chats to update timestamp
 
         // Clear ALL selected files (both 'pending' and attached types) after sending
+        // This only clears the frontend state; the backend received the files it needed.
         selectedFiles = [];
         renderSelectedFiles(); // Update the display below the message input
         // Uncheck all checkboxes in the sidebar list
@@ -1517,8 +1656,10 @@ async function handleModelChange() {
 function showSettingsModal() {
     if (isLoading) return;
     settingsModal.style.display = "block";
-    // Ensure toggle state matches current state when opening
+    // Ensure toggle states match current states when opening
     streamingToggle.checked = isStreamingEnabled;
+    filesPluginToggle.checked = isFilePluginEnabled;
+    calendarPluginToggle.checked = isCalendarPluginEnabled;
 }
 
 /** Closes the Settings modal. */
@@ -1531,6 +1672,76 @@ function handleStreamingToggle() {
     isStreamingEnabled = streamingToggle.checked;
     localStorage.setItem(STREAMING_ENABLED_KEY, isStreamingEnabled); // Persist toggle state
     updateStatus(`Streaming responses ${isStreamingEnabled ? 'enabled' : 'disabled'}.`);
+}
+
+/** Handles changes to the Files plugin toggle switch. */
+function handleFilesPluginToggle() {
+    isFilePluginEnabled = filesPluginToggle.checked;
+    localStorage.setItem(FILES_PLUGIN_ENABLED_KEY, isFilePluginEnabled); // Persist toggle state
+    updatePluginUI(); // Update UI visibility
+    updateStatus(`Files plugin ${isFilePluginEnabled ? 'enabled' : 'disabled'}.`);
+    // If disabling, clear any selected files that aren't session files
+    if (!isFilePluginEnabled) {
+        selectedFiles = []; // Clear permanent file selections
+        renderSelectedFiles(); // Update display
+        // Also uncheck checkboxes in the sidebar list
+        uploadedFilesList.querySelectorAll('.file-checkbox').forEach(checkbox => {
+            checkbox.checked = false;
+            checkbox.closest('.file-list-item').classList.remove('active-selection');
+        });
+         // Remove active-selection class from modal items
+         if (manageFilesModal.style.display === 'block') {
+             manageFilesList.querySelectorAll('.file-list-item').forEach(item => {
+                 item.classList.remove('active-selection');
+             });
+         }
+         // Clear file lists in sidebar/modal if open
+         uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
+         manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
+    } else {
+        // If enabling, reload the file lists
+        loadUploadedFiles();
+    }
+}
+
+/** Handles changes to the Calendar plugin toggle switch. */
+function handleCalendarPluginToggle() {
+    isCalendarPluginEnabled = calendarPluginToggle.checked;
+    localStorage.setItem(CALENDAR_PLUGIN_ENABLED_KEY, isCalendarPluginEnabled); // Persist toggle state
+    updatePluginUI(); // Update UI visibility
+    updateStatus(`Calendar plugin ${isCalendarPluginEnabled ? 'enabled' : 'disabled'}.`);
+    // If disabling, clear calendar context and toggle state
+    if (!isCalendarPluginEnabled) {
+        calendarContext = null;
+        isCalendarContextActive = false;
+        calendarToggle.checked = false; // Force the input area toggle off
+        updateCalendarStatus(); // Update status display
+    }
+}
+
+/** Updates the visibility of plugin-related UI elements based on enabled state. */
+function updatePluginUI() {
+    // Files Plugin UI
+    if (isFilePluginEnabled) {
+        filePluginSection.classList.remove('hidden');
+        fileUploadSessionLabel.classList.remove('hidden'); // Show paperclip button
+    } else {
+        filePluginSection.classList.add('hidden');
+        fileUploadSessionLabel.classList.add('hidden'); // Hide paperclip button
+    }
+
+    // Calendar Plugin UI
+    if (isCalendarPluginEnabled) {
+        calendarPluginSection.classList.remove('hidden');
+        calendarToggleInputArea.classList.remove('hidden'); // Show calendar toggle next to input
+    } else {
+        calendarPluginSection.classList.add('hidden');
+        calendarToggleInputArea.classList.add('hidden'); // Hide calendar toggle next to input
+    }
+
+    // Note: The plugins sidebar itself (#plugins-sidebar) is controlled by pluginsToggleButton.
+    // We don't hide the entire sidebar just because one plugin is off.
+    // We hide the individual plugin sections within the sidebar.
 }
 
 
@@ -1588,7 +1799,7 @@ urlModal.addEventListener('click', (event) => {
 // Calendar Plugin Listeners
 calendarPluginHeader.addEventListener('click', toggleCalendarPlugin);
 loadCalendarButton.addEventListener('click', loadCalendarEvents);
-calendarToggle.addEventListener('change', handleCalendarToggle); // Listen to toggle change
+calendarToggle.addEventListener('change', handleCalendarToggle); // Listen to toggle change (next to message input)
 viewCalendarButton.addEventListener('click', showCalendarModal); // Listen to view button
 closeCalendarModalButton.addEventListener('click', () => closeModal(calendarModal)); // Use generic close
 
@@ -1601,7 +1812,7 @@ summaryModal.addEventListener('click', (event) => {
     }
 });
 
-// Settings Modal Listeners (NEW)
+// Settings Modal Listeners
 settingsButton.addEventListener('click', showSettingsModal);
 closeSettingsModalButton.addEventListener('click', () => closeModal(settingsModal));
 settingsModal.addEventListener('click', (event) => {
@@ -1610,6 +1821,10 @@ settingsModal.addEventListener('click', (event) => {
     }
 });
 streamingToggle.addEventListener('change', handleStreamingToggle); // Listen to streaming toggle change
+
+// New Plugin Toggle Listeners in Settings Modal
+filesPluginToggle.addEventListener('change', handleFilesPluginToggle);
+calendarPluginToggle.addEventListener('change', handleCalendarPluginToggle);
 
 
 // Model Selector Listener
@@ -1633,19 +1848,34 @@ async function initializeApp() {
         setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
         setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY);
 
+        // Load Calendar Context Active state (toggle next to input)
         isCalendarContextActive = localStorage.getItem('calendarContextActive') === 'true';
         calendarToggle.checked = isCalendarContextActive;
-        updateCalendarStatus(); // Initial status update
+        // updateCalendarStatus() is called after loading plugin enabled state
 
-        // Load streaming toggle state (default to true if not found)
+        // Load Streaming toggle state (default to true if not found)
         const storedStreamingState = localStorage.getItem(STREAMING_ENABLED_KEY);
         // localStorage stores strings, convert 'true'/'false' to boolean
         isStreamingEnabled = storedStreamingState === null ? true : storedStreamingState === 'true';
         streamingToggle.checked = isStreamingEnabled;
 
+        // Load Plugin Enabled states (default to true if not found)
+        const storedFilesPluginState = localStorage.getItem(FILES_PLUGIN_ENABLED_KEY);
+        isFilePluginEnabled = storedFilesPluginState === null ? true : storedFilesPluginState === 'true';
+        filesPluginToggle.checked = isFilePluginEnabled; // Update settings modal toggle
+
+        const storedCalendarPluginState = localStorage.getItem(CALENDAR_PLUGIN_ENABLED_KEY);
+        isCalendarPluginEnabled = storedCalendarPluginState === null ? true : storedCalendarPluginState === 'true';
+        calendarPluginToggle.checked = isCalendarPluginEnabled; // Update settings modal toggle
+
+        // Update UI visibility based on loaded plugin states
+        updatePluginUI();
+        // Now update calendar status based on loaded context and plugin state
+        updateCalendarStatus();
+
 
         await loadSavedChats();
-        // loadUploadedFiles() is now called by loadChat
+        // loadUploadedFiles() is now called by loadChat (conditionally based on plugin state)
         const firstChatElement = savedChatsList.querySelector('.list-item');
         if (firstChatElement) {
             const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
