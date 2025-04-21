@@ -682,9 +682,7 @@ def generate_chat_response(
         logger.info(
             f"Processing {len(attached_files)} attached files (from DB) for chat {chat_id}."
         )
-        for (
-            file_detail
-        in attached_files):  # Iterate over the list of objects {id, filename, type}
+        for file_detail in attached_files: 
             file_id = file_detail.get("id")
             attachment_type = file_detail.get("type")  # 'full' or 'summary'
             frontend_filename = file_detail.get(
