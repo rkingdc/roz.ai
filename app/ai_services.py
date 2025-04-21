@@ -105,14 +105,13 @@ def generate_summary(file_id):
 
         summary_model_instance = genai.GenerativeModel(summary_model_name)
         timeout = current_app.config.get("GEMINI_REQUEST_TIMEOUT", 300)
-        # Add max_output_tokens for summary generation as well
-        max_tokens = current_app.config.get("GEMINI_MAX_OUTPUT_TOKENS", 4096)
+        # Removed max_output_tokens for summary generation
         response = summary_model_instance.generate_content(
             parts,
             request_options={"timeout": timeout},
-            generation_config=genai.types.GenerationConfig(
-                max_output_tokens=max_tokens
-            )
+            # generation_config=genai.types.GenerationConfig(
+            #     max_output_tokens=max_tokens # Removed
+            # )
         )
         summary = response.text
         logger.info(f"Summary generated successfully for '{filename}'.")
@@ -653,16 +652,15 @@ def generate_chat_response(
                 {"role": "user", "parts": gemini_parts}
             ]
             timeout = current_app.config.get("GEMINI_REQUEST_TIMEOUT", 300)
-            # Get max tokens from config, default to 4096
-            max_tokens = current_app.config.get("GEMINI_MAX_OUTPUT_TOKENS", 4096)
+            # Removed max_output_tokens from chat generation
 
             # --- Actual API Call ---
             response = chat_model.generate_content(
                 full_request_content,
                 request_options={"timeout": timeout},
-                generation_config=genai.types.GenerationConfig(
-                    max_output_tokens=max_tokens # Add max_output_tokens here
-                )
+                # generation_config=genai.types.GenerationConfig(
+                #     max_output_tokens=max_tokens # Removed
+                # )
             )
             # --- End Actual API Call ---
 
@@ -739,4 +737,3 @@ def generate_chat_response(
                     logger.info(f"Temp file not found, already removed? {temp_path}")
             except OSError as e:
                 logger.info(f"Error removing temp file {temp_path}: {e}")
-
