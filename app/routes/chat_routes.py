@@ -5,9 +5,9 @@ from .. import ai_services  # Use relative import for ai services
 
 # Configure logging
 import logging
-
-logging.basicConfig(level=logging.INFO)
+# Removed basicConfig here, logging level is set in app/__init__.py
 logger = logging.getLogger(__name__)
+
 
 # Create Blueprint for chat API, using '/api' prefix
 bp = Blueprint("chat_api", __name__, url_prefix="/api")
@@ -85,15 +85,6 @@ def save_chat_model(chat_id):
         return jsonify({"message": f"Chat model updated to {new_model_name}."})
     else:
         return jsonify({"error": "Failed to update chat model"}), 500
-
-
-@bp.route("/chat/<int:chat_id>", methods=["DELETE"])
-def delete_chat(chat_id):
-    """API endpoint to delete a chat."""
-    if db.delete_chat_from_db(chat_id):
-        return jsonify({"message": "Chat deleted successfully."})
-    else:
-        return jsonify({"error": "Failed to delete chat"}), 500
 
 
 @bp.route("/chat/<int:chat_id>/message", methods=["POST"])

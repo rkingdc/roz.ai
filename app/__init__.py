@@ -3,10 +3,13 @@ import os
 from flask import Flask
 import google.generativeai as genai
 
-# Configure logging
+# Configure logging FIRST, at the application entry point
 import logging
-logging.basicConfig(level=logging.INFO)
+# Set the root logger level to DEBUG to see all messages from all loggers
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+logger.info("Root logger configured to DEBUG level.")
+
 
 def create_app(test_config=None):
     """Create and configure an instance of the Flask application."""
