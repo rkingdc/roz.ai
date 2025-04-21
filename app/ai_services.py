@@ -61,8 +61,12 @@ def generate_summary(file_id):
     prompt = f"Please provide a concise summary of the attached file named '{filename}'. Focus on the main points and key information."
 
     try:
-        if mimetype.startswith("text/"):
+        # Treat text files and JavaScript files as text content for the prompt
+        if mimetype.startswith("text/") or filename.lower().endswith(".js"):
             try:
+                # Use 'application/javascript' as mimetype hint if it was originally js but not text/*
+                effective_mimetype = mimetype if mimetype.startswith("text/") else 'application/javascript'
+                logger.info(f"Treating '{filename}' as text ({effective_mimetype}) for summary.")
                 text_content = content_blob.decode("utf-8", errors="ignore")
                 prompt = f"Please provide a concise summary of the following text content from the file named '{filename}':\n\n{text_content}"
                 parts = [prompt]
