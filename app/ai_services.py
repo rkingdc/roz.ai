@@ -22,8 +22,9 @@ import logging
 from functools import wraps
 from werkzeug.utils import secure_filename  # Moved import here for clarity
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 # --- Configuration Check ---
 
