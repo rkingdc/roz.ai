@@ -520,16 +520,25 @@ async function loadUploadedFiles() {
 
                 const uploadDateSpan = document.createElement('span');
                 let dateString = file.upload_date;
+
+                // --- Add logging here ---
+                console.log(`Processing file ID ${file.id}, filename "${file.filename}". Raw upload_date: "${dateString}"`);
+
                 // Attempt to make the date string more reliably parseable by replacing space with 'T'
                 // This assumes a format like 'YYYY-MM-DD HH:MM:SS' or similar
                 if (dateString && typeof dateString === 'string' && dateString.includes(' ')) {
                     dateString = dateString.replace(' ', 'T');
+                    console.log(`Modified date string for parsing: "${dateString}"`);
                 }
                 const date = new Date(dateString);
                 let formattedDate = 'Invalid Date'; // Default in case parsing still fails
                 if (!isNaN(date.getTime())) { // Check if the date is valid using getTime()
                     formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                     console.log(`Parsed and formatted date: "${formattedDate}"`);
+                } else {
+                     console.log(`Date parsing failed for string: "${dateString}"`);
                 }
+
 
                 uploadDateSpan.textContent = `Uploaded: ${formattedDate}`;
                 uploadDateSpan.classList.add('text-xs', 'text-gray-500');
@@ -634,7 +643,7 @@ function handleFileUpload(event) {
     });
 }
 
-// New function to handle adding file from URL (triggered from Manage Files modal)
+// New function to handle adding file from URL (triggered from Manage Files Modal)
 async function addFileFromUrl(url) {
     if (isLoading) return;
     if (!url || !url.startsWith('http')) {
