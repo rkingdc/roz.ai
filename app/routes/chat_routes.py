@@ -133,27 +133,43 @@ def send_message_route(chat_id):
                 full_reply = ""
                 try:
                     for chunk in assistant_response_generator: # Iterate the generator
-                        # *** FIX: Access the .text attribute of the chunk ***
-                        chunk_text = ""
-                        if hasattr(chunk, 'text'):
-                            chunk_text = chunk.text
-                            # Removed the debug log that iterated over the chunk,
-                            # keeping only the log for the extracted text.
-                            logger.debug(f"Streaming chunk text: {chunk_text}")
+                        chunk_to_send = "" # What we will send to the client for this chunk
+                        log_message = f"Processing chunk: {chunk}" # Default log
+
+                        # *** FIX: Extract text or system message from chunk ***
+                        if hasattr(chunk, 'text') and chunk.text:
+                            chunk_to_send = chunk.text
+                            log_message = f"Streaming chunk text (length {len(chunk_to_send)}): {chunk_to_send[:100]}..." # Log start of text
+                        elif hasattr(chunk, 'prompt_feedback') and chunk.prompt_feedback:
+                            feedback_reason = "N/A"
+                            try:
+                                if chunk.prompt_feedback.block_reason:
+                                    feedback_reason = chunk.prompt_feedback.block_reason
+                            except Exception:
+                                pass
+                            chunk_to_send = f"\n[AI Safety Error: Request or response blocked due to safety settings (Reason: {feedback_reason})]"
+                            log_message = f"Streaming chunk has prompt feedback: {chunk.prompt_feedback}. Yielding system message."
                         elif hasattr(chunk, 'candidates') and chunk.candidates:
-                             # Log if a chunk has candidates but no text (might indicate issues)
-                             logger.debug(f"Streaming chunk has candidates but no text: {chunk}")
-                        elif hasattr(chunk, 'prompt_feedback'):
-                             # Log prompt feedback received during streaming
-                             logger.debug(f"Streaming chunk has prompt feedback: {chunk.prompt_feedback}")
-                             # Optionally yield a system message about feedback if needed
-                             # yield f"\n[System Note: Prompt feedback received: {chunk.prompt_feedback}]"
+                             log_message = f"Streaming chunk has candidates but no text: {chunk}"
+                             # Don't yield anything for this type of chunk unless we want a placeholder
                         else:
-                             logger.debug(f"Streaming chunk has no text, candidates, or feedback: {chunk}")
+                             log_message = f"Streaming chunk has no text, candidates, or feedback: {chunk}"
+                             # Don't yield anything for empty chunks
 
+                        logger.debug(log_message)
 
-                        full_reply += chunk_text
-                        yield chunk_text # Yield the text content to the Flask stream
+                        if chunk_to_send: # Only yield and accumulate if we have something to send
+                            full_reply += chunk_to_send
+                            yield chunk_to_send
+
+                    # After the loop finishes, check if any content was yielded
+                    if not full_reply:
+                         logger.warning(f"Streaming generator for chat {chat_id} yielded no content.")
+                         # Optionally yield a final message if nothing was ever yielded
+                         # final_message = "[System Note: The AI did not return any content.]"
+                         # yield final_message
+                         # full_reply = final_message # Update full_reply for saving
+
 
                 except Exception as e:
                     # Log error during streaming
@@ -168,12 +184,8 @@ def send_message_route(chat_id):
                         # Ensure the role is 'assistant' when saving the final message
                         if not db.add_message_to_db(chat_id, "assistant", full_reply):
                             logger.warning(f"Failed to save full streamed assistant message for chat {chat_id}.")
-                    else:
-                         # Handle case where generator yielded nothing (e.g., immediate error)
-                         logger.warning(f"Streaming generator for chat {chat_id} yielded no content.")
-                         # Optionally save a placeholder error if nothing was yielded
-                         # if not db.add_message_to_db(chat_id, "assistant", "[No content streamed]"):
-                         #     logger.warning(f"Failed to save empty streamed message placeholder for chat {chat_id}.")
+                    # Removed the else block that logged "yielded no content" here,
+                    # as that warning is now handled inside the try block after the loop.
 
 
             # Return a streaming response
