@@ -1047,6 +1047,8 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryStatus.textContent = `Error: ${error.message}`;
             summaryStatus.classList.add('text-red-500');
             // No re-throw needed here as this is not part of the critical init path
+        } finally {
+            setLoadingState(false);
         }
     }
     async function saveSummary() {
@@ -1237,6 +1239,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadSavedChats() {
         updateStatus("Loading saved chats...");
+        console.log("[DEBUG] loadSavedChats called."); // Added log
         try {
             const response = await fetch('/api/chats');
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -1299,10 +1302,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             updateActiveChatListItem();
             updateStatus("Saved chats loaded.");
+            console.log("[DEBUG] loadSavedChats finished successfully."); // Added log
         } catch (error) {
             console.error('Error loading saved chats:', error);
             savedChatsList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading chats.</p>';
             updateStatus("Error loading saved chats.", true);
+            console.log("[DEBUG] loadSavedChats caught an error."); // Added log
             throw error; // Re-throw the error
         }
     }
@@ -1357,36 +1362,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     async function loadChat(chatId) {
-        if (isLoading) return;
+        console.log(`[DEBUG] loadChat(${chatId}) called.`); // Added log
+        if (isLoading) {
+            console.log(`[DEBUG] loadChat(${chatId}) skipped, isLoading is true.`); // Added log
+            return;
+        }
         setLoadingState(true, "Loading Chat");
         updateStatus(`Loading chat ${chatId}...`);
         clearChatbox();
         addMessage('system', `Loading chat (ID: ${chatId})...`);
+        console.log(`[DEBUG] Chatbox cleared and loading message added for chat ${chatId}.`); // Added log
+
         try {
+            console.log(`[DEBUG] Fetching chat data for chat ${chatId}...`); // Added log
             const response = await fetch(`/api/chat/${chatId}`);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
+            if (!response.ok) {
+                const errorText = await response.text(); // Get text for more info
+                throw new Error(`HTTP error! status: ${response.status} ${response.statusText} - ${errorText}`);
+            }
             const data = await response.json();
+            console.log(`[DEBUG] Chat data fetched successfully for chat ${chatId}.`); // Added log
+
             currentChatId = chatId;
-            clearChatbox();
+            console.log(`[DEBUG] currentChatId set to ${currentChatId}.`); // Added log
+
+            clearChatbox(); // Clear the loading message
             currentChatNameInput.value = data.details.name || '';
             currentChatIdDisplay.textContent = `ID: ${currentChatId}`;
             modelSelector.value = data.details.model_name || defaultModel;
+
+            console.log(`[DEBUG] Populating chat history for chat ${chatId}. History length: ${data.history.length}`); // Added log
             if (data.history.length === 0) {
                 addMessage('system', 'This chat is empty. Start typing!');
             } else {
-                // Add historical messages, applying markdown immediately
                 data.history.forEach(msg => {
-                    const msgElement = addMessage(msg.role, msg.content);
-                    // Re-apply markdown to ensure correct rendering of saved history
-                    // This is important because saved history might not have the UI markers processed
-                    // or the markdown might need re-rendering based on current markedOptions.
-                    // However, addMessage already applies markdown for non-streaming.
-                    // So, just calling addMessage is sufficient for history.
+                    addMessage(msg.role, msg.content);
                 });
             }
-            updateActiveChatListItem();
-            updateStatus(`Chat ${chatId} loaded.`);
-            setSidebarCollapsed(sidebar, sidebarToggleButton, false, SIDEBAR_COLLAPSED_KEY, 'sidebar');
+            console.log(`[DEBUG] Chat history populated for chat ${chatId}.`); // Added log
+
 
             // Reset chat-specific context, but NOT plugin enabled states
             selectedFiles = []; // Clear permanent file selections
@@ -1396,44 +1410,98 @@ document.addEventListener('DOMContentLoaded', () => {
             if (existingSessionTag) existingSessionTag.remove();
             renderSelectedFiles(); // Render (clears plugin files and updates visibility)
             fileUploadSessionInput.value = ''; // Reset file input
+            console.log(`[DEBUG] Chat context (files, session file) reset for chat ${chatId}.`); // Added log
+
 
             calendarContext = null;
             isCalendarContextActive = false;
-            calendarToggle.checked = false;
+            calendarToggle.checked = isCalendarContextActive; // Ensure UI matches state
             updateCalendarStatus(); // Update status based on cleared context
-
             viewCalendarButton.classList.add('hidden');
+            console.log(`[DEBUG] Calendar context reset for chat ${chatId}.`); // Added log
+
             webSearchToggle.checked = false; // Reset web search toggle
+            console.log(`[DEBUG] Web search toggle reset for chat ${chatId}.`); // Added log
+
 
             // Ensure plugin UI reflects the *current* enabled state (which wasn't reset)
             updatePluginUI();
+            console.log(`[DEBUG] Plugin UI updated based on settings for chat ${chatId}.`); // Added log
+
 
             // Load files for the new chat context (files are global, but list needs refreshing)
             // Only load files if the plugin is enabled
             if (isFilePluginEnabled) {
+                 console.log(`[DEBUG] Files plugin enabled, loading uploaded files for chat ${chatId}.`); // Added log
                  await loadUploadedFiles(); // This might re-throw, which is caught by the catch block below
+                 console.log(`[DEBUG] loadUploadedFiles completed for chat ${chatId}.`); // Added log
             } else {
+                 console.log(`[DEBUG] Files plugin disabled, skipping loadUploadedFiles for chat ${chatId}.`); // Added log
                  // If plugin is disabled, clear the lists and show disabled message
                  uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
                  manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
             }
 
+            // Update chat list highlighting AFTER everything else is loaded/rendered
+            updateActiveChatListItem();
+            console.log(`[DEBUG] updateActiveChatListItem called for chat ${chatId}.`); // Added log
+
+
+            updateStatus(`Chat ${chatId} loaded.`);
+            console.log(`[DEBUG] loadChat(${chatId}) finished successfully.`); // Added log
+
 
         } catch (error) { // <-- This will now catch errors from fetch('/api/chat') AND re-thrown errors from loadUploadedFiles
             console.error('Error loading chat:', error);
-            clearChatbox();
+            clearChatbox(); // Clear any partial history or loading message
             addMessage('system', `[Error loading chat ${chatId}: ${error.message}]`, true);
-            currentChatId = null;
+            console.log(`[DEBUG] Error message added to chatbox for chat ${chatId}.`); // Added log
+
+            currentChatId = null; // Clear current chat state on error
             currentChatNameInput.value = '';
             currentChatIdDisplay.textContent = 'ID: -';
             modelSelector.value = defaultModel;
+            console.log(`[DEBUG] Chat state reset on error for chat ${chatId}.`); // Added log
+
             updateStatus(`Error loading chat ${chatId}.`, true);
-            updateActiveChatListItem();
+            console.log(`[DEBUG] Status updated for error loading chat ${chatId}.`); // Added log
+
+            updateActiveChatListItem(); // Update highlighting (should remove highlight)
+            console.log(`[DEBUG] updateActiveChatListItem called after error for chat ${chatId}.`); // Added log
+
+            // Reset chat-specific context again on error to be safe
+            selectedFiles = [];
+            sessionFile = null;
+            const existingSessionTag = selectedFilesContainer.querySelector('.session-file-tag');
+            if (existingSessionTag) existingSessionTag.remove();
+            renderSelectedFiles();
+            fileUploadSessionInput.value = '';
+            calendarContext = null;
+            isCalendarContextActive = false;
+            calendarToggle.checked = isCalendarContextActive;
+            updateCalendarStatus();
+            viewCalendarButton.classList.add('hidden');
+            webSearchToggle.checked = false;
+            console.log(`[DEBUG] Chat context reset again on error for chat ${chatId}.`); // Added log
+
+
             // Ensure plugin UI reflects the *current* enabled state even on error
             updatePluginUI();
+            console.log(`[DEBUG] Plugin UI updated after error for chat ${chatId}.`); // Added log
+
+            // Clear file lists if plugin enabled (as they might be stale)
+            if (isFilePluginEnabled) {
+                 uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
+                 manageFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
+                 console.log(`[DEBUG] File lists cleared/error state set after error loading chat ${chatId}.`); // Added log
+            }
+
+
             throw error; // Re-throw the error so initializeApp's catch block can handle it if this was the initial load
         } finally {
+            console.log(`[DEBUG] loadChat(${chatId}) finally block entered.`); // Added log
             setLoadingState(false); // <-- This will now run even if loadUploadedFiles re-throws
+            console.log(`[DEBUG] setLoadingState(false) called in loadChat(${chatId}) finally block.`); // Added log
         }
     }
 
@@ -1674,6 +1742,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateActiveChatListItem() {
+        console.log(`[DEBUG] updateActiveChatListItem called. currentChatId: ${currentChatId}`); // Added log
         const chatListItems = document.querySelectorAll('.chat-list-item');
 
         chatListItems.forEach(item => {
@@ -1681,15 +1750,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const timestampElement = item.querySelector('.text-xs'); // select the timestamp element
 
             if (chatId === currentChatId) {
+                console.log(`[DEBUG] Highlighting chat item ${chatId}`); // Added log
                 item.classList.add('active');
                 timestampElement.classList.remove('text-rz-tab-background-text'); // Remove inactive color
                 timestampElement.classList.add('text-rz-sidebar-text'); // Add active color
             } else {
+                console.log(`[DEBUG] Deactivating chat item ${chatId}`); // Added log
                 item.classList.remove('active');
                 timestampElement.classList.remove('text-rz-sidebar-text'); // Remove active color
                 timestampElement.classList.add('text-rz-tab-background-text'); // Add inactive color
             }
         });
+         console.log(`[DEBUG] updateActiveChatListItem finished.`); // Added log
     }
 
 
@@ -1905,9 +1977,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initial Application Load (MUST be inside DOMContentLoaded) ---
     /** Initializes the application on page load. */
     async function initializeApp() {
+        console.log("[DEBUG] initializeApp called."); // Added log
         // Set initial status
         updateStatus("Initializing application...");
         setLoadingState(true, "Initializing"); // Set loading state at the very beginning
+        console.log("[DEBUG] Initializing state set."); // Added log
 
         try {
             // Load and set initial toggle states from localStorage
@@ -1919,10 +1993,13 @@ document.addEventListener('DOMContentLoaded', () => {
             setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, pluginSidebarCollapsed, PLUGINS_COLLAPSED_KEY, 'plugins');
             setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
             setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY);
+            console.log("[DEBUG] Sidebar/Plugin collapse states loaded and applied."); // Added log
+
 
             // Load Calendar Context Active state (toggle next to input)
             isCalendarContextActive = localStorage.getItem('calendarContextActive') === 'true';
             calendarToggle.checked = isCalendarContextActive;
+            console.log(`[DEBUG] Calendar context active state loaded: ${isCalendarContextActive}.`); // Added log
             // updateCalendarStatus() is called after loading plugin enabled state
 
             // Load Streaming toggle state (default to true if not found)
@@ -1930,35 +2007,60 @@ document.addEventListener('DOMContentLoaded', () => {
             // localStorage stores strings, convert 'true'/'false' to boolean
             isStreamingEnabled = storedStreamingState === null ? true : storedStreamingState === 'true';
             streamingToggle.checked = isStreamingEnabled;
+            console.log(`[DEBUG] Streaming enabled state loaded: ${isStreamingEnabled}.`); // Added log
+
 
             // Load Plugin Enabled states (default to true if not found)
             const storedFilesPluginState = localStorage.getItem(FILES_PLUGIN_ENABLED_KEY);
             isFilePluginEnabled = storedFilesPluginState === null ? true : storedFilesPluginState === 'true';
             filesPluginToggle.checked = isFilePluginEnabled; // Update settings modal toggle
+            console.log(`[DEBUG] Files plugin enabled state loaded: ${isFilePluginEnabled}.`); // Added log
+
 
             const storedCalendarPluginState = localStorage.getItem(CALENDAR_PLUGIN_ENABLED_KEY);
             isCalendarPluginEnabled = storedCalendarPluginState === null ? true : storedCalendarPluginState === 'true';
             calendarPluginToggle.checked = isCalendarPluginEnabled; // Update settings modal toggle
+            console.log(`[DEBUG] Calendar plugin enabled state loaded: ${isCalendarPluginEnabled}.`); // Added log
+
 
             // Update UI visibility based on loaded plugin states
             updatePluginUI();
+            console.log("[DEBUG] Plugin UI visibility updated."); // Added log
             // Now update calendar status based on loaded context and plugin state
             updateCalendarStatus();
+            console.log("[DEBUG] Calendar status updated."); // Added log
 
 
+            console.log("[DEBUG] Calling loadSavedChats..."); // Added log
             await loadSavedChats(); // This will now re-throw if it fails
+            console.log("[DEBUG] loadSavedChats completed."); // Added log
+
             // If loadSavedChats succeeds, proceed to load the chat
             const firstChatElement = savedChatsList.querySelector('.list-item');
+            console.log(`[DEBUG] First chat element found: ${firstChatElement ? 'Yes' : 'No'}`); // Added log
+
             if (firstChatElement) {
                 const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
+                console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`); // Added log
                 await loadChat(mostRecentChatId); // This will now re-throw if it fails (including file loading)
+                console.log(`[DEBUG] loadChat(${mostRecentChatId}) completed.`); // Added log
             } else {
+                console.log("[DEBUG] No saved chats found, starting new chat."); // Added log
                 await startNewChat(); // This calls loadChat internally and will re-throw if it fails
+                console.log("[DEBUG] startNewChat completed."); // Added log
             }
+
+            // After loadChat/startNewChat completes, currentChatId should be set
+            console.log(`[DEBUG] initializeApp finished chat loading. Final currentChatId: ${currentChatId}`); // Added log
+
             renderSelectedFiles(); // Render any initially selected files (though none on fresh load)
+            console.log("[DEBUG] Selected files rendered."); // Added log
+
 
             // Final status update on successful initialization
             updateStatus("Application initialized.");
+            console.log("[DEBUG] initializeApp finished successfully."); // Added log
+
 
         } catch (error) {
             console.error('Error during application initialization:', error);
@@ -1966,10 +2068,13 @@ document.addEventListener('DOMContentLoaded', () => {
             addMessage('system', `[Fatal Error during initialization: ${error.message}. Please check console for details.]`, true);
             // Update status bar with error
             updateStatus("Initialization failed.", true);
+            console.log("[DEBUG] initializeApp caught an error."); // Added log
             // The finally block will now run because the error is caught here
         } finally {
+            console.log("[DEBUG] initializeApp finally block entered."); // Added log
             // Ensure loading state is false even if an error occurred during initialization
             setLoadingState(false); // This is crucial to unlock the UI
+            console.log("[DEBUG] setLoadingState(false) called in initializeApp finally block."); // Added log
         }
     }
 
