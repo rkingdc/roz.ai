@@ -39,12 +39,12 @@ def create_app(test_config=None):
     from . import database
     # Override DB_NAME with DATABASE_URI from config
     app.config['DB_NAME'] = app.config['DATABASE_URI']
-    database.init_app(app)
-
     # Initialize the database if using an in-memory database
     if app.config['TEST_DATABASE']:
         with app.app_context():
             database.init_db()
+
+    database.init_app(app)
 
     # Register Blueprints
     from .routes import main_routes, chat_routes, file_routes
