@@ -451,11 +451,12 @@ def generate_chat_response(
                             logger.info(
                                 f"Uploading temp file '{temp_filepath}' for '{filename}' via API..."
                             )
+                        js_mimetype = 'application/javascript' if filename.lower().endswith('.js') else mimetype
                         try:
                             uploaded_file = genai.upload_file(
                                 path=temp_filepath,
                                 display_name=filename,
-                                mime_type=mimetype,
+                                mime_type=js_mimetype,
                             )
                             gemini_parts.append(uploaded_file)
                             logger.info(
