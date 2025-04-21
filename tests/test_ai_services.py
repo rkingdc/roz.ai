@@ -86,7 +86,6 @@ def mock_genai():
 def mock_db():
     """Mocks the app.database module functions."""
     with patch("app.ai_services.database", autospec=True) as mock_db_module:
-        # Setup default return values for commonly used functions
         yield mock_db_module
 
 
