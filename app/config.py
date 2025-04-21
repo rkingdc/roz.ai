@@ -18,13 +18,10 @@ class Config:
     DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true' # Enable debug mode via env var
 
     # Database
-    TEST_DATABASE = os.environ.get('TEST_DATABASE', 'FALSE').lower() == 'true'
-    # Use a temporary file path for the database if TEST_DATABASE is true
-    if TEST_DATABASE:
-        DB_NAME = '/tmp/assistant_dev_db.sqlite' # Use a fixed temporary file path
-        logger.info(f"Using temporary file database for development: {DB_NAME}")
-    else:
-        DB_NAME = os.environ.get('DATABASE_NAME', 'assistant_chat_v7.db')  # Default database filename
+    TEST_DATABASE = os.environ.get('TEST_DATABASE', 'FALSE').lower() == 'true' # Keep this flag separate for other logic
+    # Always read DB_NAME from environment variable, default to file name
+    DB_NAME = os.environ.get('DATABASE_NAME', 'assistant_chat_v7.db')
+    logger.info(f"Database name configured as: {DB_NAME} (from DATABASE_NAME env var or default)")
 
     # DATABASE_URI is not strictly needed if DB_NAME holds the full path
     # Keeping it for potential compatibility, but DB_NAME is the source of truth for sqlite3.connect
