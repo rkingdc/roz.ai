@@ -1,10 +1,10 @@
 import pytest
-import pytest_asyncio  # Import pytest_asyncio
+import pytest_asyncio # Import pytest_asyncio
 from unittest.mock import patch, MagicMock, mock_open, call
 import os
 import base64
-import unittest.mock  # Need this import for the updated test_generate_search_query_success
-from flask import current_app  # Import current_app
+import unittest.mock # Need this import for the updated test_generate_search_query_success
+from flask import current_app # Import current_app
 
 # Import the module to test AFTER potentially patching builtins if needed
 # For now, direct import is fine.
@@ -40,10 +40,11 @@ def app():
     return app
 
 
-@pytest_asyncio.fixture  # Changed to pytest_asyncio.fixture
+@pytest_asyncio.fixture # Changed to pytest_asyncio.fixture
 async def app_context(app):
     """Provides the Flask application context."""
-    async with app.app_context():
+    # Use 'with' for the synchronous Flask AppContext
+    with app.app_context():
         yield
 
 
@@ -73,7 +74,7 @@ def mock_genai():
         yield mock_genai_lib
 
 
-@pytest_asyncio.fixture  # Changed to pytest_asyncio.fixture
+@pytest_asyncio.fixture # Changed to pytest_asyncio.fixture
 async def mock_db(app_context):
     """Mocks the app.database module functions within an app context."""
     # The app_context fixture ensures we are in the context
@@ -144,10 +145,10 @@ def test_configure_gemini_api_error(app, mock_genai):
 
 # == Test generate_summary ==
 @pytest.mark.asyncio
-async def test_generate_summary_not_configured(app_context):  # app_context requested
+async def test_generate_summary_not_configured(app_context): # app_context requested
     """Test generate_summary when Gemini is not configured."""
     ai_services.gemini_configured = False
-    # Removed async with app_context:
+    # Removed async with app_context: - pytest-asyncio handles this
     result = await ai_services.generate_summary(1)
     assert result == "[Error: AI model not configured]"
 
@@ -427,7 +428,7 @@ async def test_generate_search_query_success(
     mock_genai.GenerativeModel.return_value.generate_content.return_value.text = (
         " London weather forecast tomorrow "  # With extra spaces
     )
-    # Removed async with app_context:
+    # Removed async with app_context: - pytest-asyncio handles this
     result = await ai_services.generate_search_query(user_message)
 
     assert result == "London weather forecast tomorrow"  # Check cleaning
@@ -483,7 +484,7 @@ async def test_generate_search_query_cleaning(
         "numbered query",
     ]
 
-    # Removed async with app_context:
+    # Removed async with app_context: - pytest-asyncio handles this
     for i, messy_output in enumerate(test_cases):
         mock_genai.GenerativeModel.return_value.generate_content.reset_mock()  # Reset for next iteration
         mock_genai.GenerativeModel.return_value.generate_content.return_value.text = (
@@ -499,7 +500,7 @@ async def test_generate_search_query_not_configured(
 ):  # app_context requested
     """Test generate_search_query when not configured."""
     ai_services.gemini_configured = False
-    # Removed async with app_context:
+    # Removed async with app_context: - pytest-asyncio handles this
     result = await ai_services.generate_search_query("Any message")
     assert result is None
 
@@ -510,7 +511,7 @@ async def test_generate_search_query_empty_message(
 ):  # app_context requested
     """Test generate_search_query with an empty user message."""
     ai_services.gemini_configured = True
-    # Removed async with app_context:
+    # Removed async with app_context: - pytest-asyncio handles this
     result = await ai_services.generate_search_query("")
     assert result is None
     result = await ai_services.generate_search_query("   ")
@@ -526,7 +527,7 @@ async def test_generate_search_query_api_error(
     mock_genai.GenerativeModel.return_value.generate_content.side_effect = Exception(
         "API Error"
     )
-    # Removed async with app_context:
+    # Removed async with app_context: - pytest-asyncio handles this
     result = await ai_services.generate_search_query("A message", max_retries=1)
     assert result is None
     # Called once for initial try, once for retry
@@ -547,7 +548,7 @@ async def test_generate_search_query_blocked(
         mock_response
     )
 
-    # Removed async with app_context:
+    # Removed async with app_context: - pytest-asyncio handles this
     result = await ai_services.generate_search_query("Risky message", max_retries=1)
     assert result is None
     # Should not retry if blocked
@@ -564,7 +565,7 @@ async def test_generate_search_query_empty_response(
         "  "  # Empty after strip
     )
 
-    # Removed async with app_context:
+    # Removed async with app_context: - pytest-asyncio handles this
     result = await ai_services.generate_search_query("A message", max_retries=1)
     assert result is None
     # Should not retry if LLM returns empty
@@ -592,7 +593,7 @@ async def test_generate_chat_response_not_configured(
 ):  # app_context requested
     """Test chat response when Gemini is not configured."""
     ai_services.gemini_configured = False
-    # Removed async with app_context:
+    # Removed async with app_context: - pytest-asyncio handles this
     result = await ai_services.generate_chat_response(1, "Hello", [], None, [])
     assert result == "[Error: Gemini API Key not configured]"
 
@@ -1021,3 +1022,8 @@ async def test_generate_chat_response_api_error(
     mock_db.add_message_to_db.assert_any_call(
         chat_id, "assistant", "[Error communicating with AI: Chat API Failed]"
     )
+
+
+# Add more tests for specific error types (429, blocked, timeout, etc.) if needed
+# Add tests for file processing errors within generate_chat_response
+# Add tests for model fallback logic
