@@ -521,22 +521,27 @@ async function loadUploadedFiles() {
                 const uploadDateSpan = document.createElement('span');
                 let dateString = file.upload_date;
 
-                // --- Add logging here ---
+                // --- Keep logging here for now ---
                 console.log(`Processing file ID ${file.id}, filename "${file.filename}". Raw upload_date: "${dateString}"`);
 
-                // Attempt to make the date string more reliably parseable by replacing space with 'T'
-                // This assumes a format like 'YYYY-MM-DD HH:MM:SS' or similar
-                if (dateString && typeof dateString === 'string' && dateString.includes(' ')) {
-                    dateString = dateString.replace(' ', 'T');
-                    console.log(`Modified date string for parsing: "${dateString}"`);
-                }
-                const date = new Date(dateString);
-                let formattedDate = 'Invalid Date'; // Default in case parsing still fails
-                if (!isNaN(date.getTime())) { // Check if the date is valid using getTime()
-                    formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-                     console.log(`Parsed and formatted date: "${formattedDate}"`);
+                let formattedDate = 'Date N/A'; // Default if date is missing or invalid
+
+                if (dateString && typeof dateString === 'string') {
+                     // Attempt to make the date string more reliably parseable by replacing space with 'T'
+                     // This assumes a format like 'YYYY-MM-DD HH:MM:SS' or similar
+                     if (dateString.includes(' ')) {
+                         dateString = dateString.replace(' ', 'T');
+                         console.log(`Modified date string for parsing: "${dateString}"`);
+                     }
+                     const date = new Date(dateString);
+                     if (!isNaN(date.getTime())) { // Check if the date is valid using getTime()
+                         formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                          console.log(`Parsed and formatted date: "${formattedDate}"`);
+                     } else {
+                          console.log(`Date parsing failed for string: "${dateString}"`);
+                     }
                 } else {
-                     console.log(`Date parsing failed for string: "${dateString}"`);
+                    console.log(`upload_date is missing or not a string for file ID ${file.id}`);
                 }
 
 
