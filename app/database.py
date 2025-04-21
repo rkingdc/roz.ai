@@ -32,6 +32,8 @@ def get_db():
             # For in-memory databases, the schema needs to be applied
             # per connection/worker if it hasn't been already.
             # Check if the 'chats' table exists as a proxy for schema presence.
+            # This block is now only relevant if DB_NAME is explicitly ':memory:'
+            # which should not happen with the Makefile change, but kept for robustness.
             if db_name == ':memory:':
                 cursor = g.db.cursor()
                 try:
