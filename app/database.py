@@ -291,7 +291,7 @@ def get_chat_history_from_db(chat_id, limit=100):
     try:
         db = get_db()
         cursor = db.cursor()
-        cursor.execute("SELECT role, content, timestamp FROM messages WHERE chat_id = ? ORDER BY timestamp ASC LIMIT ?",
+        cursor.execute("SELECT role, content, timestamp FROM messages WHERE chat_id = ? AND role <> 'assistant' ORDER BY timestamp ASC LIMIT ?",
                        (chat_id, limit))
         history = cursor.fetchall()
         return [dict(row) for row in history]

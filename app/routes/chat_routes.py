@@ -129,7 +129,7 @@ def send_message_route(chat_id):
             attached_files=attached_files, # Pass the list of {id, filename, type}
             session_files=session_files,  # Pass the list of {filename, mimetype, content}
             calendar_context=calendar_context,  # Pass calendar context
-            enable_web_search=enable_web_search,  # Pass web search flag
+            web_search_enabled=enable_web_search,  # Pass web search flag
         )
         # Check if the reply indicates an internal error occurred
         if isinstance(assistant_reply, str) and assistant_reply.startswith("[Error:"):
