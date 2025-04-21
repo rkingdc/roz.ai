@@ -18,14 +18,15 @@ default: help
 .PHONY: install
 install:
 	@echo "Setting up virtual environment and installing dependencies..."
-	@mkdir -p $(VENV_DIR)
-	@python3 -m venv $(VENV_DIR)
+	@mkdir -p $(VENV_DIR) # Ensure parent directories exist
+	@test -d $(VENV_DIR)/bin/activate || (echo "Creating virtual environment at $(VENV_DIR)..." && python3 -m venv $(VENV_DIR))
+	@echo "Upgrading pip and installing dependencies..."
 	@$(PYTHON) -m pip install --upgrade pip
 	@$(PYTHON) -m pip install -r requirements.txt
 	@echo "Checking for .env file..."
 	@test -f .env || cp .env.example .env
 	@test -f .env && echo ".env file exists." || echo ".env file created from .env.example. Please configure it."
-	@echo "Installation complete. Virtual environment created at $(VENV_DIR)."
+	@echo "Installation complete."
 
 # Target to run tests
 .PHONY: test
@@ -54,8 +55,9 @@ help:
 	@echo "Makefile for the AI Assistant Application"
 	@echo "----------------------------------------------------"
 	@echo "Available targets:"
-	@echo "  make install - Creates a virtual environment at $(VENV_DIR), installs dependencies from requirements.txt,"
-	@echo "                 and creates a .env file from .env.example if it doesn't exist."
+	@echo "  make install - Creates a virtual environment at $(VENV_DIR) (if it doesn't exist),"
+	@echo "                 installs dependencies from requirements.txt, and creates a .env file"
+	@echo "                 from .env.example if it doesn't exist."
 	@echo "  make start   - Stops any existing process and starts the application using uvicorn."
 	@echo "                 Logs output to $(LOG_FILE) and the console. Runs 'install' first."
 	@echo "  make stop    - Attempts to stop the running application process based on the virtual environment path."
