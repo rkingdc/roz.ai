@@ -6,9 +6,10 @@ from datetime import datetime
 from .. import database as db # Use relative import for database module
 from .. import ai_services # Use relative import for ai services
 from .. import file_utils # Use relative import for file utils
+import validators # Import validators library for URL validation
 
 # Configure logging
-import logging        
+import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,68 @@ def upload_file_route():
     else:
          # Should not happen if loop runs unless no files were sent or all failed validation before try block
          return jsonify({"error": "No valid files processed."}), 400
+
+@bp.route('/files/from_url', methods=['POST'])
+def add_file_from_url_route():
+    """API endpoint to fetch content from a URL and save it as a file."""
+    data = request.json
+    url = data.get('url')
+
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    # Basic URL validation
+    if not validators.url(url):
+         return jsonify({"error": "Invalid URL format"}), 400
+
+    max_size = current_app.config['MAX_FILE_SIZE_BYTES']
+
+    try:
+        # Fetch content from the URL
+        # fetch_web_content returns (content, title) or (None, None) on failure
+        content, title = file_utils.fetch_web_content(url)
+
+        if content is None:
+             # fetch_web_content logs its own errors, just return a generic failure
+             return jsonify({"error": f"Failed to fetch content from URL: {url}"}), 500
+
+        # Convert content to bytes (assuming fetch_web_content returns string)
+        content_blob = content.encode('utf-8') # Or detect encoding if possible
+        filesize = len(content_blob)
+
+        # Check size after fetching
+        if filesize > max_size:
+             return jsonify({"error": f"Content from URL ({filesize} bytes) exceeds size limit ({max_size // 1024 // 1024} MB)."}), 400
+
+        # Determine filename (use URL as requested, maybe truncate if too long)
+        # Using the full URL as filename might be problematic for some DBs/filesystems,
+        # but sticking to the request for now. A safer approach might be a hash or truncated URL.
+        # Let's use the full URL for now.
+        filename = url # As requested
+
+        # Determine mimetype (default to text/plain for fetched web content)
+        mimetype = 'text/plain' # Or 'text/html' if you want to preserve HTML structure
+
+        # Save record and blob to DB
+        file_id = db.save_file_record_to_db(filename, content_blob, mimetype, filesize)
+
+        if file_id:
+            # Return metadata of successfully saved file
+            return jsonify({
+                "id": file_id,
+                "filename": filename,
+                "mimetype": mimetype,
+                "filesize": filesize,
+                "uploaded_at": datetime.now().isoformat(), # This will be current time, not fetch time
+                "has_summary": False # New files don't have summaries yet
+            }), 201 # Return 201 Created
+        else:
+            # DB function already logs error
+            return jsonify({"error": f"Failed to save content from URL '{url}' to database."}), 500
+
+    except Exception as e:
+        current_app.logger.error(f"Error adding file from URL '{url}': {e}", exc_info=True)
+        return jsonify({"error": f"An unexpected error occurred while processing the URL: {e}"}), 500
 
 
 @bp.route('/files/<int:file_id>/summary', methods=['GET'])

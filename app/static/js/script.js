@@ -38,6 +38,15 @@ const closeCalendarModalButton = document.getElementById('close-calendar-modal')
 const calendarModalContent = document.getElementById('calendar-modal-content');
 const webSearchToggle = document.getElementById('web-search-toggle'); // Added web search toggle
 
+// New DOM Element References for URL feature
+const addUrlButton = document.getElementById('add-url-btn');
+const urlModal = document.getElementById('url-modal');
+const closeUrlModalButton = document.getElementById('close-url-modal');
+const urlInput = document.getElementById('url-input');
+const fetchUrlButton = document.getElementById('fetch-url-btn');
+const urlStatus = document.getElementById('url-status');
+
+
 // Application State (Added Calendar state)
 let currentChatId = null;
 let isLoading = false;
@@ -109,6 +118,10 @@ function setLoadingState(loading, operation = "Processing") {
     calendarToggle.disabled = loading;
     viewCalendarButton.disabled = loading || !calendarContext;
     webSearchToggle.disabled = loading; // Disable web search toggle
+    addUrlButton.disabled = loading; // Disable new Add URL button
+    fetchUrlButton.disabled = loading; // Disable Fetch URL button in modal
+    urlInput.disabled = loading; // Disable URL input in modal
+
     uploadedFilesList.querySelectorAll('input[type="checkbox"], button').forEach(el => el.disabled = loading);
     selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading);
     sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send';
@@ -196,7 +209,7 @@ let sessionFile = null; // Variable to store selected session file
 
 // Show the file upload container
 fileUploadSessionLabel.addEventListener('click', () => {
-    fileUploadSessionContainer.classList.remove('hidden');
+    // fileUploadSessionContainer.classList.remove('hidden'); // This container is now always visible but input is hidden
     fileUploadSessionInput.click(); // Simulate click to open file dialog.
 });
 
@@ -278,7 +291,7 @@ fileUploadSessionInput.addEventListener('change', async (e) => {
 
 
 // Assume 'marked' is available globally or imported
-// Make sure you have 
+// Make sure you have
 // and Font Awesome if using the UI markers.
 
 // Create a custom renderer to apply your specific classes
@@ -473,6 +486,52 @@ function handleFileUpload(event) {
     });
 }
 
+// New function to handle adding file from URL
+async function addFileFromUrl(url) {
+    if (isLoading) return;
+    if (!url || !url.startsWith('http')) {
+        urlStatus.textContent = "Please enter a valid URL (must start with http or https).";
+        urlStatus.classList.add('text-red-500');
+        return;
+    }
+
+    setLoadingState(true, "Fetching URL");
+    urlStatus.textContent = "Fetching content...";
+    urlStatus.classList.remove('text-red-500');
+
+    try {
+        const response = await fetch('/api/files/from_url', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ url: url })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP error! status: ${response.status}`);
+        }
+
+        updateStatus(`Successfully added file from URL: ${data.filename}`);
+        urlStatus.textContent = `Successfully added file: ${data.filename}`;
+        urlStatus.classList.remove('text-red-500'); // Clear error styling
+        urlInput.value = ''; // Clear input on success
+        await loadUploadedFiles(); // Reload the file list
+        closeUrlModal(); // Close the modal on success
+
+    } catch (error) {
+        console.error('Error adding file from URL:', error);
+        updateStatus(`Error adding file from URL: ${error.message}`, true);
+        urlStatus.textContent = `Error: ${error.message}`;
+        urlStatus.classList.add('text-red-500');
+    } finally {
+        setLoadingState(false);
+    }
+}
+
+
 function attachSelectedFiles(type) {
     const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked');
     if (checkboxes.length === 0) {
@@ -616,6 +675,24 @@ function closeModal() {
 function closeCalendarModal() {
     calendarModal.style.display = "none";
 }
+
+// New URL Modal Functions
+function showUrlModal() {
+    if (isLoading) return;
+    urlInput.value = ''; // Clear previous input
+    urlStatus.textContent = ''; // Clear previous status
+    urlStatus.classList.remove('text-red-500');
+    urlModal.style.display = "block";
+    setTimeout(() => urlInput.focus(), 100); // Focus input after modal is displayed
+}
+
+function closeUrlModal() {
+    urlModal.style.display = "none";
+    urlInput.value = ''; // Clear input on close
+    urlStatus.textContent = ''; // Clear status on close
+    urlStatus.classList.remove('text-red-500');
+}
+
 
 // --- Calendar Plugin Functions (MODIFIED) ---
 /** Fetches calendar events and updates state/UI. */
@@ -853,17 +930,20 @@ async function sendMessage() {
         return;
     }
     const message = messageInput.value.trim();
-    if (!message && selectedFiles.length === 0 && (!isCalendarContextActive || !calendarContext)) {
+    if (!message && selectedFiles.length === 0 && (!isCalendarContextActive || !calendarContext) && !sessionFile) { // Added sessionFile check
         updateStatus("Cannot send: Type a message or attach file(s)/active context.", true);
         return;
     }
 
     // --- Display user message + UI markers immediately ---
-    let displayMessage = message || ((selectedFiles.length > 0 || (isCalendarContextActive && calendarContext)) ? "(Context attached)" : "");
+    let displayMessage = message || ((selectedFiles.length > 0 || (isCalendarContextActive && calendarContext) || sessionFile) ? "(Context attached)" : ""); // Added sessionFile check
     let uiMarkers = "";
     if (selectedFiles.length > 0) {
         // Use non-HTML placeholder for files
         uiMarkers = selectedFiles.map(f => `[UI-MARKER:file:${f.filename}:${f.type}]`).join('');
+    }
+     if (sessionFile) { // Add marker for session file
+        uiMarkers += `[UI-MARKER:file:${sessionFile.filename}:session]`;
     }
     if (isCalendarContextActive && calendarContext) {
         // Use non-HTML placeholder for calendar
@@ -1063,6 +1143,22 @@ filePluginHeader.addEventListener('click', toggleFilePlugin);
 fileUploadInput.addEventListener('change', handleFileUpload);
 attachFullButton.addEventListener('click', () => attachSelectedFiles('full'));
 attachSummaryButton.addEventListener('click', () => attachSelectedFiles('summary'));
+// New URL Feature Listeners
+addUrlButton.addEventListener('click', showUrlModal);
+closeUrlModalButton.addEventListener('click', closeUrlModal);
+fetchUrlButton.addEventListener('click', () => addFileFromUrl(urlInput.value));
+urlInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        addFileFromUrl(urlInput.value);
+    }
+});
+urlModal.addEventListener('click', (event) => {
+    if (event.target === urlModal) {
+        closeUrlModal();
+    }
+});
+
 // Calendar Plugin Listeners
 calendarPluginHeader.addEventListener('click', toggleCalendarPlugin);
 loadCalendarButton.addEventListener('click', loadCalendarEvents);

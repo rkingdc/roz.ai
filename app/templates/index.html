@@ -97,14 +97,19 @@
                 <i class="fas fa-chevron-down toggle-icon"></i>
             </div>
             <div class="plugin-content flex flex-col p-2" id="file-plugin-content">
-                <input type="file" id="file-upload-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf" multiple>
-                <label for="file-upload-input" id="file-upload-label" class="btn btn-secondary btn-sm w-full mb-2 flex-shrink-0">
-                    <i class="fas fa-upload"></i> Add New File(s)
-                </label>
+                <div class="flex gap-2 mb-2 flex-shrink-0"> <!-- Container for the two buttons -->
+                    <input type="file" id="file-upload-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf" multiple class="hidden"> <!-- Hide the default input -->
+                    <label for="file-upload-input" id="file-upload-label" class="btn btn-secondary btn-sm flex-grow">
+                        <i class="fas fa-upload"></i> Add New File(s)
+                    </label>
+                    <button id="add-url-btn" class="btn btn-secondary btn-sm flex-grow"> <!-- New button -->
+                        <i class="fas fa-link"></i> Add URL
+                    </button>
+                </div>
                 <h4 class="text-sm font-medium text-rz-sidebar-text mb-1 flex-shrink-0">Available Files:</h4>
                  <div class="sidebar-section-container flex-grow mb-2 max-h-60">
                    <div id="uploaded-files-list" class="sidebar-list border border-rz-sidebar-border rounded p-1 bg-rz-sidebar-bg">
-		     
+
                         <p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading files...</p>
                     </div>
                 </div>
@@ -172,6 +177,26 @@
             </div>
             <div class="modal-body">
                 <pre id="calendar-modal-content" class="text-xs bg-white p-2 border border-rz-tab-line rounded"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- New URL Input Modal -->
+    <div id="url-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Add File from URL</h3>
+                <button class="close-btn" id="close-url-modal" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label for="url-input" class="block text-sm font-medium text-gray-700 mb-1">Enter URL:</label>
+                <input type="text" id="url-input" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm" placeholder="e.g., https://example.com/document.txt">
+                <p id="url-status" class="text-xs mt-1"></p>
+            </div>
+            <div class="modal-footer">
+                <button id="fetch-url-btn" class="btn btn-primary btn-sm">
+                    <i class="fas fa-download mr-1"></i> Fetch and Add
+                </button>
             </div>
         </div>
     </div>
