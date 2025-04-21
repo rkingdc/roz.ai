@@ -83,7 +83,7 @@ def mock_genai():
 
 
 @pytest.fixture
-def mock_db():
+def mock_db(app_context):
     """Mocks the app.database module functions."""
     with patch("app.ai_services.database", autospec=True) as mock_db_module:
         # Setup default return values for commonly used functions
@@ -102,7 +102,8 @@ def mock_db():
         mock_db_module.get_chat_history_from_db.return_value = []
         mock_db_module.save_summary_in_db.return_value = True
         mock_db_module.add_message_to_db.return_value = True
-        yield mock_db_module
+        with app_context:
+            yield mock_db_module
 
 
 @pytest.fixture
