@@ -83,10 +83,11 @@ def mock_genai():
 
 
 @pytest.fixture
-def mock_db():
+def mock_db(app_context):
     """Mocks the app.database module functions."""
-    with patch("app.ai_services.database", autospec=True) as mock_db_module:
-        yield mock_db_module
+    with app_context:
+        with patch("app.ai_services.database", autospec=True) as mock_db_module:
+            yield mock_db_module
 
 
 @pytest.fixture
