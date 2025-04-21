@@ -17,7 +17,6 @@ default: help
 # Target to set up the virtual environment and install dependencies
 .PHONY: install
 install:
-	@echo "Setting up virtual environment and installing dependencies..."
 	@mkdir -p $(VENV_DIR) # Ensure parent directories exist
 	@test -d $(VENV_DIR)/bin/activate || (echo "Creating virtual environment at $(VENV_DIR)..." && python3 -m venv $(VENV_DIR))
 	@echo "Upgrading pip and installing dependencies..."
