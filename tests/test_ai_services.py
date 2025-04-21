@@ -234,7 +234,7 @@ async def test_generate_summary_image_file(app, mock_genai, mock_db, mock_tempfi
         )  # Check temp file removed
 
 
-async def test_generate_summary_unsupported_type(app, mock_db):
+async def test_generate_summary_unsupported_type(app, mock_db, app_context):
     """Test summary generation for an unsupported file type."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = {
