@@ -49,10 +49,10 @@ async def app_context(app):
 
 
 @pytest_asyncio.fixture # Changed to pytest_asyncio.fixture
-async def mock_db(app_context):
+async def mock_db(app_context): # Still depends on app_context
     """Mocks specific app.database functions within an app context."""
-    # The app_context fixture ensures we are in the context
-    # Patch individual functions instead of the whole module with autospec
+    # The app_context fixture ensures we are in the context when this fixture runs
+    # Patch individual functions outside the context manager within the fixture
     with patch("app.ai_services.database.get_chat_details_from_db") as mock_get_chat_details, \
          patch("app.ai_services.database.get_chat_history_from_db") as mock_get_chat_history, \
          patch("app.ai_services.database.add_message_to_db") as mock_add_message, \
@@ -63,6 +63,8 @@ async def mock_db(app_context):
         # This is still good practice even with individual mocks
         mock_add_message.return_value = True
 
+        # Yield the dictionary of mocks. The test will run within the app_context
+        # provided by the app_context fixture, and these patches should be active.
         yield {
             "get_chat_details_from_db": mock_get_chat_details,
             "get_chat_history_from_db": mock_get_chat_history,
@@ -862,9 +864,10 @@ async def test_generate_chat_response_with_permanent_file_summary(
     mock_db["get_chat_history_from_db"].return_value = []
 
     # Mock get_file_details: Provide return values for BOTH calls without include_content
+    # The first call is in generate_chat_response, the second is in get_or_generate_summary
     mock_db["get_file_details_from_db"].side_effect = [
-        file_details_dict,  # For the call in generate_chat_response (~line 289)
-        file_details_dict,  # For the call in get_or_generate_summary (~line 111)
+        file_details_dict,
+        file_details_dict,
     ]
     mock_genai.GenerativeModel.return_value.generate_content.return_value.text = (
         "Summary Response"
@@ -886,7 +889,7 @@ async def test_generate_chat_response_with_permanent_file_summary(
         expected_calls_get_details, any_order=False
     )  # Adjust any_order if needed
 
-    # Ensure it wasn't called with include_content=True
+    # Ensure it wasn't called with include_content=True in either call
     for call_args in mock_db["get_file_details_from_db"].call_args_list:
         # Check the keyword arguments specifically
         if call_args.kwargs.get("include_content") is True:
