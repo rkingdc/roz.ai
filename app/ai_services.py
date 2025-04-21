@@ -44,7 +44,7 @@ def configure_gemini(app):
         gemini_api_key_present = False
         logger.error(
             "Gemini API key NOT found in config. AI features relying on it will fail."
-        )
+)
     return gemini_api_key_present
 
 
@@ -922,14 +922,68 @@ def generate_chat_response(
                 stream=streaming_enabled
             )
 
+            # --- Debugging Logs for Response ---
+            logger.debug(f"Gemini API response object type: {type(response)}")
+            if hasattr(response, 'candidates'):
+                 logger.debug(f"Response has {len(response.candidates)} candidates.")
+                 if response.candidates:
+                      logger.debug(f"First candidate finish reason: {response.candidates[0].finish_reason}")
+                      if hasattr(response.candidates[0], 'content') and response.candidates[0].content:
+                           logger.debug(f"First candidate content parts: {len(response.candidates[0].content.parts)}")
+                           if response.candidates[0].content.parts:
+                                logger.debug(f"First part type: {type(response.candidates[0].content.parts[0])}")
+                                if hasattr(response.candidates[0].content.parts[0], 'text'):
+                                     logger.debug(f"First part text length: {len(response.candidates[0].content.parts[0].text)}")
+                                else:
+                                     logger.debug("First part has no 'text' attribute.")
+                           else:
+                                logger.debug("First candidate content has no parts.")
+                      else:
+                           logger.debug("First candidate has no 'content' or content is empty.")
+                 else:
+                      logger.debug("Response candidates list is empty.")
+            elif hasattr(response, 'prompt_feedback'):
+                 logger.debug(f"Response has prompt feedback: {response.prompt_feedback}")
+            else:
+                 logger.debug("Response has no candidates or prompt feedback.")
+            # --- End Debugging Logs ---
+
+
             if streaming_enabled:
                 # Iterate through the streaming response and yield text chunks
-                logger.info(f"Starting streaming response for chat {chat_id}.")
+                logger.info(f"Starting streaming response iteration for chat {chat_id}.")
                 # Use a separate try/except for the streaming iteration itself
                 try:
+                    # Check if response is iterable (it should be for stream=True)
+                    if not hasattr(response, '__iter__'):
+                         logger.error(f"Expected streaming response to be iterable, but got {type(response)}")
+                         yield "[Streaming Error: Unexpected API response format]"
+                         return
+
+                    chunk_count = 0
                     for chunk in response:
-                        if chunk.text: # Only yield if there is text in the chunk
+                        chunk_count += 1
+                        logger.debug(f"Received chunk {chunk_count}: {chunk}")
+                        if hasattr(chunk, 'text') and chunk.text: # Only yield if there is text in the chunk
+                            logger.debug(f"Yielding chunk text (length {len(chunk.text)}).")
                             yield chunk.text
+                        elif hasattr(chunk, 'candidates') and chunk.candidates:
+                             # Sometimes chunks might contain candidates even if text is empty?
+                             logger.debug(f"Chunk {chunk_count} has candidates but no text.")
+                        elif hasattr(chunk, 'prompt_feedback'):
+                             logger.debug(f"Chunk {chunk_count} has prompt feedback: {chunk.prompt_feedback}")
+                             # Optionally yield a system message about feedback
+                             # yield f"\n[System Note: Prompt feedback received: {chunk.prompt_feedback}]"
+                        else:
+                             logger.debug(f"Chunk {chunk_count} has no text, candidates, or prompt feedback.")
+
+
+                    if chunk_count == 0:
+                         logger.warning(f"Streaming iteration for chat {chat_id} completed but yielded no chunks.")
+                         # Yield a message if no chunks were received at all
+                         yield "[System Note: The AI did not return any content.]"
+
+
                 except Exception as stream_err:
                     logger.error(f"Error during streaming iteration for chat {chat_id}: {stream_err}", exc_info=True)
                     yield f"\n[Streaming Error: {type(stream_err).__name__}]"
@@ -938,9 +992,29 @@ def generate_chat_response(
 
             else:
                 # Get the full text response for non-streaming
-                assistant_reply = response.text
-                logger.info(f"Successfully received full response for chat {chat_id}.")
-                return assistant_reply # Return the string
+                # Check if response has text attribute (should for stream=False)
+                if hasattr(response, 'text'):
+                    assistant_reply = response.text
+                    logger.info(f"Successfully received full response text (length {len(assistant_reply)}) for chat {chat_id}.")
+                    if not assistant_reply.strip():
+                         logger.warning(f"Non-streaming response for chat {chat_id} was empty or whitespace.")
+                         assistant_reply = "[System Note: The AI returned an empty response.]" # Provide a user-friendly message
+                    return assistant_reply # Return the string
+                elif hasattr(response, 'candidates') and not response.candidates:
+                     logger.warning(f"Non-streaming response for chat {chat_id} had no candidates.")
+                     # Check for prompt feedback if no candidates
+                     if hasattr(response, 'prompt_feedback') and response.prompt_feedback:
+                          logger.warning(f"Non-streaming response had prompt feedback: {response.prompt_feedback}")
+                          return f"[AI Safety Error: Request blocked due to safety settings (Reason: {response.prompt_feedback.block_reason})]"
+                     else:
+                          return "[AI Error: The AI did not return any candidates.]"
+                elif hasattr(response, 'prompt_feedback'):
+                     logger.warning(f"Non-streaming response for chat {chat_id} had prompt feedback but no text/candidates.")
+                     return f"[AI Safety Error: Request blocked due to safety settings (Reason: {response.prompt_feedback.block_reason})]"
+                else:
+                    logger.error(f"Non-streaming response for chat {chat_id} had unexpected format: {type(response)}")
+                    return "[AI Error: Unexpected API response format.]"
+
 
         # --- Specific Error Handling for API Call ---
         # These exceptions need to be caught here and returned/yielded as error messages
