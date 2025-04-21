@@ -450,9 +450,10 @@ function addMessage(role, content, isError = false, targetElement = null) {
         processedContent = processedContent.replace(/\[UI-MARKER:file:(.*?):(.*?)\]/g, (match, filename, type) => `<span class="attachment-icon" title="Attached ${filename} (${type})"><i class="fas fa-paperclip"></i> ${filename}</span>`).replace(/\[UI-MARKER:calendar\]/g, `<span class="attachment-icon" title="Calendar Context Active"><i class="fas fa-calendar-check"></i> Calendar</span>`).replace(/\[UI-MARKER:error:(.*?)\]/g, (match, filename) => `<span class="attachment-icon error-marker" title="Error attaching ${filename}"><i class="fas fa-exclamation-circle"></i> ${filename}</span>`);
 
         // Apply markdown parsing only when creating a new message (non-streaming initial content)
-        // For streaming, markdown is applied *after* the stream finishes.
+        // For streaming, content is appended chunk by chunk, markdown applied at the end
         // This branch is for non-streaming or initial message creation
-        contentSpan.innerHTML = marked.parse(escapeHtml(processedContent), markedOptions); // Escape before parsing
+        // REMOVED escapeHtml here - let marked handle escaping within code blocks/spans
+        contentSpan.innerHTML = marked.parse(processedContent, markedOptions);
 
 
         // Append the new message element to the chatbox
@@ -1265,17 +1266,17 @@ async function sendMessage() {
     let uiMarkers = "";
     if (filesToAttach.length > 0) {
         // Use non-HTML placeholder for files
-        uiMarkers = filesToAttach.map(f => `[UI-MARKER:file:${f.filename}:${f.type}]`).join('');
+        uiMarkers = filesToAttach.map(f => `\[UI-MARKER:file:${f.filename}:${f.type}\]`).join(''); // Escaped brackets
     }
      if (sessionFile) { // Add marker for session file
-        uiMarkers += `[UI-MARKER:file:${sessionFile.filename}:session]`;
+        uiMarkers += `\[UI-MARKER:file:${sessionFile.filename}:session\]`; // Escaped brackets
     }
     if (isCalendarContextActive && calendarContext) {
         // Use non-HTML placeholder for calendar
-        uiMarkers += `[UI-MARKER:calendar]`;
+        uiMarkers += `\[UI-MARKER:calendar\]`; // Escaped brackets
     }
     if (webSearchToggle.checked) { // Add marker for web search
-        uiMarkers += `[UI-MARKER:websearch]`;
+        uiMarkers += `\[UI-MARKER:websearch\]`; // Escaped brackets
     }
 
     // Prepend placeholders to the actual message text
