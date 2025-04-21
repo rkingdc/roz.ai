@@ -131,7 +131,7 @@ def send_message_route(chat_id):
             # If streaming is enabled, iterate the generator and yield chunks to the client
             def stream_generator():
                 full_reply = ""
-                logger.debug(f"Starting iteration over streaming generator for chat {chat_id}.") # Add log before loop
+                logger.info(f"Starting iteration over streaming generator for chat {chat_id}.") # Add log before loop
                 try:
                     for chunk in assistant_response_generator: # Iterate the generator
                         chunk_to_send = "" # What we will send to the client for this chunk
@@ -158,13 +158,13 @@ def send_message_route(chat_id):
                         else:
                              log_message = f"Streaming chunk has no text, candidates, or feedback: {chunk}"
 
-                        logger.debug(log_message)
+                        logger.info(log_message)
 
                         if chunk_to_send: # Only yield and accumulate if we have something to send
                             full_reply += chunk_to_send
                             yield chunk_to_send
 
-                    logger.debug(f"Finished iteration over streaming generator for chat {chat_id}.") # Add log after loop
+                    logger.info(f"Finished iteration over streaming generator for chat {chat_id}.") # Add log after loop
                     # After the loop finishes, check if any content was yielded
                     if not full_reply:
                          logger.warning(f"Streaming generator for chat {chat_id} yielded no content.")
@@ -212,11 +212,11 @@ def send_message_route(chat_id):
                     if hasattr(chunk, 'text'):
                          chunk_text = chunk.text
                     elif hasattr(chunk, 'candidates') and chunk.candidates:
-                         logger.debug(f"Non-streaming chunk has candidates but no text: {chunk}")
+                         logger.info(f"Non-streaming chunk has candidates but no text: {chunk}")
                     elif hasattr(chunk, 'prompt_feedback'):
-                         logger.debug(f"Non-streaming chunk has prompt feedback: {chunk.prompt_feedback}")
+                         logger.info(f"Non-streaming chunk has prompt feedback: {chunk.prompt_feedback}")
                     else:
-                         logger.debug(f"Non-streaming chunk has no text, candidates, or feedback: {chunk}")
+                         logger.info(f"Non-streaming chunk has no text, candidates, or feedback: {chunk}")
 
                     full_reply += chunk_text
 
