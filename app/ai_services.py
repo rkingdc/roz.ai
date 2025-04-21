@@ -1,6 +1,14 @@
 # app/ai_services.py
 import google.genai as genai  # Use the new SDK
-from google.genai.types import GenerationConfig, Part, Content
+
+# Import necessary types, including the one for FileDataPart
+from google.genai.types import (
+    GenerationConfig,
+    Part,
+    Content,
+    GenerateContentResponse,
+
+)
 from flask import current_app, g  # Import g for request context caching
 import tempfile
 import os
@@ -13,10 +21,12 @@ from google.api_core.exceptions import (
     DeadlineExceeded,
     ClientError,
     NotFound,
+    InvalidArgument,  # Import InvalidArgument for malformed content errors
 )
 from pydantic_core import ValidationError
 import grpc
 import logging
+
 # from functools import wraps # Remove this import
 from werkzeug.utils import secure_filename
 
@@ -25,23 +35,16 @@ logger = logging.getLogger(__name__)
 
 # --- Configuration Check ---
 # Remove gemini_api_key_present global and configure_gemini function
-# gemini_api_key_present = False
-# def configure_gemini(app): ... # Remove this function
 
 # --- Helper Functions for Client Instantiation ---
 # Remove _get_api_key and get_gemini_client functions
-# def _get_api_key(): ... # Remove this function
-# def get_gemini_client(): ... # Remove this function
-
 
 # --- Decorator for AI Readiness Check ---
 # Remove the entire decorator function
-# def ai_ready_required(f): ... # Remove this function
 
 
 # --- Summary Generation ---
 # Remove the decorator
-# @ai_ready_required
 def generate_summary(file_id):
     """
     Generates a summary for a file using a designated multi-modal model via the client.
@@ -54,14 +57,16 @@ def generate_summary(file_id):
     try:
         # Check for Flask request context
         try:
-             _ = current_app.config # Simple check that raises RuntimeError if no context
-             logger.debug("generate_summary: Flask request context is active.")
+            _ = (
+                current_app.config
+            )  # Simple check that raises RuntimeError if no context
+            logger.debug("generate_summary: Flask request context is active.")
         except RuntimeError:
-             logger.error(
-                 "generate_summary called outside of active Flask request context.",
-                 exc_info=True # Log traceback
-             )
-             return "[Error: AI Service called outside request context]"
+            logger.error(
+                "generate_summary called outside of active Flask request context.",
+                exc_info=True,  # Log traceback
+            )
+            return "[Error: AI Service called outside request context]"
 
         api_key = current_app.config.get("API_KEY")
         if not api_key:
@@ -69,15 +74,23 @@ def generate_summary(file_id):
             return "[Error: AI Service API Key not configured]"
 
         try:
-            client = genai.Client(api_key=api_key)
-            logger.info("Successfully created genai.Client for summary generation.")
+            # Use client caching via Flask's 'g' object if in request context
+            if "genai_client" not in g:
+                logger.info("Creating new genai.Client and caching in 'g'.")
+                g.genai_client = genai.Client(api_key=api_key)
+            else:
+                logger.debug("Using cached genai.Client from 'g'.")
+            client = g.genai_client
+            # Test the client connection minimally (optional, can add latency)
+            # client.models.list() # Example test
+            logger.info("Successfully obtained genai.Client for summary generation.")
         except (GoogleAPIError, ClientError, ValueError, Exception) as e:
-            logger.error(f"Failed to initialize genai.Client for summary: {e}", exc_info=True)
+            logger.error(
+                f"Failed to initialize/get genai.Client for summary: {e}", exc_info=True
+            )
             # Check for invalid key specifically
             if "api key not valid" in str(e).lower():
-                 # We can't use g here reliably if called outside request context,
-                 # but the API call itself will fail anyway. Just return the error.
-                 return "[Error: Invalid Gemini API Key]"
+                return "[Error: Invalid Gemini API Key]"
             return "[Error: Failed to initialize AI client]"
 
     except Exception as e:
@@ -88,7 +101,6 @@ def generate_summary(file_id):
         )
         return f"[CRITICAL Unexpected Error during AI Service readiness check: {type(e).__name__}]"
     # --- End AI Readiness Check ---
-
 
     try:
         file_details = database.get_file_details_from_db(file_id, include_content=True)
@@ -148,36 +160,44 @@ def generate_summary(file_id):
                 return "[Error: Could not decode text content for summary]"
 
         # --- File Upload Logic ---
+        # Check supported types for the specific model being used if possible
+        # This example uses generic checks
         elif mimetype.startswith(("image/", "audio/", "video/", "application/pdf")):
             try:
+                # Use File API for supported types by creating a FileDataPart
+                logger.info(
+                    f"Preparing FileDataPart for '{filename}' ({mimetype}) for summary."
+                )
+                # Ensure the client has access to the file data (e.g., via temp file or directly)
+                # Using temp file approach here for broader compatibility
                 with tempfile.NamedTemporaryFile(
                     delete=False, suffix=f"_{secure_filename(filename)}"
                 ) as temp_file:
                     temp_file.write(content_blob)
                     temp_filepath = temp_file.name
-                    temp_file_to_clean = temp_filepath
+                    temp_file_to_clean = temp_filepath  # Schedule for cleanup
+
                 logger.info(
                     f"Uploading temp file '{temp_filepath}' for summary generation..."
                 )
-                # Use the client's file upload method (client.files.upload)
+                # Use the client's file upload method
                 uploaded_file = client.files.upload(
                     file=temp_filepath,
-                    config={"display_name": filename},
+                    config={"display_name": filename, "mime_type": mimetype},
+                )
+                logger.info(
+                    f"File '{filename}' uploaded for summary, URI: {uploaded_file.uri}"
                 )
                 # Construct parts including the prompt (as Part) and the uploaded file reference
                 content_parts = [
                     Part(text=prompt),
-                    uploaded_file,
-                ]  # Wrap prompt, keep file object
-                logger.info(
-                    f"File '{filename}' uploaded for summary, URI: {uploaded_file.uri}"
-                )
+                    uploaded_file,  # Add the File object directly
+                ]
             except Exception as upload_err:
                 logger.error(
                     f"Error preparing/uploading file for summary: {upload_err}",
                     exc_info=True,
                 )
-                # Check for invalid key specifically during upload
                 if "api key not valid" in str(upload_err).lower():
                     return "[Error: Invalid Gemini API Key during file upload]"
                 return f"[Error preparing/uploading file for summary: {type(upload_err).__name__}]"
@@ -190,15 +210,59 @@ def generate_summary(file_id):
 
         # Use the client.models attribute to generate content
         # Summary generation is NOT streamed, always get full response
-        response = client.models.generate_content(
+        response =  client.models.generate_content(
             model=summary_model_name,
-            contents=content_parts,  # Pass the constructed parts/contents
+            contents=content_parts, 
         )
-        summary = response.text
-        logger.info(f"Summary generated successfully for '{filename}'.")
-        return summary
+
+        # --- Process Response ---
+        # Check for safety issues first
+        if response.prompt_feedback and response.prompt_feedback.block_reason:
+            reason = response.prompt_feedback.block_reason.name
+            logger.warning(
+                f"Summary generation blocked by safety settings for {filename}. Reason: {reason}"
+            )
+            return f"[Error: Summary generation blocked due to safety settings (Reason: {reason})]"
+
+        # Check if candidates exist and have text
+        if (
+            response.candidates
+            and hasattr(response.candidates[0], "content")
+            and hasattr(response.candidates[0].content, "parts")
+            and response.candidates[0].content.parts
+        ):
+            # Extract text from all parts and join them (though usually there's one)
+            summary = "".join(
+                part.text
+                for part in response.candidates[0].content.parts
+                if hasattr(part, "text")
+            )
+            if summary.strip():  # Check if summary is not just whitespace
+                logger.info(f"Summary generated successfully for '{filename}'.")
+                return summary
+            else:
+                logger.warning(
+                    f"Summary generation for '{filename}' resulted in empty text content."
+                )
+                return "[System Note: AI generated an empty summary.]"
+        else:
+            # Handle cases where response is empty or has unexpected structure
+            logger.warning(
+                f"Summary generation for '{filename}' did not produce usable content. Response: {response!r}"
+            )
+            # Check finish reason if available
+            finish_reason = "UNKNOWN"
+            if response.candidates and hasattr(response.candidates[0], "finish_reason"):
+                finish_reason = response.candidates[0].finish_reason.name
+            return f"[Error: AI did not generate summary content (Finish Reason: {finish_reason})]"
 
     # --- Error Handling for API Call ---
+    except InvalidArgument as e:
+        logger.error(
+            f"InvalidArgument error during summary generation for '{filename}': {e}. Often due to unsupported file type or malformed request.",
+            exc_info=True,
+        )
+        return f"[Error generating summary: Invalid argument or unsupported file type ({type(e).__name__}).]"
     except TypeError as e:
         logger.error(
             f"TypeError during summary generation for '{filename}': {e}. Check SDK method signature.",
@@ -223,26 +287,9 @@ def generate_summary(file_id):
         )
         err_str = str(e).lower()
         if "api key not valid" in err_str:
-            # No need to set g.gemini_api_key_invalid anymore
             return "[Error: Invalid Gemini API Key]"
-        if "prompt was blocked" in err_str or "SAFETY" in str(
-            e
-        ):  # Broader safety check
-            feedback_reason = "N/A"
-            try:
-                if (
-                    response
-                    and hasattr(response, "prompt_feedback")
-                    and response.prompt_feedback
-                ):
-                    feedback_reason = response.prompt_feedback.block_reason
-            except Exception:
-                pass
-            logger.warning(
-                f"Summary generation blocked by safety settings for {filename}. Reason: {feedback_reason}"
-            )
-            return f"[Error: Summary generation blocked due to safety settings (Reason: {feedback_reason})]"
-        if "resource has been exhausted" in err_str or "429" in err_str:
+        # Safety check moved to response processing above
+        if "resource has been exhausted" in err_str or "429" in str(e):
             logger.warning(
                 f"Quota/Rate limit hit during summary generation for {filename}."
             )
@@ -257,8 +304,9 @@ def generate_summary(file_id):
     finally:
         if temp_file_to_clean:
             try:
-                os.remove(temp_file_to_clean)
-                logger.info(f"Cleaned up temp summary file: {temp_file_to_clean}")
+                if os.path.exists(temp_file_to_clean):
+                    os.remove(temp_file_to_clean)
+                    logger.info(f"Cleaned up temp summary file: {temp_file_to_clean}")
             except OSError as e:
                 logger.warning(
                     f"Error removing temp summary file {temp_file_to_clean}: {e}"
@@ -280,8 +328,8 @@ def get_or_generate_summary(file_id):
             file_details.get("has_summary")
             and file_details.get("summary")
             and not file_details["summary"].startswith(
-                "[Error"
-            )  # Check if it's not an old error message
+                ("[Error", "[System Note", "[AI Error")
+            )  # Check if it's not an old error/note message
         ):
             logger.info(f"Retrieved existing summary for file ID: {file_id}")
             return file_details["summary"]
@@ -290,8 +338,11 @@ def get_or_generate_summary(file_id):
             # Call the refactored function (which now handles its own readiness)
             new_summary = generate_summary(file_id)
 
-            # Only save if generation was successful (doesn't start with "[Error")
-            if isinstance(new_summary, str) and not new_summary.startswith("[Error"):
+            # Only save if generation was successful (doesn't start with error/note prefixes)
+            error_prefixes = ("[Error", "[System Note", "[AI Error")
+            if isinstance(new_summary, str) and not new_summary.startswith(
+                error_prefixes
+            ):
                 if database.save_summary_in_db(file_id, new_summary):
                     logger.info(
                         f"Successfully generated and saved summary for file ID: {file_id}"
@@ -304,12 +355,12 @@ def get_or_generate_summary(file_id):
                     # Return the summary anyway, but log the save error
                     return new_summary
             else:
-                # If generation failed, return the error message directly
+                # If generation failed or returned a system note, return it directly
                 logger.warning(
-                    f"Summary generation failed for file ID {file_id}: {new_summary}"
+                    f"Summary generation failed or produced note for file ID {file_id}: {new_summary}"
                 )
-                # Optionally save the error state to prevent retries?
-                # database.save_summary_in_db(file_id, new_summary) # Uncomment to save errors
+                # Optionally save the error/note state to prevent retries?
+                # database.save_summary_in_db(file_id, new_summary) # Uncomment to save errors/notes
                 return new_summary
     except Exception as e:
         logger.error(
@@ -321,7 +372,6 @@ def get_or_generate_summary(file_id):
 
 # --- Generate Search Query ---
 # Remove the decorator
-# @ai_ready_required
 def generate_search_query(user_message: str, max_retries=1) -> str | None:
     """
     Uses the default LLM via client to generate a concise web search query.
@@ -332,28 +382,38 @@ def generate_search_query(user_message: str, max_retries=1) -> str | None:
     try:
         # Check for Flask request context
         try:
-             _ = current_app.config # Simple check that raises RuntimeError if no context
-             logger.debug("generate_search_query: Flask request context is active.")
+            _ = (
+                current_app.config
+            )  # Simple check that raises RuntimeError if no context
+            logger.debug("generate_search_query: Flask request context is active.")
         except RuntimeError:
-             logger.error(
-                 "generate_search_query called outside of active Flask request context.",
-                 exc_info=True # Log traceback
-             )
-             return None # Return None as expected by the caller
+            logger.error(
+                "generate_search_query called outside of active Flask request context.",
+                exc_info=True,  # Log traceback
+            )
+            return None  # Return None as expected by the caller
 
         api_key = current_app.config.get("API_KEY")
         if not api_key:
             logger.error("API_KEY is missing from current_app.config.")
-            return None # Return None as expected by the caller
+            return None  # Return None as expected by the caller
 
         try:
-            client = genai.Client(api_key=api_key)
-            logger.info("Successfully created genai.Client for query generation.")
+            # Use client caching via Flask's 'g' object if in request context
+            if "genai_client" not in g:
+                logger.info("Creating new genai.Client and caching in 'g'.")
+                g.genai_client = genai.Client(api_key=api_key)
+            else:
+                logger.debug("Using cached genai.Client from 'g'.")
+            client = g.genai_client
+            logger.info("Successfully obtained genai.Client for query generation.")
         except (GoogleAPIError, ClientError, ValueError, Exception) as e:
-            logger.error(f"Failed to initialize genai.Client for query: {e}", exc_info=True)
+            logger.error(
+                f"Failed to initialize/get genai.Client for query: {e}", exc_info=True
+            )
             if "api key not valid" in str(e).lower():
-                 return None # Return None
-            return None # Return None
+                return None  # Return None
+            return None  # Return None
 
     except Exception as e:
         # Catch any unexpected errors during the readiness check itself
@@ -361,9 +421,8 @@ def generate_search_query(user_message: str, max_retries=1) -> str | None:
             f"generate_search_query: Unexpected error during readiness check: {type(e).__name__} - {e}",
             exc_info=True,
         )
-        return None # Return None as expected by the caller
+        return None  # Return None as expected by the caller
     # --- End AI Readiness Check ---
-
 
     if not user_message or user_message.isspace():
         logger.info("Cannot generate search query from empty user message.")
@@ -397,42 +456,73 @@ Search Query:"""
             # Query generation is NOT streamed
             response = client.models.generate_content(
                 model=model_name,
-                contents=prompt,  # Simple text promp
+                contents=prompt,
             )
 
             # Check for blocked prompt before accessing text
             if response.prompt_feedback and response.prompt_feedback.block_reason:
-                logger.warning(
-                    f"Prompt blocked for query gen, reason: {response.prompt_feedback.block_reason}"
-                )
+                reason = response.prompt_feedback.block_reason.name
+                logger.warning(f"Prompt blocked for query gen, reason: {reason}")
                 return None  # Don't retry if blocked
 
-            generated_query = response.text.strip()
+            # Extract text safely
+            generated_query = ""
+            if (
+                response.candidates
+                and hasattr(response.candidates[0], "content")
+                and hasattr(response.candidates[0].content, "parts")
+                and response.candidates[0].content.parts
+            ):
+                generated_query = "".join(
+                    part.text
+                    for part in response.candidates[0].content.parts
+                    if hasattr(part, "text")
+                ).strip()
 
             # Clean the generated query
-            logger.info(f"Raw query generated: '{generated_query}'")
-            generated_query = re.sub(
-                r'^"|"$', "", generated_query
-            )  # Remove leading/trailing quotes
-            generated_query = re.sub(
-                r"^\s*[-\*\d]+\.?\s*", "", generated_query
-            )  # Remove leading list markers
-            generated_query = re.sub(
-                r"^(?:Search Query:|Here is a search query:|query:)\s*",
-                "",
-                generated_query,
-                flags=re.IGNORECASE,
-            )  # Remove common prefixes
-            generated_query = generated_query.strip()  # Final strip
-
             if generated_query:
-                logger.info(f"Cleaned Search Query: '{generated_query}'")
-                return generated_query
-            else:
-                logger.warning("LLM generated an empty search query after cleaning.")
-                # Don't retry empty query, likely a model issue
-                return None
+                logger.info(f"Raw query generated: '{generated_query}'")
+                generated_query = re.sub(
+                    r'^"|"$', "", generated_query
+                )  # Remove leading/trailing quotes
+                generated_query = re.sub(
+                    r"^\s*[-\*\d]+\.?\s*", "", generated_query
+                )  # Remove leading list markers
+                generated_query = re.sub(
+                    r"^(?:Search Query:|Here is a search query:|query:)\s*",
+                    "",
+                    generated_query,
+                    flags=re.IGNORECASE,
+                )  # Remove common prefixes
+                generated_query = generated_query.strip()  # Final strip
 
+                if generated_query:
+                    logger.info(f"Cleaned Search Query: '{generated_query}'")
+                    return generated_query
+                else:
+                    logger.warning(
+                        "LLM generated an empty search query after cleaning."
+                    )
+                    # Don't retry empty query, likely a model issue
+                    return None
+            else:
+                # Handle cases where response is empty or has unexpected structure
+                logger.warning(
+                    f"Query generation did not produce usable content. Response: {response!r}"
+                )
+                finish_reason = "UNKNOWN"
+                if response.candidates and hasattr(
+                    response.candidates[0], "finish_reason"
+                ):
+                    finish_reason = response.candidates[0].finish_reason.name
+                logger.warning(f"Query generation finish reason: {finish_reason}")
+                return None  # Don't retry if no content
+
+        except InvalidArgument as e:
+            logger.error(
+                f"InvalidArgument error during query generation: {e}.", exc_info=True
+            )
+            return None  # Don't retry
         except TypeError as e:
             logger.error(
                 f"TypeError during search query generation: {e}. Check SDK method signature.",
@@ -459,31 +549,15 @@ Search Query:"""
             )
             err_str = str(e).lower()
             if "api key not valid" in err_str:
-                # No need to set g.gemini_api_key_invalid anymore
                 logger.error(
                     "API key invalid during search query generation. Aborting."
                 )
                 return None  # Don't retry if key is invalid
-            if "resource has been exhausted" in err_str or "429" in err_str:
+            if "resource has been exhausted" in err_str or "429" in str(e):
                 logger.warning("Quota/Rate limit hit during query generation.")
                 # Could implement backoff here, but for now just retry once if allowed
                 retries += 1
-            elif "prompt was blocked" in err_str or "SAFETY" in str(e):
-                # Attempt to get feedback if available on the response object
-                feedback_reason = "N/A"
-                try:
-                    if (
-                        response
-                        and hasattr(response, "prompt_feedback")
-                        and response.prompt_feedback
-                    ):
-                        feedback_reason = response.prompt_feedback.block_reason
-                except Exception:
-                    pass
-                logger.warning(
-                    f"Query generation blocked by safety settings. Reason: {feedback_reason}"
-                )
-                return None  # Don't retry if blocked by safety
+            # Safety check moved to response processing above
             else:
                 # For other API errors, retry once if allowed
                 retries += 1
@@ -498,9 +572,18 @@ Search Query:"""
     return None
 
 
+# --- Internal Helper for Streaming Error Handling ---
+def _yield_streaming_error(error_msg: str):
+    """Helper to yield an error message in a GenerateContentResponse structure for streaming."""
+    logger.debug(f"Yielding streaming error: {error_msg}")
+    # Mimic the structure the route expects for error chunks
+    # Use prompt_feedback or a simple text part based on route handler's preference
+    # Using a simple text part might be easier for the client to parse consistently.
+    yield GenerateContentResponse(parts=[Part(text=error_msg)])
+
+
 # --- Chat Response Generation ---
-# Remove the decorator
-# @ai_ready_required
+# This function is now DESIGNED to return EITHER a generator (if streaming) OR a string (if not streaming)
 def generate_chat_response(
     chat_id,
     user_message,
@@ -508,81 +591,155 @@ def generate_chat_response(
     session_files=None,
     calendar_context=None,
     web_search_enabled=False,
-    streaming_enabled=False,
+    streaming_enabled=False,  # This flag determines the *return type*
 ):
     """
-    Generates a chat response using the Gemini API via the client,
-    incorporating history, context, file summaries, and optional web search.
-    Handles potential errors gracefully.
-    Uses the NEW google.genai library structure (client-based).
-    Supports streaming responses if streaming_enabled is True.
+    Generates a chat response using the Gemini API via the client.
+    Handles history, context, files, web search. Handles errors gracefully.
+
+    Args:
+        ... (standard args) ...
+        streaming_enabled (bool): If True, returns a generator yielding response chunks.
+                                  If False, returns a string with the full response or error message.
+
+    Returns:
+        - Generator[GenerateContentResponse, None, None]: If streaming_enabled is True.
+        - str: If streaming_enabled is False.
     """
     logger.info(
-        f"Entering generate_chat_response (generator body starts here) for chat {chat_id}. Streaming: {streaming_enabled}"
+        f"Entering generate_chat_response for chat {chat_id}. Streaming: {streaming_enabled}"
     )
 
-    # --- AI Readiness Check (Moved from Decorator) ---
+    # --- AI Readiness Check ---
+    # This check needs to return/yield correctly based on streaming_enabled
     try:
-        # Check for Flask request context
         try:
-             _ = current_app.config # Simple check that raises RuntimeError if no context
-             logger.debug("generate_chat_response: Flask request context is active.")
+            _ = current_app.config
+            logger.debug("generate_chat_response: Flask request context is active.")
         except RuntimeError:
-             logger.error(
-                 "generate_chat_response called outside of active Flask request context.",
-                 exc_info=True # Log traceback
-             )
-             error_msg = "[Error: AI Service called outside request context]"
-             if streaming_enabled:
-                 yield error_msg
-                 return # Stop generator
-             else:
-                 return error_msg
+            logger.error(
+                "generate_chat_response called outside of active Flask request context.",
+                exc_info=True,
+            )
+            error_msg = "[Error: AI Service called outside request context]"
+            if streaming_enabled:
+                # Must return a generator immediately, even for errors
+                return _yield_streaming_error(error_msg)
+            else:
+                return error_msg  # Return string directly
 
         api_key = current_app.config.get("API_KEY")
         if not api_key:
             logger.error("API_KEY is missing from current_app.config.")
             error_msg = "[Error: AI Service API Key not configured]"
             if streaming_enabled:
-                yield error_msg
-                return # Stop generator
+                return _yield_streaming_error(error_msg)
             else:
                 return error_msg
 
         try:
-            client = genai.Client(api_key=api_key)
-            logger.info("Successfully created genai.Client for chat response.")
+            if "genai_client" not in g:
+                logger.info("Creating new genai.Client and caching in 'g'.")
+                g.genai_client = genai.Client(api_key=api_key)
+            else:
+                logger.debug("Using cached genai.Client from 'g'.")
+            client = g.genai_client
+            logger.info("Successfully obtained genai.Client for chat response.")
         except (GoogleAPIError, ClientError, ValueError, Exception) as e:
-            logger.error(f"Failed to initialize genai.Client for chat: {e}", exc_info=True)
+            logger.error(
+                f"Failed to initialize/get genai.Client for chat: {e}", exc_info=True
+            )
             error_msg = "[Error: Failed to initialize AI client]"
-            # Check for invalid key specifically
             if "api key not valid" in str(e).lower():
-                 error_msg = "[Error: Invalid Gemini API Key]"
-                 # No need to set g.gemini_api_key_invalid anymore
+                error_msg = "[Error: Invalid Gemini API Key]"
             if streaming_enabled:
-                yield error_msg
-                return # Stop generator
+                return _yield_streaming_error(error_msg)
             else:
                 return error_msg
 
     except Exception as e:
-        # Catch any unexpected errors during the readiness check itself
         logger.error(
             f"generate_chat_response: Unexpected error during readiness check: {type(e).__name__} - {e}",
             exc_info=True,
         )
         error_msg = f"[CRITICAL Unexpected Error during AI Service readiness check: {type(e).__name__}]"
         if streaming_enabled:
-            yield error_msg
-            return # Stop generator
+            return _yield_streaming_error(error_msg)
         else:
             return error_msg
     # --- End AI Readiness Check ---
 
+    # --- Main Logic ---
+    # This part needs to be structured differently depending on streaming
+    # We can use a helper function for the core API call and processing
+    # to avoid code duplication and keep the main function clean.
 
-    # Add a try...except block around the main logic to catch early errors
-    # This outer block remains to catch errors *before* the inner try/finally
+    if streaming_enabled:
+        # If streaming, call a helper that IS a generator
+        return _generate_chat_response_stream(
+            client=client,  # Pass the initialized client
+            chat_id=chat_id,
+            user_message=user_message,
+            attached_files=attached_files,
+            session_files=session_files,
+            calendar_context=calendar_context,
+            web_search_enabled=web_search_enabled,
+        )
+    else:
+        # If not streaming, call a helper that returns a string
+        return _generate_chat_response_non_stream(
+            client=client,  # Pass the initialized client
+            chat_id=chat_id,
+            user_message=user_message,
+            attached_files=attached_files,
+            session_files=session_files,
+            calendar_context=calendar_context,
+            web_search_enabled=web_search_enabled,
+        )
+
+
+# --- Helper Function for NON-STREAMING Response ---
+def _generate_chat_response_non_stream(
+    client,
+    chat_id,
+    user_message,
+    attached_files,
+    session_files,
+    calendar_context,
+    web_search_enabled,
+) -> str:
+    """Internal helper to generate a full chat response string."""
+    logger.info(f"_generate_chat_response_non_stream called for chat {chat_id}")
+    temp_files_to_clean = []
     try:
+        # --- Prepare History and Parts (Common Logic) ---
+        history, current_turn_parts, temp_files_to_clean = _prepare_chat_content(
+            client,
+            chat_id,
+            user_message,
+            attached_files,
+            session_files,
+            calendar_context,
+            web_search_enabled,
+        )
+
+        # Check if preparation returned an error message (string)
+        if isinstance(
+            history, str
+        ):  # Using history variable to signal error from preparation
+            logger.error(
+                f"Error preparing content for non-streaming chat {chat_id}: {history}"
+            )
+            return history  # Return the error string
+
+        if not current_turn_parts:
+            logger.error(
+                f"Chat {chat_id}: No parts generated for the current turn (non-streaming)."
+            )
+            return (
+                "[Error: No content (message, files, context) provided for this turn.]"
+            )
+
         # --- Determine Model ---
         raw_model_name = current_app.config.get(
             "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
@@ -592,659 +749,628 @@ def generate_chat_response(
             if not raw_model_name.startswith("models/")
             else raw_model_name
         )
-        logger.info(f"Primary model for chat {chat_id} response: '{model_to_use}'.")
+        logger.info(f"Non-streaming model for chat {chat_id}: '{model_to_use}'.")
 
-        # --- Fetch History ---
-        logger.info(f"Fetching history for chat {chat_id}...")
-        history = []
-        try:
-            history_data = database.get_chat_history_from_db(chat_id)
-            history = []  # Re-initialize history list
-            for msg in history_data:
-                # Ensure roles are 'user' or 'model' for the API
-                # The API expects 'user' and 'model' roles, not 'assistant'
-                role = "user" if msg["role"] == "user" else "model"
-                history.append(Content(role=role, parts=[Part(text=msg["content"])]))
-            logger.info(f"Fetched {len(history)} history turns for chat {chat_id}.")
-            logger.info(f"History prepared for API: {history}")
+        # --- Call Gemini API (Non-Streaming) ---
+        full_conversation = history + [Content(role="user", parts=current_turn_parts)]
 
-            # Ensure history starts with 'user' role for the API
-            # The API expects alternating user/model turns starting with user.
-            # If the history is not empty and the first message is not 'user',
-            # it indicates an issue with the history structure for the API.
-            # The SDK's chat.send_message handles the current turn's role implicitly
-            # based on the history provided. We just need to ensure the history list
-            # itself is correctly formatted (alternating roles, starting with user).
-            # The DB query should return history in chronological order.
-            # If the very first message in the DB is 'assistant', something is wrong.
-            # Let's check the *first* message role.
-            if history and history[0].role != "user":
-                logger.error(
-                    f"Chat history for {chat_id} does not start with a user turn. First role: {history[0].role}. This may cause API errors."
-                )
-                # We won't attempt to fix the history here, as it might corrupt the chat.
-                # The API call might fail, which will be caught below.
+        logger.info(
+            f"Calling model.generate_content (non-streaming) for chat {chat_id}"
+        )
+        response = client.models.generate_content(
+            model=model_to_use,
+            contents=full_conversation,
+        )
+        logger.info(f"Non-streaming generate_content call returned for chat {chat_id}.")
 
-        except Exception as e:
-            logger.error(
-                f"Failed to fetch history for chat {chat_id}: {e}", exc_info=True
+        # --- Process Non-Streaming Response ---
+        logger.debug(f"Non-streaming raw response object: {response!r}")
+
+        # Check for safety issues first
+        if response.prompt_feedback and response.prompt_feedback.block_reason:
+            reason = response.prompt_feedback.block_reason.name
+            logger.warning(
+                f"Non-streaming response blocked by safety settings for chat {chat_id}. Reason: {reason}"
             )
-            error_msg = "[Error: Could not load chat history]"
-            if streaming_enabled:
-                yield error_msg
-                return  # Stop generator
+            return f"[AI Safety Error: Request blocked due to safety settings (Reason: {reason})]"
+
+        # Check candidates and extract text
+        if (
+            response.candidates
+            and hasattr(response.candidates[0], "content")
+            and hasattr(response.candidates[0].content, "parts")
+            and response.candidates[0].content.parts
+        ):
+            assistant_reply = "".join(
+                part.text
+                for part in response.candidates[0].content.parts
+                if hasattr(part, "text")
+            )
+            if assistant_reply.strip():
+                logger.info(
+                    f"Successfully received full response text (length {len(assistant_reply)}) for chat {chat_id}."
+                )
+                return assistant_reply
             else:
-                return error_msg
-
-        # --- Prepare Current Turn Parts ---
-        current_turn_parts = []
-        temp_files_to_clean = []
-
-        # Use a try...finally block for temp file cleanup *around* the main logic
-        try:
-            logger.info(
-                f"Preparing current turn parts for chat {chat_id}..."
+                logger.warning(
+                    f"Non-streaming response for chat {chat_id} was empty or whitespace."
+                )
+                return "[System Note: The AI returned an empty response.]"
+        else:
+            logger.warning(
+                f"Non-streaming response for chat {chat_id} did not produce usable content. Response: {response!r}"
             )
-            # 1. Add Calendar Context (if provided)
-            if calendar_context:
-                logger.info(f"Adding calendar context to chat {chat_id} prompt.")
-                current_turn_parts.extend(
-                    [
-                        Part(text="--- Start Calendar Context ---"),
-                        Part(text=calendar_context),
-                        Part(text="--- End Calendar Context ---"),
-                    ]
+            finish_reason = "UNKNOWN"
+            if response.candidates and hasattr(response.candidates[0], "finish_reason"):
+                finish_reason = response.candidates[0].finish_reason.name
+            # Check prompt feedback again
+            if response.prompt_feedback and response.prompt_feedback.block_reason:
+                reason = response.prompt_feedback.block_reason.name
+                return f"[AI Safety Error: Request blocked (Reason: {reason}, Finish Reason: {finish_reason})]"
+            else:
+                return f"[AI Error: The AI did not return any content (Finish Reason: {finish_reason})]"
+
+    # --- Error Handling for Non-Streaming API Call ---
+    except InvalidArgument as e:
+        logger.error(
+            f"InvalidArgument error during non-streaming chat {chat_id}: {e}.",
+            exc_info=True,
+        )
+        return f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
+    except ValidationError as e:
+        logger.error(
+            f"Data validation error calling non-streaming Gemini API for chat {chat_id}: {e}",
+            exc_info=True,
+        )
+        try:
+            error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
+        except Exception:
+            error_details = "Check logs."
+        return f"[AI Error: Internal data format error. {error_details}]"
+    except DeadlineExceeded:
+        logger.error(f"Non-streaming Gemini API call timed out for chat {chat_id}.")
+        return "[AI Error: The request timed out. Please try again.]"
+    except NotFound as e:
+        raw_model_name = current_app.config.get(
+            "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
+        )  # Get model name again for error msg
+        logger.error(f"Model for non-streaming chat {chat_id} not found: {e}")
+        return f"[AI Error: Model '{raw_model_name}' not found or access denied.]"
+    except GoogleAPIError as e:
+        logger.error(
+            f"Google API error for non-streaming chat {chat_id}: {e}", exc_info=False
+        )
+        err_str = str(e).lower()
+        if "api key not valid" in err_str:
+            return "[Error: Invalid Gemini API Key]"
+        if "permission denied" in err_str:
+            return (
+                f"[AI Error: Permission denied for model. Check API key permissions.]"
+            )
+        if "resource has been exhausted" in err_str or "429" in str(e):
+            logger.warning(f"Quota/Rate limit hit for non-streaming chat {chat_id}.")
+            return (
+                "[AI Error: API quota or rate limit exceeded. Please try again later.]"
+            )
+        if "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
+            logger.warning(
+                f"API error indicates safety block for non-streaming chat {chat_id}: {e}"
+            )
+            return f"[AI Safety Error: Request or response blocked due to safety settings (Reason: SAFETY)]"
+        if "internal error" in err_str or "500" in str(e):
+            logger.error(
+                f"Internal server error from Gemini API for non-streaming chat {chat_id}: {e}"
+            )
+            return "[AI Error: The AI service encountered an internal error.]"
+        return f"[AI API Error: {type(e).__name__}]"  # Generic API error
+    except Exception as e:
+        logger.error(
+            f"Unexpected error during non-streaming Gemini API interaction for chat {chat_id}: {e}",
+            exc_info=True,
+        )
+        return f"[Unexpected AI Error: {type(e).__name__}]"
+    finally:
+        _cleanup_temp_files(temp_files_to_clean, f"non-streaming chat {chat_id}")
+
+
+# --- Helper Function for STREAMING Response ---
+def _generate_chat_response_stream(
+    client,
+    chat_id,
+    user_message,
+    attached_files,
+    session_files,
+    calendar_context,
+    web_search_enabled,
+):  # -> Generator[GenerateContentResponse, None, None] implicitly
+    """Internal helper that IS a generator yielding chat response chunks."""
+    logger.info(f"_generate_chat_response_stream called for chat {chat_id}")
+    temp_files_to_clean = []
+    response_iterator = None  # Initialize
+    try:
+        # --- Prepare History and Parts (Common Logic) ---
+        history, current_turn_parts, temp_files_to_clean = _prepare_chat_content(
+            client,
+            chat_id,
+            user_message,
+            attached_files,
+            session_files,
+            calendar_context,
+            web_search_enabled,
+        )
+
+        # Check if preparation returned an error message (string)
+        if isinstance(history, str):  # Using history variable to signal error
+            logger.error(
+                f"Error preparing content for streaming chat {chat_id}: {history}"
+            )
+            yield from _yield_streaming_error(history)  # Yield the error and stop
+            return
+
+        if not current_turn_parts:
+            logger.error(
+                f"Chat {chat_id}: No parts generated for the current turn (streaming)."
+            )
+            yield from _yield_streaming_error(
+                "[Error: No content (message, files, context) provided for this turn.]"
+            )
+            return
+
+        # --- Determine Model ---
+        raw_model_name = current_app.config.get(
+            "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
+        )
+        model_to_use = (
+            f"models/{raw_model_name}"
+            if not raw_model_name.startswith("models/")
+            else raw_model_name
+        )
+        logger.info(f"Streaming model for chat {chat_id}: '{model_to_use}'.")
+
+        # --- Call Gemini API (Streaming) ---
+        full_conversation = history + [Content(role="user", parts=current_turn_parts)]
+
+        logger.info(f"Calling model.generate_content (streaming) for chat {chat_id}")
+        response_iterator = client.models.generate_content_stream(
+            model=model_to_use,
+            contents=full_conversation,
+        )
+        logger.info(
+            f"Streaming generate_content call returned iterator for chat {chat_id}."
+        )
+
+        # --- Yield Chunks from Iterator ---
+        chunk_count = 0
+        for chunk in response_iterator:
+            # logger.debug(f"Yielding chunk {chunk_count} for chat {chat_id}: {chunk!r}") # Very verbose
+            yield chunk
+            chunk_count += 1
+        logger.info(f"Finished yielding {chunk_count} chunks for chat {chat_id}.")
+
+    # --- Error Handling for Streaming API Call ---
+    # Handle errors that might occur during iteration or the initial call
+    except InvalidArgument as e:
+        logger.error(
+            f"InvalidArgument error during streaming chat {chat_id}: {e}.",
+            exc_info=True,
+        )
+        yield from _yield_streaming_error(
+            f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
+        )
+    except ValidationError as e:
+        logger.error(
+            f"Data validation error calling streaming Gemini API for chat {chat_id}: {e}",
+            exc_info=True,
+        )
+        try:
+            error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
+        except Exception:
+            error_details = "Check logs."
+        yield from _yield_streaming_error(
+            f"[AI Error: Internal data format error. {error_details}]"
+        )
+    except DeadlineExceeded:
+        logger.error(f"Streaming Gemini API call timed out for chat {chat_id}.")
+        yield from _yield_streaming_error(
+            "[AI Error: The request timed out. Please try again.]"
+        )
+    except NotFound as e:
+        raw_model_name = current_app.config.get(
+            "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
+        )
+        logger.error(f"Model for streaming chat {chat_id} not found: {e}")
+        yield from _yield_streaming_error(
+            f"[AI Error: Model '{raw_model_name}' not found or access denied.]"
+        )
+    except GoogleAPIError as e:
+        logger.error(
+            f"Google API error for streaming chat {chat_id}: {e}", exc_info=False
+        )
+        err_str = str(e).lower()
+        error_message = f"[AI API Error: {type(e).__name__}]"  # Default
+        if "api key not valid" in err_str:
+            error_message = "[Error: Invalid Gemini API Key]"
+        elif "permission denied" in err_str:
+            error_message = (
+                f"[AI Error: Permission denied for model. Check API key permissions.]"
+            )
+        elif "resource has been exhausted" in err_str or "429" in str(e):
+            logger.warning(f"Quota/Rate limit hit for streaming chat {chat_id}.")
+            error_message = (
+                "[AI Error: API quota or rate limit exceeded. Please try again later.]"
+            )
+        elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
+            logger.warning(
+                f"API error indicates safety block for streaming chat {chat_id}: {e}"
+            )
+            error_message = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: SAFETY)]"
+        elif "internal error" in err_str or "500" in str(e):
+            logger.error(
+                f"Internal server error from Gemini API for streaming chat {chat_id}: {e}"
+            )
+            error_message = "[AI Error: The AI service encountered an internal error.]"
+        yield from _yield_streaming_error(error_message)
+    except Exception as e:
+        # This catches errors during the iteration over `response_iterator` as well
+        logger.error(
+            f"Unexpected error during streaming Gemini API interaction for chat {chat_id}: {e}",
+            exc_info=True,
+        )
+        yield from _yield_streaming_error(f"[Unexpected AI Error: {type(e).__name__}]")
+    finally:
+        # Ensure cleanup happens even if the generator isn't fully consumed
+        _cleanup_temp_files(temp_files_to_clean, f"streaming chat {chat_id}")
+
+
+# --- Helper Function to Prepare History and Content Parts ---
+def _prepare_chat_content(
+    client,
+    chat_id,
+    user_message,
+    attached_files,
+    session_files,
+    calendar_context,
+    web_search_enabled,
+):
+    """Prepares history list and current turn parts list. Returns (history, parts, temp_files) or (error_string, None, None)."""
+    logger.info(f"Preparing content for chat {chat_id}")
+    history = []
+    current_turn_parts = []
+    temp_files_to_clean = []
+
+    # --- Fetch History ---
+    try:
+        history_data = database.get_chat_history_from_db(chat_id)
+        history = []
+        for msg in history_data:
+            role = "user" if msg["role"] == "user" else "model"
+            if msg.get("content"):
+                history.append(Content(role=role, parts=[Part(text=msg["content"])]))
+            else:
+                logger.warning(
+                    f"Skipping history message with empty content for chat {chat_id}: Role={role}"
                 )
-                logger.info(
-                    f"Added calendar context. Current parts count: {len(current_turn_parts)}"
+        logger.info(f"Prepared {len(history)} history turns for chat {chat_id}.")
+
+        # Ensure history starts with 'user' if not empty
+        if history and history[0].role != "user":
+            logger.warning(
+                f"Chat history for {chat_id} does not start with user. Removing leading non-user messages."
+            )
+            while history and history[0].role != "user":
+                history.pop(0)
+
+    except Exception as e:
+        logger.error(
+            f"Failed to fetch/prepare history for chat {chat_id}: {e}", exc_info=True
+        )
+        return (
+            "[Error: Could not load or prepare chat history]",
+            None,
+            None,
+        )  # Return error string
+
+    # --- Prepare Current Turn Parts ---
+    # Wrap the rest in try/except to catch errors during part preparation
+    try:
+        # 1. Calendar Context
+        if calendar_context:
+            current_turn_parts.extend(
+                [
+                    Part(text="--- Start Calendar Context ---"),
+                    Part(text=calendar_context),
+                    Part(text="--- End Calendar Context ---"),
+                ]
+            )
+
+        # 2. Attached Files (DB)
+        if attached_files:
+            logger.info(
+                f"Processing {len(attached_files)} attached files for chat {chat_id}."
+            )
+            for file_detail in attached_files:
+                # ... (Existing logic for attached files - summary/full) ...
+                # Ensure this logic appends Parts or FileDataParts to current_turn_parts
+                # and adds temp file paths to temp_files_to_clean
+                file_id = file_detail.get("id")
+                attachment_type = file_detail.get("type")
+                frontend_filename = file_detail.get("filename", "Unknown File")
+                logger.debug(
+                    f"Processing attached file: ID={file_id}, Type={attachment_type}, Name={frontend_filename}"
                 )
 
-            # 2. Process Attached Files (from DB by ID, with type)
-            if attached_files:
-                logger.info(
-                    f"Processing {len(attached_files)} attached files (from DB) for chat {chat_id}."
-                )
-                for file_detail in attached_files:
-                    file_id = file_detail.get("id")
-                    attachment_type = file_detail.get("type")
-                    frontend_filename = file_detail.get("filename", "Unknown File")
-
-                    logger.info(
-                        f"Processing attached file: {file_detail}"
+                if file_id is None or attachment_type is None:
+                    logger.warning(
+                        f"Skipping invalid attached file detail: {file_detail}"
                     )
-
-                    if file_id is None or attachment_type is None:
+                    current_turn_parts.append(
+                        Part(text=f"[System: Skipped invalid attached file detail.]")
+                    )
+                    continue
+                try:
+                    db_file_details = database.get_file_details_from_db(
+                        file_id, include_content=True
+                    )
+                    if not db_file_details or not db_file_details.get("content"):
                         logger.warning(
-                            f"Skipping invalid attached file detail: {file_detail}"
-                        )
-                        current_turn_parts.append(
-                            Part(text=f"[System: Skipped invalid attached file detail.]")
-                        )
-                        continue
-
-                    try:
-                        db_file_details = database.get_file_details_from_db(
-                            file_id, include_content=True
-                        )
-                        if not db_file_details or not db_file_details.get("content"):
-                            logger.warning(
-                                f"Could not get details/content for attached file_id {file_id} in chat {chat_id}."
-                            )
-                            current_turn_parts.append(
-                                Part(
-                                    text=f"[System: Error retrieving attached file details for ID {file_id}]"
-                                )
-                            )
-                            continue
-
-                        filename = db_file_details["filename"]
-                        mimetype = db_file_details["mimetype"]
-                        content_blob = db_file_details["content"]
-
-                        if attachment_type == "summary":
-                            logger.info(
-                                f"Getting summary for file {file_id} ('{filename}')."
-                            )
-                            summary = get_or_generate_summary(file_id)
-                            current_turn_parts.append(
-                                Part(
-                                    text=f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"
-                                )
-                            )
-                            logger.info(
-                                f"Added summary for file {file_id}. Current parts count: {len(current_turn_parts)}"
-                            )
-                        elif attachment_type == "full":
-                            logger.info(
-                                f"Attaching full content for file {file_id} ('{filename}')."
-                            )
-                            if mimetype.startswith(
-                                ("image/", "audio/", "video/", "application/pdf", "text/")
-                            ):
-                                logger.info(
-                                    f"Attaching full content for '{filename}' ({mimetype}) for chat {chat_id}."
-                                )
-                                try:
-                                    with tempfile.NamedTemporaryFile(
-                                        delete=False, suffix=f"_{secure_filename(filename)}"
-                                    ) as temp_file:
-                                        temp_file.write(content_blob)
-                                        temp_filepath = temp_file.name
-                                        temp_files_to_clean.append(temp_filepath)
-                                    logger.info(
-                                        f"Created temp file: {temp_filepath}"
-                                    )
-
-                                    uploaded_file = client.files.upload(
-                                        file=temp_filepath,
-                                        config={"display_name": filename},
-                                    )
-                                    current_turn_parts.append(uploaded_file)
-                                    logger.info(
-                                        f"Successfully uploaded '{filename}' (URI: {uploaded_file.uri}) for chat {chat_id}."
-                                    )
-                                    logger.info(
-                                        f"Added uploaded file {uploaded_file.uri}. Current parts count: {len(current_turn_parts)}"
-                                    )
-                                except Exception as upload_err:
-                                    logger.error(
-                                        f"Failed to upload attached file '{filename}' for chat {chat_id}: {upload_err}",
-                                        exc_info=True,
-                                    )
-                                    current_turn_parts.append(
-                                        Part(
-                                            text=f"[System: Error uploading attached file '{filename}'. {type(upload_err).__name__}]"
-                                        )
-                                    )
-                                    if "api key not valid" in str(upload_err).lower():
-                                        # No need to set g.gemini_api_key_invalid anymore
-                                        pass # Error message already added to parts
-                            else:
-                                logger.warning(
-                                    f"Full content attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}."
-                                )
-                                current_turn_parts.append(
-                                    Part(
-                                        text=f"[System: Full content attachment not supported for file '{filename}' ({mimetype}).]"
-                                    )
-                                )
-                        else:
-                            logger.warning(
-                                f"Unknown attachment type '{attachment_type}' for file '{filename}' in chat {chat_id}."
-                            )
-                            current_turn_parts.append(
-                                Part(
-                                    text=f"[System: Unknown attachment type '{attachment_type}' for file '{filename}'.]"
-                                )
-                            )
-
-                    except Exception as file_proc_err:
-                        logger.error(
-                            f"Error processing attached file_id {file_id} for chat {chat_id}: {file_proc_err}",
-                            exc_info=True,
+                            f"Could not get details/content for attached file_id {file_id} ('{frontend_filename}') in chat {chat_id}."
                         )
                         current_turn_parts.append(
                             Part(
-                                text=f"[System: Error processing attached file ID {file_id}. {type(file_proc_err).__name__}]"
+                                text=f"[System: Error retrieving attached file '{frontend_filename}']"
                             )
-                        )
-                logger.info(
-                    f"Finished processing attached files. Total parts: {len(current_turn_parts)}"
-                )
-
-            # 3. Process Session Files (with content)
-            if session_files:
-                logger.info(
-                    f"Processing {len(session_files)} session files (with content) for chat {chat_id}."
-                )
-                for session_file_detail in session_files:
-                    filename = session_file_detail.get("filename", "Unknown Session File")
-                    mimetype = session_file_detail.get("mimetype")
-                    content_base64 = session_file_detail.get("content")
-
-                    logger.info(
-                        f"Processing session file: {session_file_detail.get('filename')}"
-                    )
-
-                    if not filename or not mimetype or not content_base64:
-                        logger.warning(
-                            f"Skipping invalid session file detail: {session_file_detail}"
-                        )
-                        current_turn_parts.append(
-                            Part(text=f"[System: Skipped invalid session file detail.]")
                         )
                         continue
 
-                    try:
-                        # Decode base64 content. Handle potential data URL prefix (e.g., "data:image/png;base64,...")
-                        if "," in content_base64:
-                            header, base64_string = content_base64.split(",", 1)
-                        else:
-                            base64_string = content_base64
+                    filename = db_file_details["filename"]
+                    mimetype = db_file_details["mimetype"]
+                    content_blob = db_file_details["content"]
 
-                        content_blob = base64.b64decode(base64_string)
-                        logger.info(
-                            f"Decoded session file content for '{filename}'."
-                        )
-
-                        # Session files are always treated as 'full' content attachments
-                        if mimetype.startswith(
-                            ("image/", "audio/", "video/", "application/pdf", "text/")
-                        ):  # Include text for full upload
-                            logger.info(
-                                f"Attaching session file '{filename}' ({mimetype}) for chat {chat_id}."
+                    if attachment_type == "summary":
+                        summary = get_or_generate_summary(file_id)
+                        current_turn_parts.append(
+                            Part(
+                                text=f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"
                             )
+                        )
+                    elif attachment_type == "full":
+                        supported_mimetypes = (
+                            "image/",
+                            "audio/",
+                            "video/",
+                            "application/pdf",
+                            "text/",
+                        )  # Simplified check
+                        if mimetype.startswith(supported_mimetypes):
                             try:
                                 with tempfile.NamedTemporaryFile(
                                     delete=False, suffix=f"_{secure_filename(filename)}"
                                 ) as temp_file:
                                     temp_file.write(content_blob)
                                     temp_filepath = temp_file.name
-                                    temp_files_to_clean.append(
-                                        temp_filepath
-                                    )  # Add to cleanup list
-                                logger.info(
-                                    f"Created temp file for session file: {temp_filepath}"
-                                )
-
+                                    temp_files_to_clean.append(temp_filepath)
                                 uploaded_file = client.files.upload(
                                     file=temp_filepath,
-                                    config={"display_name": filename},
+                                    config={
+                                        "display_name": filename,
+                                        "mime_type": mimetype,
+                                    },
                                 )
-                                current_turn_parts.append(uploaded_file)
+                                current_turn_parts.append(
+                                    uploaded_file
+                                )  # Add File object
                                 logger.info(
-                                    f"Successfully uploaded session file '{filename}' (URI: {uploaded_file.uri}) for chat {chat_id}."
-                                )
-                                logger.info(
-                                    f"Added uploaded session file {uploaded_file.uri}. Current parts count: {len(current_turn_parts)}"
+                                    f"Attached DB file '{filename}' via File API."
                                 )
                             except Exception as upload_err:
                                 logger.error(
-                                    f"Failed to upload session file '{filename}' for chat {chat_id}: {upload_err}",
+                                    f"Failed to upload attached DB file '{filename}': {upload_err}",
                                     exc_info=True,
                                 )
                                 current_turn_parts.append(
                                     Part(
-                                        text=f"[System: Error uploading session file '{filename}'. {type(upload_err).__name__}]"
+                                        text=f"[System: Error uploading attached file '{filename}'. {type(upload_err).__name__}]"
                                     )
                                 )
-                                if "api key not valid" in str(upload_err).lower():
-                                    # No need to set g.gemini_api_key_invalid anymore
-                                    pass # Error message already added to parts
                         else:
                             logger.warning(
-                                f"Session file attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}."
+                                f"Full content attachment via File API not supported for DB file mimetype: {mimetype}"
                             )
                             current_turn_parts.append(
                                 Part(
-                                    text=f"[System: Session file attachment not supported for file '{filename}' ({mimetype}).]"
+                                    text=f"[System: Full content attachment not supported for file '{filename}' ({mimetype}).]"
                                 )
                             )
-
-                    except Exception as file_proc_err:
-                        logger.error(
-                            f"Error processing session file '{filename}' for chat {chat_id}: {file_proc_err}",
-                            exc_info=True,
+                    else:
+                        logger.warning(
+                            f"Unknown attachment type '{attachment_type}' for file '{filename}'."
                         )
                         current_turn_parts.append(
                             Part(
-                                text=f"[System: Error processing session file '{filename}'. {type(file_proc_err).__name__}]"
+                                text=f"[System: Unknown attachment type '{attachment_type}'.]"
                             )
                         )
-                logger.info(
-                    f"Finished processing session files. Total parts: {len(current_turn_parts)}"
-                )
 
-            # 4. Perform Web Search (if enabled and seems appropriate)
-            search_results = None
-            if web_search_enabled:
-                logger.info(f"Web search enabled for chat {chat_id}. Generating query...")
-                # Pass streaming_enabled=False to generate_search_query as it's not streamed
-                search_query = generate_search_query(user_message) # Removed streaming_enabled=False arg as it's not needed by generate_search_query anymore
-                logger.info(
-                    f"Generated search query: '{search_query}'"
-                )
-                if search_query:
-                    logger.info(
-                        f"Performing web search for chat {chat_id} with query: '{search_query}'"
-                    )
-                    search_results = perform_web_search(
-                        search_query
-                    )  # Assumes this returns a list of strings or None
-                    logger.info(
-                        f"Web search results: {search_results}"
-                    )
-                    if search_results:
-                        logger.info(f"Adding web search results to chat {chat_id} prompt.")
-                        current_turn_parts.extend(
-                            [
-                                Part(text="--- Start Web Search Results ---"),
-                                *[Part(text=s) for s in search_results],
-                                Part(text="--- End Web Search Results ---"),
-                            ]
-                        )
-                        logger.info(
-                            f"Added web search results. Current parts count: {len(current_turn_parts)}"
-                        )
-                    else:
-                        logger.info(f"Web search yielded no results for chat {chat_id}.")
-                        current_turn_parts.append(
-                            Part(
-                                text="[System Note: Web search was performed but returned no results.]"
-                            )
-                        )
-                else:
-                    logger.info(
-                        f"Could not generate a suitable web search query for chat {chat_id}."
-                    )
-                    current_turn_parts.append(
-                        Part(
-                            text="[System Note: Web search was enabled but no query could be generated.]"
-                        )
-                    )
-                logger.info(
-                    f"Finished processing web search. Total parts: {len(current_turn_parts)}"
-                )
-
-            # 5. Add User's Text Message
-            if user_message:
-                logger.info(
-                    f"Adding user message to parts for chat {chat_id}."
-                )
-                current_turn_parts.append(Part(text=user_message))
-                logger.info(
-                    f"Added user message. Current parts count: {len(current_turn_parts)}"
-                )
-            else:
-                # Handle cases where maybe only files were sent?
-                # If current_turn_parts is still empty, we might need a placeholder
-                if not current_turn_parts:
-                    logger.warning(
-                        f"Chat {chat_id}: User message is empty and no files/context were added."
-                    )
-                    current_turn_parts.append(
-                        Part(
-                            text="[User provided no text, only attached files or context.]"
-                        )
-                    )
-                    logger.info(
-                        f"Added placeholder for empty user message. Current parts count: {len(current_turn_parts)}"
-                    )
-
-            logger.info(f"Current turn parts prepared for API: {current_turn_parts}")
-
-            # --- Call Gemini API ---
-            logger.info(
-                f"Sending request to Gemini for chat {chat_id} with {len(history)} history turns and {len(current_turn_parts)} current parts. Streaming: {streaming_enabled}"
-            )
-
-            try:
-                logger.info(
-                    f"Creating chat session with model '{model_to_use}' and history."
-                )
-                chat_session = client.chats.create(model=model_to_use, history=history)
-                logger.info(f"Chat session created: {chat_session}")
-
-                logger.info(
-                    f"Sending message to chat session with parts: {current_turn_parts}"
-                )
-                if streaming_enabled:
-                    # Call the streaming method
-                    response = chat_session.send_message_stream(
-                        message=current_turn_parts
-                    )
-                    logger.info(f"send_message_stream call returned.")
-                else:
-                    # Call the non-streaming method
-                    response = chat_session.send_message(
-                        message=current_turn_parts
-                    )
-                    logger.info(f"send_message call returned.")
-
-                # --- Debugging Logs for Response ---
-                # Log the type of response, but do NOT iterate over it here if streaming
-                logger.info(f"Gemini API raw response object type: {type(response)}")
-                if not streaming_enabled and hasattr(response, "candidates"):
-                    logger.info(f"Response has {len(response.candidates)} candidates.")
-                    if response.candidates:
-                        logger.info(
-                            f"First candidate finish reason: {response.candidates[0].finish_reason}"
-                        )
-                        if (
-                            hasattr(response.candidates[0], "content")
-                            and response.candidates[0].content
-                        ):
-                            logger.info(
-                                f"First candidate content parts: {len(response.candidates[0].content.parts)}"
-                            )
-                            if response.candidates[0].content.parts:
-                                logger.info(
-                                    f"First part type: {type(response.candidates[0].content.parts[0])}"
-                                )
-                                if hasattr(response.candidates[0].content.parts[0], "text"):
-                                    logger.info(
-                                        f"First part text length: {len(response.candidates[0].content.parts[0].text)}"
-                                    )
-                                else:
-                                    logger.info("First part has no 'text' attribute.")
-                            else:
-                                logger.info("First candidate content has no parts.")
-                        else:
-                            logger.info(
-                                "First candidate has no 'content' or content is empty."
-                            )
-                    else:
-                        logger.info("Response candidates list is empty.")
-                elif not streaming_enabled and hasattr(response, "prompt_feedback"):
-                    logger.info(f"Response has prompt feedback: {response.prompt_feedback}")
-                elif streaming_enabled:
-                     logger.info("Response is a generator (streaming). Will be iterated in route handler.")
-                else:
-                    logger.info("Response has no candidates or prompt feedback (non-streaming).")
-                # --- End Debugging Logs ---
-
-
-                if streaming_enabled:
-                    # Return the generator directly. The route handler will iterate and yield.
-                    logger.info(
-                        f"Returning streaming generator for chat {chat_id}."
-                    )
-                    return response # Return the generator object
-
-                else:
-                    # Get the full text response for non-streaming
-                    logger.info(
-                        f"Processing non-streaming response for chat {chat_id}."
-                    )
-                    # Check if response has text attribute (should for stream=False)
-                    if hasattr(response, "text"):
-                        assistant_reply = response.text
-                        logger.info(
-                            f"Successfully received full response text (length {len(assistant_reply)}) for chat {chat_id}."
-                        )
-                        if not assistant_reply.strip():
-                            logger.warning(
-                                f"Non-streaming response for chat {chat_id} was empty or whitespace."
-                            )
-                            assistant_reply = "[System Note: The AI returned an empty response.]"  # Provide a user-friendly message
-                        return assistant_reply  # Return the string
-                    elif hasattr(response, "candidates") and not response.candidates:
-                        logger.warning(
-                            f"Non-streaming response for chat {chat_id} had no candidates."
-                        )
-                        # Check for prompt feedback if no candidates
-                        if (
-                            hasattr(response, "prompt_feedback")
-                            and response.prompt_feedback
-                        ):
-                            logger.warning(
-                                f"Non-streaming response had prompt feedback: {response.prompt_feedback}"
-                            )
-                            return f"[AI Safety Error: Request blocked due to safety settings (Reason: {response.prompt_feedback.block_reason})]"
-                        else:
-                            return "[AI Error: The AI did not return any candidates.]"
-                    elif hasattr(response, "prompt_feedback"):
-                        logger.warning(
-                            f"Non-streaming response for chat {chat_id} had prompt feedback but no text/candidates."
-                        )
-                        return f"[AI Safety Error: Request blocked due to safety settings (Reason: {response.prompt_feedback.block_reason})]"
-                    else:
-                        logger.error(
-                            f"Non-streaming response for chat {chat_id} had unexpected format: {type(response)}"
-                        )
-                        return "[AI Error: Unexpected API response format.]"
-
-            # --- Specific Error Handling for API Call ---
-            # These exceptions need to be caught here and returned/yielded as error messages
-            # The route handler will catch any exceptions *not* caught here.
-            except ValidationError as e:
-                logger.error(
-                    f"Data validation error calling Gemini API for chat {chat_id} with model {model_to_use}: {e}",
-                    exc_info=True,
-                )
-                error_msg = f"[AI Error: Internal data format error. Please check logs. ({e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}')]"
-                if streaming_enabled:
-                    # If streaming, yield the error message and stop
-                    yield error_msg
-                    return
-                else:
-                    # If not streaming, return the error message string
-                    return error_msg
-            except DeadlineExceeded:
-                logger.error(f"Gemini API call timed out for chat {chat_id}.")
-                error_msg = "[AI Error: The request timed out. Please try again.]"
-                if streaming_enabled:
-                    yield error_msg
-                    return
-                else:
-                    return error_msg
-            except NotFound as e:
-                logger.error(
-                    f"Model '{model_to_use}' not found or inaccessible for chat {chat_id}: {e}"
-                )
-                error_msg = (
-                    f"[AI Error: Model '{raw_model_name}' not found or access denied.]"
-                )
-                if streaming_enabled:
-                    yield error_msg
-                    return
-                else:
-                    return error_msg
-            except GoogleAPIError as e:
-                logger.error(f"Google API error for chat {chat_id}: {e}")
-                err_str = str(e).lower()
-                error_message = f"[AI API Error: {type(e).__name__}]"
-
-                if "api key not valid" in err_str:
-                    # No need to set g.gemini_api_key_invalid anymore
-                    error_message = "[Error: Invalid Gemini API Key]"
-                elif "prompt was blocked" in err_str or "SAFETY" in str(e):
-                    feedback_reason = "N/A"
-                    try:
-                        # Check if response object exists from the try block
-                        # For streaming, response is the generator itself, need to check its properties if available
-                        # For non-streaming, response is the result object
-                        if (
-                            not streaming_enabled
-                            and response
-                            and hasattr(response, "prompt_feedback")
-                            and response.prompt_feedback
-                        ):
-                            feedback_reason = response.prompt_feedback.block_reason
-                        # Check candidate finish reason if prompt feedback isn't the cause (more common in streaming)
-                        elif (
-                            streaming_enabled
-                            and hasattr(e, "response")
-                            and e.response
-                            and e.response.candidates
-                            and e.response.candidates[0].finish_reason == 3
-                        ):
-                            feedback_reason = "Response Content Safety"
-                        elif (
-                            hasattr(e, "response")
-                            and e.response
-                            and hasattr(e.response, "prompt_feedback")
-                            and e.response.prompt_feedback
-                        ):
-                            feedback_reason = e.response.prompt_feedback.block_reason
-                    except Exception:
-                        pass
-                    logger.warning(
-                        f"API error indicates safety block for chat {chat_id}. Reason: {feedback_reason}"
-                    )
-                    error_message = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: {feedback_reason})]"
-                elif "resource has been exhausted" in err_str or "429" in err_str:
-                    logger.warning(f"Quota/Rate limit hit for chat {chat_id}.")
-                    error_message = "[AI Error: API quota or rate limit exceeded. Please try again later.]"
-                elif "internal error" in err_str or "500" in str(e):
+                except Exception as file_proc_err:
                     logger.error(
-                        f"Internal server error from Gemini API for chat {chat_id}: {e}"
+                        f"Error processing attached file_id {file_id} ('{frontend_filename}'): {file_proc_err}",
+                        exc_info=True,
                     )
-                    error_message = "[AI Error: The AI service encountered an internal error. Please try again later.]"
+                    current_turn_parts.append(
+                        Part(
+                            text=f"[System: Error processing attached file '{frontend_filename}'.]"
+                        )
+                    )
 
-                if streaming_enabled:
-                    yield error_message
-                    return
-                else:
-                    return error_message
-
-            except Exception as e:
-                logger.error(
-                    f"Unexpected error calling Gemini API for chat {chat_id} with model {model_to_use}: {e}",
-                    exc_info=True,
-                )
-                error_msg = f"[Unexpected AI Error: {type(e).__name__}]"
-                if streaming_enabled:
-                    yield error_msg
-                    return
-                else:
-                    return error_msg
-
-        finally:
-            # --- Clean up temporary files ---
-            # This block runs regardless of whether an exception occurred,
-            # but only after the try block is exited (either by return, yield, or exception).
-            # For a generator, this runs when the generator is exhausted or closed.
+        # 3. Session Files (Base64)
+        if session_files:
             logger.info(
-                f"Executing finally block for chat {chat_id}. Cleaning up temp files."
+                f"Processing {len(session_files)} session files for chat {chat_id}."
             )
-            if temp_files_to_clean:
-                logger.info(
-                    f"Cleaning up {len(temp_files_to_clean)} temporary files for chat {chat_id}..."
+            for session_file_detail in session_files:
+                # ... (Existing logic for session files) ...
+                # Ensure this logic appends Parts or FileDataParts to current_turn_parts
+                # and adds temp file paths to temp_files_to_clean
+                filename = session_file_detail.get("filename", "Unknown Session File")
+                mimetype = session_file_detail.get("mimetype")
+                content_base64 = session_file_detail.get("content")
+                logger.debug(
+                    f"Processing session file: {filename}, Mimetype: {mimetype}"
                 )
-                for temp_path in temp_files_to_clean:
-                    try:
-                        if os.path.exists(temp_path):
-                            os.remove(temp_path)
-                            logger.info(f"Removed temp file: {temp_path}")
-                        else:
-                            logger.info(
-                                f"Temp file not found, already removed? {temp_path}"
+
+                if not filename or not mimetype or not content_base64:
+                    logger.warning(
+                        f"Skipping invalid session file detail: {filename or 'No Name'}"
+                    )
+                    current_turn_parts.append(
+                        Part(
+                            text=f"[System: Skipped invalid session file detail '{filename or 'No Name'}'.]"
+                        )
+                    )
+                    continue
+                try:
+                    if "," in content_base64:
+                        _, base64_string = content_base64.split(",", 1)
+                    else:
+                        base64_string = content_base64
+                    content_blob = base64.b64decode(base64_string)
+
+                    supported_mimetypes = (
+                        "image/",
+                        "audio/",
+                        "video/",
+                        "application/pdf",
+                        "text/",
+                    )  # Simplified check
+                    if mimetype.startswith(supported_mimetypes):
+                        try:
+                            with tempfile.NamedTemporaryFile(
+                                delete=False, suffix=f"_{secure_filename(filename)}"
+                            ) as temp_file:
+                                temp_file.write(content_blob)
+                                temp_filepath = temp_file.name
+                                temp_files_to_clean.append(temp_filepath)
+                            uploaded_file = client.files.upload(
+                                file=temp_filepath,
+                                config={
+                                    "display_name": filename,
+                                    "mime_type": mimetype,
+                                },
                             )
-                    except OSError as e:
-                        logger.warning(f"Error removing temp file {temp_path}: {e}")
-            logger.info(
-                f"Finished executing finally block for chat {chat_id}."
+                            current_turn_parts.append(uploaded_file)  # Add File object
+                            logger.info(
+                                f"Attached session file '{filename}' via File API."
+                            )
+                        except Exception as upload_err:
+                            logger.error(
+                                f"Failed to upload session file '{filename}': {upload_err}",
+                                exc_info=True,
+                            )
+                            current_turn_parts.append(
+                                Part(
+                                    text=f"[System: Error uploading session file '{filename}'. {type(upload_err).__name__}]"
+                                )
+                            )
+                    else:
+                        logger.warning(
+                            f"Session file attachment via File API not supported for mimetype: {mimetype}"
+                        )
+                        current_turn_parts.append(
+                            Part(
+                                text=f"[System: Session file attachment not supported for file '{filename}' ({mimetype}).]"
+                            )
+                        )
+
+                except base64.BinasciiError as b64_err:
+                    logger.error(
+                        f"Base64 decoding failed for session file '{filename}': {b64_err}"
+                    )
+                    current_turn_parts.append(
+                        Part(
+                            text=f"[System: Error decoding session file '{filename}'.]"
+                        )
+                    )
+                except Exception as file_proc_err:
+                    logger.error(
+                        f"Error processing session file '{filename}': {file_proc_err}",
+                        exc_info=True,
+                    )
+                    current_turn_parts.append(
+                        Part(
+                            text=f"[System: Error processing session file '{filename}'.]"
+                        )
+                    )
+
+        # 4. Web Search
+        if web_search_enabled:
+            logger.info(f"Web search enabled for chat {chat_id}. Generating query...")
+            search_query = generate_search_query(user_message)
+            if search_query:
+                search_results = perform_web_search(search_query)
+                if search_results:
+                    results_text = "\n".join(search_results)
+                    current_turn_parts.extend(
+                        [
+                            Part(text="--- Start Web Search Results ---"),
+                            Part(text=results_text),
+                            Part(text="--- End Web Search Results ---"),
+                        ]
+                    )
+                else:
+                    current_turn_parts.append(
+                        Part(text="[System Note: Web search performed, no results.]")
+                    )
+            else:
+                current_turn_parts.append(
+                    Part(text="[System Note: Web search enabled, no query generated.]")
+                )
+
+        # 5. User Message
+        if user_message:
+            current_turn_parts.append(Part(text=user_message))
+        elif not current_turn_parts:  # Only add placeholder if nothing else was added
+            current_turn_parts.append(
+                Part(text="[User provided no text, only attachments or context.]")
             )
 
-    except Exception as e:
-        # This outer catch block handles exceptions that occur *before* the inner try/finally
-        # or exceptions that escape the inner blocks.
+        logger.info(
+            f"Prepared {len(current_turn_parts)} current turn parts for chat {chat_id}."
+        )
+        return history, current_turn_parts, temp_files_to_clean
+
+    except Exception as prep_err:
         logger.error(
-            f"generate_chat_response (outer catch): CRITICAL UNEXPECTED ERROR for chat {chat_id}: {type(e).__name__} - {e}", # Make log message more prominent
+            f"Unexpected error preparing content parts for chat {chat_id}: {prep_err}",
             exc_info=True,
         )
-        error_msg = f"[CRITICAL Unexpected AI Service Error: {type(e).__name__}]" # Make error message more prominent
-        if streaming_enabled:
-            yield error_msg
-            return # Stop generator
-        else:
-            return error_msg
+        return (
+            f"[Error: Failed to prepare content for AI ({type(prep_err).__name__})]",
+            None,
+            None,
+        )
+
+
+# --- Helper Function to Clean Up Temporary Files ---
+def _cleanup_temp_files(temp_files: list, context_msg: str):
+    """Safely removes a list of temporary files."""
+    if temp_files:
+        logger.info(
+            f"Cleaning up {len(temp_files)} temporary files for {context_msg}..."
+        )
+        for temp_path in temp_files:
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    logger.debug(f"Removed temp file: {temp_path}")
+                else:
+                    logger.debug(f"Temp file not found, already removed? {temp_path}")
+            except OSError as e:
+                logger.warning(f"Error removing temp file {temp_path}: {e}")
+        logger.info(f"Finished cleaning temp files for {context_msg}.")
 
 
 # --- Standalone Text Generation (Example) ---
 # Remove the decorator
-# @ai_ready_required
 def generate_text(prompt: str, model_name: str = None) -> str:
     """Generates text using a specified model or the default."""
     logger.info("Entering generate_text.")
@@ -1253,14 +1379,16 @@ def generate_text(prompt: str, model_name: str = None) -> str:
     try:
         # Check for Flask request context
         try:
-             _ = current_app.config # Simple check that raises RuntimeError if no context
-             logger.debug("generate_text: Flask request context is active.")
+            _ = (
+                current_app.config
+            )  # Simple check that raises RuntimeError if no context
+            logger.debug("generate_text: Flask request context is active.")
         except RuntimeError:
-             logger.error(
-                 "generate_text called outside of active Flask app/request context.",
-                 exc_info=True # Log traceback
-             )
-             return "[Error: AI Service called outside request context]"
+            logger.error(
+                "generate_text called outside of active Flask app/request context.",
+                exc_info=True,  # Log traceback
+            )
+            return "[Error: AI Service called outside request context]"
 
         api_key = current_app.config.get("API_KEY")
         if not api_key:
@@ -1268,12 +1396,20 @@ def generate_text(prompt: str, model_name: str = None) -> str:
             return "[Error: AI Service API Key not configured]"
 
         try:
-            client = genai.Client(api_key=api_key)
-            logger.info("Successfully created genai.Client for text generation.")
+            # Use client caching via Flask's 'g' object if in request context
+            if "genai_client" not in g:
+                logger.info("Creating new genai.Client and caching in 'g'.")
+                g.genai_client = genai.Client(api_key=api_key)
+            else:
+                logger.debug("Using cached genai.Client from 'g'.")
+            client = g.genai_client
+            logger.info("Successfully obtained genai.Client for text generation.")
         except (GoogleAPIError, ClientError, ValueError, Exception) as e:
-            logger.error(f"Failed to initialize genai.Client for text: {e}", exc_info=True)
+            logger.error(
+                f"Failed to initialize/get genai.Client for text: {e}", exc_info=True
+            )
             if "api key not valid" in str(e).lower():
-                 return "[Error: Invalid Gemini API Key]"
+                return "[Error: Invalid Gemini API Key]"
             return "[Error: Failed to initialize AI client]"
 
     except Exception as e:
@@ -1284,7 +1420,6 @@ def generate_text(prompt: str, model_name: str = None) -> str:
         )
         return f"[CRITICAL Unexpected Error during AI Service readiness check: {type(e).__name__}]"
     # --- End AI Readiness Check ---
-
 
     if not model_name:
         raw_model_name = current_app.config["DEFAULT_MODEL"]
@@ -1307,18 +1442,55 @@ def generate_text(prompt: str, model_name: str = None) -> str:
         # Standalone text generation is NOT streamed
         response = client.models.generate_content(
             model=model_to_use,
-            contents=prompt,  # Simple text prompt
+            contents=prompt, 
         )
-        return response.text
 
+        # Process response similar to non-streaming chat
+        if response.prompt_feedback and response.prompt_feedback.block_reason:
+            reason = response.prompt_feedback.block_reason.name
+            logger.warning(
+                f"Text generation blocked by safety settings. Reason: {reason}"
+            )
+            return f"[Error: Text generation blocked due to safety settings (Reason: {reason})]"
+
+        if (
+            response.candidates
+            and hasattr(response.candidates[0], "content")
+            and hasattr(response.candidates[0].content, "parts")
+            and response.candidates[0].content.parts
+        ):
+            text_reply = "".join(
+                part.text
+                for part in response.candidates[0].content.parts
+                if hasattr(part, "text")
+            )
+            if text_reply.strip():
+                return text_reply
+            else:
+                logger.warning("Text generation resulted in empty text content.")
+                return "[System Note: AI generated empty text.]"
+        else:
+            logger.warning(
+                f"Text generation did not produce usable content. Response: {response!r}"
+            )
+            finish_reason = "UNKNOWN"
+            if response.candidates and hasattr(response.candidates[0], "finish_reason"):
+                finish_reason = response.candidates[0].finish_reason.name
+            return f"[Error: AI did not generate text content (Finish Reason: {finish_reason})]"
+
+    except InvalidArgument as e:
+        logger.error(
+            f"InvalidArgument error during text generation: {e}.", exc_info=True
+        )
+        return f"[AI Error: Invalid argument ({type(e).__name__}).]"
     except NotFound:
         return f"[Error: Model '{model_to_use}' not found]"
     except GoogleAPIError as e:
         # Simplified error handling for this example
         logger.error(f"API error during text generation: {e}")
         if "api key not valid" in str(e).lower():
-            # No need to set g.gemini_api_key_invalid anymore
             return "[Error: Invalid Gemini API Key]"
+        # Add other common checks if needed (quota, etc.)
         return f"[AI API Error: {type(e).__name__}]"
     except Exception as e:
         logger.error(f"Unexpected error during text generation: {e}", exc_info=True)

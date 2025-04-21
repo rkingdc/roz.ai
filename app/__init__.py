@@ -43,8 +43,8 @@ def create_app(test_config=None):
         logger.info(f"Instance folder found at {app.instance_path}")
 
     # Configure Gemini API
-    from . import ai_services
-    ai_services.configure_gemini(app)
+    #from . import ai_services
+    #ai_services.configure_gemini(app)
 
     # Initialize Database
     from . import database
