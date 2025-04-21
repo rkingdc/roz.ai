@@ -303,7 +303,7 @@ async def test_generate_summary_api_blocked(app, mock_genai, mock_db, app_contex
 
 
 # == Test get_or_generate_summary ==
-async def test_get_or_generate_summary_exists(app, mock_db, mock_genai):
+async def test_get_or_generate_summary_exists(app, mock_db, mock_genai, app_context):
     """Test retrieving an existing valid summary."""
     ai_services.gemini_configured = True  # Needed if generation fallback occurs
     mock_db.get_file_details_from_db.return_value = {
@@ -324,7 +324,7 @@ async def test_get_or_generate_summary_exists(app, mock_db, mock_genai):
         mock_db.save_summary_in_db.assert_not_called()  # Should not save
 
 
-async def test_get_or_generate_summary_generate_new(app, mock_db, mock_genai):
+async def test_get_or_generate_summary_generate_new(app, mock_db, mock_genai, app_context):
     """Test generating a new summary when none exists."""
     ai_services.gemini_configured = True
     # First call to get_file_details (no content)
