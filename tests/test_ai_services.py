@@ -83,27 +83,26 @@ def mock_genai():
 
 
 @pytest.fixture
-def mock_db(app_context):
+def mock_db():
     """Mocks the app.database module functions."""
-    with app_context:
-        with patch("app.ai_services.database", autospec=True) as mock_db_module:
-            # Setup default return values for commonly used functions
-            mock_db_module.get_file_details_from_db.return_value = {
-                "id": 1,
-                "filename": "test.txt",
-                "mimetype": "text/plain",
-                "content": b"Test file content",
-                "has_summary": False,
-                "summary": None,
-            }
-            mock_db_module.get_chat_details_from_db.return_value = {
-                "id": 1,
-                "model_name": "gemini-test-default-model",
-            }
-            mock_db_module.get_chat_history_from_db.return_value = []
-            mock_db_module.save_summary_in_db.return_value = True
-            mock_db_module.add_message_to_db.return_value = True
-            yield mock_db_module
+    with patch("app.ai_services.database", autospec=True) as mock_db_module:
+        # Setup default return values for commonly used functions
+        mock_db_module.get_file_details_from_db.return_value = {
+            "id": 1,
+            "filename": "test.txt",
+            "mimetype": "text/plain",
+            "content": b"Test file content",
+            "has_summary": False,
+            "summary": None,
+        }
+        mock_db_module.get_chat_details_from_db.return_value = {
+            "id": 1,
+            "model_name": "gemini-test-default-model",
+        }
+        mock_db_module.get_chat_history_from_db.return_value = []
+        mock_db_module.save_summary_in_db.return_value = True
+        mock_db_module.add_message_to_db.return_value = True
+        yield mock_db_module
 
 
 @pytest.fixture
@@ -174,13 +173,14 @@ async def test_generate_summary_not_configured(app_context):
     assert result == "[Error: AI model not configured]"
 
 
-async def test_generate_summary_file_not_found(app_context, mock_db):
+async def test_generate_summary_file_not_found(mock_db, app):
     """Test generate_summary when file details are not found."""
     ai_services.gemini_configured = True
     mock_db.get_file_details_from_db.return_value = None
-    result = await ai_services.generate_summary(1)
-    assert result == "[Error: File content not found]"
-    mock_db.get_file_details_from_db.assert_called_once_with(1, include_content=True)
+    async with app.app_context():
+        result = await ai_services.generate_summary(1)
+        assert result == "[Error: File content not found]"
+        mock_db.get_file_details_from_db.assert_called_once_with(1, include_content=True)
 
 
 async def test_generate_summary_text_file(app_context, mock_genai, mock_db):
