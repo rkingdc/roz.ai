@@ -495,7 +495,7 @@ async def generate_chat_response(
         )
         if enable_web_search:
             try:
-                search_query = await ai_services.generate_search_query(user_message)
+                search_query = await generate_search_query(user_message)
                 logger.info(
                     f"Web search enabled, searching for: '{search_query}'"
                 )  # Using user_message for search now
