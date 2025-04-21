@@ -36,6 +36,8 @@ start: stop
 start-dev: stop
 	@echo "Starting application in development mode with in-memory database on port 5000..."
 	@sleep 1 # Give a moment for the old process to terminate
+	@echo "Initializing database..."
+	@$(PYTHON) -m flask init-db
 	@echo "Logging to $(LOG_FILE) and stdout."
 	@TEST_DATABASE=TRUE $(PYTHON) -m gunicorn --workers 1 --bind 0.0.0.0:5000 --timeout 360 run:app 2>&1 | tee $(LOG_FILE)
 
