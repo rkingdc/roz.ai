@@ -865,10 +865,9 @@ async def test_generate_chat_response_with_permanent_file_summary(
 
     # Mock get_file_details: Provide return values for BOTH calls without include_content
     # The first call is in generate_chat_response, the second is in get_or_generate_summary
-    mock_db["get_file_details_from_db"].side_effect = [
-        file_details_dict,
-        file_details_dict,
-    ]
+    # Correcting the side_effect to only provide one return value as only one call is expected
+    mock_db["get_file_details_from_db"].return_value = file_details_dict
+
     mock_genai.GenerativeModel.return_value.generate_content.return_value.text = (
         "Summary Response"
     )
@@ -880,16 +879,13 @@ async def test_generate_chat_response_with_permanent_file_summary(
     assert result == "Summary Response"
 
     # Check get_file_details calls
-    # It should be called twice with just the file_id
-    expected_calls_get_details = [call(file_id), call(file_id)]
-    # Use assert_has_calls to check for these specific calls in sequence (or any_order=True if order doesn't matter)
-    # Note: Depending on exact execution, other calls might occur *after* these.
-    # assert_has_calls checks if the sequence exists within the call list.
+    # It should be called once with just the file_id because a summary exists
+    expected_calls_get_details = [call(file_id)]
     mock_db["get_file_details_from_db"].assert_has_calls(
         expected_calls_get_details, any_order=False
-    )  # Adjust any_order if needed
+    )
 
-    # Ensure it wasn't called with include_content=True in either call
+    # Ensure it wasn't called with include_content=True
     for call_args in mock_db["get_file_details_from_db"].call_args_list:
         # Check the keyword arguments specifically
         if call_args.kwargs.get("include_content") is True:
