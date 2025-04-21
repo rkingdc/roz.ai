@@ -988,9 +988,15 @@ def generate_chat_response(
                 logger.info(
                     f"Sending message to chat session with parts: {current_turn_parts}"
                 )
-                response = chat_session.send_message_stream(
-                    message=current_turn_parts
-                )
+                if streaming_enabled:
+                    response = chat_session.send_message_stream(
+                        message=current_turn_parts
+                    )
+                else:
+                    response = chat_session.send_message(
+                        message=current_turn_parts
+                    )
+    
                 logger.info(f"send_message call returned.")
 
                 # --- Debugging Logs for Response ---
