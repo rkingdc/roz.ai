@@ -13,203 +13,82 @@ from google.api_core.exceptions import (
     DeadlineExceeded,
     ClientError,
     NotFound,
-)  # Added NotFound
-from pydantic_core import (
-    ValidationError,
-)  # Import ValidationError for specific handling
+)
+from pydantic_core import ValidationError
 import grpc
 import logging
-from functools import wraps
-from werkzeug.utils import secure_filename  # Moved import here for clarity
+# from functools import wraps # Remove this import
+from werkzeug.utils import secure_filename
 
 # Configure logging - Removed basicConfig and setLevel here
 logger = logging.getLogger(__name__)
 
 # --- Configuration Check ---
-
-gemini_api_key_present = False
-
-
-def configure_gemini(app):
-    """
-    Checks if the Gemini API key is present in the Flask app config.
-    Sets a flag indicating presence.
-    """
-    global gemini_api_key_present
-    api_key = app.config.get("API_KEY")
-    if api_key:
-        gemini_api_key_present = True
-        logger.info("Gemini API key found in configuration.")
-    else:
-        gemini_api_key_present = False
-        logger.error(
-            "Gemini API key NOT found in config. AI features relying on it will fail."
-        )
-    return gemini_api_key_present
-
+# Remove gemini_api_key_present global and configure_gemini function
+# gemini_api_key_present = False
+# def configure_gemini(app): ... # Remove this function
 
 # --- Helper Functions for Client Instantiation ---
-
-
-def _get_api_key():
-    """Safely retrieves the API key from Flask's current_app config."""
-    if not gemini_api_key_present:
-        logger.error(
-            "Attempted to get API key, but it was not found during initial configuration."
-        )
-        return None
-    try:
-        key = current_app.config.get("API_KEY")
-        if not key:
-            logger.error("API_KEY is missing from current_app.config.")
-            return None
-        return key
-    except RuntimeError:
-        logger.error("Attempted to get API key outside of Flask app/request context.")
-        return None
-
-
-def get_gemini_client():
-    """
-    Creates and returns a configured genai.Client instance using the API key
-    from the application config. Returns None on failure.
-    Caches the client in Flask's request context (g).
-    """
-    # Check if client already exists in the current request context
-    # Also check if the key was previously found invalid in this request
-    if g.get("gemini_api_key_invalid", False):
-        logger.info(
-            "Skipping client creation, API key marked invalid for this request."
-        )
-        return None
-    if "gemini_client" in g:
-        # Return cached client if it's not None (i.e., wasn't a cached failure)
-        if g.gemini_client is not None:
-            logger.info("Returning cached genai.Client for this request.")
-            return g.gemini_client
-        else:
-            logger.info("Cached client state was None (failure), skipping.")
-            return None  # Explicitly return None if cached state is failure
-
-    api_key = _get_api_key()
-    if not api_key:
-        g.gemini_client = None  # Cache failure state
-        return None  # Error logged in _get_api_key
-
-    try:
-        # Note: Client-level options like transport or client_options might be
-        # configurable here if needed for things like default timeouts,
-        # but we'll stick to the basic client for now.
-        client = genai.Client(api_key=api_key)
-        # Optional: Perform a lightweight check to validate the key early
-        # client.models.list() # Example check using the models attribute
-        g.gemini_client = client  # Cache successful client in request context
-        logger.info("Successfully created and cached genai.Client for this request.")
-        return client
-    except (GoogleAPIError, ClientError, ValueError, Exception) as e:
-        logger.error(f"Failed to initialize genai.Client: {e}", exc_info=True)
-        g.gemini_client = None  # Cache failure state
-        if "api key not valid" in str(e).lower():
-            g.gemini_api_key_invalid = True  # Mark key as invalid for this request
-        return None
+# Remove _get_api_key and get_gemini_client functions
+# def _get_api_key(): ... # Remove this function
+# def get_gemini_client(): ... # Remove this function
 
 
 # --- Decorator for AI Readiness Check ---
-def ai_ready_required(f):
-    """
-    Decorator to ensure the API key is configured and we have a client
-    before running an AI function. Ensures request context.
-    """
-
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        logger.debug(f"Decorator '{f.__name__}': Entering decorator.")
-        try:
-            # Check if configure_gemini found the key initially
-            if not gemini_api_key_present:
-                logger.warning(
-                    f"Decorator '{f.__name__}': AI function called but API key was missing at startup."
-                )
-                error_msg = "[Error: AI Service API Key not configured]"
-                # Return a string error message for non-streaming, or yield for streaming
-                if kwargs.get("streaming_enabled", False):
-                    yield error_msg
-                    return  # Stop generator
-                else:
-                    return error_msg
-
-            # Check if we have a valid request context (needed for g and current_app)
-            try:
-                 _ = current_app.config # Simple check that raises RuntimeError if no context
-                 logger.debug(f"Decorator '{f.__name__}': Flask request context is active.")
-            except RuntimeError:
-                 logger.error(
-                     f"Decorator '{f.__name__}': AI function called outside of active Flask request context.",
-                     exc_info=True # Log traceback
-                 )
-                 error_msg = "[Error: AI Service called outside request context]"
-                 if kwargs.get("streaming_enabled", False):
-                     yield error_msg
-                     return  # Stop generator
-                 else:
-                     return error_msg
-
-
-            # Attempt to get the client (this also checks the invalid key flag in g)
-            client = get_gemini_client()
-            if not client:
-                if g.get("gemini_api_key_invalid", False):
-                    logger.warning(
-                        f"Decorator '{f.__name__}': AI function called but API key was found invalid in this request."
-                    )
-                    error_msg = "[Error: Invalid Gemini API Key]"
-                else:
-                    logger.error(
-                        f"Decorator '{f.__name__}': AI function called but failed to get Gemini client."
-                    )
-                    error_msg = "[Error: Failed to initialize AI client]"
-
-                # Return error message based on streaming preference
-                if kwargs.get("streaming_enabled", False):
-                    yield error_msg
-                    return  # Stop generator
-                else:
-                    return error_msg
-
-            # If client is obtained, proceed with the function
-            logger.debug(f"Decorator '{f.__name__}': AI readiness check passed. Calling wrapped function.")
-            result = f(*args, **kwargs)
-            logger.debug(f"Decorator '{f.__name__}': Wrapped function call returned/yielded.")
-            return result
-
-        except Exception as e:
-            # Catch any unexpected exceptions that weren't caught inside the wrapped function
-            logger.error(
-                f"Decorator '{f.__name__}': CRITICAL UNEXPECTED EXCEPTION: {type(e).__name__} - {e}", # Make log message more prominent
-                exc_info=True, # Log traceback
-            )
-            error_msg = f"[CRITICAL Unexpected Error in AI Service Decorator: {type(e).__name__}]" # Make error message more prominent
-            if kwargs.get("streaming_enabled", False):
-                yield error_msg
-                return # Stop generator
-            else:
-                return error_msg
-
-
-    return decorated_function
+# Remove the entire decorator function
+# def ai_ready_required(f): ... # Remove this function
 
 
 # --- Summary Generation ---
-@ai_ready_required  # Apply the decorator
+# Remove the decorator
+# @ai_ready_required
 def generate_summary(file_id):
     """
     Generates a summary for a file using a designated multi-modal model via the client.
     Handles text directly and uses file upload API for other types.
     Uses the NEW google.genai library structure (client-based).
     """
-    client = get_gemini_client()  # Get client via helper (already checked by decorator)
-    if not client:  # Should not happen if decorator works, but belt-and-suspenders
-        return "[Error: Failed to initialize AI client - Check Logs]"
+    logger.info(f"Entering generate_summary for file {file_id}.")
+
+    # --- AI Readiness Check (Moved from Decorator) ---
+    try:
+        # Check for Flask request context
+        try:
+             _ = current_app.config # Simple check that raises RuntimeError if no context
+             logger.debug("generate_summary: Flask request context is active.")
+        except RuntimeError:
+             logger.error(
+                 "generate_summary called outside of active Flask request context.",
+                 exc_info=True # Log traceback
+             )
+             return "[Error: AI Service called outside request context]"
+
+        api_key = current_app.config.get("API_KEY")
+        if not api_key:
+            logger.error("API_KEY is missing from current_app.config.")
+            return "[Error: AI Service API Key not configured]"
+
+        try:
+            client = genai.Client(api_key=api_key)
+            logger.info("Successfully created genai.Client for summary generation.")
+        except (GoogleAPIError, ClientError, ValueError, Exception) as e:
+            logger.error(f"Failed to initialize genai.Client for summary: {e}", exc_info=True)
+            # Check for invalid key specifically
+            if "api key not valid" in str(e).lower():
+                 # We can't use g here reliably if called outside request context,
+                 # but the API call itself will fail anyway. Just return the error.
+                 return "[Error: Invalid Gemini API Key]"
+            return "[Error: Failed to initialize AI client]"
+
+    except Exception as e:
+        # Catch any unexpected errors during the readiness check itself
+        logger.error(
+            f"generate_summary: Unexpected error during readiness check: {type(e).__name__} - {e}",
+            exc_info=True,
+        )
+        return f"[CRITICAL Unexpected Error during AI Service readiness check: {type(e).__name__}]"
+    # --- End AI Readiness Check ---
+
 
     try:
         file_details = database.get_file_details_from_db(file_id, include_content=True)
@@ -298,8 +177,8 @@ def generate_summary(file_id):
                     f"Error preparing/uploading file for summary: {upload_err}",
                     exc_info=True,
                 )
+                # Check for invalid key specifically during upload
                 if "api key not valid" in str(upload_err).lower():
-                    g.gemini_api_key_invalid = True
                     return "[Error: Invalid Gemini API Key during file upload]"
                 return f"[Error preparing/uploading file for summary: {type(upload_err).__name__}]"
         else:
@@ -345,7 +224,7 @@ def generate_summary(file_id):
         )
         err_str = str(e).lower()
         if "api key not valid" in err_str:
-            g.gemini_api_key_invalid = True
+            # No need to set g.gemini_api_key_invalid anymore
             return "[Error: Invalid Gemini API Key]"
         if "prompt was blocked" in err_str or "SAFETY" in str(
             e
@@ -388,7 +267,7 @@ def generate_summary(file_id):
 
 
 # --- Get Or Generate Summary ---
-# No decorator needed here as it calls generate_summary which has it
+# No decorator needed here as it calls generate_summary which now handles its own readiness
 def get_or_generate_summary(file_id):
     """Gets summary from DB or generates+saves it if not present."""
     try:
@@ -409,7 +288,7 @@ def get_or_generate_summary(file_id):
             return file_details["summary"]
         else:
             logger.info(f"Generating summary for file ID: {file_id}...")
-            # Call the refactored function (which is decorated)
+            # Call the refactored function (which now handles its own readiness)
             new_summary = generate_summary(file_id)
 
             # Only save if generation was successful (doesn't start with "[Error")
@@ -442,14 +321,50 @@ def get_or_generate_summary(file_id):
 
 
 # --- Generate Search Query ---
-@ai_ready_required  # Apply the decorator
+# Remove the decorator
+# @ai_ready_required
 def generate_search_query(user_message: str, max_retries=1) -> str | None:
     """
     Uses the default LLM via client to generate a concise web search query.
     """
-    client = get_gemini_client()  # Get client via helper
-    if not client:
-        return None  # Should be caught by decorator
+    logger.info("Entering generate_search_query.")
+
+    # --- AI Readiness Check (Moved from Decorator) ---
+    try:
+        # Check for Flask request context
+        try:
+             _ = current_app.config # Simple check that raises RuntimeError if no context
+             logger.debug("generate_search_query: Flask request context is active.")
+        except RuntimeError:
+             logger.error(
+                 "generate_search_query called outside of active Flask request context.",
+                 exc_info=True # Log traceback
+             )
+             return None # Return None as expected by the caller
+
+        api_key = current_app.config.get("API_KEY")
+        if not api_key:
+            logger.error("API_KEY is missing from current_app.config.")
+            return None # Return None as expected by the caller
+
+        try:
+            client = genai.Client(api_key=api_key)
+            logger.info("Successfully created genai.Client for query generation.")
+        except (GoogleAPIError, ClientError, ValueError, Exception) as e:
+            logger.error(f"Failed to initialize genai.Client for query: {e}", exc_info=True)
+            if "api key not valid" in str(e).lower():
+                 return None # Return None
+            return None # Return None
+
+    except Exception as e:
+        # Catch any unexpected errors during the readiness check itself
+        logger.error(
+            f"generate_search_query: Unexpected error during readiness check: {type(e).__name__} - {e}",
+            exc_info=True,
+        )
+        return None # Return None as expected by the caller
+    # --- End AI Readiness Check ---
+
 
     if not user_message or user_message.isspace():
         logger.info("Cannot generate search query from empty user message.")
@@ -546,7 +461,7 @@ Search Query:"""
             )
             err_str = str(e).lower()
             if "api key not valid" in err_str:
-                g.gemini_api_key_invalid = True
+                # No need to set g.gemini_api_key_invalid anymore
                 logger.error(
                     "API key invalid during search query generation. Aborting."
                 )
@@ -586,7 +501,8 @@ Search Query:"""
 
 
 # --- Chat Response Generation ---
-@ai_ready_required
+# Remove the decorator
+# @ai_ready_required
 def generate_chat_response(
     chat_id,
     user_message,
@@ -606,20 +522,68 @@ def generate_chat_response(
     logger.info(
         f"Entering generate_chat_response (generator body starts here) for chat {chat_id}. Streaming: {streaming_enabled}"
     )
-    client = get_gemini_client()
-    logger.info(f"Client obtained inside generate_chat_response: {client}")
-    if not client:
-        # Decorator should handle this and return/yield error message
-        # If it somehow fails here, return/yield a generic error
-        error_msg = "[Error: Failed to initialize AI client - Check Logs]"
-        logger.error(error_msg)  # Log the error here too
+
+    # --- AI Readiness Check (Moved from Decorator) ---
+    try:
+        # Check for Flask request context
+        try:
+             _ = current_app.config # Simple check that raises RuntimeError if no context
+             logger.debug("generate_chat_response: Flask request context is active.")
+        except RuntimeError:
+             logger.error(
+                 "generate_chat_response called outside of active Flask request context.",
+                 exc_info=True # Log traceback
+             )
+             error_msg = "[Error: AI Service called outside request context]"
+             if streaming_enabled:
+                 yield error_msg
+                 return # Stop generator
+             else:
+                 return error_msg
+
+        api_key = current_app.config.get("API_KEY")
+        if not api_key:
+            logger.error("API_KEY is missing from current_app.config.")
+            error_msg = "[Error: AI Service API Key not configured]"
+            if streaming_enabled:
+                yield error_msg
+                return # Stop generator
+            else:
+                return error_msg
+
+        try:
+            client = genai.Client(api_key=api_key)
+            logger.info("Successfully created genai.Client for chat response.")
+        except (GoogleAPIError, ClientError, ValueError, Exception) as e:
+            logger.error(f"Failed to initialize genai.Client for chat: {e}", exc_info=True)
+            error_msg = "[Error: Failed to initialize AI client]"
+            # Check for invalid key specifically
+            if "api key not valid" in str(e).lower():
+                 error_msg = "[Error: Invalid Gemini API Key]"
+                 # No need to set g.gemini_api_key_invalid anymore
+            if streaming_enabled:
+                yield error_msg
+                return # Stop generator
+            else:
+                return error_msg
+
+    except Exception as e:
+        # Catch any unexpected errors during the readiness check itself
+        logger.error(
+            f"generate_chat_response: Unexpected error during readiness check: {type(e).__name__} - {e}",
+            exc_info=True,
+        )
+        error_msg = f"[CRITICAL Unexpected Error during AI Service readiness check: {type(e).__name__}]"
         if streaming_enabled:
             yield error_msg
-            return  # Stop generator
+            return # Stop generator
         else:
             return error_msg
+    # --- End AI Readiness Check ---
+
 
     # Add a try...except block around the main logic to catch early errors
+    # This outer block remains to catch errors *before* the inner try/finally
     try:
         # --- Determine Model ---
         raw_model_name = current_app.config.get(
@@ -795,7 +759,8 @@ def generate_chat_response(
                                         )
                                     )
                                     if "api key not valid" in str(upload_err).lower():
-                                        g.gemini_api_key_invalid = True
+                                        # No need to set g.gemini_api_key_invalid anymore
+                                        pass # Error message already added to parts
                             else:
                                 logger.warning(
                                     f"Full content attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}."
@@ -906,7 +871,8 @@ def generate_chat_response(
                                     )
                                 )
                                 if "api key not valid" in str(upload_err).lower():
-                                    g.gemini_api_key_invalid = True  # Mark key invalid
+                                    # No need to set g.gemini_api_key_invalid anymore
+                                    pass # Error message already added to parts
                         else:
                             logger.warning(
                                 f"Session file attachment not supported for mimetype: {mimetype} for file '{filename}' in chat {chat_id}."
@@ -936,7 +902,7 @@ def generate_chat_response(
             if web_search_enabled:
                 logger.info(f"Web search enabled for chat {chat_id}. Generating query...")
                 # Pass streaming_enabled=False to generate_search_query as it's not streamed
-                search_query = generate_search_query(user_message, streaming_enabled=False)
+                search_query = generate_search_query(user_message) # Removed streaming_enabled=False arg as it's not needed by generate_search_query anymore
                 logger.info(
                     f"Generated search query: '{search_query}'"
                 )
@@ -1212,7 +1178,7 @@ def generate_chat_response(
                 error_message = f"[AI API Error: {type(e).__name__}]"
 
                 if "api key not valid" in err_str:
-                    g.gemini_api_key_invalid = True
+                    # No need to set g.gemini_api_key_invalid anymore
                     error_message = "[Error: Invalid Gemini API Key]"
                 elif "prompt was blocked" in err_str or "SAFETY" in str(e):
                     feedback_reason = "N/A"
@@ -1319,12 +1285,48 @@ def generate_chat_response(
 
 
 # --- Standalone Text Generation (Example) ---
-@ai_ready_required
+# Remove the decorator
+# @ai_ready_required
 def generate_text(prompt: str, model_name: str = None) -> str:
     """Generates text using a specified model or the default."""
-    client = get_gemini_client()
-    if not client:
-        return "[Error: Failed to initialize AI client]"
+    logger.info("Entering generate_text.")
+
+    # --- AI Readiness Check (Moved from Decorator) ---
+    try:
+        # Check for Flask request context
+        try:
+             _ = current_app.config # Simple check that raises RuntimeError if no context
+             logger.debug("generate_text: Flask request context is active.")
+        except RuntimeError:
+             logger.error(
+                 "generate_text called outside of active Flask app/request context.",
+                 exc_info=True # Log traceback
+             )
+             return "[Error: AI Service called outside request context]"
+
+        api_key = current_app.config.get("API_KEY")
+        if not api_key:
+            logger.error("API_KEY is missing from current_app.config.")
+            return "[Error: AI Service API Key not configured]"
+
+        try:
+            client = genai.Client(api_key=api_key)
+            logger.info("Successfully created genai.Client for text generation.")
+        except (GoogleAPIError, ClientError, ValueError, Exception) as e:
+            logger.error(f"Failed to initialize genai.Client for text: {e}", exc_info=True)
+            if "api key not valid" in str(e).lower():
+                 return "[Error: Invalid Gemini API Key]"
+            return "[Error: Failed to initialize AI client]"
+
+    except Exception as e:
+        # Catch any unexpected errors during the readiness check itself
+        logger.error(
+            f"generate_text: Unexpected error during readiness check: {type(e).__name__} - {e}",
+            exc_info=True,
+        )
+        return f"[CRITICAL Unexpected Error during AI Service readiness check: {type(e).__name__}]"
+    # --- End AI Readiness Check ---
+
 
     if not model_name:
         raw_model_name = current_app.config["DEFAULT_MODEL"]
@@ -1358,7 +1360,7 @@ def generate_text(prompt: str, model_name: str = None) -> str:
         # Simplified error handling for this example
         logger.error(f"API error during text generation: {e}")
         if "api key not valid" in str(e).lower():
-            g.gemini_api_key_invalid = True
+            # No need to set g.gemini_api_key_invalid anymore
             return "[Error: Invalid Gemini API Key]"
         return f"[AI API Error: {type(e).__name__}]"
     except Exception as e:
