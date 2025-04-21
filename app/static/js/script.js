@@ -362,8 +362,12 @@ renderer.code = function(code, language) {
     // --- Added Logging ---
     console.log(`renderer.code called: code type=${typeof code}, code value=`, code);
     // --- End Added Logging ---
+
+    // Attempt to get the string content if 'code' is an object
+    let codeString = typeof code === 'object' && code !== null && typeof code.text === 'string' ? code.text : String(code);
+
     // Ensure the input 'code' is treated as a string and escape its content
-    const escapedCode = escapeHtml(code);
+    const escapedCode = escapeHtml(codeString);
     return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapedCode}</code></pre>`;
 };
 
@@ -371,8 +375,12 @@ renderer.codespan = function(text) {
     // --- Added Logging ---
     console.log(`renderer.codespan called: text type=${typeof text}, text value=`, text);
     // --- End Added Logging ---
+
+    // Attempt to get the string content if 'text' is an object
+    let textString = typeof text === 'object' && text !== null && typeof text.text === 'string' ? text.text : String(text);
+
     // Ensure the input 'text' is treated as a string and escape its content
-    const escapedText = escapeHtml(text);
+    const escapedText = escapeHtml(textString);
 
     // Return the HTML string with your desired classes
     return `<code class="bg-gray-200 px-1 rounded text-sm font-mono">${escapedText}</code>`;
