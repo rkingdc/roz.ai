@@ -6,7 +6,7 @@ LOG_FILE = roz.ai.log
 # Use single quotes for the pattern to avoid shell expansion issues within Make
 PROCESS_PATTERN = '/home/roz/.venv/assistant/bin/python -m uvicorn.*run:asgi_app'
 # Increase timeout to 120 seconds for potentially long AI operations
-RUN_CMD = $(PYTHON) -m uvicorn run:asgi_app --host 0.0.0.0 --port 8000 --timeout 120
+RUN_CMD = $(PYTHON) -m uvicorn run:asgi_app --host 0.0.0.0 --port 8000 --timeout-keep-alive 120
 
 # Default target (optional)
 .PHONY: default
