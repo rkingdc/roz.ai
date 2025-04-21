@@ -1316,7 +1316,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     async function startNewChat() {
-        if (isLoading) return;
+        // REMOVED: if (isLoading) return;
         setLoadingState(true, "Creating Chat");
         updateStatus("Creating new chat...");
         try {
@@ -1363,10 +1363,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     async function loadChat(chatId) {
         console.log(`[DEBUG] loadChat(${chatId}) called.`); // Added log
-        if (isLoading) {
-            console.log(`[DEBUG] loadChat(${chatId}) skipped, isLoading is true.`); // Added log
-            return;
-        }
+        // REMOVED: if (isLoading) { console.log(`[DEBUG] loadChat(${chatId}) skipped, isLoading is true.`); return; }
         setLoadingState(true, "Loading Chat");
         updateStatus(`Loading chat ${chatId}...`);
         clearChatbox();
@@ -1681,8 +1678,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     async function handleSaveChatName() {
-        if (isLoading || !currentChatId) {
-            updateStatus("Cannot save name: No active chat or busy.", true);
+        if (isLoading) return; // Keep this check for user-initiated saves
+        if (!currentChatId) {
+            updateStatus("Cannot save name: No active chat.", true);
             return;
         }
         const newName = currentChatNameInput.value.trim();
@@ -1712,7 +1710,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     async function handleDeleteChat(chatId, listItemElement) {
-        if (isLoading) return;
+        if (isLoading) return; // Keep this check for user-initiated deletes
         const chatName = listItemElement.querySelector('span.filename').textContent || `Chat ${chatId}`;
         if (!confirm(`Are you sure you want to delete "${chatName}"? This cannot be undone.`)) {
             return;
@@ -1767,7 +1765,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     async function handleModelChange() {
-        if (!currentChatId || isLoading) return;
+        if (!currentChatId || isLoading) return; // Keep this check for user-initiated changes
         const newModel = modelSelector.value;
         updateStatus(`Updating model to ${newModel}...`);
         setLoadingState(true, "Updating Model");
@@ -1798,7 +1796,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** Shows the Settings modal. */
     function showSettingsModal() {
-        if (isLoading) return;
+        if (isLoading) return; // Keep this check for user-initiated modal open
         settingsModal.style.display = "block";
         // Ensure toggle states match current states when opening
         streamingToggle.checked = isStreamingEnabled;
@@ -1981,7 +1979,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("[DEBUG] initializeApp called."); // Added log
         // Set initial status
         updateStatus("Initializing application...");
-        setLoadingState(true, "Initializing"); // Set loading state at the very beginning
+        // REMOVED: setLoadingState(true, "Initializing"); // Set loading state at the very beginning
         console.log("[DEBUG] Initializing state set."); // Added log
 
         try {
@@ -1993,7 +1991,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setSidebarCollapsed(sidebar, sidebarToggleButton, chatSidebarCollapsed, SIDEBAR_COLLAPSED_KEY, 'sidebar');
             setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, pluginSidebarCollapsed, PLUGINS_COLLAPSED_KEY, 'plugins');
             setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
-            setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY);
+            setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLABSED_KEY);
             console.log("[DEBUG] Sidebar/Plugin collapse states loaded and applied."); // Added log
 
 
@@ -2081,8 +2079,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             console.log("[DEBUG] initializeApp finally block entered."); // Added log
             // Ensure loading state is false even if an error occurred during initialization
-            setLoadingState(false); // This is crucial to unlock the UI
-            console.log("[DEBUG] setLoadingState(false) called in initializeApp finally block."); // Added log
+            // setLoadingState(false); // This is now handled by loadChat/startNewChat's finally block
+            console.log("[DEBUG] setLoadingState(false) is handled by loadChat/startNewChat finally block."); // Added log
         }
     }
 
