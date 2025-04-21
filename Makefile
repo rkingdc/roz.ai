@@ -29,7 +29,15 @@ start: stop
 	@echo "Starting application..."
 	@sleep 1 # Give a moment for the old process to terminate
 	@echo "Logging to $(LOG_FILE) and stdout."
-	@$(GUNICORN_CMD) 2>&1 | tee $(LOG_FILE) 
+	@$(GUNICORN_CMD) 2>&1 | tee $(LOG_FILE)
+
+# Target to start the application in development mode with an in-memory database
+.PHONY: start-dev
+start-dev: stop
+	@echo "Starting application in development mode with in-memory database..."
+	@sleep 1 # Give a moment for the old process to terminate
+	@echo "Logging to $(LOG_FILE) and stdout."
+	@TEST_DATABASE=TRUE $(GUNICORN_CMD) 2>&1 | tee $(LOG_FILE)
 
 # Target to display help
 .PHONY: help

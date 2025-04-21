@@ -18,7 +18,9 @@ class Config:
     DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true' # Enable debug mode via env var
 
     # Database
-    DB_NAME = os.environ.get('DATABASE_NAME', 'assistant_chat_v7.db') # Database filename
+    DB_NAME = os.environ.get('DATABASE_NAME', 'assistant_chat_v7.db')  # Database filename
+    TEST_DATABASE = os.environ.get('TEST_DATABASE', 'FALSE').lower() == 'true'
+    DATABASE_URI = ':memory:' if TEST_DATABASE else DB_NAME
 
     # File Uploads (Using BLOB storage now, UPLOAD_FOLDER not needed)
     # Define allowed extensions for frontend validation and potential backend checks

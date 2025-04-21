@@ -14,7 +14,8 @@ def create_app(test_config=None):
         __name__,
         template_folder='templates',
         static_folder='static',
-        instance_relative_config=True)
+        instance_relative_config=True
+    )
 
     # Load Configuration
     app.config.from_object('app.config.Config')
@@ -36,6 +37,8 @@ def create_app(test_config=None):
 
     # Initialize Database
     from . import database
+    # Override DB_NAME with DATABASE_URI from config
+    app.config['DB_NAME'] = app.config['DATABASE_URI']
     database.init_app(app)
 
     # Register Blueprints
