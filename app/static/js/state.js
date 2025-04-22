@@ -58,10 +58,13 @@ export function removeSelectedFileById(fileId) {
 }
 
 /** Removes the session file entry from the selectedFiles array. */
+// REMOVED: Session file is now managed separately from selectedFiles
+/*
 export function removeSessionFileFromSelected() {
     // Reassign the array after filtering out the session file
     selectedFiles = selectedFiles.filter(f => f.type !== 'session');
 }
+*/
 
 
 export function setSessionFile(file) {
