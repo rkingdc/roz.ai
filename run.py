@@ -1,46 +1,40 @@
-
 # Configure logging
-import logging        
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-# run.py
-# This script creates the Flask app using the factory
-# and runs the development server.
-import os
+import logging
+import os # Need os for environment variables
 import uvicorn
-from flask import Flask
-from asgiref.wsgi import WsgiToAsgi
+# from flask import Flask # Not needed at top level when using factory=True
+# from asgiref.wsgi import WsgiToAsgi # Not needed for factory pattern
 
 from app import create_app  # Import the factory function from our app package
 
-# Create the Flask app instance
-app = create_app()
+logger = logging.getLogger(__name__) # Move logger definition after imports
 
-# Wrap Flask app with ASGI handler
-asgi_app = WsgiToAsgi(app)
 
 if __name__ == "__main__":
-    # Get config values safely after app creation
-    db_name = app.config.get('DB_NAME', 'unknown_db')
+    # Get config values safely *before* starting uvicorn for logging/reload flag
+    # The actual app config is set inside create_app when Uvicorn calls it.
+
+    # Get host and port from environment
     host = os.environ.get('FLASK_RUN_HOST', '127.0.0.1')
-    port = int(os.environ.get('FLASK_RUN_PORT', 5000)) # Default to 5000 for dev consistency
-    debug = app.config.get('DEBUG', False) # Get debug status from app config
-    is_dev_server = app.config.get('IS_DEV_SERVER', False) # Check if running via start-dev
+    port = int(os.environ.get('FLASK_RUN_PORT', 5000))
 
-    logger.info(f"Starting Uvicorn server on http://{host}:{port} (DB: {db_name}, Debug: {debug}, Dev Server: {is_dev_server})")
+    # Determine debug/reload status based on environment variables set by Makefile
+    # IS_DEV_SERVER=TRUE is set by the Makefile for start-dev
+    debug_reload = os.environ.get('IS_DEV_SERVER', 'False').lower() == 'true' or os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 
-    # Enable reload only if DEBUG is True (typically set by FLASK_DEBUG or IS_DEV_SERVER)
-    # Use app factory pattern for uvicorn reload to work correctly
+    # Log info before starting uvicorn
+    # Avoid logging DB_NAME here as it might be misleading before the factory runs
+    logger.info(f"Starting Uvicorn server on http://{host}:{port} (Debug/Reload: {debug_reload})")
+
+    # Start uvicorn using the factory pattern
+    # Uvicorn will import run.py, find create_app, call it,
+    # and automatically wrap the returned Flask (WSGI) app.
     uvicorn.run(
         "run:create_app", # Point to the factory function string
         factory=True,     # Indicate using factory
         host=host,
         port=port,
         log_level="info",
-        reload=debug      # Enable reload based on debug flag
+        reload=debug_reload # Enable reload based on debug flag
     )
-
-
 
