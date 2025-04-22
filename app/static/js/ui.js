@@ -651,8 +651,9 @@ export function updateAttachButtonState() {
     // Attach Full is enabled if at least one file is selected in the sidebar AND not loading
     attachFullButton.disabled = state.isLoading || selectedCount === 0; // Read from state
 
-    // Attach Summary is enabled if at least one file is selected in the sidebar AND at least one selected file has a summary AND not loading
-    attachSummaryButton.disabled = state.isLoading || selectedCount === 0 || !hasSummarizable; // Read from state
+    // Attach Summary is enabled if at least one file is selected in the sidebar AND not loading
+    // It will attempt to generate summaries if they don't exist.
+    attachSummaryButton.disabled = state.isLoading || selectedCount === 0; // Read from state
 }
 
 

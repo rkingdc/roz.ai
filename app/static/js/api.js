@@ -225,7 +225,10 @@ export async function fetchSummary(fileId) {
         state.setCurrentEditingFileId(fileId); // Ensure state knows which file summary is being edited
         state.setSummaryContent(data.summary); // Assuming you add setSummaryContent to state.js
 
-        setStatus(`Summary loaded for file ${fileId}.`);
+        setStatus(`Summary loaded/generated for file ${fileId}.`);
+
+        // Reload file list state to update has_summary flag in UI
+        await loadUploadedFiles();
 
     } catch (error) {
         console.error("Error fetching summary:", error);
@@ -307,36 +310,78 @@ export function attachSelectedFilesFull() {
 /**
  * Attaches selected files from the sidebar to the current chat as 'summary' files.
  * Updates state.attachedFiles and clears state.sidebarSelectedFiles.
+ * Generates summaries if they don't exist.
  */
-export function attachSelectedFilesSummary() {
-     if (!state.isFilePluginEnabled || state.currentTab !== 'chat' || state.isLoading) {
+export async function attachSelectedFilesSummary() {
+    if (!state.isFilePluginEnabled || state.currentTab !== 'chat' || state.isLoading) {
         setStatus("Cannot attach files: Files plugin disabled, not on Chat tab, or busy.", true);
         return;
     }
-    if (state.sidebarSelectedFiles.length === 0) {
+    const selectedFiles = [...state.sidebarSelectedFiles]; // Copy selection
+    if (selectedFiles.length === 0) {
         setStatus("No files selected in the sidebar to attach.", true);
         return;
     }
-    // Check if any selected file actually has a summary
-    const filesWithSummary = state.sidebarSelectedFiles.filter(file => file.has_summary);
-    if (filesWithSummary.length === 0) {
-         setStatus("None of the selected files have a summary to attach.", true);
-         return;
-    }
 
-    // Add selected files with summaries to the attachedFiles state with type 'summary'
-    filesWithSummary.forEach(file => {
-        // Ensure we don't add duplicates (same file ID, same type)
-        if (!state.attachedFiles.some(f => f.id === file.id && f.type === 'summary')) {
-            state.addAttachedFile({ id: file.id, filename: file.filename, type: 'summary' });
+    setLoading(true, "Attaching Summaries (generating if needed)...");
+    const filesToAttach = []; // Collect files to attach after processing
+    const errors = [];
+
+    for (const file of selectedFiles) {
+        setStatus(`Processing ${file.filename}...`); // Update status per file
+        let summaryAvailable = file.has_summary;
+        let fileId = file.id; // Get file ID
+
+        if (!summaryAvailable) {
+            setStatus(`Generating summary for ${file.filename}...`);
+            try {
+                // Call fetchSummary which handles the API call, state update, and file list reload
+                await fetchSummary(fileId);
+
+                // Check state for the summary content after fetchSummary completes
+                // We need to find the updated file details from the main list now
+                const updatedFile = state.uploadedFiles.find(f => f.id === fileId);
+                if (updatedFile && updatedFile.has_summary && !state.summaryContent.startsWith('[Error')) {
+                    summaryAvailable = true; // Mark as available after successful generation
+                    setStatus(`Summary generated for ${file.filename}.`);
+                } else {
+                    // Use the potentially updated summaryContent from state for the error message
+                    const errorMsg = state.summaryContent.startsWith('[Error') ? state.summaryContent : `Failed to generate summary for ${file.filename}`;
+                    throw new Error(errorMsg);
+                }
+            } catch (error) {
+                console.error(`Error generating summary for ${file.filename}:`, error);
+                errors.push(`${file.filename}: ${error.message}`);
+                summaryAvailable = false; // Ensure it's not attached if generation failed
+            }
         }
+
+        // If summary was initially available or successfully generated, prepare to attach
+        if (summaryAvailable) {
+            // Check for duplicates in the main attachedFiles state before adding
+            if (!state.attachedFiles.some(f => f.id === fileId && f.type === 'summary')) {
+                 filesToAttach.push({ id: fileId, filename: file.filename, type: 'summary' });
+            } else {
+                 console.log(`[DEBUG] File ${fileId} (summary) already attached, skipping duplicate.`);
+            }
+        }
+    } // End for loop
+
+    // Now add all successfully processed files to the state
+    filesToAttach.forEach(file => {
+        state.addAttachedFile(file); // Notifies attachedFiles
     });
 
     // Clear the temporary sidebar selection state
-    state.clearSidebarSelectedFiles();
+    state.clearSidebarSelectedFiles(); // Notifies sidebarSelectedFiles
 
-    // UI will react to state changes (attachedFiles and sidebarSelectedFiles)
-    setStatus(`Attached ${filesWithSummary.length} file(s) (summary).`); // Status message might need refinement
+    // Final status update
+    let finalStatus = `Attached ${filesToAttach.length} file(s) (summary).`;
+    if (errors.length > 0) {
+        finalStatus += ` Errors: ${errors.join('; ')}`;
+    }
+    setStatus(finalStatus, errors.length > 0);
+    setLoading(false);
 }
 
 
