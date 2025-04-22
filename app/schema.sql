@@ -36,12 +36,13 @@ CREATE TABLE files (
 );
 
 -- Create the notes table
--- We'll use a single row with a fixed ID (e.g., 1) for a single global note
+-- Modified to allow multiple notes
 CREATE TABLE notes (
-    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1), -- Enforce single row with ID 1
+    id INTEGER PRIMARY KEY AUTOINCREMENT, -- Allow multiple notes with auto-incrementing ID
+    name TEXT NOT NULL DEFAULT 'New Note', -- Add a name field for notes
     content TEXT NOT NULL DEFAULT '',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, -- Add creation timestamp
     last_saved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert the initial single row for notes if it doesn't exist
-INSERT OR IGNORE INTO notes (id, content, last_saved_at) VALUES (1, '', CURRENT_TIMESTAMP);
+-- No initial insert needed for multiple notes, they will be created via the UI

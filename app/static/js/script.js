@@ -1,5 +1,6 @@
 // Global variables/constants (can be defined outside DOMContentLoaded)
 let currentChatId = null;
+let currentNoteId = null; // New: Track the currently active note ID
 let isLoading = false;
 let selectedFiles = []; // Files selected for attachment (from the modal list)
 let currentEditingFileId = null;
@@ -21,6 +22,7 @@ const FILES_PLUGIN_ENABLED_KEY = 'filesPluginEnabled'; // New localStorage key f
 const CALENDAR_PLUGIN_ENABLED_KEY = 'calendarPluginEnabled'; // New localStorage key for Calendar plugin
 const WEB_SEARCH_PLUGIN_ENABLED_KEY = 'webSearchPluginEnabled'; // New: localStorage key for Web Search plugin
 const ACTIVE_TAB_KEY = 'activeTab'; // New: localStorage key for active tab
+const CURRENT_NOTE_ID_KEY = 'currentNoteId'; // New: localStorage key for current note ID
 
 
 const MAX_FILE_SIZE_MB = 10;
@@ -221,12 +223,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const notesSection = document.getElementById('notes-section');
     const notesTextarea = document.getElementById('notes-textarea');
     const notesPreview = document.getElementById('notes-preview');
-    const saveNoteButton = document.getElementById('save-note-button');
+    // const saveNoteButton = document.getElementById('save-note-button'); // This button is now in the sidebar
+    const chatSidebarContent = document.getElementById('chat-sidebar-content'); // New: Container for chat sidebar elements
+    const notesSidebarContent = document.getElementById('notes-sidebar-content'); // New: Container for notes sidebar elements
+    const newNoteButton = document.getElementById('new-note-btn'); // New: New Note button
+    const currentNoteNameInput = document.getElementById('current-note-name'); // New: Current Note name input
+    const saveNoteNameButton = document.getElementById('save-note-name-btn'); // New: Save Note Name button (also saves content)
+    const currentNoteIdDisplay = document.getElementById('current-note-id-display'); // New: Current Note ID display
+    const savedNotesList = document.getElementById('saved-notes-list'); // New: Saved Notes list container
+    const modelSelectorContainer = document.getElementById('model-selector-container'); // New: Container for model selector
 
 
     // Application State (Re-declare or ensure access to global state if needed)
     // These are already declared globally, so no need to re-declare with `let` or `const`
     // let currentChatId = null; // Already global
+    // let currentNoteId = null; // Already global
     // let isLoading = false; // Already global
     // let selectedFiles = []; // Already global
     // let currentEditingFileId = null; // Already global
@@ -286,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Chat elements
         messageInput.disabled = loading;
         sendButton.disabled = loading;
-        newChatButton.disabled = loading;
+        // newChatButton.disabled = loading; // Disabled below based on tab
         saveChatNameButton.disabled = loading;
         modelSelector.disabled = loading;
         attachFullButton.disabled = loading;
@@ -298,7 +309,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Notes elements
         notesTextarea.disabled = loading;
-        saveNoteButton.disabled = loading;
+        // saveNoteButton.disabled = loading; // Disabled below based on tab
+        newNoteButton.disabled = loading; // New: Disable New Note button
+        currentNoteNameInput.disabled = loading; // New: Disable Current Note name input
+        saveNoteNameButton.disabled = loading; // New: Disable Save Note Name button
 
 
         // Sidebar/Modal/Settings elements
@@ -311,7 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
         calendarPluginToggle.disabled = loading; // Disable calendar plugin toggle when loading
         webSearchPluginToggle.disabled = loading; // New: Disable web search plugin toggle when loading
 
-        // Navigation buttons
+        // Navigation buttons (in sidebar)
         chatNavButton.disabled = loading;
         notesNavButton.disabled = loading;
 
@@ -336,13 +350,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading);
 
+        // Disable/Enable buttons within the saved chats/notes lists
+        savedChatsList.querySelectorAll('button').forEach(el => el.disabled = loading);
+        savedNotesList.querySelectorAll('button').forEach(el => el.disabled = loading); // New: Disable delete buttons in notes list
+
+
         // Update button text/icons based on current tab and loading state
         if (currentTab === 'chat') {
-             sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send';
-             saveNoteButton.innerHTML = '<i class="fas fa-save mr-1"></i> Save Note'; // Reset notes button if on chat tab
+             sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane"></i> Send';
+             newChatButton.disabled = loading; // Enable/Disable New Chat button
+             newNoteButton.disabled = true; // Disable New Note button when on chat tab
+             saveNoteNameButton.disabled = true; // Disable Save Note Name button when on chat tab
         } else if (currentTab === 'notes') {
-             saveNoteButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-1"></i> ${operation}...` : '<i class="fas fa-save mr-1"></i> Save Note';
-             sendButton.innerHTML = '<i class="fas fa-paper-plane mr-2"></i> Send'; // Reset chat button if on notes tab
+             // saveNoteButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-1"></i> ${operation}...` : '<i class="fas fa-save mr-1"></i> Save Note'; // Button moved
+             sendButton.innerHTML = '<i class="fas fa-paper-plane"></i> Send'; // Reset chat button if on notes tab
+             newChatButton.disabled = true; // Disable New Chat button when on notes tab
+             newNoteButton.disabled = loading; // Enable/Disable New Note button
+             saveNoteNameButton.disabled = loading; // Enable/Disable Save Note Name button
         }
 
 
@@ -1084,7 +1108,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Summary Modal Functions ---
     async function showSummaryModal(fileId, filename) {
-        // Only allow if Files plugin is enabled AND we are on the chat tab
+        if (isLoading) return;
+        // Only show if Files plugin is enabled AND we are on the chat tab
         if (!isFilePluginEnabled) {
             updateStatus("Files plugin is disabled in settings.", true);
             return;
@@ -2101,17 +2126,38 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update button styles
         chatNavButton.classList.remove('active');
         notesNavButton.classList.remove('active');
+
+        // Hide/Show main content sections
         if (tabName === 'chat') {
             chatNavButton.classList.add('active');
             chatSection.classList.remove('hidden');
             notesSection.classList.add('hidden');
-            // Show chat-specific sidebar elements
-            sidebar.classList.remove('hidden'); // Chat sidebar is the main sidebar
-            pluginsSidebar.classList.remove('hidden'); // Plugins sidebar is always visible if not collapsed
-            // Show chat-specific input area elements
-            document.getElementById('input-area').classList.remove('hidden');
-            // Update plugin UI visibility based on enabled state (some elements are chat-only)
-            updatePluginUI();
+            document.getElementById('input-area').classList.remove('hidden'); // Show chat input area
+            modelSelectorContainer.classList.remove('hidden'); // Show model selector
+
+            // Show chat sidebar content, hide notes sidebar content
+            chatSidebarContent.classList.remove('hidden');
+            notesSidebarContent.classList.add('hidden');
+
+            // Ensure chat sidebar is visible if not collapsed
+            sidebar.classList.remove('hidden');
+
+            // Load chat data if not already loaded or if switching back
+            if (currentChatId === null) {
+                 // This case should ideally be handled by initializeApp, but as a fallback
+                 await loadSavedChats();
+                 const firstChatElement = savedChatsList.querySelector('.list-item');
+                 if (firstChatElement) {
+                     await loadChat(parseInt(firstChatElement.dataset.chatId));
+                 } else {
+                     await startNewChat();
+                 }
+            } else {
+                 // If chat is already loaded, just ensure highlighting is correct
+                 updateActiveChatListItem();
+            }
+
+
             // Focus message input
             messageInput.focus();
 
@@ -2119,80 +2165,149 @@ document.addEventListener('DOMContentLoaded', () => {
             notesNavButton.classList.add('active');
             chatSection.classList.add('hidden');
             notesSection.classList.remove('hidden');
-            // Hide chat-specific sidebar elements (or rather, ensure only notes-relevant ones are visible if any)
-            // For now, the main sidebar is chat-specific, so hide it.
-            sidebar.classList.add('hidden');
-            // Plugins sidebar might still be relevant for settings, keep it visible if not collapsed
-            pluginsSidebar.classList.remove('hidden');
-             // Hide chat-specific input area elements
-            document.getElementById('input-area').classList.add('hidden');
-            // Hide chat-specific plugin UI elements (handled by updatePluginUI)
-            updatePluginUI();
-            // Load the note content when switching to the notes tab
-            await loadNote();
+            document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
+            modelSelectorContainer.classList.add('hidden'); // Hide model selector
+
+            // Hide chat sidebar content, show notes sidebar content
+            chatSidebarContent.classList.add('hidden');
+            notesSidebarContent.classList.remove('hidden');
+
+            // Ensure chat sidebar is visible if not collapsed (it contains the notes content now)
+            sidebar.classList.remove('hidden');
+
+
+            // Load notes data
+            await loadSavedNotes(); // Load the list of notes
+            if (currentNoteId === null) {
+                 // If no note is currently selected, load the most recent one or create a new one
+                 const firstNoteElement = savedNotesList.querySelector('.list-item');
+                 if (firstNoteElement) {
+                     await loadNote(parseInt(firstNoteElement.dataset.noteId));
+                 } else {
+                     await startNewNote(); // Create and load a new note
+                 }
+            } else {
+                 // If a note is already selected, load its content
+                 await loadNote(currentNoteId);
+            }
+
+
             // Focus notes textarea
             notesTextarea.focus();
         }
 
+        // Update plugin UI visibility based on enabled state (some elements are chat-only)
+        updatePluginUI();
+
         // Ensure sidebars are positioned correctly after tab switch
-        // This might require re-applying collapsed classes or triggering a resize event
-        // For now, just ensure the body classes are correct
         setSidebarCollapsed(sidebar, sidebarToggleButton, bodyElement.classList.contains('sidebar-collapsed'), SIDEBAR_COLLAPSED_KEY, 'sidebar');
         setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, bodyElement.classList.contains('plugins-collapsed'), PLUGINS_COLLAPSED_KEY, 'plugins');
 
         updateStatus(`Switched to ${tabName} section.`);
     }
 
-    // --- Notes Feature Functions ---
+    // --- Notes Feature Functions (MODIFIED for multiple notes) ---
 
-    /** Loads the note content from the backend and displays it. */
-    async function loadNote() {
+    /** Creates a new note entry and loads it. */
+    async function startNewNote() {
         if (isLoading) return;
-        setLoadingState(true, "Loading Note");
-        updateStatus("Loading note...");
-        notesTextarea.value = ""; // Clear textarea while loading
-        notesPreview.innerHTML = ""; // Clear preview while loading
-        notesTextarea.placeholder = "Loading note...";
+        setLoadingState(true, "Creating Note");
+        updateStatus("Creating new note...");
+        notesTextarea.value = ""; // Clear textarea while creating
+        notesPreview.innerHTML = ""; // Clear preview while creating
+        currentNoteNameInput.value = "New Note"; // Set default name
+        currentNoteIdDisplay.textContent = "ID: -"; // Clear ID display
+        notesTextarea.placeholder = "Creating new note...";
 
         try {
-            const response = await fetch('/api/note');
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-            const noteContent = data.content || ''; // Use empty string if content is null/undefined
-            notesTextarea.value = noteContent;
-            // Trigger markdown preview update manually after loading
-            updateNotesPreview();
-            notesTextarea.placeholder = "Start typing your markdown notes here...";
-            updateStatus("Note loaded.");
+            const response = await fetch('/api/notes', { // POST to /api/notes
+                method: 'POST'
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const newNote = await response.json(); // Expect the new note details back
+            await loadNote(newNote.id); // Load the newly created note
+            await loadSavedNotes(); // Reload the list in the sidebar
+            updateStatus(`New note created (ID: ${newNote.id}).`);
+            // No need to toggle sidebar collapse here, it's handled by switchTab
         } catch (error) {
-            console.error('Error loading note:', error);
-            notesTextarea.value = `[Error loading note: ${error.message}]`;
-            notesPreview.innerHTML = `<p class="text-red-500">Error loading note: ${escapeHtml(error.message)}</p>`;
-            notesTextarea.placeholder = "Could not load note.";
-            updateStatus("Error loading note.", true);
+            console.error('Error starting new note:', error);
+            notesTextarea.value = `[Error creating new note: ${error.message}]`;
+            notesPreview.innerHTML = `<p class="text-red-500">Error creating new note: ${escapeHtml(error.message)}</p>`;
+            notesTextarea.placeholder = "Could not create note.";
+            updateStatus("Error creating new note.", true);
         } finally {
             setLoadingState(false);
         }
     }
 
-    /** Saves the current note content to the backend. */
-    async function saveNote() {
-        if (isLoading) return;
-        setLoadingState(true, "Saving Note");
-        updateStatus("Saving note...");
 
+    /** Loads the note content from the backend and displays it. */
+    async function loadNote(noteId) {
+        if (isLoading) return;
+        if (noteId === currentNoteId) {
+             console.log(`[DEBUG] loadNote(${noteId}) called, but it's already the current note.`);
+             return; // Avoid reloading if already on this note
+        }
+        setLoadingState(true, "Loading Note");
+        updateStatus(`Loading note ${noteId}...`);
+        notesTextarea.value = ""; // Clear textarea while loading
+        notesPreview.innerHTML = ""; // Clear preview while loading
+        currentNoteNameInput.value = ""; // Clear name while loading
+        currentNoteIdDisplay.textContent = `ID: ${noteId}`; // Show ID while loading
+        notesTextarea.placeholder = "Loading note...";
+
+        try {
+            const response = await fetch(`/api/note/${noteId}`); // GET /api/note/<id>
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json(); // Expect note details {id, name, content, last_saved_at}
+            currentNoteId = data.id; // Set current note ID
+            currentNoteNameInput.value = data.name || ''; // Populate name input
+            notesTextarea.value = data.content || ''; // Populate content textarea
+            // Trigger markdown preview update manually after loading
+            updateNotesPreview();
+            notesTextarea.placeholder = "Start typing your markdown notes here...";
+            updateStatus(`Note ${noteId} loaded.`);
+            updateActiveNoteListItem(); // Highlight the loaded note in the list
+            localStorage.setItem(CURRENT_NOTE_ID_KEY, noteId); // Persist current note ID
+
+        } catch (error) {
+            console.error(`Error loading note ${noteId}:`, error);
+            notesTextarea.value = `[Error loading note ${noteId}: ${error.message}]`;
+            notesPreview.innerHTML = `<p class="text-red-500">Error loading note: ${escapeHtml(error.message)}</p>`;
+            notesTextarea.placeholder = "Could not load note.";
+            updateStatus(`Error loading note ${noteId}.`, true);
+            currentNoteId = null; // Clear current note state on error
+            currentNoteNameInput.value = '';
+            currentNoteIdDisplay.textContent = 'ID: -';
+            updateActiveNoteListItem(); // Remove highlight
+            localStorage.removeItem(CURRENT_NOTE_ID_KEY); // Clear persisted ID
+        } finally {
+            setLoadingState(false);
+        }
+    }
+
+    /** Saves the current note content and name to the backend. */
+    async function saveNote() {
+        if (isLoading || !currentNoteId) {
+             updateStatus("Cannot save note: No active note selected.", true);
+             return;
+        }
+        setLoadingState(true, "Saving Note");
+        updateStatus(`Saving note ${currentNoteId}...`);
+
+        const noteName = currentNoteNameInput.value.trim();
         const noteContent = notesTextarea.value;
 
         try {
-            const response = await fetch('/api/note', {
+            const response = await fetch(`/api/note/${currentNoteId}`, { // PUT /api/note/<id>
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ content: noteContent })
+                body: JSON.stringify({ name: noteName, content: noteContent })
             });
 
             if (!response.ok) {
@@ -2200,15 +2315,162 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
             }
 
-            updateStatus("Note saved successfully.");
+            updateStatus(`Note ${currentNoteId} saved successfully.`);
+            await loadSavedNotes(); // Reload the list to update timestamp/name
+            updateActiveNoteListItem(); // Ensure highlighting remains correct
 
         } catch (error) {
-            console.error('Error saving note:', error);
+            console.error(`Error saving note ${currentNoteId}:`, error);
             updateStatus(`Error saving note: ${error.message}`, true);
         } finally {
             setLoadingState(false);
         }
     }
+
+    /** Loads all saved notes and populates the list in the sidebar. */
+    async function loadSavedNotes() {
+        updateStatus("Loading saved notes...");
+        console.log("[DEBUG] loadSavedNotes called.");
+        try {
+            const response = await fetch('/api/notes'); // GET /api/notes
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const notes = await response.json();
+            savedNotesList.innerHTML = ''; // Clear current list
+
+            if (notes.length === 0) {
+                savedNotesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved notes yet.</p>`;
+            } else {
+                notes.forEach(note => {
+                    const listItem = document.createElement('div');
+                    listItem.classList.add('list-item', 'note-list-item'); // Add note-list-item class
+                    listItem.dataset.noteId = note.id;
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = note.name || `Note ${note.id}`;
+                    nameSpan.classList.add('filename');
+                    nameSpan.title = note.name || `Note ${note.id}`;
+
+                    const timestampElement = document.createElement('div');
+                    const date = new Date(note.last_saved_at);
+                    const formattedDate = date.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit'
+                    });
+                    timestampElement.textContent = `Last saved: ${formattedDate}`;
+                    timestampElement.classList.add('text-xs', 'text-rz-tab-background-text', 'mt-0.5');
+
+                    const deleteButton = document.createElement('button');
+                    deleteButton.classList.add('delete-btn');
+                    deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>';
+                    deleteButton.title = "Delete Note";
+                    deleteButton.onclick = (e) => {
+                        e.stopPropagation();
+                        handleDeleteNote(note.id, listItem);
+                    };
+
+                    const nameContainer = document.createElement('div');
+                    nameContainer.classList.add('name-container');
+                    nameContainer.appendChild(nameSpan);
+                    nameContainer.appendChild(deleteButton);
+
+                    listItem.appendChild(nameContainer);
+                    listItem.appendChild(timestampElement);
+
+                    listItem.onclick = () => {
+                        if (note.id != currentNoteId) {
+                            loadNote(note.id); // Load this note when clicked
+                        }
+                    };
+                    savedNotesList.appendChild(listItem);
+                });
+            }
+            updateActiveNoteListItem(); // Highlight the currently loaded note
+            updateStatus("Saved notes loaded.");
+            console.log("[DEBUG] loadSavedNotes finished successfully.");
+        } catch (error) {
+            console.error('Error loading saved notes:', error);
+            savedNotesList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading notes.</p>';
+            updateStatus("Error loading saved notes.", true);
+            console.log("[DEBUG] loadSavedNotes caught an error.");
+            throw error;
+        }
+    }
+
+    /** Deletes a specific note. */
+    async function handleDeleteNote(noteId, listItemElement) {
+        if (isLoading) return;
+        const noteName = listItemElement.querySelector('span.filename').textContent || `Note ${noteId}`;
+        if (!confirm(`Are you sure you want to delete "${noteName}"? This cannot be undone.`)) {
+            return;
+        }
+        setLoadingState(true, "Deleting Note");
+        updateStatus(`Deleting note ${noteId}...`);
+        try {
+            const response = await fetch(`/api/note/${noteId}`, { // DELETE /api/note/<id>
+                method: 'DELETE'
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            updateStatus(`Note ${noteId} deleted.`);
+            listItemElement.remove(); // Remove from UI list
+
+            // If the deleted note was the currently active one, start a new note
+            if (noteId == currentNoteId) {
+                currentNoteId = null; // Clear current note state
+                localStorage.removeItem(CURRENT_NOTE_ID_KEY); // Clear persisted ID
+                // Check if there are any notes left. If so, load the most recent. If not, create a new one.
+                await loadSavedNotes(); // Reload the list first
+                const firstNoteElement = savedNotesList.querySelector('.list-item');
+                 if (firstNoteElement) {
+                     await loadNote(parseInt(firstNoteElement.dataset.noteId));
+                 } else {
+                     await startNewNote(); // Create and load a new note
+                 }
+            } else {
+                 // If a different note was deleted, just reload the list to be safe
+                 await loadSavedNotes();
+            }
+
+        } catch (error) {
+            console.error(`Error deleting note ${noteId}:`, error);
+            updateStatus(`Error deleting note: ${error.message}`, true);
+            // Optionally display error in the notes area if it was the current note
+            if (noteId == currentNoteId) {
+                 notesTextarea.value = `[Error deleting note ${noteId}: ${error.message}]`;
+                 notesPreview.innerHTML = `<p class="text-red-500">Error deleting note: ${escapeHtml(error.message)}</p>`;
+            }
+        } finally {
+            setLoadingState(false);
+        }
+    }
+
+    /** Updates the highlighting of the active note in the sidebar list. */
+    function updateActiveNoteListItem() {
+        console.log(`[DEBUG] updateActiveNoteListItem called. currentNoteId: ${currentNoteId}`);
+        const noteListItems = document.querySelectorAll('.note-list-item');
+        console.log(`[DEBUG] Found ${noteListItems.length} note list items.`);
+
+        noteListItems.forEach(item => {
+            const noteId = parseInt(item.dataset.noteId);
+            const timestampElement = item.querySelector('.text-xs');
+
+            if (noteId === currentNoteId) {
+                console.log(`[DEBUG] Highlighting note item ${noteId}`);
+                item.classList.add('active');
+                timestampElement.classList.remove('text-rz-tab-background-text');
+                timestampElement.classList.add('text-rz-sidebar-text');
+            } else {
+                console.log(`[DEBUG] Deactivating note item ${noteId}`);
+                item.classList.remove('active');
+                timestampElement.classList.remove('text-rz-sidebar-text');
+                timestampElement.classList.add('text-rz-tab-background-text');
+            }
+        });
+        console.log(`[DEBUG] updateActiveNoteListItem finished.`);
+    }
+
 
     /** Updates the markdown preview area based on the textarea content. */
     function updateNotesPreview() {
@@ -2309,7 +2571,9 @@ document.addEventListener('DOMContentLoaded', () => {
     chatNavButton.addEventListener('click', () => switchTab('chat'));
     notesNavButton.addEventListener('click', () => switchTab('notes'));
     notesTextarea.addEventListener('input', updateNotesPreview); // Real-time markdown preview
-    saveNoteButton.addEventListener('click', saveNote);
+    // saveNoteButton.addEventListener('click', saveNote); // Button moved
+    newNoteButton.addEventListener('click', startNewNote); // New: Listener for New Note button
+    saveNoteNameButton.addEventListener('click', saveNote); // New: Save button in notes sidebar now saves the current note
 
 
     // --- Initial Application Load (MUST be inside DOMContentLoaded) ---
@@ -2380,6 +2644,11 @@ document.addEventListener('DOMContentLoaded', () => {
             currentTab = (storedTab === 'chat' || storedTab === 'notes') ? storedTab : 'chat';
             console.log(`[DEBUG] Active tab loaded: ${currentTab}.`); // Added log
 
+            // Load persisted current note ID (default to null)
+            const persistedNoteId = localStorage.getItem(CURRENT_NOTE_ID_KEY);
+            currentNoteId = persistedNoteId ? parseInt(persistedNoteId) : null;
+            console.log(`[DEBUG] Persisted currentNoteId loaded: ${currentNoteId}.`);
+
 
             // Load data based on the initial tab
             if (currentTab === 'chat') {
@@ -2416,13 +2685,38 @@ document.addEventListener('DOMContentLoaded', () => {
                  chatNavButton.classList.add('active');
                  notesNavButton.classList.remove('active');
                  document.getElementById('input-area').classList.remove('hidden');
+                 modelSelectorContainer.classList.remove('hidden'); // Show model selector
+                 chatSidebarContent.classList.remove('hidden'); // Show chat sidebar content
+                 notesSidebarContent.classList.add('hidden'); // Hide notes sidebar content
                  sidebar.classList.remove('hidden'); // Ensure chat sidebar is visible
 
             } else if (currentTab === 'notes') {
                  console.log("[DEBUG] Initializing Notes tab.");
-                 // Load the note content
-                 await loadNote(); // This will now re-throw if it fails
-                 console.log("[DEBUG] loadNote completed.");
+                 // Load notes data
+                 await loadSavedNotes(); // Load the list of notes
+                 console.log("[DEBUG] loadSavedNotes completed.");
+
+                 if (currentNoteId !== null) {
+                     console.log(`[DEBUG] Loading persisted note: ${currentNoteId}`);
+                     await loadNote(currentNoteId); // Load the persisted note
+                     console.log(`[DEBUG] loadNote(${currentNoteId}) completed.`);
+                 } else {
+                     console.log("[DEBUG] No persisted note found, loading most recent or creating new.");
+                     const firstNoteElement = savedNotesList.querySelector('.list-item');
+                     if (firstNoteElement) {
+                         const mostRecentNoteId = parseInt(firstNoteElement.dataset.noteId);
+                         console.log(`[DEBUG] Loading most recent note: ${mostRecentNoteId}`);
+                         await loadNote(mostRecentNoteId); // Load the most recent note
+                         console.log(`[DEBUG] loadNote(${mostRecentNoteId}) completed.`);
+                     } else {
+                         console.log("[DEBUG] No saved notes found, starting new note.");
+                         await startNewNote(); // Create and load a new note
+                         console.log("[DEBUG] startNewNote completed.");
+                     }
+                 }
+                 // After loadNote/startNewNote completes, currentNoteId should be set
+                 console.log(`[DEBUG] initializeApp finished notes loading. Final currentNoteId: ${currentNoteId}`);
+
 
                  // Ensure notes section is visible and chat is hidden
                  chatSection.classList.add('hidden');
@@ -2430,7 +2724,10 @@ document.addEventListener('DOMContentLoaded', () => {
                  chatNavButton.classList.remove('active');
                  notesNavButton.classList.add('active');
                  document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
-                 sidebar.classList.add('hidden'); // Hide chat sidebar
+                 modelSelectorContainer.classList.add('hidden'); // Hide model selector
+                 chatSidebarContent.classList.add('hidden'); // Hide chat sidebar content
+                 notesSidebarContent.classList.remove('hidden'); // Show notes sidebar content
+                 sidebar.classList.remove('hidden'); // Ensure chat sidebar is visible
 
                  // Note: Plugins sidebar remains visible if not collapsed, its content visibility is handled by updatePluginUI
             }

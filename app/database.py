@@ -88,15 +88,17 @@ def get_db():
                             CREATE INDEX IF NOT EXISTS idx_files_filename ON files (filename);
                             CREATE INDEX IF NOT EXISTS idx_files_uploaded_at ON files (uploaded_at DESC); -- Added index
 
-                            -- Create the notes table
+                            -- Create the notes table (for multiple notes)
                             CREATE TABLE IF NOT EXISTS notes (
-                                id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1), -- Enforce single row with ID 1
+                                id INTEGER PRIMARY KEY AUTOINCREMENT, -- Allow multiple notes
+                                name TEXT NOT NULL DEFAULT 'New Note', -- Add name field
                                 content TEXT NOT NULL DEFAULT '',
+                                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                                 last_saved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
                             );
+                            CREATE INDEX IF NOT EXISTS idx_notes_last_saved ON notes (last_saved_at DESC); -- Add index for ordering
 
-                            -- Insert the initial single row for notes if it doesn't exist
-                            INSERT OR IGNORE INTO notes (id, content, last_saved_at) VALUES (1, '', CURRENT_TIMESTAMP);
+                            -- No initial insert needed for multiple notes
                         '''
                         cursor.executescript(schema_sql)
 
@@ -193,20 +195,20 @@ def init_db():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_files_uploaded_at ON files (uploaded_at DESC)') # Added IF NOT EXISTS
         logger.info("Created 'files' table and indexes.")
 
-        # Create the notes table - Added IF NOT EXISTS
+        # Create the notes table (for multiple notes) - Added IF NOT EXISTS
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS notes (
-                id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1), -- Enforce single row with ID 1
+                id INTEGER PRIMARY KEY AUTOINCREMENT, -- Allow multiple notes
+                name TEXT NOT NULL DEFAULT 'New Note', -- Add name field
                 content TEXT NOT NULL DEFAULT '',
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 last_saved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        logger.info("Created 'notes' table.")
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_notes_last_saved ON notes (last_saved_at DESC)') # Add index for ordering
+        logger.info("Created 'notes' table and index.")
 
-        # Insert the initial single row for notes if it doesn't exist
-        cursor.execute("INSERT OR IGNORE INTO notes (id, content, last_saved_at) VALUES (1, '', CURRENT_TIMESTAMP)")
-        logger.info("Ensured initial row exists in 'notes' table.")
-
+        # No initial insert needed for multiple notes
 
         db.commit()
         logger.info("Database schema initialized successfully.")
@@ -469,37 +471,88 @@ def delete_file_record_from_db(file_id):
         logger.error(f"Database error deleting file record {file_id}: {e}", exc_info=True)
         return False # Indicate failure
 
-# Notes
-def save_note_to_db(content):
-    """Saves or updates the single note entry."""
+# Notes (Modified for multiple notes)
+def create_new_note_entry():
+    """Creates a new note entry with a default name based on current time."""
+    db = get_db()
+    cursor = db.cursor()
+    now = datetime.now()
+    # Format: Fri Apr 18, 03:27 PM (example)
+    formatted_time = now.strftime("%a %b %d, %I:%M %p")
+    default_note_name = f"Note on {formatted_time}"
+
+    try:
+        logger.info(f"Attempting to create new note entry...")
+        cursor.execute("INSERT INTO notes (name, content, created_at, last_saved_at) VALUES (?, ?, ?, ?)",
+                       (default_note_name, '', now, now))
+        new_note_id = cursor.lastrowid
+        db.commit()
+        logger.info(f"Successfully created new note with ID: {new_note_id}, Name: '{default_note_name}'")
+        return new_note_id
+    except sqlite3.Error as e:
+        logger.error(f"Database error creating new note entry: {e}", exc_info=True)
+        return None # Indicate failure
+
+def get_saved_notes_from_db():
+    """Retrieves a list of all notes, ordered by last saved."""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT id, name, last_saved_at FROM notes ORDER BY last_saved_at DESC")
+        notes = cursor.fetchall()
+        return [dict(row) for row in notes]
+    except sqlite3.Error as e:
+        logger.error(f"Database error getting saved notes: {e}", exc_info=True)
+        return []
+
+def get_note_from_db(note_id):
+    """Retrieves the content and details of a specific note by ID."""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        logger.info(f"Attempting to retrieve note content for ID: {note_id}...")
+        cursor.execute("SELECT id, name, content, last_saved_at FROM notes WHERE id = ?", (note_id,))
+        result = cursor.fetchone()
+        content = dict(result) if result else None
+        logger.info(f"Successfully retrieved note content for ID: {note_id}.")
+        return content
+    except sqlite3.Error as e:
+        logger.error(f"Database error getting note {note_id}: {e}", exc_info=True)
+        return None # Indicate failure
+
+def save_note_to_db(note_id, name, content):
+    """Saves or updates a specific note entry by ID."""
     try:
         db = get_db()
         cursor = db.cursor()
         now = datetime.now()
-        logger.info("Attempting to save note content...")
-        # Use INSERT OR REPLACE to handle both initial insert and subsequent updates
-        cursor.execute("INSERT OR REPLACE INTO notes (id, content, last_saved_at) VALUES (1, ?, ?)",
-                       (content, now))
+        # Ensure name is not empty, fallback if necessary
+        effective_name = name.strip() if name and name.strip() else f"Note {note_id}" # Fallback if empty
+        logger.info(f"Attempting to save note content for ID: {note_id} (name: '{effective_name}')...")
+        cursor.execute("UPDATE notes SET name = ?, content = ?, last_saved_at = ? WHERE id = ?",
+                       (effective_name, content, now, note_id))
         db.commit()
-        logger.info("Successfully saved note content.")
+        logger.info(f"Successfully saved note content for ID: {note_id}.")
         return True
     except sqlite3.Error as e:
-        logger.error(f"Database error saving note: {e}", exc_info=True)
+        logger.error(f"Database error saving note {note_id}: {e}", exc_info=True)
         return False # Indicate failure
 
-def get_note_from_db():
-    """Retrieves the content of the single note entry."""
+def delete_note_from_db(note_id):
+    """Deletes a note entry by ID."""
     try:
         db = get_db()
         cursor = db.cursor()
-        logger.info("Attempting to retrieve note content...")
-        # Select the single row with ID 1
-        cursor.execute("SELECT content FROM notes WHERE id = 1")
-        result = cursor.fetchone()
-        # Return content if row exists, otherwise return empty string
-        content = result['content'] if result and result['content'] is not None else ''
-        logger.info("Successfully retrieved note content.")
-        return content
+        logger.info(f"Attempting to delete note with ID: {note_id}...")
+        cursor.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+        deleted_count = cursor.rowcount # Check how many rows were affected
+        db.commit()
+        if deleted_count > 0:
+            logger.info(f"Successfully deleted note with ID: {note_id}")
+            return True
+        else:
+            logger.warning(f"No note record found with ID: {note_id} to delete.")
+            return False # Indicate note not found
     except sqlite3.Error as e:
-        logger.error(f"Database error getting note: {e}", exc_info=True)
-        return None # Indicate failure
+        logger.error(f"Database error deleting note {note_id}: {e}", exc_info=True)
+        return False # Indicate failure

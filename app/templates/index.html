@@ -22,48 +22,77 @@
     </button>
 
     <aside id="sidebar">
-        <h2 class="text-xl font-semibold mb-4 whitespace-nowrap">roz.ai</h2>
-        <button id="new-chat-btn" class="btn btn-primary w-full mb-4 flex-shrink-0">
-            <i class="fas fa-plus"></i> New Chat
-        </button>
-        <div class="mb-4 p-3 bg-rz-frame rounded-lg border border-rz-sidebar-border shadow-sm flex-shrink-0">
-            <label for="current-chat-name" class="block text-sm font-medium text-rz-sidebar-text mb-1 whitespace-nowrap">Current Chat:</label>
-            <div class="flex gap-2 items-center">
-                 <input type="text" id="current-chat-name" class="chat-name-input flex-grow text-sm min-w-0" placeholder="Name this chat...">
-                 <button id="save-chat-name-btn" class="btn btn-outline p-1.5 flex-shrink-0" title="Save Name">
-                     <i class="fas fa-save text-sm"></i>
-                 </button>
-            </div>
-            <div id="current-chat-id-display" class="text-xs text-rz-tab-background-text mt-1 whitespace-nowrap">ID: -</div>
-        </div>
-        <div class="flex flex-col min-h-0 flex-grow sidebar-section-container">
-            <h3 class="text-lg font-medium mb-1 border-t border-rz-sidebar-border pt-3 flex-shrink-0 whitespace-nowrap">Saved Chats</h3>
-            <div id="saved-chats-list" class="sidebar-list">
-                <p class="text-rz-sidebar-text opacity-75 text-sm p-1">Loading chats...</p>
+        <!-- Moved button group here -->
+        <div class="flex items-center justify-between mb-4 whitespace-nowrap">
+             <h2 class="text-xl font-semibold">roz.ai</h2>
+             <div class="inline-flex rounded-md shadow-sm" role="group">
+                <button type="button" id="chat-nav-btn" class="px-3 py-1 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-l-md hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-blue-500 dark:focus:text-white active">
+                  Chat
+                </button>
+                <button type="button" id="notes-nav-btn" class="px-3 py-1 text-xs font-medium text-gray-900 bg-white border border-gray-200 rounded-r-md hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-blue-500 dark:focus:text-white">
+                  Notes
+                </button>
             </div>
         </div>
+        <!-- End button group -->
+
+        <!-- Chat Sidebar Content -->
+        <div id="chat-sidebar-content">
+            <button id="new-chat-btn" class="btn btn-primary w-full mb-4 flex-shrink-0">
+                <i class="fas fa-plus"></i> New Chat
+            </button>
+            <div class="mb-4 p-3 bg-rz-frame rounded-lg border border-rz-sidebar-border shadow-sm flex-shrink-0">
+                <label for="current-chat-name" class="block text-sm font-medium text-rz-sidebar-text mb-1 whitespace-nowrap">Current Chat:</label>
+                <div class="flex gap-2 items-center">
+                     <input type="text" id="current-chat-name" class="chat-name-input flex-grow text-sm min-w-0" placeholder="Name this chat...">
+                     <button id="save-chat-name-btn" class="btn btn-outline p-1.5 flex-shrink-0" title="Save Name">
+                         <i class="fas fa-save text-sm"></i>
+                     </button>
+                </div>
+                <div id="current-chat-id-display" class="text-xs text-rz-tab-background-text mt-1 whitespace-nowrap">ID: -</div>
+            </div>
+            <div class="flex flex-col min-h-0 flex-grow sidebar-section-container">
+                <h3 class="text-lg font-medium mb-1 border-t border-rz-sidebar-border pt-3 flex-shrink-0 whitespace-nowrap">Saved Chats</h3>
+                <div id="saved-chats-list" class="sidebar-list">
+                    <p class="text-rz-sidebar-text opacity-75 text-sm p-1">Loading chats...</p>
+                </div>
+            </div>
+        </div>
+        <!-- End Chat Sidebar Content -->
+
+        <!-- Notes Sidebar Content (Initially Hidden) -->
+        <div id="notes-sidebar-content" class="hidden">
+             <button id="new-note-btn" class="btn btn-primary w-full mb-4 flex-shrink-0">
+                <i class="fas fa-plus"></i> New Note
+            </button>
+            <div class="mb-4 p-3 bg-rz-frame rounded-lg border border-rz-sidebar-border shadow-sm flex-shrink-0">
+                <label for="current-note-name" class="block text-sm font-medium text-rz-sidebar-text mb-1 whitespace-nowrap">Current Note:</label>
+                <div class="flex gap-2 items-center">
+                     <input type="text" id="current-note-name" class="note-name-input flex-grow text-sm min-w-0" placeholder="Name this note...">
+                     <button id="save-note-name-btn" class="btn btn-outline p-1.5 flex-shrink-0" title="Save Name">
+                         <i class="fas fa-save text-sm"></i>
+                     </button>
+                </div>
+                 <div id="current-note-id-display" class="text-xs text-rz-tab-background-text mt-1 whitespace-nowrap">ID: -</div>
+            </div>
+            <div class="flex flex-col min-h-0 flex-grow sidebar-section-container">
+                <h3 class="text-lg font-medium mb-1 border-t border-rz-sidebar-border pt-3 flex-shrink-0 whitespace-nowrap">Saved Notes</h3>
+                <div id="saved-notes-list" class="sidebar-list">
+                    <p class="text-rz-sidebar-text opacity-75 text-sm p-1">Loading notes...</p>
+                </div>
+            </div>
+        </div>
+        <!-- End Notes Sidebar Content -->
+
     </aside>
 
     <main id="main-content">
-        <!-- Header with Nav Buttons and Model Selector -->
+        <!-- Header - Removed roz.ai h1 -->
         <header class="bg-rz-header text-white p-4 flex justify-between items-center flex-wrap flex-shrink-0">
+            <!-- Removed h1 "roz.ai" -->
             <div class="flex items-center">
-                <!-- Add the button group here -->
-                <div class="inline-flex rounded-md shadow-sm mr-4" role="group">
-                    <button type="button" id="chat-nav-btn" class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-l-md hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-blue-500 dark:focus:text-white active">
-                      Chat
-                    </button>
-                    <button type="button" id="notes-nav-btn" class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-r-md hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-blue-500 dark:focus:text-white">
-                      Notes
-                    </button>
-                </div>
-                <!-- Keep the h1 -->
-                <h1 class="text-xl font-bold">roz.ai</h1>
-            </div>
-            <!-- Keep the rest of the header content (settings, plugins toggles) -->
-            <div class="flex items-center space-x-4">
-                <!-- Model Selector -->
-                <div class="flex items-center gap-2">
+                 <!-- Model Selector - Moved here -->
+                <div id="model-selector-container" class="flex items-center gap-2 mr-4">
                     <label for="model-selector" class="text-sm font-medium text-rz-header-text">Model:</label>
                     <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line">
                         {% for model in available_models %}
@@ -71,6 +100,10 @@
                         {% endfor %}
                     </select>
                 </div>
+                <!-- End Model Selector -->
+            </div>
+            <!-- Keep the rest of the header content (settings, plugins toggles) -->
+            <div class="flex items-center space-x-4">
                 <!-- Settings Button - Now in plugins sidebar header -->
                 <!-- <button id="settings-btn" class="p-1 rounded text-white hover:bg-gray-700" title="Settings">
                     <i class="fas fa-cog"></i>
@@ -142,12 +175,12 @@
                     </div>
                 </div>
             </div>
-            <!-- Save Button -->
-            <div class="mt-4 flex justify-end flex-shrink-0">
+            <!-- Save Button - Moved to sidebar, but keeping this one for now if needed -->
+            <!-- <div class="mt-4 flex justify-end flex-shrink-0">
                 <button id="save-note-button" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-700 dark:hover:bg-blue-800">
                     Save Note
                 </button>
-            </div>
+            </div> -->
         </div>
         <!-- End Notes Section -->
 
