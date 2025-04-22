@@ -840,6 +840,11 @@
     color: var(--rz-sidebar-active-text); /* Active color for timestamp */
 }
 
+/* Style for the trash can icon when active */
+.list-item.active .delete-btn.active-trash {
+    color: var(--rz-sidebar-active-text); /* Active color for trash can */
+}
+
 /* Status Bar Theming */
  #status-bar {
      background-color: var(--rz-status-bar-bg);

@@ -365,7 +365,11 @@ export function updateActiveChatListItem() {
                 timestampDiv.classList.add('text-rz-sidebar-text', 'active-timestamp');
                 timestampDiv.classList.remove('text-rz-tab-background-text');
             }
-            // Filename color is handled by CSS rule .list-item .filename (inherits from parent)
+            // Trash can icon should also change color when selected
+            const deleteButton = item.querySelector('.delete-btn');
+            if (deleteButton) {
+                deleteButton.classList.add('active-trash');
+            }
         } else {
             item.classList.remove('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
@@ -375,7 +379,11 @@ export function updateActiveChatListItem() {
                 timestampDiv.classList.remove('text-rz-sidebar-text', 'active-timestamp');
                 timestampDiv.classList.add('text-rz-tab-background-text');
             }
-            // Filename color is handled by CSS rule .list-item .filename (inherits from parent)
+            // Trash can icon should revert to default color when not selected
+            const deleteButton = item.querySelector('.delete-btn');
+            if (deleteButton) {
+                deleteButton.classList.remove('active-trash');
+            }
         }
     });
 }
@@ -517,7 +525,11 @@ export function updateActiveNoteListItem() {
                 timestampDiv.classList.add('text-rz-sidebar-text', 'active-timestamp');
                 timestampDiv.classList.remove('text-rz-tab-background-text');
             }
-             // Filename color is handled by CSS rule .list-item .filename (inherits from parent)
+             // Trash can icon should also change color when selected
+            const deleteButton = item.querySelector('.delete-btn');
+            if (deleteButton) {
+                deleteButton.classList.add('active-trash');
+            }
         } else {
             item.classList.remove('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
@@ -527,7 +539,11 @@ export function updateActiveNoteListItem() {
                 timestampDiv.classList.remove('text-rz-sidebar-text', 'active-timestamp');
                 timestampDiv.classList.add('text-rz-tab-background-text');
             }
-            // Filename color is handled by CSS rule .list-item .filename (inherits from parent)
+            // Trash can icon should revert to default color when not selected
+            const deleteButton = item.querySelector('.delete-btn');
+            if (deleteButton) {
+                deleteButton.classList.remove('active-trash');
+            }
         }
     });
 }
