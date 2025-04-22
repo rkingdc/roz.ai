@@ -867,6 +867,8 @@ export function renderSessionFileTag() {
  * @returns {boolean} True if the modal was shown, false otherwise.
  */
 export function showModal(modalElement, requiredPlugin = null, requiredTab = null) {
+    console.log(`[DEBUG] showModal called for element:`, modalElement, `Required Plugin: ${requiredPlugin}`, `Required Tab: ${requiredTab}`);
+
     if (!modalElement) {
         console.error("Modal element not found.");
         return false;
@@ -879,18 +881,25 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
         if (requiredPlugin === 'calendar' && state.isCalendarPluginEnabled) pluginEnabled = true;
         // Add checks for other plugins here
         if (!pluginEnabled) {
+            console.log(`[DEBUG] showModal: Required plugin "${requiredPlugin}" not enabled.`);
             updateStatus(`${requiredPlugin.charAt(0).toUpperCase() + requiredPlugin.slice(1)} plugin is not enabled.`, true);
             return false;
         }
+         console.log(`[DEBUG] showModal: Required plugin "${requiredPlugin}" is enabled.`);
     }
 
     // Check if required tab is active
     if (requiredTab && state.currentTab !== requiredTab) {
+         console.log(`[DEBUG] showModal: Required tab "${requiredTab}" not active. Current tab: ${state.currentTab}`);
          updateStatus(`This action is only available on the ${requiredTab.charAt(0).toUpperCase() + requiredTab.slice(1)} tab.`, true);
          return false;
     }
+     if (requiredTab) {
+         console.log(`[DEBUG] showModal: Required tab "${requiredTab}" is active.`);
+     }
 
 
+    console.log(`[DEBUG] showModal: Checks passed. Adding 'show' class to modal.`);
     modalElement.classList.add('show');
     elements.bodyElement?.classList.add('modal-open'); // Prevent body scroll
     return true;
