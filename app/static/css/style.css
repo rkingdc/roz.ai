@@ -716,6 +716,20 @@
 /* Tailwind's default prose-invert handles this, but if you have custom prose styles,
    make sure they work in dark mode. */
 
+/* --- Apply basic prose styles within the notes-preview --- */
+#notes-preview .prose {
+    color: var(--rz-popup-text); /* Default text color */
+}
+
+#notes-preview .prose a {
+    color: var(--rz-toolbar-text); /* Link color */
+    text-decoration: none; /* Remove underline */
+}
+
+#notes-preview .prose a:hover {
+    text-decoration: underline; /* Underline on hover */
+}
+
 /* --- Fallback Markdown Styling for Notes Preview --- */
 /* These styles are added to ensure basic markdown elements are visible and structured
    in the #notes-preview area, in case the 'prose' class is not fully effective
@@ -738,6 +752,7 @@
 #notes-preview h4 { font-size: 1.1em; } /* Slightly larger font for H4 */
 /* H5 and H6 might just need bolding and margin */
 
+#notes-preview .prose p,
 #notes-preview p {
     margin-bottom: 1em; /* Add space below paragraphs */
     line-height: 1.6; /* Improve readability */
@@ -758,6 +773,7 @@
     list-style-type: decimal; /* Use numbers for ordered lists */
 }
 
+#notes-preview .prose li,
 #notes-preview li {
     margin-bottom: 0.5em; /* Add space between list items */
 }
