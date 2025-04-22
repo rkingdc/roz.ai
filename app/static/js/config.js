@@ -21,15 +21,8 @@ export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 // export const textDecoder = new TextDecoder();
 
 // Marked.js Renderer Configuration (can be done in app.js or ui.js)
-// Helper function for basic HTML escaping within code
-function escapeHtml(html) {
-    // Ensure input is a string
-    const strHtml = String(html);
-    return strHtml
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-}
+// Import escapeHtml from utils.js
+import { escapeHtml } from './utils.js';
 
 // Create a custom renderer
 export const markedRenderer = new marked.Renderer();
@@ -42,7 +35,8 @@ markedRenderer.code = function(code, language) {
 
 markedRenderer.codespan = function(text) {
     let textString = typeof text === 'object' && text !== null && typeof text.text === 'string' ? text.text : String(text);
-    const escapedText = escapeHtml(escapedText); // Corrected: Should use escapedText here
+    // Corrected: Escape the original textString, not an already escaped variable
+    const escapedText = escapeHtml(textString);
     return `<code class="bg-gray-200 px-1 rounded text-sm font-mono">${escapedText}</code>`;
 };
 

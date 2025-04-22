@@ -28,5 +28,5 @@ export function escapeHtml(html) {
         .replace(/'/g, '&#039;');
 }
 
-// Note: The marked.js renderer configuration is moved to config.js
-// Note: updateStatus and setLoadingState are moved to ui.js as they directly manipulate the DOM.
+// Note: The marked.js renderer configuration is in config.js
+// Note: updateStatus and setLoadingState are in ui.js as they directly manipulate the DOM.
