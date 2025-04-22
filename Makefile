@@ -1,6 +1,7 @@
 # Makefile for the assistant project
 
 # Define variables
+# Define the path to the Python executable *inside* the virtual environment
 PYTHON := $(VENV_DIR)/bin/python
 PIP := $(PYTHON) -m pip
 VENV_DIR := .venv
@@ -24,7 +25,8 @@ all: install
 
 venv:
 	@echo "Creating virtual environment..."
-	@test -d $(VENV_DIR) || $(PYTHON) -m venv $(VENV_DIR)
+	# Use the system's python3 command to create the venv
+	@test -d $(VENV_DIR) || python3 -m venv $(VENV_DIR)
 	@echo "Virtual environment ready."
 
 install: venv
