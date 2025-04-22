@@ -38,7 +38,7 @@ start: stop
 .PHONY: start-dev
 start-dev:
 	@echo "Starting application in development mode with temporary file database on port 5000 using 'flask run --debug'..."
-	# Clean up previous temporary file database
+	# Clean up previous temporary dev database file
 	@echo "Cleaning up previous temporary dev database file..."
 	@rm -f $(DEV_DB_PATH)
 	# Initialize the temporary database file

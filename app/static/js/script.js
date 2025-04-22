@@ -9,6 +9,7 @@ let isStreamingEnabled = true; // Track streaming toggle state (default to true)
 let isFilePluginEnabled = true; // Track Files plugin enabled state (default to true)
 let isCalendarPluginEnabled = true; // Track Calendar plugin enabled state (default to true)
 let isWebSearchPluginEnabled = true; // New: Track Web Search plugin enabled state (default to true)
+let currentTab = 'chat'; // New: Track the currently active tab ('chat' or 'notes')
 
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
@@ -19,6 +20,7 @@ const STREAMING_ENABLED_KEY = 'streamingEnabled'; // New localStorage key for st
 const FILES_PLUGIN_ENABLED_KEY = 'filesPluginEnabled'; // New localStorage key for Files plugin
 const CALENDAR_PLUGIN_ENABLED_KEY = 'calendarPluginEnabled'; // New localStorage key for Calendar plugin
 const WEB_SEARCH_PLUGIN_ENABLED_KEY = 'webSearchPluginEnabled'; // New: localStorage key for Web Search plugin
+const ACTIVE_TAB_KEY = 'activeTab'; // New: localStorage key for active tab
 
 
 const MAX_FILE_SIZE_MB = 10;
@@ -212,6 +214,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Session File Input Reference (This was the one causing the error)
     const fileUploadSessionInput = document.getElementById('file-upload-session-input');
 
+    // New Notes Feature References
+    const chatNavButton = document.getElementById('chat-nav-btn');
+    const notesNavButton = document.getElementById('notes-nav-btn');
+    const chatSection = document.getElementById('chat-section');
+    const notesSection = document.getElementById('notes-section');
+    const notesTextarea = document.getElementById('notes-textarea');
+    const notesPreview = document.getElementById('notes-preview');
+    const saveNoteButton = document.getElementById('save-note-button');
+
 
     // Application State (Re-declare or ensure access to global state if needed)
     // These are already declared globally, so no need to re-declare with `let` or `const`
@@ -225,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // let isFilePluginEnabled = true; // Already global
     // let isCalendarPluginEnabled = true; // Already global
     // let isWebSearchPluginEnabled = true; // Already global
+    // let currentTab = 'chat'; // Already global
     let sessionFile = null; // Variable to store selected session file (can be local or global, let's keep global)
 
 
@@ -271,25 +283,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function setLoadingState(loading, operation = "Processing") {
         isLoading = loading;
+        // Chat elements
         messageInput.disabled = loading;
         sendButton.disabled = loading;
         newChatButton.disabled = loading;
         saveChatNameButton.disabled = loading;
-        sidebarToggleButton.disabled = loading;
-        pluginsToggleButton.disabled = loading;
+        modelSelector.disabled = loading;
         attachFullButton.disabled = loading;
         attachSummaryButton.disabled = loading;
-        saveSummaryButton.disabled = loading;
-        modelSelector.disabled = loading;
         loadCalendarButton.disabled = loading;
         calendarToggle.disabled = loading;
         viewCalendarButton.disabled = loading || !calendarContext;
         webSearchToggle.disabled = loading; // Disable the web search toggle next to input
+
+        // Notes elements
+        notesTextarea.disabled = loading;
+        saveNoteButton.disabled = loading;
+
+
+        // Sidebar/Modal/Settings elements
+        sidebarToggleButton.disabled = loading;
+        pluginsToggleButton.disabled = loading;
+        saveSummaryButton.disabled = loading;
         settingsButton.disabled = loading; // Disable settings button when loading
         streamingToggle.disabled = loading; // Disable streaming toggle when loading
         filesPluginToggle.disabled = loading; // Disable files plugin toggle when loading
         calendarPluginToggle.disabled = loading; // Disable calendar plugin toggle when loading
         webSearchPluginToggle.disabled = loading; // New: Disable web search plugin toggle when loading
+
+        // Navigation buttons
+        chatNavButton.disabled = loading;
+        notesNavButton.disabled = loading;
 
 
         // Disable/Enable elements in the Manage Files Modal
@@ -311,14 +335,28 @@ document.addEventListener('DOMContentLoaded', () => {
         uploadedFilesList.querySelectorAll('input[type="checkbox"]').forEach(el => el.disabled = loading);
 
         selectedFilesContainer.querySelectorAll('button').forEach(el => el.disabled = loading);
-        sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send';
+
+        // Update button text/icons based on current tab and loading state
+        if (currentTab === 'chat') {
+             sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane mr-2"></i> Send';
+             saveNoteButton.innerHTML = '<i class="fas fa-save mr-1"></i> Save Note'; // Reset notes button if on chat tab
+        } else if (currentTab === 'notes') {
+             saveNoteButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-1"></i> ${operation}...` : '<i class="fas fa-save mr-1"></i> Save Note';
+             sendButton.innerHTML = '<i class="fas fa-paper-plane mr-2"></i> Send'; // Reset chat button if on notes tab
+        }
+
+
         if (loading) {
             updateStatus(`${operation}...`);
         } else {
             updateStatus("Idle");
-            // Only focus if no modals are open and sidebars are not collapsed
+            // Only focus if no modals are open and sidebars are not collapsed AND on the correct tab
             if (manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
-                 messageInput.focus();
+                 if (currentTab === 'chat') {
+                     messageInput.focus();
+                 } else if (currentTab === 'notes') {
+                     notesTextarea.focus();
+                 }
             }
         }
     }
@@ -343,9 +381,15 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleButton.title = `Collapse ${isLeft ? 'Chat List' : 'Plugins'}`;
             localStorage.setItem(storageKey, 'false');
         }
-        // Only focus if no modals are open and sidebars are not collapsed
+        // Only focus if no modals are open and sidebars are not collapsed AND on the correct tab
         if (!collapsed && !isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
-            setTimeout(() => messageInput.focus(), 350);
+            setTimeout(() => {
+                if (currentTab === 'chat') {
+                    messageInput.focus();
+                } else if (currentTab === 'notes') {
+                    notesTextarea.focus();
+                }
+            }, 350); // Small delay to allow transition
         }
     }
 
@@ -393,12 +437,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event Listener for Session File Input Label (Paperclip button)
     fileUploadSessionLabel.addEventListener('click', () => {
-        // Only trigger if the Files plugin is enabled
-        if (isFilePluginEnabled) {
+        // Only trigger if the Files plugin is enabled AND we are on the chat tab
+        if (isFilePluginEnabled && currentTab === 'chat') {
             fileUploadSessionInput.click(); // Simulate click to open file dialog.
-        } else {
+        } else if (!isFilePluginEnabled) {
             updateStatus("Files plugin is disabled in settings.", true);
         }
+        // No status update needed if not on chat tab, the button is hidden
     });
 
     // Event Listener for Session File Input
@@ -599,11 +644,15 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Shows the Manage Files modal and loads the file list. */
     async function showManageFilesModal() {
         if (isLoading) return;
-        // Only show if Files plugin is enabled
+        // Only show if Files plugin is enabled AND we are on the chat tab
         if (!isFilePluginEnabled) {
             updateStatus("Files plugin is disabled in settings.", true);
             return;
         }
+         if (currentTab !== 'chat') {
+             updateStatus("Manage Files is only available in the Chat section.", true);
+             return;
+         }
         manageFilesModal.style.display = "block";
         // Load files when the modal is shown
         await loadUploadedFiles(); // This will now load into both lists
@@ -803,12 +852,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** Handles file upload triggered from the modal. */
     function handleFileUpload(event) {
-        // Only allow if Files plugin is enabled
+        // Only allow if Files plugin is enabled AND we are on the chat tab
         if (!isFilePluginEnabled) {
             updateStatus("Files plugin is disabled in settings.", true);
             fileUploadModalInput.value = ''; // Reset input
             return;
         }
+         if (currentTab !== 'chat') {
+             updateStatus("File uploads are only available in the Chat section.", true);
+             fileUploadModalInput.value = ''; // Reset input
+             return;
+         }
+
 
         const files = event.target.files;
         if (!files || files.length === 0) return;
@@ -860,13 +915,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // New function to handle adding file from URL (triggered from Manage Files Modal)
     async function addFileFromUrl(url) {
         if (isLoading) return;
-        // Only allow if Files plugin is enabled
+        // Only allow if Files plugin is enabled AND we are on the chat tab
         if (!isFilePluginEnabled) {
             urlStatus.textContent = "Files plugin is disabled in settings.";
             urlStatus.classList.add('text-red-500');
             updateStatus("Files plugin is disabled in settings.", true);
             return;
         }
+         if (currentTab !== 'chat') {
+             urlStatus.textContent = "Adding files from URL is only available in the Chat section.";
+             urlStatus.classList.add('text-red-500');
+             updateStatus("Adding files from URL is only available in the Chat section.", true);
+             return;
+         }
+
 
         if (!url || !url.startsWith('http')) {
             urlStatus.textContent = "Please enter a valid URL (must start with http or https).";
@@ -912,11 +974,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** Attaches selected files from the sidebar list to the current chat. */
     function attachSelectedFiles(type) {
-        // Only allow if Files plugin is enabled
+        // Only allow if Files plugin is enabled AND we are on the chat tab
         if (!isFilePluginEnabled) {
             updateStatus("Files plugin is disabled in settings.", true);
             return;
         }
+         if (currentTab !== 'chat') {
+             updateStatus("Attaching files is only available in the Chat section.", true);
+             return;
+         }
+
 
         // Get checkboxes from the list *inside the sidebar*
         const checkboxes = uploadedFilesList.querySelectorAll('.file-checkbox:checked');
@@ -1017,11 +1084,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Summary Modal Functions ---
     async function showSummaryModal(fileId, filename) {
-        // Only allow if Files plugin is enabled
+        // Only allow if Files plugin is enabled AND we are on the chat tab
         if (!isFilePluginEnabled) {
             updateStatus("Files plugin is disabled in settings.", true);
             return;
         }
+         if (currentTab !== 'chat') {
+             updateStatus("File summaries are only available in the Chat section.", true);
+             return;
+         }
+
         currentEditingFileId = fileId;
         summaryModalFilename.textContent = filename;
         summaryTextarea.value = "";
@@ -1063,11 +1135,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     async function saveSummary() {
         if (!currentEditingFileId || isLoading) return;
-        // Only allow if Files plugin is enabled
+        // Only allow if Files plugin is enabled AND we are on the chat tab
         if (!isFilePluginEnabled) {
             updateStatus("Files plugin is disabled in settings.", true);
             return;
         }
+         if (currentTab !== 'chat') {
+             updateStatus("Saving summaries is only available in the Chat section.", true);
+             return;
+         }
+
         const updatedSummary = summaryTextarea.value;
         setLoadingState(true, "Saving Summary");
         summaryStatus.textContent = "Saving...";
@@ -1112,20 +1189,22 @@ document.addEventListener('DOMContentLoaded', () => {
          if (modalElement === urlModal && manageFilesModal.style.display === 'block') {
              // No specific element to focus in the manage files modal, maybe just ensure it's interactive
          } else if (modalElement === manageFilesModal) {
-             // If the manage files modal was closed, ensure focus returns to message input
+             // If the manage files modal was closed, ensure focus returns to message input (if on chat tab)
              if (!isLoading && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
-                 messageInput.focus();
+                 if (currentTab === 'chat') messageInput.focus();
              }
          } else if (modalElement === settingsModal) {
-             // If the settings modal was closed, ensure focus returns to message input
+             // If the settings modal was closed, ensure focus returns to message input/notes textarea
              if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
-                 messageInput.focus();
+                 if (currentTab === 'chat') messageInput.focus();
+                 else if (currentTab === 'notes') notesTextarea.focus();
              }
          }
          else {
-             // Default case, focus message input if no modals are open
+             // Default case, focus message input/notes textarea if no modals are open
              if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
-                 messageInput.focus();
+                 if (currentTab === 'chat') messageInput.focus();
+                 else if (currentTab === 'notes') notesTextarea.focus();
              }
          }
     }
@@ -1134,11 +1213,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // New URL Modal Functions (Triggered from Manage Files Modal)
     function showUrlModal() {
         if (isLoading) return;
-        // Only show if Files plugin is enabled
+        // Only show if Files plugin is enabled AND we are on the chat tab
         if (!isFilePluginEnabled) {
             updateStatus("Files plugin is disabled in settings.", true);
             return;
         }
+         if (currentTab !== 'chat') {
+             updateStatus("Adding files from URL is only available in the Chat section.", true);
+             return;
+         }
+
         urlInput.value = ''; // Clear previous input
         urlStatus.textContent = ''; // Clear previous status
         urlStatus.classList.remove('text-red-500');
@@ -1155,11 +1239,16 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Fetches calendar events and updates state/UI. */
     async function loadCalendarEvents() {
         if (isLoading) return;
-        // Only load if Calendar plugin is enabled
+        // Only load if Calendar plugin is enabled AND we are on the chat tab
         if (!isCalendarPluginEnabled) {
             updateStatus("Calendar plugin is disabled in settings.", true);
             return;
         }
+         if (currentTab !== 'chat') {
+             updateStatus("Calendar events can only be loaded in the Chat section.", true);
+             return;
+         }
+
         setLoadingState(true, "Loading Events");
         updateStatus("Loading calendar events...");
 
@@ -1210,12 +1299,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** Handles changes to the calendar context toggle switch (next to message input). */
     function handleCalendarToggle() {
-        // Only allow toggle if Calendar plugin is enabled
+        // Only allow toggle if Calendar plugin is enabled AND we are on the chat tab
         if (!isCalendarPluginEnabled) {
             calendarToggle.checked = false; // Force off if plugin disabled
             updateStatus("Calendar plugin is disabled in settings.", true);
             return;
         }
+         if (currentTab !== 'chat') {
+             calendarToggle.checked = false; // Force off if not on chat tab
+             updateStatus("Calendar context is only available in the Chat section.", true);
+             return;
+         }
+
         isCalendarContextActive = calendarToggle.checked;
         localStorage.setItem('calendarContextActive', isCalendarContextActive); // Persist toggle state
         updateCalendarStatus(); // Update display text
@@ -1223,11 +1318,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** Shows the modal with the loaded calendar events. */
     function showCalendarModal() {
-        // Only show if Calendar plugin is enabled and context exists
+        // Only show if Calendar plugin is enabled and context exists AND we are on the chat tab
         if (!isCalendarPluginEnabled) {
              updateStatus("Calendar plugin is disabled in settings.", true);
              return;
         }
+         if (currentTab !== 'chat') {
+             updateStatus("Viewing calendar events is only available in the Chat section.", true);
+             return;
+         }
+
         if (calendarContext) {
             calendarModalContent.textContent = calendarContext; // Display raw text in <pre>
             calendarModal.style.display = 'block';
@@ -1507,8 +1607,9 @@ document.addEventListener('DOMContentLoaded', () => {
             throw error; // Re-throw the error so initializeApp's catch block can handle it if this was the initial load
         } finally {
             console.log(`[DEBUG] loadChat(${chatId}) finally block entered.`); // Added log
-            setLoadingState(false); // <-- This will now run even if loadUploadedFiles re-throws
-            console.log(`[DEBUG] setLoadingState(false) called in loadChat(${chatId}) finally block.`); // Added log
+            // Ensure loading state is false even if an error occurred during initialization
+            // setLoadingState(false); // This is now handled by loadChat/startNewChat's finally block
+            console.log("[DEBUG] setLoadingState(false) is handled by loadChat/startNewChat finally block."); // Added log
         }
     }
 
@@ -1518,6 +1619,11 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus("Cannot send message: No active chat or busy.", true);
             return;
         }
+         if (currentTab !== 'chat') {
+             updateStatus("Messages can only be sent in the Chat section.", true);
+             return;
+         }
+
         const message = messageInput.value.trim();
 
         // Filter selectedFiles to only include those marked for attachment (type !== 'pending')
@@ -1694,6 +1800,11 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus("Cannot save name: No active chat.", true);
             return;
         }
+         if (currentTab !== 'chat') {
+             updateStatus("Chat name can only be saved in the Chat section.", true);
+             return;
+         }
+
         const newName = currentChatNameInput.value.trim();
         setLoadingState(true, "Saving Name");
         updateStatus(`Saving name for chat ${currentChatId}...`);
@@ -1722,6 +1833,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     async function handleDeleteChat(chatId, listItemElement) {
         if (isLoading) return; // Keep this check for user-initiated deletes
+         if (currentTab !== 'chat') {
+             updateStatus("Chats can only be deleted from the Chat section.", true);
+             return;
+         }
+
         const chatName = listItemElement.querySelector('span.filename').textContent || `Chat ${chatId}`;
         if (!confirm(`Are you sure you want to delete "${chatName}"? This cannot be undone.`)) {
             return;
@@ -1777,6 +1893,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleModelChange() {
         if (!currentChatId || isLoading) return; // Keep this check for user-initiated changes
+         if (currentTab !== 'chat') {
+             updateStatus("Model can only be changed in the Chat section.", true);
+             // Reset selector to current chat model if not on chat tab
+             if (currentChatId) {
+                 // Need to fetch chat details to get the current model
+                 fetch(`/api/chat/${currentChatId}`)
+                     .then(response => response.json())
+                     .then(data => {
+                         modelSelector.value = data.details.model_name || defaultModel;
+                     })
+                     .catch(error => {
+                         console.error("Error fetching chat details for model reset:", error);
+                         modelSelector.value = defaultModel; // Fallback
+                     });
+             } else {
+                 modelSelector.value = defaultModel; // Fallback if no current chat
+             }
+             return;
+         }
+
         const newModel = modelSelector.value;
         updateStatus(`Updating model to ${newModel}...`);
         setLoadingState(true, "Updating Model");
@@ -1798,6 +1934,21 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error("Error updating model:", error);
             updateStatus(`Error updating model: ${error.message}`, true);
+            // Revert model selector on error
+            if (currentChatId) {
+                 // Need to fetch chat details to get the current model
+                 fetch(`/api/chat/${currentChatId}`)
+                     .then(response => response.json())
+                     .then(data => {
+                         modelSelector.value = data.details.model_name || defaultModel;
+                     })
+                     .catch(error => {
+                         console.error("Error fetching chat details for model revert:", error);
+                         modelSelector.value = defaultModel; // Fallback
+                     });
+             } else {
+                 modelSelector.value = defaultModel; // Fallback if no current chat
+             }
         } finally {
             setLoadingState(false);
         }
@@ -1892,26 +2043,41 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Updates the visibility of plugin-related UI elements based on enabled state. */
     function updatePluginUI() {
         // Files Plugin UI
+        // Hide/Show the entire file plugin section in the sidebar
         if (isFilePluginEnabled) {
             filePluginSection.classList.remove('hidden');
-            fileUploadSessionLabel.classList.remove('hidden'); // Show paperclip button
         } else {
             filePluginSection.classList.add('hidden');
-            fileUploadSessionLabel.classList.add('hidden'); // Hide paperclip button
         }
+        // Hide/Show the paperclip button next to the message input (only visible on chat tab)
+        // Visibility is also controlled by the tab switching logic
+        if (isFilePluginEnabled && currentTab === 'chat') {
+             fileUploadSessionLabel.classList.remove('hidden');
+        } else {
+             fileUploadSessionLabel.classList.add('hidden');
+        }
+
 
         // Calendar Plugin UI
+        // Hide/Show the entire calendar plugin section in the sidebar
         if (isCalendarPluginEnabled) {
             calendarPluginSection.classList.remove('hidden');
-            calendarToggleInputArea.classList.remove('hidden'); // Show calendar toggle next to input
         } else {
             calendarPluginSection.classList.add('hidden');
-            calendarToggleInputArea.classList.add('hidden'); // Hide calendar toggle next to input
+        }
+        // Hide/Show the calendar toggle next to the message input (only visible on chat tab)
+        // Visibility is also controlled by the tab switching logic
+        if (isCalendarPluginEnabled && currentTab === 'chat') {
+             calendarToggleInputArea.classList.remove('hidden');
+        } else {
+             calendarToggleInputArea.classList.add('hidden');
         }
 
+
         // New: Web Search Plugin UI
-        // Hide/Show the label element that wraps the web search toggle input
-        if (isWebSearchPluginEnabled) {
+        // Hide/Show the label element that wraps the web search toggle input (only visible on chat tab)
+        // Visibility is also controlled by the tab switching logic
+        if (isWebSearchPluginEnabled && currentTab === 'chat') {
             webSearchToggleLabel.classList.remove('hidden');
         } else {
             webSearchToggleLabel.classList.add('hidden');
@@ -1921,6 +2087,135 @@ document.addEventListener('DOMContentLoaded', () => {
         // Note: The plugins sidebar itself (#plugins-sidebar) is controlled by pluginsToggleButton.
         // We don't hide the entire sidebar just because one plugin is off.
         // We hide the individual plugin sections within the sidebar.
+    }
+
+    // --- Tab Navigation Functions ---
+
+    /** Switches between the Chat and Notes sections. */
+    async function switchTab(tabName) {
+        if (isLoading || currentTab === tabName) return;
+
+        currentTab = tabName;
+        localStorage.setItem(ACTIVE_TAB_KEY, tabName); // Persist active tab
+
+        // Update button styles
+        chatNavButton.classList.remove('active');
+        notesNavButton.classList.remove('active');
+        if (tabName === 'chat') {
+            chatNavButton.classList.add('active');
+            chatSection.classList.remove('hidden');
+            notesSection.classList.add('hidden');
+            // Show chat-specific sidebar elements
+            sidebar.classList.remove('hidden'); // Chat sidebar is the main sidebar
+            pluginsSidebar.classList.remove('hidden'); // Plugins sidebar is always visible if not collapsed
+            // Show chat-specific input area elements
+            document.getElementById('input-area').classList.remove('hidden');
+            // Update plugin UI visibility based on enabled state (some elements are chat-only)
+            updatePluginUI();
+            // Focus message input
+            messageInput.focus();
+
+        } else if (tabName === 'notes') {
+            notesNavButton.classList.add('active');
+            chatSection.classList.add('hidden');
+            notesSection.classList.remove('hidden');
+            // Hide chat-specific sidebar elements (or rather, ensure only notes-relevant ones are visible if any)
+            // For now, the main sidebar is chat-specific, so hide it.
+            sidebar.classList.add('hidden');
+            // Plugins sidebar might still be relevant for settings, keep it visible if not collapsed
+            pluginsSidebar.classList.remove('hidden');
+             // Hide chat-specific input area elements
+            document.getElementById('input-area').classList.add('hidden');
+            // Hide chat-specific plugin UI elements (handled by updatePluginUI)
+            updatePluginUI();
+            // Load the note content when switching to the notes tab
+            await loadNote();
+            // Focus notes textarea
+            notesTextarea.focus();
+        }
+
+        // Ensure sidebars are positioned correctly after tab switch
+        // This might require re-applying collapsed classes or triggering a resize event
+        // For now, just ensure the body classes are correct
+        setSidebarCollapsed(sidebar, sidebarToggleButton, bodyElement.classList.contains('sidebar-collapsed'), SIDEBAR_COLLAPSED_KEY, 'sidebar');
+        setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, bodyElement.classList.contains('plugins-collapsed'), PLUGINS_COLLAPSED_KEY, 'plugins');
+
+        updateStatus(`Switched to ${tabName} section.`);
+    }
+
+    // --- Notes Feature Functions ---
+
+    /** Loads the note content from the backend and displays it. */
+    async function loadNote() {
+        if (isLoading) return;
+        setLoadingState(true, "Loading Note");
+        updateStatus("Loading note...");
+        notesTextarea.value = ""; // Clear textarea while loading
+        notesPreview.innerHTML = ""; // Clear preview while loading
+        notesTextarea.placeholder = "Loading note...";
+
+        try {
+            const response = await fetch('/api/note');
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            const noteContent = data.content || ''; // Use empty string if content is null/undefined
+            notesTextarea.value = noteContent;
+            // Trigger markdown preview update manually after loading
+            updateNotesPreview();
+            notesTextarea.placeholder = "Start typing your markdown notes here...";
+            updateStatus("Note loaded.");
+        } catch (error) {
+            console.error('Error loading note:', error);
+            notesTextarea.value = `[Error loading note: ${error.message}]`;
+            notesPreview.innerHTML = `<p class="text-red-500">Error loading note: ${escapeHtml(error.message)}</p>`;
+            notesTextarea.placeholder = "Could not load note.";
+            updateStatus("Error loading note.", true);
+        } finally {
+            setLoadingState(false);
+        }
+    }
+
+    /** Saves the current note content to the backend. */
+    async function saveNote() {
+        if (isLoading) return;
+        setLoadingState(true, "Saving Note");
+        updateStatus("Saving note...");
+
+        const noteContent = notesTextarea.value;
+
+        try {
+            const response = await fetch('/api/note', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ content: noteContent })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+
+            updateStatus("Note saved successfully.");
+
+        } catch (error) {
+            console.error('Error saving note:', error);
+            updateStatus(`Error saving note: ${error.message}`, true);
+        } finally {
+            setLoadingState(false);
+        }
+    }
+
+    /** Updates the markdown preview area based on the textarea content. */
+    function updateNotesPreview() {
+        const markdownText = notesTextarea.value;
+        // Use marked.parse with the custom renderer and options
+        // Ensure the result is a string before setting innerHTML
+        notesPreview.innerHTML = String(marked.parse(markdownText, markedOptions));
     }
 
 
@@ -2010,6 +2305,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Model Selector Listener
     modelSelector.addEventListener('change', handleModelChange);
 
+    // New Notes Feature Listeners
+    chatNavButton.addEventListener('click', () => switchTab('chat'));
+    notesNavButton.addEventListener('click', () => switchTab('notes'));
+    notesTextarea.addEventListener('input', updateNotesPreview); // Real-time markdown preview
+    saveNoteButton.addEventListener('click', saveNote);
+
 
     // --- Initial Application Load (MUST be inside DOMContentLoaded) ---
     /** Initializes the application on page load. */
@@ -2074,38 +2375,65 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log("[DEBUG] Calendar status updated.");
 
 
-            console.log("[DEBUG] Calling loadSavedChats..."); // Added log
-            // loadSavedChats populates the list but no longer highlights
-            await loadSavedChats(); // This will now re-throw if it fails
-            console.log("[DEBUG] loadSavedChats completed."); // Added log
+            // Load and set initial tab state from localStorage (default to 'chat')
+            const storedTab = localStorage.getItem(ACTIVE_TAB_KEY);
+            currentTab = (storedTab === 'chat' || storedTab === 'notes') ? storedTab : 'chat';
+            console.log(`[DEBUG] Active tab loaded: ${currentTab}.`); // Added log
 
-            // If loadSavedChats succeeds, proceed to load the chat
-            const firstChatElement = savedChatsList.querySelector('.list-item');
-            console.log(`[DEBUG] First chat element found: ${firstChatElement ? 'Yes' : 'No'}`); // Added log
 
-            if (firstChatElement) {
-                const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
-                console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`); // Added log
-                // loadChat sets currentChatId, loads history/files, and calls updateActiveChatListItem
-                await loadChat(mostRecentChatId); // This will now re-throw if it fails (including file loading)
-                console.log(`[DEBUG] loadChat(${mostRecentChatId}) completed.`); // Added log
-            } else {
-                console.log("[DEBUG] No saved chats found, starting new chat."); // Added log
-                // startNewChat calls loadChat internally, which sets currentChatId, loads files, and calls updateActiveChatListItem
-                await startNewChat(); // This calls loadChat internally and will re-throw if it fails
-                console.log("[DEBUG] startNewChat completed."); // Added log
+            // Load data based on the initial tab
+            if (currentTab === 'chat') {
+                 console.log("[DEBUG] Initializing Chat tab.");
+                 // Load chats and then the most recent chat
+                 console.log("[DEBUG] Calling loadSavedChats...");
+                 await loadSavedChats(); // This will now re-throw if it fails
+                 console.log("[DEBUG] loadSavedChats completed.");
+
+                 const firstChatElement = savedChatsList.querySelector('.list-item');
+                 console.log(`[DEBUG] First chat element found: ${firstChatElement ? 'Yes' : 'No'}`);
+
+                 if (firstChatElement) {
+                     const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
+                     console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`);
+                     // loadChat sets currentChatId, loads history/files, and calls updateActiveChatListItem
+                     await loadChat(mostRecentChatId); // This will now re-throw if it fails (including file loading)
+                     console.log(`[DEBUG] loadChat(${mostRecentChatId}) completed.`);
+                 } else {
+                     console.log("[DEBUG] No saved chats found, starting new chat.");
+                     // startNewChat calls loadChat internally, which sets currentChatId, loads files, and calls updateActiveChatListItem
+                     await startNewChat(); // This calls loadChat internally and will re-throw if it fails
+                     console.log("[DEBUG] startNewChat completed.");
+                 }
+                 // After loadChat/startNewChat completes, currentChatId should be set
+                 console.log(`[DEBUG] initializeApp finished chat loading. Final currentChatId: ${currentChatId}`);
+
+                 renderSelectedFiles(); // Render any initially selected files (though none on fresh load)
+                 console.log("[DEBUG] Selected files rendered.");
+
+                 // Ensure chat section is visible and notes is hidden
+                 chatSection.classList.remove('hidden');
+                 notesSection.classList.add('hidden');
+                 chatNavButton.classList.add('active');
+                 notesNavButton.classList.remove('active');
+                 document.getElementById('input-area').classList.remove('hidden');
+                 sidebar.classList.remove('hidden'); // Ensure chat sidebar is visible
+
+            } else if (currentTab === 'notes') {
+                 console.log("[DEBUG] Initializing Notes tab.");
+                 // Load the note content
+                 await loadNote(); // This will now re-throw if it fails
+                 console.log("[DEBUG] loadNote completed.");
+
+                 // Ensure notes section is visible and chat is hidden
+                 chatSection.classList.add('hidden');
+                 notesSection.classList.remove('hidden');
+                 chatNavButton.classList.remove('active');
+                 notesNavButton.classList.add('active');
+                 document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
+                 sidebar.classList.add('hidden'); // Hide chat sidebar
+
+                 // Note: Plugins sidebar remains visible if not collapsed, its content visibility is handled by updatePluginUI
             }
-
-            // After loadChat/startNewChat completes, currentChatId should be set
-            console.log(`[DEBUG] initializeApp finished chat loading. Final currentChatId: ${currentChatId}`); // Added log
-
-            // REMOVED: updateActiveChatListItem is now called within loadChat
-            // console.log("[DEBUG] Calling updateActiveChatListItem after chat load.");
-            // updateActiveChatListItem(); // <-- REMOVED THIS LINE
-
-            renderSelectedFiles(); // Render any initially selected files (though none on fresh load)
-            console.log("[DEBUG] Selected files rendered.");
-
 
             // Final status update on successful initialization
             updateStatus("Application initialized.");
@@ -2114,8 +2442,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Error during application initialization:', error);
-            // Display a prominent error message in the chatbox
-            addMessage('system', `[Fatal Error during initialization: ${error.message}. Please check console for details.]`, true);
+            // Display a prominent error message in the chatbox (if chatbox exists)
+            if (chatbox) {
+                 addMessage('system', `[Fatal Error during initialization: ${error.message}. Please check console for details.]`, true);
+            } else {
+                 console.error("Chatbox not found, cannot display fatal error message.");
+            }
             // Update status bar with error
             updateStatus("Initialization failed.", true);
             console.log("[DEBUG] initializeApp caught an error.");
@@ -2123,8 +2455,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             console.log("[DEBUG] initializeApp finally block entered."); // Added log
             // Ensure loading state is false even if an error occurred during initialization
-            // setLoadingState(false); // This is now handled by loadChat/startNewChat's finally block
-            console.log("[DEBUG] setLoadingState(false) is handled by loadChat/startNewChat finally block."); // Added log
+            // setLoadingState(false); // This is now handled by loadChat/startNewChat/loadNote's finally block
+            console.log("[DEBUG] setLoadingState(false) is handled by tab-specific load functions finally block."); // Added log
         }
     }
 

@@ -1,14 +1,17 @@
 # Configure logging
 import logging
 import os # Import os to get process ID
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# app/database.py
 import sqlite3
 import click
 from flask import current_app, g
 from datetime import datetime
+
+# Configure logging
+# Ensure basicConfig is only called once if this file is imported multiple times
+if not logging.getLogger(__name__).handlers:
+    logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 # --- Database Connection ---
 
@@ -36,25 +39,31 @@ def get_db():
             # Check if the 'chats' table exists as a proxy for schema presence.
             # This block is now only relevant if DB_NAME is explicitly ':memory:'
             # which should not happen with the Makefile change, but kept for robustness.
+            # Also check for 'notes' table now.
             if db_name == ':memory:':
                 cursor = g.db.cursor()
                 try:
                     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='chats';")
-                    table_exists = cursor.fetchone()
+                    chats_table_exists = cursor.fetchone()
+                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='notes';")
+                    notes_table_exists = cursor.fetchone()
 
-                    if not table_exists:
-                        logger.info(f"In-memory database '{db_name}' is empty in process {os.getpid()}. Applying schema...")
+
+                    if not chats_table_exists or not notes_table_exists:
+                        logger.info(f"In-memory database '{db_name}' is empty or incomplete in process {os.getpid()}. Applying schema...")
                         # Execute the schema creation SQL directly using executescript
+                        # Ensure this matches the schema.sql content
                         schema_sql = f'''
                             PRAGMA foreign_keys = ON; -- Ensure foreign keys are enforced
 
                             CREATE TABLE IF NOT EXISTS chats (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                name TEXT NOT NULL,
+                                name TEXT NOT NULL DEFAULT 'New Chat',
                                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                                 last_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                                 model_name TEXT DEFAULT '{current_app.config.get("DEFAULT_MODEL", "gemini-pro")}'
                             );
+                            CREATE INDEX IF NOT EXISTS idx_chats_last_updated ON chats (last_updated_at DESC); -- Added index
 
                             CREATE TABLE IF NOT EXISTS messages (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,6 +74,7 @@ def get_db():
                                 FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
                             );
                             CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id);
+                            CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages (timestamp ASC); -- Added index
 
                             CREATE TABLE IF NOT EXISTS files (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,6 +86,17 @@ def get_db():
                                 uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
                             );
                             CREATE INDEX IF NOT EXISTS idx_files_filename ON files (filename);
+                            CREATE INDEX IF NOT EXISTS idx_files_uploaded_at ON files (uploaded_at DESC); -- Added index
+
+                            -- Create the notes table
+                            CREATE TABLE IF NOT EXISTS notes (
+                                id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1), -- Enforce single row with ID 1
+                                content TEXT NOT NULL DEFAULT '',
+                                last_saved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+                            );
+
+                            -- Insert the initial single row for notes if it doesn't exist
+                            INSERT OR IGNORE INTO notes (id, content, last_saved_at) VALUES (1, '', CURRENT_TIMESTAMP);
                         '''
                         cursor.executescript(schema_sql)
 
@@ -121,6 +142,7 @@ def init_db():
         cursor.execute("DROP TABLE IF EXISTS messages")
         cursor.execute("DROP TABLE IF EXISTS files")
         cursor.execute("DROP TABLE IF EXISTS chats")
+        cursor.execute("DROP TABLE IF EXISTS notes") # Drop notes table
         logger.info("Dropped existing tables (if any).")
 
         # Ensure foreign keys are enforced during schema creation
@@ -130,13 +152,15 @@ def init_db():
         cursor.execute(f'''
             CREATE TABLE IF NOT EXISTS chats (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
+                name TEXT NOT NULL DEFAULT 'New Chat',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 last_updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 model_name TEXT DEFAULT '{current_app.config.get("DEFAULT_MODEL", "gemini-pro")}'
             )
         ''')
-        logger.info("Created 'chats' table.")
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_chats_last_updated ON chats (last_updated_at DESC)') # Added IF NOT EXISTS
+        logger.info("Created 'chats' table and index.")
+
 
         # Create messages table - Added IF NOT EXISTS
         cursor.execute('''
@@ -150,7 +174,8 @@ def init_db():
             )
         ''')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id)') # Added IF NOT EXISTS
-        logger.info("Created 'messages' table and index.")
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages (timestamp ASC)') # Added IF NOT EXISTS
+        logger.info("Created 'messages' table and indexes.")
 
         # Create files table (with BLOB) - Added IF NOT EXISTS
         cursor.execute('''
@@ -165,7 +190,23 @@ def init_db():
             )
         ''')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_files_filename ON files (filename)') # Added IF NOT EXISTS
-        logger.info("Created 'files' table and index.")
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_files_uploaded_at ON files (uploaded_at DESC)') # Added IF NOT EXISTS
+        logger.info("Created 'files' table and indexes.")
+
+        # Create the notes table - Added IF NOT EXISTS
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS notes (
+                id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1), -- Enforce single row with ID 1
+                content TEXT NOT NULL DEFAULT '',
+                last_saved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        logger.info("Created 'notes' table.")
+
+        # Insert the initial single row for notes if it doesn't exist
+        cursor.execute("INSERT OR IGNORE INTO notes (id, content, last_saved_at) VALUES (1, '', CURRENT_TIMESTAMP)")
+        logger.info("Ensured initial row exists in 'notes' table.")
+
 
         db.commit()
         logger.info("Database schema initialized successfully.")
@@ -427,3 +468,38 @@ def delete_file_record_from_db(file_id):
     except sqlite3.Error as e:
         logger.error(f"Database error deleting file record {file_id}: {e}", exc_info=True)
         return False # Indicate failure
+
+# Notes
+def save_note_to_db(content):
+    """Saves or updates the single note entry."""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        now = datetime.now()
+        logger.info("Attempting to save note content...")
+        # Use INSERT OR REPLACE to handle both initial insert and subsequent updates
+        cursor.execute("INSERT OR REPLACE INTO notes (id, content, last_saved_at) VALUES (1, ?, ?)",
+                       (content, now))
+        db.commit()
+        logger.info("Successfully saved note content.")
+        return True
+    except sqlite3.Error as e:
+        logger.error(f"Database error saving note: {e}", exc_info=True)
+        return False # Indicate failure
+
+def get_note_from_db():
+    """Retrieves the content of the single note entry."""
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        logger.info("Attempting to retrieve note content...")
+        # Select the single row with ID 1
+        cursor.execute("SELECT content FROM notes WHERE id = 1")
+        result = cursor.fetchone()
+        # Return content if row exists, otherwise return empty string
+        content = result['content'] if result and result['content'] is not None else ''
+        logger.info("Successfully retrieved note content.")
+        return content
+    except sqlite3.Error as e:
+        logger.error(f"Database error getting note: {e}", exc_info=True)
+        return None # Indicate failure

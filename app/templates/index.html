@@ -68,7 +68,6 @@
                     <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line">
                         {% for model in available_models %}
                             <option value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
-                        {% endif %}>{{ model }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -122,16 +121,22 @@
 
 
         <!-- Notes Section -->
+        <!-- Added flex-grow and overflow-hidden to make it fill available space -->
         <div id="notes-section" class="flex flex-col flex-grow p-4 overflow-hidden hidden">
+            <!-- Added flex-grow and overflow-hidden to make the content area fill space -->
             <div class="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden">
                 <!-- Textarea for Markdown Input -->
+                <!-- Added flex-1 and overflow-hidden to make it fill space -->
                 <div class="flex-1 flex flex-col overflow-hidden">
                     <label for="notes-textarea" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Markdown Input</label>
-                    <textarea id="notes-textarea" class="flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white font-mono text-sm resize-none overflow-auto"></textarea>
+                    <!-- Added flex-grow and overflow-auto to make textarea fill its container and scroll -->
+                    <textarea id="notes-textarea" class="flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white font-mono text-sm resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
                 </div>
                 <!-- Preview Area -->
+                <!-- Added flex-1 and overflow-hidden to make it fill space -->
                 <div class="flex-1 flex flex-col overflow-hidden">
                      <label for="notes-preview" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preview</label>
+                    <!-- Added flex-grow and overflow-y-auto to make preview fill its container and scroll -->
                     <div id="notes-preview" class="flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm overflow-y-auto prose dark:prose-invert max-w-none dark:bg-gray-800 dark:border-gray-600 dark:text-white">
                         <!-- Markdown will be rendered here -->
                     </div>

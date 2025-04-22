@@ -5,9 +5,11 @@ import google.generativeai as genai
 
 # Configure logging FIRST, at the application entry point
 import logging
-logging.basicConfig(level=logging.INFO)
+# Ensure basicConfig is only called once if this file is imported multiple times
+if not logging.getLogger(__name__).handlers:
+    logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.info("Root logger configured to DEBUG level via basicConfig.")
+logger.info("Root logger configured to INFO level via basicConfig.")
 
 
 def create_app(test_config=None):
@@ -59,7 +61,7 @@ def create_app(test_config=None):
             if db_path and db_path != ':memory:': # Ensure it's a file path, not in-memory
                 try:
                     os.remove(db_path)
-                    logger.info(f"Deleted database file: {db_path}")
+                    logger.debug(f"Deleted database file: {db_path}")
                 except FileNotFoundError:
                     # File might have already been deleted by another teardown in debug mode
                     logger.debug(f"Database file not found during deletion attempt: {db_path}")
@@ -84,6 +86,18 @@ def create_app(test_config=None):
     except Exception as e:
         logger.error(f"Error registering calendar blueprint: {e}")
     # ---------------------------------
+
+    # --- Register Notes Blueprint ---
+    try:
+        from .routes import notes_routes
+        app.register_blueprint(notes_routes.bp)
+        logger.info("Registered blueprint: notes_api")
+    except ImportError:
+        logger.error("Notes routes not found or import error, skipping registration.")
+    except Exception as e:
+        logger.error(f"Error registering notes blueprint: {e}")
+    # ---------------------------------
+
 
     # Health Check Route
     @app.route('/health')
