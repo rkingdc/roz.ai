@@ -344,7 +344,7 @@ export async function attachSelectedFilesSummary() {
 
                 // Check if summary generation was successful.
                 // fetchSummary updates state.summaryContent and reloads state.uploadedFiles.
-                const updatedFile = state.uploadedFiles.find(f => f.id === fileId);
+                // const updatedFile = state.uploadedFiles.find(f => f.id === fileId); // Removed duplicate declaration
                 const summaryLooksValid = !state.summaryContent.startsWith('[Error'); // Check if fetchSummary reported success
 
                 // Consider summary available if the reloaded data shows it OR if fetchSummary didn't report an error.
