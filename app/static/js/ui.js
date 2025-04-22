@@ -589,38 +589,83 @@ function createSidebarFileItem(file, isSelected) {
 
     const itemDiv = document.createElement('div');
     // Add 'list-item' class and remove conflicting layout/padding classes
+    // Remove flex, items-center, p-1, truncate, flex-grow as they conflict with list-item's column flex
     itemDiv.classList.add('list-item', 'file-list-item', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
     itemDiv.dataset.fileId = file.id;
     itemDiv.dataset.filename = file.filename;
     itemDiv.dataset.hasSummary = file.has_summary; // Store summary status
+    // Add 'active' class if currently selected
+    if (isSelected) {
+        itemDiv.classList.add('active');
+    }
 
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.classList.add('file-checkbox', 'mr-2');
-    checkbox.checked = isSelected;
-    checkbox.addEventListener('change', handleSidebarFileCheckboxChange); // Attach listener
+
+    // Container for name and potential future actions (flex row) - similar to chat item
+    const nameContainer = document.createElement('div');
+    nameContainer.classList.add('name-container'); // Use specific class
 
     const nameSpan = document.createElement('span');
-    nameSpan.classList.add('filename', 'text-sm', 'text-rz-sidebar-text', 'truncate', 'flex-grow'); // Added truncate and flex-grow
+    // Use only 'filename' class as per CORRECT HTML - color handled by CSS
+    // Remove truncate and flex-grow as they conflict with list-item's column flex
+    nameSpan.classList.add('filename'); // Use specific class
     nameSpan.textContent = file.filename;
     nameSpan.title = file.filename; // Add tooltip
 
-    // Add summary status indicator
-    const summaryStatus = document.createElement('span');
-    summaryStatus.classList.add('summary-status', 'text-xs', 'ml-1', file.has_summary ? 'text-green-600' : 'text-yellow-600');
-    summaryStatus.innerHTML = file.has_summary ? '<i class="fas fa-check-circle" title="Summary available"></i>' : '<i class="fas fa-exclamation-circle" title="No summary"></i>';
+    // No delete button or summary status indicator in sidebar file list as per request
 
+    nameContainer.appendChild(nameSpan);
+    // Append other action buttons here if needed in the future, similar to chat item
 
-    itemDiv.appendChild(checkbox);
-    itemDiv.appendChild(nameSpan);
-    itemDiv.appendChild(summaryStatus);
+    // Add timestamp div
+    // Use 'div' and specific classes as per chat list item
+    const timestampDiv = document.createElement('div');
+    // Default color is text-rz-tab-background-text (greyish) based on provided HTML
+    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-toolbar-field-text'); // Use specific classes and mt-0.5 - color handled by CSS
+    try {
+        const date = new Date(file.uploaded_at); // Use uploaded_at for files
+        // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
+        const now = new Date();
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
 
-    // Add click listener to toggle checkbox when clicking the item div (but not the checkbox itself)
-    itemDiv.addEventListener('click', (event) => {
-        if (event.target !== checkbox) {
-            checkbox.checked = !checkbox.checked;
-            checkbox.dispatchEvent(new Event('change')); // Trigger the change event manually
+        let formattedDate;
+        if (date.toDateString() === now.toDateString()) {
+            formattedDate = `Today, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+        } else if (date.toDateString() === yesterday.toDateString()) {
+            formattedDate = `Yesterday, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+        } else {
+            formattedDate = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
         }
+        // Prepend "Uploaded: "
+        timestampDiv.textContent = `Uploaded: ${formattedDate}`;
+    } catch (e) {
+        console.error("Error formatting date:", file.uploaded_at, e);
+        timestampDiv.textContent = 'Uploaded: Invalid Date';
+    }
+
+
+    itemDiv.appendChild(nameContainer); // Append the container
+    itemDiv.appendChild(timestampDiv); // Append the timestamp div
+
+    // Add click listener to toggle selection
+    itemDiv.addEventListener('click', () => {
+        const fileId = parseInt(itemDiv.dataset.fileId);
+        const filename = itemDiv.dataset.filename;
+        if (isNaN(fileId) || !filename) return;
+
+        const isCurrentlySelected = state.selectedFiles.some(f => f.id === fileId);
+
+        if (isCurrentlySelected) {
+            // Remove the file from selectedFiles
+            state.removeSelectedFileById(fileId);
+        } else {
+            // Add the file to selectedFiles (type will be determined later)
+            state.addSelectedFile({ id: fileId, filename: filename, type: 'pending' });
+        }
+
+        // Update styling for this item and re-render selected files display
+        updateSelectedFileListItemStyling(); // Update all file list items
+        renderSelectedFiles(); // Update the display below the message input
     });
 
 
@@ -628,9 +673,36 @@ function createSidebarFileItem(file, isSelected) {
 }
 
 /**
+ * Updates the highlighting for selected file list items.
+ * Multiple files can be selected.
+ */
+function updateSelectedFileListItemStyling() {
+    const { uploadedFilesList } = elements;
+    if (!uploadedFilesList) return;
+
+    uploadedFilesList.querySelectorAll('.file-list-item').forEach(item => {
+        const fileId = parseInt(item.dataset.fileId);
+        if (isNaN(fileId)) return;
+
+        const isSelected = state.selectedFiles.some(f => f.id === fileId);
+
+        if (isSelected) {
+            item.classList.add('active'); // Use 'active' class for selected state
+            // Timestamp and other elements will inherit active styles via CSS
+        } else {
+            item.classList.remove('active'); // Remove 'active' class
+            // Timestamp and other elements will revert to default styles via CSS
+        }
+    });
+}
+
+
+/**
  * Helper to handle sidebar file checkbox change.
  * @param {Event} e - The change event.
  */
+// REMOVED: This function is no longer needed as checkboxes are removed from sidebar file list.
+/*
 function handleSidebarFileCheckboxChange(e) {
     const checkbox = e.target;
     const fileId = parseInt(checkbox.closest('.file-list-item')?.dataset.fileId); // Get ID from dataset
@@ -657,6 +729,7 @@ function handleSidebarFileCheckboxChange(e) {
     }
     renderSelectedFiles(); // Update the display below the message input
 }
+*/
 
 
 /**

@@ -140,22 +140,27 @@ function handleAttachFilesClick(type) {
         return;
     }
 
-    // Get checked checkboxes from the sidebar list
-    const checkboxes = elements.uploadedFilesList?.querySelectorAll('.file-checkbox:checked');
-    if (!checkboxes || checkboxes.length === 0) {
+    // Get selected files from the state
+    const filesToAttach = state.selectedFiles;
+
+    if (!filesToAttach || filesToAttach.length === 0) {
         ui.updateStatus("No files selected to attach.", true);
         return;
     }
 
     let addedCount = 0;
-    checkboxes.forEach(checkbox => {
-        const fileId = parseInt(checkbox.value);
-        const listItem = checkbox.closest('.file-list-item');
-        const filename = listItem?.dataset.filename;
-        if (filename) {
-            // Add/replace the file in the selectedFiles state with the specified type
-            state.addSelectedFile({ id: fileId, filename: filename, type: type });
+    filesToAttach.forEach(file => {
+        // Update the type of the selected file in the state
+        // We need to find the existing entry and update its type
+        const existingFileIndex = state.selectedFiles.findIndex(f => f.id === file.id);
+        if (existingFileIndex !== -1) {
+            state.selectedFiles[existingFileIndex].type = type;
             addedCount++;
+        } else {
+             // This case should ideally not happen if state is managed correctly,
+             // but as a fallback, add it if not found.
+             state.addSelectedFile({ id: file.id, filename: file.filename, type: type });
+             addedCount++;
         }
     });
 
