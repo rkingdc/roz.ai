@@ -129,7 +129,8 @@ export function setupEventListeners() {
         const fileId = parseInt(itemDiv.dataset.fileId);
         const filename = itemDiv.dataset.filename;
         const hasSummaryDataset = itemDiv.dataset.hasSummary; // Get raw dataset value
-        const hasSummary = hasSummaryDataset === 'true'; // Convert to boolean
+        // Convert to boolean, accepting 'true' or '1' as true
+        const hasSummary = hasSummaryDataset === 'true' || hasSummaryDataset === '1';
         console.log(`[DEBUG] Sidebar file clicked: ID=${fileId}, Name=${filename}, Dataset hasSummary=${hasSummaryDataset}, Parsed hasSummary=${hasSummary}`); // Log values
         if (isNaN(fileId) || !filename) return;
 
