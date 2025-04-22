@@ -140,28 +140,29 @@ function handleAttachFilesClick(type) {
         return;
     }
 
-    // Get selected files from the state
-    const filesToAttach = state.selectedFiles;
+    // Get the visually selected file list items from the sidebar
+    const selectedSidebarItems = elements.uploadedFilesList?.querySelectorAll('.file-list-item.active');
 
-    if (!filesToAttach || filesToAttach.length === 0) {
-        ui.updateStatus("No files selected to attach.", true);
+    if (!selectedSidebarItems || selectedSidebarItems.length === 0) {
+        ui.updateStatus("No files visually selected in the sidebar to attach.", true);
         return;
     }
 
     let addedCount = 0;
-    filesToAttach.forEach(file => {
-        // Update the type of the selected file in the state
-        // We need to find the existing entry and update its type
-        const existingFileIndex = state.selectedFiles.findIndex(f => f.id === file.id);
-        if (existingFileIndex !== -1) {
-            state.selectedFiles[existingFileIndex].type = type;
+    selectedSidebarItems.forEach(item => {
+        const fileId = parseInt(item.dataset.fileId);
+        const filename = item.dataset.filename;
+        if (!isNaN(fileId) && filename) {
+            // Add the file to state.selectedFiles with the specified type
+            // state.addSelectedFile handles adding or updating if already present
+            state.addSelectedFile({ id: fileId, filename: filename, type: type });
             addedCount++;
-        } else {
-             // This case should ideally not happen if state is managed correctly,
-             // but as a fallback, add it if not found.
-             state.addSelectedFile({ id: file.id, filename: file.filename, type: type });
-             addedCount++;
         }
+    });
+
+    // After adding to state, unselect the files in the sidebar
+    selectedSidebarItems.forEach(item => {
+        item.classList.remove('active');
     });
 
     ui.renderSelectedFiles(); // Update the display below the message input
@@ -264,6 +265,12 @@ function handleFilesPluginToggleChange() {
         // Clear file lists
         if(elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
         if(elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
+
+        // Also clear visual selection in the sidebar
+        elements.uploadedFilesList?.querySelectorAll('.file-list-item.active').forEach(item => {
+            item.classList.remove('active');
+        });
+
     } else {
         // If enabling, reload the file lists
         api.loadUploadedFiles();

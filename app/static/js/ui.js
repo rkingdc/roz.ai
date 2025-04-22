@@ -838,17 +838,15 @@ function handleModalFileCheckboxChange(e) {
 
 
     if (checkbox.checked) {
-        // Add a placeholder entry, type will be determined later when attach button clicked
-        state.addSelectedFile({ id: fileId, filename: filename, type: 'pending' });
-        listItem.classList.add('active-selection');
-        if (modalItem) modalItem.classList.add('active-selection'); // Sync modal styling
-        if (modalCheckbox) modalCheckbox.checked = true; // Sync modal checkbox
+        // Add the file to selectedFiles (type will be determined later)
+        state.addSelectedFile({ id: fileId, filename: filename, type: 'pending' }); // Use 'pending' type initially
+        listItem.classList.add('active-selection'); // Apply active styling in modal
+        // No sidebar sync needed here
     } else {
         // Remove ALL entries for this file ID from selectedFiles
         state.removeSelectedFileById(fileId);
-        listItem.classList.remove('active-selection');
-        if (modalItem) modalItem.classList.remove('active-selection'); // Sync modal styling
-        if (modalCheckbox) modalCheckbox.checked = false; // Sync modal checkbox
+        listItem.classList.remove('active-selection'); // Remove active styling in modal
+        // No sidebar sync needed here
     }
     renderSelectedFiles(); // Update the display below the message input
 }
@@ -876,16 +874,32 @@ export function renderSelectedFiles() {
 
     state.selectedFiles.forEach(file => {
         const fileTag = document.createElement('span');
-        fileTag.classList.add('selected-file-tag', 'inline-flex', 'items-center', 'bg-blue-100', 'text-blue-800', 'text-xs', 'font-medium', 'px-2.5', 'py-0.5', 'rounded-full', 'mr-2', 'mb-1');
+        // Use theme colors for tags
+        fileTag.classList.add('selected-file-tag', 'inline-flex', 'items-center', 'text-xs', 'font-medium', 'px-2.5', 'py-0.5', 'rounded-full', 'mr-2', 'mb-1');
         fileTag.dataset.fileId = file.id;
         fileTag.dataset.fileType = file.type; // 'permanent' or 'session'
+
+        // Apply color based on type (using theme variables)
+        if (file.type === 'session') {
+             fileTag.classList.add('bg-rz-tag-bg', 'text-rz-tag-text', 'border', 'border-rz-tag-border');
+        } else { // 'full' or 'summary'
+             fileTag.classList.add('bg-rz-button-primary-bg', 'text-rz-button-primary-text');
+        }
+
 
         const filenameSpan = document.createElement('span');
         filenameSpan.textContent = file.filename;
         filenameSpan.classList.add('mr-1');
 
+        // Add file type indicator
+        const typeSpan = document.createElement('span');
+        typeSpan.classList.add('file-type'); // Use specific class for styling
+        typeSpan.textContent = file.type === 'full' ? 'Full' : (file.type === 'summary' ? 'Summary' : 'Session');
+        filenameSpan.prepend(typeSpan); // Prepend type to filename span
+
+
         const removeButton = document.createElement('button');
-        removeButton.classList.add('remove-file-btn', 'ml-1', 'text-blue-800', 'hover:text-blue-900');
+        removeButton.classList.add('remove-file-btn', 'ml-1'); // Removed text-blue classes, use theme colors via CSS
         removeButton.innerHTML = '<i class="fas fa-times-circle"></i>';
         removeButton.title = `Remove ${file.type === 'session' ? 'session' : 'attached'} file`;
         removeButton.addEventListener('click', () => {
@@ -895,13 +909,16 @@ export function renderSelectedFiles() {
                 if (elements.fileUploadSessionInput) { // Use elements.fileUploadSessionInput
                     elements.fileUploadSessionInput.value = '';
                 }
-            } else { // Permanent file
+            } else { // Permanent file (full or summary)
                 state.removeSelectedFileById(file.id);
-                 // Uncheck the corresponding checkbox in the sidebar/modal
-                const sidebarCheckbox = elements.uploadedFilesList?.querySelector(`.file-list-item[data-file-id="${file.id}"] .file-checkbox`);
-                if (sidebarCheckbox) sidebarCheckbox.checked = false;
-                 const modalCheckbox = elements.manageFilesList?.querySelector(`.file-list-item[data-file-id="${file.id}"] .file-checkbox`);
-                if (modalCheckbox) modalCheckbox.checked = false;
+                 // Find the corresponding item in the modal list and uncheck/unselect it
+                 const modalItem = elements.manageFilesList?.querySelector(`.file-list-item[data-file-id="${file.id}"]`);
+                 if (modalItem) {
+                     const modalCheckbox = modalItem.querySelector('.file-checkbox');
+                     if (modalCheckbox) modalCheckbox.checked = false;
+                     modalItem.classList.remove('active-selection');
+                 }
+                 // Do NOT affect sidebar item styling here. Sidebar selection is independent.
             }
             renderSelectedFiles(); // Re-render the display
         });
