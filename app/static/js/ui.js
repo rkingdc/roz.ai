@@ -274,7 +274,8 @@ function createChatItem(chat) {
 
     // Add delete button
     const deleteButton = document.createElement('button');
-    deleteButton.classList.add('delete-btn', 'text-red-500', 'hover:text-red-700', 'ml-2', 'flex-shrink-0'); // Added ml-2 and flex-shrink-0
+    // Changed text-red-500 to text-rz-sidebar-text for gold color consistency
+    deleteButton.classList.add('delete-btn', 'text-rz-sidebar-text', 'hover:text-red-700', 'ml-2', 'flex-shrink-0');
     deleteButton.innerHTML = '<i class="fas fa-trash-alt text-xs"></i>';
     deleteButton.title = `Delete "${chat.name || `Chat ${chat.id}`}"`;
     deleteButton.addEventListener('click', (event) => {
