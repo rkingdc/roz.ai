@@ -269,7 +269,7 @@ function createChatItem(chat) {
 
     const listItem = document.createElement('div');
     // Use 'active' class for selection as per CORRECT HTML
-    listItem.classList.add('list-item', 'chat-list-item', 'p-2', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
+    listItem.classList.add('list-item', 'chat-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
     listItem.dataset.chatId = chat.id;
 
     // Container for name and delete button (flex row)
@@ -430,7 +430,7 @@ function createNoteItem(note) {
 
     const listItem = document.createElement('div');
     // Note items use 'active' class for selection as per provided HTML
-    listItem.classList.add('list-item', 'note-list-item', 'p-2', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
+    listItem.classList.add('list-item', 'note-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
     listItem.dataset.noteId = note.id;
 
     // Container for name and delete button (flex row)

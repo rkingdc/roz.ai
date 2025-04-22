@@ -478,6 +478,7 @@
      transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
      white-space: nowrap;
      color: var(--rz-sidebar-text); /* Default text color (Gold) */
+     border-bottom: 1px solid var(--rz-sidebar-bg);
 }
  .list-item:hover {
      background-color: var(--rz-sidebar-hover-bg);
