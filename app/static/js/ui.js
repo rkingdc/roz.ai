@@ -286,7 +286,7 @@ function createChatItem(chat) {
     // Add delete button
     // Use only 'delete-btn' class as per CORRECT HTML - color handled by CSS
     const deleteButton = document.createElement('button');
-    deleteButton.classList.add('delete-btn'); // Use specific class
+    deleteButton.classList.add('delete-btn', 'text-rz-sidebar-text'); // Use specific class
     deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per CORRECT HTML
     deleteButton.title = `Delete "${chat.name || `Chat ${chat.id}`}"`;
     deleteButton.addEventListener('click', (event) => {
@@ -439,7 +439,7 @@ function createNoteItem(note) {
     // Add delete button
     // Use only 'delete-btn' class as per provided HTML - color handled by CSS
     const deleteButton = document.createElement('button');
-    deleteButton.classList.add('delete-btn'); // Use specific class
+    deleteButton.classList.add('delete-btn', 'text-rz-sidebar-text'); // Use specific class
     deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per provided HTML
     deleteButton.title = `Delete "${note.name || `Note ${note.id}`}"`;
     deleteButton.addEventListener('click', (event) => {
