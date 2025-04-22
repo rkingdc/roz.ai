@@ -2249,146 +2249,156 @@ document.addEventListener('DOMContentLoaded', () => {
         chatNavButton.classList.remove('active');
         notesNavButton.classList.remove('active');
 
-        // Hide/Show main content sections and header elements
-        if (tabName === 'chat') {
-            chatNavButton.classList.add('active');
-            chatSection.classList.remove('hidden');
-            notesSection.classList.add('hidden');
-            document.getElementById('input-area').classList.remove('hidden'); // Show chat input area
-            modelSelectorContainer.classList.remove('hidden'); // Show model selector
-            notesModeElements.classList.add('hidden'); // Hide notes mode elements container
+        // Set loading state for the entire tab switch operation
+        setLoadingState(true, `Switching to ${tabName === 'chat' ? 'Chat' : 'Notes'}`);
 
-            // Show chat sidebar content, hide notes sidebar content
-            chatSidebarContent.classList.remove('hidden');
-            notesSidebarContent.classList.add('hidden');
+        try {
+            // Hide/Show main content sections and header elements
+            if (tabName === 'chat') {
+                chatNavButton.classList.add('active');
+                chatSection.classList.remove('hidden');
+                notesSection.classList.add('hidden');
+                document.getElementById('input-area').classList.remove('hidden'); // Show chat input area
+                modelSelectorContainer.classList.remove('hidden'); // Show model selector
+                notesModeElements.classList.add('hidden'); // Hide notes mode elements container
 
-            // Ensure chat sidebar is visible if not collapsed
-            sidebar.classList.remove('hidden');
+                // Show chat sidebar content, hide notes sidebar content
+                chatSidebarContent.classList.remove('hidden');
+                notesSidebarContent.classList.add('hidden');
 
-            // Load chat data if not already loaded or if switching back
-            if (currentChatId === null) {
-                 console.log("[DEBUG] switchTab (chat): No currentChatId, loading initial chat."); // Added log
-                 // This case should ideally be handled by initializeApp, but as a fallback
-                 try {
-                     await loadSavedChats();
-                     const firstChatElement = savedChatsList.querySelector('.list-item');
-                     if (firstChatElement) {
-                         await loadChat(parseInt(firstChatElement.dataset.chatId));
-                     } else {
-                         await startNewChat();
-                     }
-                 } catch (error) {
-                     console.error("[DEBUG] switchTab (chat): Error during initial chat load:", error);
-                     // Error handling is done within loadChat/startNewChat, just log here
-                 }
-            } else {
-                 console.log(`[DEBUG] switchTab (chat): currentChatId is ${currentChatId}, ensuring highlight.`); // Added log
-                 // If chat is already loaded, just ensure highlighting is correct
-                 updateActiveChatListItem();
-            }
+                // Ensure chat sidebar is visible if not collapsed
+                sidebar.classList.remove('hidden');
 
-
-            // Focus message input
-            messageInput.focus();
-
-        } else if (tabName === 'notes') {
-            notesNavButton.classList.add('active');
-            chatSection.classList.add('hidden');
-            notesSection.classList.remove('hidden');
-            document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
-            modelSelectorContainer.classList.add('hidden'); // Hide model selector
-            notesModeElements.classList.remove('hidden'); // Show notes mode elements container
-
-            // Hide chat sidebar content, show notes sidebar content
-            chatSidebarContent.classList.add('hidden');
-            notesSidebarContent.classList.remove('hidden');
-
-            // Ensure chat sidebar is visible if not collapsed (it contains the notes content now)
-            sidebar.classList.remove('hidden');
-
-
-            // Load notes data
-            console.log("[DEBUG] switchTab (notes): Loading notes data..."); // Added log
-            try {
-                 await loadSavedNotes(); // Load the list of notes
-                 console.log("[DEBUG] loadSavedNotes completed.");
-
-                 if (currentNoteId !== null) {
-                     console.log(`[DEBUG] switchTab (notes): currentNoteId is ${currentNoteId}, attempting to load it.`); // Added log
+                // Load chat data if not already loaded or if switching back
+                if (currentChatId === null) {
+                     console.log("[DEBUG] switchTab (chat): No currentChatId, loading initial chat."); // Added log
+                     // This case should ideally be handled by initializeApp, but as a fallback
                      try {
-                         await loadNote(currentNoteId); // Load the persisted note
-                         console.log(`[DEBUG] loadNote(${currentNoteId}) completed.`);
+                         await loadSavedChats();
+                         const firstChatElement = savedChatsList.querySelector('.list-item');
+                         if (firstChatElement) {
+                             await loadChat(parseInt(firstChatElement.dataset.chatId));
+                         } else {
+                             await startNewChat();
+                         }
                      } catch (error) {
-                         console.warn(`[DEBUG] switchTab (notes): loadNote(${currentNoteId}) failed: ${error}. Starting new note.`);
-                         // If loading the persisted note fails (e.g., deleted), start a new one
-                         await startNewNote(); // Create and load a new note
-                         console.log("[DEBUG] switchTab (notes): startNewNote completed after load failure.");
+                         console.error("[DEBUG] switchTab (chat): Error during initial chat load:", error);
+                         // Error handling is done within loadChat/startNewChat, just log here
                      }
-                 } else {
-                     console.log("[DEBUG] No currentNoteId, loading most recent or creating new.");
-                     const firstNoteElement = savedNotesList.querySelector('.list-item');
-                     if (firstNoteElement) {
-                         const mostRecentNoteId = parseInt(firstNoteElement.dataset.noteId);
-                         console.log(`[DEBUG] Loading most recent note: ${mostRecentNoteId}`);
-                         await loadNote(mostRecentNoteId);
-                         console.log(`[DEBUG] loadNote(${mostRecentNoteId}) completed.`);
+                } else {
+                     console.log(`[DEBUG] switchTab (chat): currentChatId is ${currentChatId}, ensuring highlight.`); // Added log
+                     // If chat is already loaded, just ensure highlighting is correct
+                     updateActiveChatListItem();
+                }
+
+
+                // Focus message input
+                messageInput.focus();
+
+            } else if (tabName === 'notes') {
+                notesNavButton.classList.add('active');
+                chatSection.classList.add('hidden');
+                notesSection.classList.remove('hidden');
+                document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
+                modelSelectorContainer.classList.add('hidden'); // Hide model selector
+                notesModeElements.classList.remove('hidden'); // Show notes mode elements container
+
+                // Hide chat sidebar content, show notes sidebar content
+                chatSidebarContent.classList.add('hidden');
+                notesSidebarContent.classList.remove('hidden');
+
+                // Ensure chat sidebar is visible if not collapsed (it contains the notes content now)
+                sidebar.classList.remove('hidden');
+
+
+                // Load notes data
+                console.log("[DEBUG] switchTab (notes): Loading notes data..."); // Added log
+                try {
+                     await loadSavedNotes(); // Load the list of notes
+                     console.log("[DEBUG] loadSavedNotes completed.");
+
+                     if (currentNoteId !== null) {
+                         console.log(`[DEBUG] switchTab (notes): currentNoteId is ${currentNoteId}, attempting to load it.`); // Added log
+                         try {
+                             await loadNote(currentNoteId); // Load the persisted note
+                             console.log(`[DEBUG] loadNote(${currentNoteId}) completed.`);
+                         } catch (error) {
+                             console.warn(`[DEBUG] switchTab (notes): loadNote(${currentNoteId}) failed: ${error}. Starting new note.`);
+                             // If loading the persisted note fails (e.g., deleted), start a new one
+                             await startNewNote(); // Create and load a new note
+                             console.log("[DEBUG] switchTab (notes): startNewNote completed after load failure.");
+                         }
                      } else {
-                         console.log("[DEBUG] No saved notes found, starting new note.");
-                         await startNewNote(); // Create and load a new note
-                         console.log("[DEBUG] startNewNote completed.");
+                         console.log("[DEBUG] No currentNoteId, loading most recent or creating new.");
+                         const firstNoteElement = savedNotesList.querySelector('.list-item');
+                         if (firstNoteElement) {
+                             const mostRecentNoteId = parseInt(firstNoteElement.dataset.noteId);
+                             console.log(`[DEBUG] Loading most recent note: ${mostRecentNoteId}`);
+                             await loadNote(mostRecentNoteId);
+                             console.log(`[DEBUG] loadNote(${mostRecentNoteId}) completed.`);
+                         } else {
+                             console.log("[DEBUG] No saved notes found, starting new note.");
+                             await startNewNote(); // Create and load a new note
+                             console.log("[DEBUG] startNewNote completed.");
+                         }
                      }
-                 }
-                 // After loadNote/startNewNote completes, currentNoteId should be set
-                 console.log(`[DEBUG] switchTab (notes): Finished loading note. Final currentNoteId: ${currentNoteId}`);
+                     // After loadNote/startNewNote completes, currentNoteId should be set
+                     console.log(`[DEBUG] switchTab (notes): Finished loading note. Final currentNoteId: ${currentNoteId}`);
 
-                 // Ensure the correct note mode is applied after loading content
-                 // The mode is loaded in initializeApp, but we need to apply it here
-                 // if switching tabs. loadNote also calls switchNoteMode.
-                 // Let's ensure switchNoteMode is called *after* content is loaded.
-                 // loadNote already calls updateNotesPreview and switchNoteMode.
-                 // So, if loadNote succeeds, the mode is set. If it fails and startNewNote is called,
-                 // startNewNote calls loadNote, which sets the mode.
-                 // The only case is if loadSavedNotes fails entirely, then currentNoteId remains null.
-                 // In that case, we should default to edit mode.
-                 if (currentNoteId === null) {
-                     switchNoteMode('edit'); // Default to edit if no note could be loaded/created
-                 }
+                     // Ensure the correct note mode is applied after loading content
+                     // The mode is loaded in initializeApp, but we need to apply it here
+                     // if switching tabs. loadNote also calls switchNoteMode.
+                     // Let's ensure switchNoteMode is called *after* content is loaded.
+                     // loadNote already calls updateNotesPreview and switchNoteMode.
+                     // So, if loadNote succeeds, the mode is set. If it fails and startNewNote is called,
+                     // startNewNote calls loadNote, which sets the mode.
+                     // The only case is if loadSavedNotes fails entirely, then currentNoteId remains null.
+                     // In that case, we should default to edit mode.
+                     if (currentNoteId === null) {
+                         switchNoteMode('edit'); // Default to edit if no note could be loaded/created
+                     }
 
 
-            } catch (error) {
-                 console.error("[DEBUG] switchTab (notes): Error during initial notes load:", error);
-                 // Error handling is done within loadSavedNotes/loadNote/startNewNote, just log here
-                 // Ensure UI is in a safe state (e.g., edit mode, disabled)
-                 switchNoteMode('edit'); // Default to edit mode on error
-                 notesTextarea.value = `[Error loading notes: ${error.message}]`;
-                 notesPreview.innerHTML = `<p class="text-red-500">Error loading note: ${escapeHtml(error.message)}</p>`;
-                 notesTextarea.disabled = true; // Disable input on fatal error
-                 currentNoteId = null; // Ensure state is null
-                 currentNoteNameInput.value = '';
-                 currentNoteIdDisplay.textContent = 'ID: -';
-                 updateActiveNoteListItem(); // Remove highlight
-                 localStorage.removeItem(CURRENT_NOTE_ID_KEY); // Clear persisted ID
+                } catch (error) {
+                     console.error("[DEBUG] switchTab (notes): Error during initial notes load:", error);
+                     // Error handling is done within loadSavedNotes/loadNote/startNewNote, just log here
+                     // Ensure UI is in a safe state (e.g., edit mode, disabled)
+                     switchNoteMode('edit'); // Default to edit mode on error
+                     notesTextarea.value = `[Error loading notes: ${error.message}]`;
+                     notesPreview.innerHTML = `<p class="text-red-500">Error loading note: ${escapeHtml(error.message)}</p>`;
+                     notesTextarea.disabled = true; // Disable input on fatal error
+                     currentNoteId = null; // Ensure state is null
+                     currentNoteNameInput.value = '';
+                     currentNoteIdDisplay.textContent = 'ID: -';
+                     updateActiveNoteListItem(); // Remove highlight
+                     localStorage.removeItem(CURRENT_NOTE_ID_KEY); // Clear persisted ID
+                }
+
+
+                // Focus notes textarea (if in edit mode) or notes section (if in view mode)
+                if (currentNoteMode === 'edit') {
+                     notesTextarea.focus();
+                } else {
+                     // Cannot focus preview, maybe focus the section?
+                     notesSection.focus(); // Or just do nothing
+                }
             }
 
+            // Update plugin UI visibility based on enabled state (some elements are chat-only)
+            updatePluginUI();
 
-            // Focus notes textarea (if in edit mode) or notes section (if in view mode)
-            if (currentNoteMode === 'edit') {
-                 notesTextarea.focus();
-            } else {
-                 // Cannot focus preview, maybe focus the section?
-                 notesSection.focus(); // Or just do nothing
-            }
+            // Ensure sidebars are positioned correctly after tab switch
+            setSidebarCollapsed(sidebar, sidebarToggleButton, bodyElement.classList.contains('sidebar-collapsed'), SIDEBAR_COLLAPSED_KEY, 'sidebar');
+            setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, bodyElement.classList.contains('plugins-collapsed'), PLUGINS_COLLAPSED_KEY, 'plugins');
+
+            updateStatus(`Switched to ${tabName} section.`);
+            console.log(`[DEBUG] switchTab finished for tab: ${tabName}. isLoading: ${isLoading}`); // Added log
+
+        } finally {
+            // Ensure loading state is false after the entire tab switch process
+            setLoadingState(false);
+            console.log(`[DEBUG] switchTab finally block. isLoading: ${isLoading}`); // Added log
         }
-
-        // Update plugin UI visibility based on enabled state (some elements are chat-only)
-        updatePluginUI();
-
-        // Ensure sidebars are positioned correctly after tab switch
-        setSidebarCollapsed(sidebar, sidebarToggleButton, bodyElement.classList.contains('sidebar-collapsed'), SIDEBAR_COLLAPSED_KEY, 'sidebar');
-        setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, bodyElement.classList.contains('plugins-collapsed'), PLUGINS_COLLAPSED_KEY, 'plugins');
-
-        updateStatus(`Switched to ${tabName} section.`);
-        console.log(`[DEBUG] switchTab finished for tab: ${tabName}. isLoading: ${isLoading}`); // Added log
     }
 
     // --- Notes Feature Functions (MODIFIED for multiple notes and mode toggle) ---
@@ -2480,7 +2490,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isLoading) return;
         // REMOVED: Early exit check - we want this to run fully when called
         // if (noteId === currentNoteId) {
-        //      console.log(`[DEBUG] loadNote(${noteId}): Already the current note. Skipping reload.`); // Added log
+        //      console.log(`[DEBUG] loadNote(${noteId}) skipped, isLoading is true.`); // Added log
         //      return; // Avoid reloading if already on this note
         // }
         setLoadingState(true, "Loading Note");
@@ -2939,98 +2949,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
             // Load data based on the initial tab
-            if (currentTab === 'chat') {
-                 console.log("[DEBUG] Initializing Chat tab.");
-                 // Load chats and then the most recent chat
-                 // console.log("[DEBUG] Calling loadSavedChats..."); // Reduced verbosity
-                 await loadSavedChats(); // This will now re-throw if it fails
-                 // console.log("[DEBUG] loadSavedChats completed."); // Reduced verbosity
+            // Use switchTab to handle the initial load based on the persisted tab
+            await switchTab(currentTab); // This will now manage the loading state internally
 
-                 const firstChatElement = savedChatsList.querySelector('.list-item');
-                 // console.log(`[DEBUG] First chat element found: ${firstChatElement ? 'Yes' : 'No'}`); // Reduced verbosity
-
-                 if (firstChatElement) {
-                     const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
-                     // console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`); // Reduced verbosity
-                     // loadChat sets currentChatId, loads history/files, and calls updateActiveChatListItem
-                     await loadChat(mostRecentChatId); // This will now re-throw if it fails (including file loading)
-                     // console.log(`[DEBUG] loadChat(${mostRecentChatId}) completed.`); // Reduced verbosity
-                 } else {
-                     console.log("[DEBUG] No saved chats found, starting new chat.");
-                     // startNewChat calls loadChat internally, which sets currentChatId, loads files, and calls updateActiveChatListItem
-                     await startNewChat(); // This calls loadChat internally and will re-throw if it fails
-                     // console.log("[DEBUG] startNewChat completed."); // Reduced verbosity
-                 }
-                 // After loadChat/startNewChat completes, currentChatId should be set
-                 console.log(`[DEBUG] initializeApp finished chat loading. Final currentChatId: ${currentChatId}`);
-
-                 renderSelectedFiles(); // Render any initially selected files (though none on fresh load)
-                 // console.log("[DEBUG] Selected files rendered."); // Reduced verbosity
-
-                 // Ensure chat section is visible and notes is hidden
-                 chatSection.classList.remove('hidden');
-                 notesSection.classList.add('hidden');
-                 chatNavButton.classList.add('active');
-                 notesNavButton.classList.remove('active');
-                 document.getElementById('input-area').classList.remove('hidden');
-                 modelSelectorContainer.classList.remove('hidden'); // Show model selector
-                 notesModeElements.classList.add('hidden'); // Hide notes mode elements container
-                 chatSidebarContent.classList.remove('hidden'); // Show chat sidebar content
-                 notesSidebarContent.classList.add('hidden'); // Hide notes sidebar content
-                 sidebar.classList.remove('hidden'); // Ensure chat sidebar is visible
-
-            } else if (currentTab === 'notes') {
-                 console.log("[DEBUG] Initializing Notes tab.");
-                 // Load notes data
-                 await loadSavedNotes(); // Load the list of notes
-                 console.log("[DEBUG] loadSavedNotes completed.");
-
-                 if (currentNoteId !== null) {
-                     console.log(`[DEBUG] Loading persisted note: ${currentNoteId}`);
-                     try {
-                         await loadNote(currentNoteId); // Load the persisted note
-                         console.log(`[DEBUG] loadNote(${currentNoteId}) completed.`);
-                     } catch (error) {
-                         console.warn(`[DEBUG] loadNote(${currentNoteId}) failed: ${error}. Starting new note.`);
-                         await startNewNote();
-                     }
-                 } else {
-                     console.log("[DEBUG] No persisted note found, loading most recent or creating new.");
-                     const firstNoteElement = savedNotesList.querySelector('.list-item');
-                     if (firstNoteElement) {
-                         const mostRecentNoteId = parseInt(firstNoteElement.dataset.noteId);
-                         console.log(`[DEBUG] Loading most recent note: ${mostRecentNoteId}`);
-                         await loadNote(mostRecentNoteId);
-                         console.log(`[DEBUG] loadNote(${mostRecentNoteId}) completed.`);
-                     } else {
-                         console.log("[DEBUG] No saved notes found, starting new note.");
-                         await startNewNote(); // Create and load a new note
-                         console.log("[DEBUG] startNewNote completed.");
-                     }
-                 }
-                 // After loadNote/startNewNote completes, currentNoteId should be set
-                 console.log(`[DEBUG] initializeApp finished notes loading. Final currentNoteId: ${currentNoteId}`);
-
-                 // Apply the loaded or default note mode
-                 switchNoteMode(currentNoteMode); // This will also call updateNotesPreview if mode is 'view'
-
-                 // Ensure notes section is visible and chat is hidden
-                 chatSection.classList.add('hidden');
-                 notesSection.classList.remove('hidden');
-                 chatNavButton.classList.remove('active');
-                 notesNavButton.classList.add('active');
-                 document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
-                 modelSelectorContainer.classList.add('hidden'); // Hide model selector
-                 notesModeElements.classList.remove('hidden'); // Show notes mode elements container
-                 chatSidebarContent.classList.add('hidden'); // Hide chat sidebar content
-                 notesSidebarContent.classList.remove('hidden'); // Show notes sidebar content
-                 sidebar.classList.remove('hidden'); // Ensure chat sidebar is visible
-
-                 // Note: Plugins sidebar remains visible if not collapsed, its content visibility is handled by updatePluginUI
-            }
-
-            // Final status update on successful initialization
-            updateStatus("Application initialized.");
+            // Final status update on successful initialization (handled by switchTab now)
+            // updateStatus("Application initialized.");
             console.log("[DEBUG] initializeApp finished successfully.");
 
 
@@ -3048,9 +2971,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // The finally block will now run because the error is caught here
         } finally {
             console.log("[DEBUG] initializeApp finally block entered."); // Added log
-            // Ensure loading state is false even if an error occurred during initialization
-            // setLoadingState(false); // This is now handled by loadChat/startNewChat/loadNote's finally block
-            console.log("[DEBUG] setLoadingState(false) is handled by tab-specific load functions finally block."); // Added log
+            // setLoadingState(false) is now handled by switchTab's finally block
+            console.log("[DEBUG] setLoadingState(false) is handled by switchTab finally block."); // Added log
         }
     }
 
