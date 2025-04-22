@@ -44,6 +44,11 @@ target_db = current_app.extensions['migrate'].db
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
+# --- ADD THIS IMPORT ---
+# Ensure models are loaded so Alembic can see them
+from app import models
+# -----------------------
+
 
 def get_metadata():
     if hasattr(target_db, 'metadatas'):
