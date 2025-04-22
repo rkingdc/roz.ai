@@ -91,7 +91,7 @@ function updateStatus(message, isError = false) {
     }
     statusBar.textContent = `Status: ${message}`;
     statusBar.className = `text-xs px-4 py-1 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50 border-t border-red-200' : 'text-rz-status-bar-text bg-rz-status-bar-bg border-t border-rz-frame'}`;
-    console.log(`Status Update: ${message}`);
+    // console.log(`Status Update: ${message}`); // Reduced verbosity
 }
 
 function formatFileSize(bytes) {
@@ -293,6 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function setLoadingState(loading, operation = "Processing") {
+        console.log(`[DEBUG] setLoadingState called with loading=${loading}, operation=${operation}, currentTab=${currentTab}`); // Added log
         isLoading = loading;
         // Chat elements
         messageInput.disabled = loading;
@@ -361,12 +362,14 @@ document.addEventListener('DOMContentLoaded', () => {
              newChatButton.disabled = loading; // Enable/Disable New Chat button
              newNoteButton.disabled = true; // Disable New Note button when on chat tab
              saveNoteNameButton.disabled = true; // Disable Save Note Name button when on chat tab
+             console.log(`[DEBUG] setLoadingState (Chat Tab): newNoteButton disabled=${newNoteButton.disabled}, saveNoteNameButton disabled=${saveNoteNameButton.disabled}`); // Added log
         } else if (currentTab === 'notes') {
              // saveNoteButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-1"></i> ${operation}...` : '<i class="fas fa-save mr-1"></i> Save Note'; // Button moved
              sendButton.innerHTML = '<i class="fas fa-paper-plane"></i> Send'; // Reset chat button if on notes tab
              newChatButton.disabled = true; // Disable New Chat button when on notes tab
              newNoteButton.disabled = loading; // Enable/Disable New Note button
              saveNoteNameButton.disabled = loading; // Enable/Disable Save Note Name button
+             console.log(`[DEBUG] setLoadingState (Notes Tab): newNoteButton disabled=${newNoteButton.disabled}, saveNoteNameButton disabled=${saveNoteNameButton.disabled}`); // Added log
         }
 
 
@@ -1374,7 +1377,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadSavedChats() {
         updateStatus("Loading saved chats...");
-        console.log("[DEBUG] loadSavedChats called."); // Added log
+        // console.log("[DEBUG] loadSavedChats called."); // Reduced verbosity
         try {
             const response = await fetch('/api/chats');
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -1437,12 +1440,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             // updateActiveChatListItem(); // REMOVED: Highlighting is now handled by loadChat
             updateStatus("Saved chats loaded.");
-            console.log("[DEBUG] loadSavedChats finished successfully."); // Added log
+            // console.log("[DEBUG] loadSavedChats finished successfully."); // Reduced verbosity
         } catch (error) {
             console.error('Error loading saved chats:', error);
             savedChatsList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading chats.</p>';
             updateStatus("Error loading saved chats.", true);
-            console.log("[DEBUG] loadSavedChats caught an error."); // Added log
+            // console.log("[DEBUG] loadSavedChats caught an error."); // Reduced verbosity
             throw error; // Re-throw the error
         }
     }
@@ -1497,33 +1500,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     async function loadChat(chatId) {
-        console.log(`[DEBUG] loadChat(${chatId}) called.`); // Added log
+        // console.log(`[DEBUG] loadChat(${chatId}) called.`); // Reduced verbosity
         // REMOVED: if (isLoading) { console.log(`[DEBUG] loadChat(${chatId}) skipped, isLoading is true.`); return; }
         setLoadingState(true, "Loading Chat");
         updateStatus(`Loading chat ${chatId}...`);
         clearChatbox();
         addMessage('system', `Loading chat (ID: ${chatId})...`);
-        console.log(`[DEBUG] Chatbox cleared and loading message added for chat ${chatId}.`); // Added log
+        // console.log(`[DEBUG] Chatbox cleared and loading message added for chat ${chatId}.`); // Reduced verbosity
 
         try {
-            console.log(`[DEBUG] Fetching chat data for chat ${chatId}...`); // Added log
+            // console.log(`[DEBUG] Fetching chat data for chat ${chatId}...`); // Reduced verbosity
             const response = await fetch(`/api/chat/${chatId}`);
             if (!response.ok) {
                 const errorText = await response.text(); // Get text for more info
                 throw new Error(`HTTP error! status: ${response.status} ${response.statusText} - ${errorText}`);
             }
             const data = await response.json();
-            console.log(`[DEBUG] Chat data fetched successfully for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] Chat data fetched successfully for chat ${chatId}.`); // Reduced verbosity
 
             currentChatId = chatId;
-            console.log(`[DEBUG] currentChatId set to ${currentChatId}.`); // Added log
+            // console.log(`[DEBUG] currentChatId set to ${currentChatId}.`); // Reduced verbosity
 
             clearChatbox(); // Clear the loading message
             currentChatNameInput.value = data.details.name || '';
             currentChatIdDisplay.textContent = `ID: ${currentChatId}`;
             modelSelector.value = data.details.model_name || defaultModel;
 
-            console.log(`[DEBUG] Populating chat history for chat ${chatId}. History length: ${data.history.length}`); // Added log
+            // console.log(`[DEBUG] Populating chat history for chat ${chatId}. History length: ${data.history.length}`); // Reduced verbosity
             if (data.history.length === 0) {
                 addMessage('system', 'This chat is empty. Start typing!');
             } else {
@@ -1531,7 +1534,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     addMessage(msg.role, msg.content);
                 });
             }
-            console.log(`[DEBUG] Chat history populated for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] Chat history populated for chat ${chatId}.`); // Reduced verbosity
 
 
             // Reset chat-specific context, but NOT plugin enabled states
@@ -1542,7 +1545,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (existingSessionTag) existingSessionTag.remove();
             renderSelectedFiles(); // Render (clears plugin files and updates visibility)
             fileUploadSessionInput.value = ''; // Reset file input
-            console.log(`[DEBUG] Chat context (files, session file) reset for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] Chat context (files, session file) reset for chat ${chatId}.`); // Reduced verbosity
 
 
             calendarContext = null;
@@ -1550,25 +1553,25 @@ document.addEventListener('DOMContentLoaded', () => {
             calendarToggle.checked = isCalendarContextActive; // Ensure UI matches state
             updateCalendarStatus(); // Update status based on cleared context
             viewCalendarButton.classList.add('hidden');
-            console.log(`[DEBUG] Calendar context reset for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] Calendar context reset for chat ${chatId}.`); // Reduced verbosity
 
             webSearchToggle.checked = false; // Reset web search toggle state for the loaded chat
-            console.log(`[DEBUG] Web search toggle reset for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] Web search toggle reset for chat ${chatId}.`); // Reduced verbosity
 
 
             // Ensure plugin UI reflects the *current* enabled state (which wasn't reset)
             updatePluginUI();
-            console.log(`[DEBUG] Plugin UI updated based on settings for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] Plugin UI updated based on settings for chat ${chatId}.`); // Reduced verbosity
 
 
             // Load files for the new chat context (files are global, but list needs refreshing)
             // Only load files if the plugin is enabled
             if (isFilePluginEnabled) {
-                 console.log(`[DEBUG] Files plugin enabled, loading uploaded files for chat ${chatId}.`); // Added log
+                 // console.log(`[DEBUG] Files plugin enabled, loading uploaded files for chat ${chatId}.`); // Reduced verbosity
                  await loadUploadedFiles(); // This might re-throw, which is caught by the catch block below
-                 console.log(`[DEBUG] loadUploadedFiles completed for chat ${chatId}.`); // Added log
+                 // console.log(`[DEBUG] loadUploadedFiles completed for chat ${chatId}.`); // Reduced verbosity
             } else {
-                 console.log(`[DEBUG] Files plugin disabled, skipping loadUploadedFiles for chat ${chatId}.`); // Added log
+                 // console.log(`[DEBUG] Files plugin disabled, skipping loadUploadedFiles for chat ${chatId}.`); // Reduced verbosity
                  // If plugin is disabled, clear the lists and show disabled message
                  uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
                  manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
@@ -1576,30 +1579,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Update chat list highlighting AFTER everything else is loaded/rendered
             updateActiveChatListItem(); // <-- Keep this call here
-            console.log(`[DEBUG] updateActiveChatListItem called for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] updateActiveChatListItem called for chat ${chatId}.`); // Reduced verbosity
 
 
             updateStatus(`Chat ${chatId} loaded.`);
-            console.log(`[DEBUG] loadChat(${chatId}) finished successfully.`); // Added log
+            // console.log(`[DEBUG] loadChat(${chatId}) finished successfully.`); // Reduced verbosity
 
 
         } catch (error) { // <-- This will now catch errors from fetch('/api/chat') AND re-thrown errors from loadUploadedFiles
             console.error('Error loading chat:', error);
             clearChatbox(); // Clear any partial history or loading message
             addMessage('system', `[Error loading chat ${chatId}: ${error.message}]`, true);
-            console.log(`[DEBUG] Error message added to chatbox for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] Error message added to chatbox for chat ${chatId}.`); // Reduced verbosity
 
             currentChatId = null; // Clear current chat state on error
             currentChatNameInput.value = '';
             currentChatIdDisplay.textContent = 'ID: -';
             modelSelector.value = defaultModel;
-            console.log(`[DEBUG] Chat state reset on error for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] Chat state reset on error for chat ${chatId}.`); // Reduced verbosity
 
             updateStatus(`Error loading chat ${chatId}.`, true);
-            console.log(`[DEBUG] Status updated for error loading chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] Status updated for error loading chat ${chatId}.`); // Reduced verbosity
 
             updateActiveChatListItem(); // Update highlighting (should remove highlight)
-            console.log(`[DEBUG] updateActiveChatListItem called after error for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] updateActiveChatListItem called after error for chat ${chatId}.`); // Reduced verbosity
 
             // Reset chat-specific context again on error to be safe
             selectedFiles = [];
@@ -1614,27 +1617,27 @@ document.addEventListener('DOMContentLoaded', () => {
             updateCalendarStatus();
             viewCalendarButton.classList.add('hidden');
             webSearchToggle.checked = false; // Reset web search toggle state on error
-            console.log(`[DEBUG] Chat context reset again on error for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] Chat context reset again on error for chat ${chatId}.`); // Reduced verbosity
 
 
             // Ensure plugin UI reflects the *current* enabled state even on error
             updatePluginUI();
-            console.log(`[DEBUG] Plugin UI updated after error for chat ${chatId}.`); // Added log
+            // console.log(`[DEBUG] Plugin UI updated after error for chat ${chatId}.`); // Reduced verbosity
 
             // Clear file lists if plugin enabled (as they might be stale)
             if (isFilePluginEnabled) {
                  uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
                  manageFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
-                 console.log(`[DEBUG] File lists cleared/error state set after error loading chat ${chatId}.`); // Added log
+                 // console.log(`[DEBUG] File lists cleared/error state set after error loading chat ${chatId}.`); // Reduced verbosity
             }
 
 
             throw error; // Re-throw the error so initializeApp's catch block can handle it if this was the initial load
         } finally {
-            console.log(`[DEBUG] loadChat(${chatId}) finally block entered.`); // Added log
+            // console.log(`[DEBUG] loadChat(${chatId}) finally block entered.`); // Reduced verbosity
             // Ensure loading state is false even if an error occurred during initialization
             // setLoadingState(false); // This is now handled by loadChat/startNewChat's finally block
-            console.log("[DEBUG] setLoadingState(false) is handled by loadChat/startNewChat finally block."); // Added log
+            // console.log("[DEBUG] setLoadingState(false) is handled by loadChat/startNewChat finally block."); // Reduced verbosity
         }
     }
 
@@ -1892,27 +1895,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateActiveChatListItem() {
-        console.log(`[DEBUG] updateActiveChatListItem called. currentChatId: ${currentChatId}`); // Added log
+        // console.log(`[DEBUG] updateActiveChatListItem called. currentChatId: ${currentChatId}`); // Reduced verbosity
         const chatListItems = document.querySelectorAll('.chat-list-item');
-        console.log(`[DEBUG] Found ${chatListItems.length} chat list items.`); // Added log
+        // console.log(`[DEBUG] Found ${chatListItems.length} chat list items.`); // Reduced verbosity
 
         chatListItems.forEach(item => {
             const chatId = parseInt(item.dataset.chatId);
             const timestampElement = item.querySelector('.text-xs'); // select the timestamp element
 
             if (chatId === currentChatId) {
-                console.log(`[DEBUG] Highlighting chat item ${chatId}`); // Added log
+                // console.log(`[DEBUG] Highlighting chat item ${chatId}`); // Reduced verbosity
                 item.classList.add('active');
                 timestampElement.classList.remove('text-rz-tab-background-text'); // Remove inactive color
                 timestampElement.classList.add('text-rz-sidebar-text'); // Add active color
             } else {
-                console.log(`[DEBUG] Deactivating chat item ${chatId}`); // Added log
+                // console.log(`[DEBUG] Deactivating chat item ${chatId}`); // Reduced verbosity
                 item.classList.remove('active');
                 timestampElement.classList.remove('text-rz-sidebar-text'); // Remove active color
                 timestampElement.classList.add('text-rz-tab-background-text'); // Add inactive color
             }
         });
-         console.log(`[DEBUG] updateActiveChatListItem finished.`); // Added log
+         // console.log(`[DEBUG] updateActiveChatListItem finished.`); // Reduced verbosity
     }
 
 
@@ -2118,10 +2121,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** Switches between the Chat and Notes sections. */
     async function switchTab(tabName) {
+        console.log(`[DEBUG] switchTab called for tab: ${tabName}. Current tab: ${currentTab}, isLoading: ${isLoading}`); // Added log
         if (isLoading || currentTab === tabName) return;
 
         currentTab = tabName;
         localStorage.setItem(ACTIVE_TAB_KEY, tabName); // Persist active tab
+        console.log(`[DEBUG] currentTab set to: ${currentTab}`); // Added log
 
         // Update button styles
         chatNavButton.classList.remove('active');
@@ -2144,6 +2149,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Load chat data if not already loaded or if switching back
             if (currentChatId === null) {
+                 console.log("[DEBUG] switchTab (chat): No currentChatId, loading initial chat."); // Added log
                  // This case should ideally be handled by initializeApp, but as a fallback
                  await loadSavedChats();
                  const firstChatElement = savedChatsList.querySelector('.list-item');
@@ -2153,6 +2159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                      await startNewChat();
                  }
             } else {
+                 console.log(`[DEBUG] switchTab (chat): currentChatId is ${currentChatId}, ensuring highlight.`); // Added log
                  // If chat is already loaded, just ensure highlighting is correct
                  updateActiveChatListItem();
             }
@@ -2177,8 +2184,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
             // Load notes data
+            console.log("[DEBUG] switchTab (notes): Loading notes data..."); // Added log
             await loadSavedNotes(); // Load the list of notes
             if (currentNoteId === null) {
+                 console.log("[DEBUG] switchTab (notes): No currentNoteId, loading most recent or starting new."); // Added log
                  // If no note is currently selected, load the most recent one or create a new one
                  const firstNoteElement = savedNotesList.querySelector('.list-item');
                  if (firstNoteElement) {
@@ -2187,9 +2196,11 @@ document.addEventListener('DOMContentLoaded', () => {
                      await startNewNote(); // Create and load a new note
                  }
             } else {
+                 console.log(`[DEBUG] switchTab (notes): currentNoteId is ${currentNoteId}, loading it.`); // Added log
                  // If a note is already selected, load its content
                  await loadNote(currentNoteId);
             }
+            console.log(`[DEBUG] switchTab (notes): Finished loading note ${currentNoteId}.`); // Added log
 
 
             // Focus notes textarea
@@ -2204,12 +2215,14 @@ document.addEventListener('DOMContentLoaded', () => {
         setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, bodyElement.classList.contains('plugins-collapsed'), PLUGINS_COLLAPSED_KEY, 'plugins');
 
         updateStatus(`Switched to ${tabName} section.`);
+        console.log(`[DEBUG] switchTab finished for tab: ${tabName}. isLoading: ${isLoading}`); // Added log
     }
 
     // --- Notes Feature Functions (MODIFIED for multiple notes) ---
 
     /** Creates a new note entry and loads it. */
     async function startNewNote() {
+        console.log(`[DEBUG] startNewNote called. isLoading: ${isLoading}`); // Added log
         if (isLoading) return;
         setLoadingState(true, "Creating Note");
         updateStatus("Creating new note...");
@@ -2225,9 +2238,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const newNote = await response.json(); // Expect the new note details back
+            console.log(`[DEBUG] startNewNote: Received new note ID ${newNote.id}. Loading it...`); // Added log
             await loadNote(newNote.id); // Load the newly created note
             await loadSavedNotes(); // Reload the list in the sidebar
             updateStatus(`New note created (ID: ${newNote.id}).`);
+            console.log(`[DEBUG] startNewNote: Successfully created and loaded note ${newNote.id}. currentNoteId is now ${currentNoteId}`); // Added log
             // No need to toggle sidebar collapse here, it's handled by switchTab
         } catch (error) {
             console.error('Error starting new note:', error);
@@ -2235,17 +2250,21 @@ document.addEventListener('DOMContentLoaded', () => {
             notesPreview.innerHTML = `<p class="text-red-500">Error creating new note: ${escapeHtml(error.message)}</p>`;
             notesTextarea.placeholder = "Could not create note.";
             updateStatus("Error creating new note.", true);
+            currentNoteId = null; // Ensure currentNoteId is null on error
+            console.error(`[DEBUG] startNewNote: Error occurred, currentNoteId set to null.`); // Added log
         } finally {
             setLoadingState(false);
+            console.log(`[DEBUG] startNewNote finally block. isLoading: ${isLoading}`); // Added log
         }
     }
 
 
     /** Loads the note content from the backend and displays it. */
     async function loadNote(noteId) {
+        console.log(`[DEBUG] loadNote(${noteId}) called. Current note: ${currentNoteId}, isLoading: ${isLoading}`); // Added log
         if (isLoading) return;
         if (noteId === currentNoteId) {
-             console.log(`[DEBUG] loadNote(${noteId}) called, but it's already the current note.`);
+             console.log(`[DEBUG] loadNote(${noteId}): Already the current note. Skipping reload.`); // Added log
              return; // Avoid reloading if already on this note
         }
         setLoadingState(true, "Loading Note");
@@ -2264,6 +2283,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             const data = await response.json(); // Expect note details {id, name, content, last_saved_at}
             currentNoteId = data.id; // Set current note ID
+            console.log(`[DEBUG] loadNote(${noteId}): Successfully fetched. Set currentNoteId to ${currentNoteId}`); // Added log
             currentNoteNameInput.value = data.name || ''; // Populate name input
             notesTextarea.value = data.content || ''; // Populate content textarea
             // Trigger markdown preview update manually after loading
@@ -2280,19 +2300,23 @@ document.addEventListener('DOMContentLoaded', () => {
             notesTextarea.placeholder = "Could not load note.";
             updateStatus(`Error loading note ${noteId}.`, true);
             currentNoteId = null; // Clear current note state on error
+            console.error(`[DEBUG] loadNote(${noteId}): Error occurred, currentNoteId set to null.`); // Added log
             currentNoteNameInput.value = '';
             currentNoteIdDisplay.textContent = 'ID: -';
             updateActiveNoteListItem(); // Remove highlight
             localStorage.removeItem(CURRENT_NOTE_ID_KEY); // Clear persisted ID
         } finally {
             setLoadingState(false);
+            console.log(`[DEBUG] loadNote(${noteId}) finally block. isLoading: ${isLoading}`); // Added log
         }
     }
 
     /** Saves the current note content and name to the backend. */
     async function saveNote() {
+        console.log(`[DEBUG] saveNote called. isLoading: ${isLoading}, currentNoteId: ${currentNoteId}`); // Added log
         if (isLoading || !currentNoteId) {
-             updateStatus("Cannot save note: No active note selected.", true);
+             updateStatus("Cannot save note: No active note selected or busy.", true);
+             console.warn(`[DEBUG] saveNote aborted. isLoading=${isLoading}, currentNoteId=${currentNoteId}`); // Added log
              return;
         }
         setLoadingState(true, "Saving Note");
@@ -2324,13 +2348,14 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus(`Error saving note: ${error.message}`, true);
         } finally {
             setLoadingState(false);
+            console.log(`[DEBUG] saveNote finally block. isLoading: ${isLoading}`); // Added log
         }
     }
 
     /** Loads all saved notes and populates the list in the sidebar. */
     async function loadSavedNotes() {
         updateStatus("Loading saved notes...");
-        console.log("[DEBUG] loadSavedNotes called.");
+        // console.log("[DEBUG] loadSavedNotes called."); // Reduced verbosity
         try {
             const response = await fetch('/api/notes'); // GET /api/notes
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -2389,12 +2414,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             updateActiveNoteListItem(); // Highlight the currently loaded note
             updateStatus("Saved notes loaded.");
-            console.log("[DEBUG] loadSavedNotes finished successfully.");
+            // console.log("[DEBUG] loadSavedNotes finished successfully."); // Reduced verbosity
         } catch (error) {
             console.error('Error loading saved notes:', error);
             savedNotesList.innerHTML = '<p class="text-red-500 text-sm p-1">Error loading notes.</p>';
             updateStatus("Error loading saved notes.", true);
-            console.log("[DEBUG] loadSavedNotes caught an error.");
+            // console.log("[DEBUG] loadSavedNotes caught an error."); // Reduced verbosity
             throw error;
         }
     }
@@ -2448,27 +2473,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** Updates the highlighting of the active note in the sidebar list. */
     function updateActiveNoteListItem() {
-        console.log(`[DEBUG] updateActiveNoteListItem called. currentNoteId: ${currentNoteId}`);
+        // console.log(`[DEBUG] updateActiveNoteListItem called. currentNoteId: ${currentNoteId}`); // Reduced verbosity
         const noteListItems = document.querySelectorAll('.note-list-item');
-        console.log(`[DEBUG] Found ${noteListItems.length} note list items.`);
+        // console.log(`[DEBUG] Found ${noteListItems.length} note list items.`); // Reduced verbosity
 
         noteListItems.forEach(item => {
             const noteId = parseInt(item.dataset.noteId);
             const timestampElement = item.querySelector('.text-xs');
 
             if (noteId === currentNoteId) {
-                console.log(`[DEBUG] Highlighting note item ${noteId}`);
+                // console.log(`[DEBUG] Highlighting note item ${noteId}`); // Reduced verbosity
                 item.classList.add('active');
                 timestampElement.classList.remove('text-rz-tab-background-text');
                 timestampElement.classList.add('text-rz-sidebar-text');
             } else {
-                console.log(`[DEBUG] Deactivating note item ${noteId}`);
+                // console.log(`[DEBUG] Deactivating note item ${noteId}`); // Reduced verbosity
                 item.classList.remove('active');
                 timestampElement.classList.remove('text-rz-sidebar-text');
                 timestampElement.classList.add('text-rz-tab-background-text');
             }
         });
-        console.log(`[DEBUG] updateActiveNoteListItem finished.`);
+        // console.log(`[DEBUG] updateActiveNoteListItem finished.`); // Reduced verbosity
     }
 
 
@@ -2595,13 +2620,13 @@ document.addEventListener('DOMContentLoaded', () => {
             setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, pluginSidebarCollapsed, PLUGINS_COLLAPSED_KEY, 'plugins');
             setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
             setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY);
-            console.log("[DEBUG] Sidebar/Plugin collapse states loaded and applied."); // Added log
+            // console.log("[DEBUG] Sidebar/Plugin collapse states loaded and applied."); // Reduced verbosity
 
 
             // Load Calendar Context Active state (toggle next to input)
             isCalendarContextActive = localStorage.getItem('calendarContextActive') === 'true';
             calendarToggle.checked = isCalendarContextActive;
-            console.log(`[DEBUG] Calendar context active state loaded: ${isCalendarContextActive}.`); // Added log
+            // console.log(`[DEBUG] Calendar context active state loaded: ${isCalendarContextActive}.`); // Reduced verbosity
             // updateCalendarStatus() is called after loading plugin enabled state
 
             // Load Streaming toggle state (default to true if not found)
@@ -2609,34 +2634,34 @@ document.addEventListener('DOMContentLoaded', () => {
             // localStorage stores strings, convert 'true'/'false' to boolean
             isStreamingEnabled = storedStreamingState === null ? true : storedStreamingState === 'true';
             streamingToggle.checked = isStreamingEnabled;
-            console.log(`[DEBUG] Streaming enabled state loaded: ${isStreamingEnabled}.`); // Added log
+            // console.log(`[DEBUG] Streaming enabled state loaded: ${isStreamingEnabled}.`); // Reduced verbosity
 
 
             // Load Plugin Enabled states (default to true if not found)
             const storedFilesPluginState = localStorage.getItem(FILES_PLUGIN_ENABLED_KEY);
             isFilePluginEnabled = storedFilesPluginState === null ? true : storedFilesPluginState === 'true';
             filesPluginToggle.checked = isFilePluginEnabled; // Update settings modal toggle
-            console.log(`[DEBUG] Files plugin enabled state loaded: ${isFilePluginEnabled}.`); // Added log
+            // console.log(`[DEBUG] Files plugin enabled state loaded: ${isFilePluginEnabled}.`); // Reduced verbosity
 
 
             const storedCalendarPluginState = localStorage.getItem(CALENDAR_PLUGIN_ENABLED_KEY);
             isCalendarPluginEnabled = storedCalendarPluginState === null ? true : storedCalendarPluginState === 'true';
             calendarPluginToggle.checked = isCalendarPluginEnabled; // Update settings modal toggle
-            console.log(`[DEBUG] Calendar plugin enabled state loaded: ${isCalendarPluginEnabled}.`); // Added log
+            // console.log(`[DEBUG] Calendar plugin enabled state loaded: ${isCalendarPluginEnabled}.`); // Reduced verbosity
 
             // New: Load Web Search Plugin Enabled state (default to true if not found)
             const storedWebSearchPluginState = localStorage.getItem(WEB_SEARCH_PLUGIN_ENABLED_KEY);
             isWebSearchPluginEnabled = storedWebSearchPluginState === null ? true : storedWebSearchPluginState === 'true';
             webSearchPluginToggle.checked = isWebSearchPluginEnabled; // Update settings modal toggle
-            console.log(`[DEBUG] Web Search plugin enabled state loaded: ${isWebSearchPluginEnabled}.`); // Added log
+            // console.log(`[DEBUG] Web Search plugin enabled state loaded: ${isWebSearchPluginEnabled}.`); // Reduced verbosity
 
 
             // Update UI visibility based on loaded plugin states
             updatePluginUI();
-            console.log("[DEBUG] Plugin UI visibility updated."); // Added log
+            // console.log("[DEBUG] Plugin UI visibility updated."); // Reduced verbosity
             // Now update calendar status based on loaded context and plugin state
             updateCalendarStatus();
-            console.log("[DEBUG] Calendar status updated.");
+            // console.log("[DEBUG] Calendar status updated.");
 
 
             // Load and set initial tab state from localStorage (default to 'chat')
@@ -2654,30 +2679,30 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentTab === 'chat') {
                  console.log("[DEBUG] Initializing Chat tab.");
                  // Load chats and then the most recent chat
-                 console.log("[DEBUG] Calling loadSavedChats...");
+                 // console.log("[DEBUG] Calling loadSavedChats..."); // Reduced verbosity
                  await loadSavedChats(); // This will now re-throw if it fails
-                 console.log("[DEBUG] loadSavedChats completed.");
+                 // console.log("[DEBUG] loadSavedChats completed."); // Reduced verbosity
 
                  const firstChatElement = savedChatsList.querySelector('.list-item');
-                 console.log(`[DEBUG] First chat element found: ${firstChatElement ? 'Yes' : 'No'}`);
+                 // console.log(`[DEBUG] First chat element found: ${firstChatElement ? 'Yes' : 'No'}`); // Reduced verbosity
 
                  if (firstChatElement) {
                      const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
-                     console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`);
+                     // console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`); // Reduced verbosity
                      // loadChat sets currentChatId, loads history/files, and calls updateActiveChatListItem
                      await loadChat(mostRecentChatId); // This will now re-throw if it fails (including file loading)
-                     console.log(`[DEBUG] loadChat(${mostRecentChatId}) completed.`);
+                     // console.log(`[DEBUG] loadChat(${mostRecentChatId}) completed.`); // Reduced verbosity
                  } else {
                      console.log("[DEBUG] No saved chats found, starting new chat.");
                      // startNewChat calls loadChat internally, which sets currentChatId, loads files, and calls updateActiveChatListItem
                      await startNewChat(); // This calls loadChat internally and will re-throw if it fails
-                     console.log("[DEBUG] startNewChat completed.");
+                     // console.log("[DEBUG] startNewChat completed."); // Reduced verbosity
                  }
                  // After loadChat/startNewChat completes, currentChatId should be set
                  console.log(`[DEBUG] initializeApp finished chat loading. Final currentChatId: ${currentChatId}`);
 
                  renderSelectedFiles(); // Render any initially selected files (though none on fresh load)
-                 console.log("[DEBUG] Selected files rendered.");
+                 // console.log("[DEBUG] Selected files rendered."); // Reduced verbosity
 
                  // Ensure chat section is visible and notes is hidden
                  chatSection.classList.remove('hidden');
