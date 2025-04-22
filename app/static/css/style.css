@@ -473,7 +473,7 @@
 }
  .list-item.active {
      background-color: var(--rz-sidebar-active-bg);
-     /* color: var(--rz-sidebar-active-text); REMOVED - color is handled by children classes */
+     /* REMOVED: color: var(--rz-sidebar-active-text); */ /* Remove this line */
      font-weight: 500;
 }
  /* REMOVED old active-selection rule */
