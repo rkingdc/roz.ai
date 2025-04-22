@@ -132,6 +132,9 @@
      border: 1px solid var(--rz-tab-line);
      background-color: var(--rz-toolbar-field);
      color: var(--rz-toolbar-field-text);
+     /* Added width: auto and min-width */
+     width: auto; /* Allow width to be determined by content */
+     min-width: 120px; /* Set a minimum width */
 }
  #model-selector option {
      background-color: var(--rz-toolbar-field);

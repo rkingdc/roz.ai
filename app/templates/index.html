@@ -104,7 +104,8 @@
                  {# Changed flex items-center gap-2 to flex flex-col items-center gap-1 #}
                  <div id="model-selector-container" class="flex flex-col items-center gap-1">
                     <label for="model-selector" class="text-sm font-medium text-rz-header-text">Model:</label>
-                    <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line w-32">
+                    {# Removed w-32 class #}
+                    <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line">
                         {% for model in available_models %}
                             <option class="bg-rz-toolbar-field" value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
                         {% endfor %}
