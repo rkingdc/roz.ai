@@ -116,13 +116,12 @@ stop:
 start-dev: upgrade # Depends on upgrade now
 	@echo "Starting application in development mode with temporary file database using Uvicorn..."
 	# Clean up previous temporary dev database file if it exists
-	@echo "Cleaning up previous temporary dev database file..."
+	@echo "Cleaning up temporary dev database file..."
 	@rm -f /tmp/assistant_dev_db.sqlite
 	# Migrations will create/update the temporary database file via 'make upgrade' dependency
 	@echo "Starting Uvicorn development server..."
-	# Start uvicorn using run.py (which now uses uvicorn.run with factory)
-	# Set DB name, TEST_DATABASE flag (optional, depends on test setup), IS_DEV_SERVER flag, and enable debug/reload
-	@DATABASE_NAME=/tmp/assistant_dev_db.sqlite TEST_DATABASE=TRUE IS_DEV_SERVER=TRUE $(PYTHON) $(RUN_FILE)
+	# Start uvicorn using the import string run:asgi_app and set environment variables
+	@DATABASE_NAME=/tmp/assistant_dev_db.sqlite TEST_DATABASE=TRUE IS_DEV_SERVER=TRUE $(PYTHON) -m uvicorn run:asgi_app --host 127.0.0.1 --port 5000 --log-level info --reload
 
 
 # Target to display help
