@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setLoadingState(true, "Deleting File");
-        updateStatus(`Deleting file ${fileId}...`);
+        // updateStatus(`Deleting file ${fileId}...`); // Status updated by setLoadingState
 
         try {
             const response = await fetch(`/api/files/${fileId}`, {
@@ -366,7 +366,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error deleting file:', error);
             updateStatus(`Error deleting file: ${error.message}`, true);
         } finally {
-            setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
         }
     }
 
@@ -812,7 +812,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return; // Exit early if plugin is disabled
         }
 
-        updateStatus("Loading uploaded files...");
+        setLoadingState(true, "Loading Files"); // <-- Added setLoadingState(true)
+        // updateStatus("Loading uploaded files..."); // Status updated by setLoadingState
         // Clear both lists and show loading state
         uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading...</p>`;
         manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Loading...</p>`;
@@ -986,7 +987,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus("Error loading files.", true);
             throw error; // Re-throw the error
         } finally {
-            // REMOVED: setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
         }
     }
 
@@ -1007,7 +1008,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         const files = event.target.files;
-        if (!files || files.length === 0) return;
+        if (!files || files.length === 0) {
+             fileUploadModalInput.value = ''; // Reset input even if no files selected
+             return;
+        }
         setLoadingState(true, "Uploading");
         // updateStatus("Uploading files..."); // Status bar already updated by setLoadingState
 
@@ -1048,7 +1052,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus(`Error uploading files: ${error.message}`, true);
         }).finally(async () => {
             await loadUploadedFiles(); // Reload *both* lists
-            setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
             fileUploadModalInput.value = ''; // Reset modal file input
         });
     }
@@ -1109,7 +1113,7 @@ document.addEventListener('DOMContentLoaded', () => {
             urlStatus.textContent = `Error: ${error.message}`;
             urlStatus.classList.add('text-red-500');
         } finally {
-            setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
         }
     }
 
@@ -1244,7 +1248,10 @@ document.addEventListener('DOMContentLoaded', () => {
         summaryStatus.classList.remove('text-red-500');
         summaryModal.style.display = "block";
         saveSummaryButton.disabled = true;
-        updateStatus(`Fetching summary for ${filename}...`);
+
+        setLoadingState(true, "Fetching Summary"); // <-- Added setLoadingState(true)
+        // updateStatus(`Fetching summary for ${filename}...`); // Status updated by setLoadingState
+
         try {
             const response = await fetch(`/api/files/${fileId}/summary`);
             if (!response.ok) {
@@ -1272,7 +1279,7 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryStatus.classList.add('text-red-500');
             // No re-throw needed here as this is not part of the critical init path
         } finally {
-            setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
         }
     }
     async function saveSummary() {
@@ -1316,7 +1323,7 @@ document.addEventListener('DOMContentLoaded', () => {
             summaryStatus.classList.add('text-red-500');
             // No re-throw needed here
         } finally {
-            setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
         }
     }
 
@@ -1397,7 +1404,7 @@ document.addEventListener('DOMContentLoaded', () => {
          }
 
         setLoadingState(true, "Loading Events");
-        updateStatus("Loading calendar events...");
+        // updateStatus("Loading calendar events..."); // Status updated by setLoadingState
 
         try {
             const response = await fetch('/api/calendar/events');
@@ -1423,7 +1430,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus(`Error loading calendar events: ${error.message}`, true);
             // No re-throw needed here as this is not part of the critical init path
         } finally {
-            // REMOVED: setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
         }
     }
 
@@ -1495,7 +1502,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     async function loadSavedChats() {
-        updateStatus("Loading saved chats...");
+        setLoadingState(true, "Loading Chats"); // <-- Added setLoadingState(true)
+        // updateStatus("Loading saved chats..."); // Status updated by setLoadingState
         // console.log("[DEBUG] loadSavedChats called."); // Reduced verbosity
         try {
             const response = await fetch('/api/chats');
@@ -1567,7 +1575,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // console.log("[DEBUG] loadSavedChats caught an error."); // Reduced verbosity
             throw error; // Re-throw the error
         } finally {
-            // REMOVED: setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
             // console.log("[DEBUG] setLoadingState(false) called in loadSavedChats finally block."); // Added log
         }
     }
@@ -1578,7 +1586,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function startNewChat() {
         // REMOVED: if (isLoading) return;
         setLoadingState(true, "Creating Chat");
-        updateStatus("Creating new chat...");
+        // updateStatus("Creating new chat..."); // Status updated by setLoadingState
         try {
             const response = await fetch('/api/chat', {
                 method: 'POST'
@@ -1625,7 +1633,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // console.log(`[DEBUG] loadChat(${chatId}) called.`); // Reduced verbosity
         // REMOVED: if (isLoading) { console.log(`[DEBUG] loadChat(${chatId}) skipped, isLoading is true.`); return; }
         setLoadingState(true, "Loading Chat");
-        updateStatus(`Loading chat ${chatId}...`);
+        // updateStatus(`Loading chat ${chatId}...`); // Status updated by setLoadingState
         clearChatbox();
         addMessage('system', `Loading chat (ID: ${chatId})...`);
         // console.log(`[DEBUG] Chatbox cleared and loading message added for chat ${chatId}.`); // Reduced verbosity
@@ -1756,7 +1764,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             throw error; // Re-throw the error so initializeApp's catch block can handle it if this was the initial load
         } finally {
-            // REMOVED: setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
             // console.log("[DEBUG] setLoadingState(false) called in loadChat finally block."); // Added log
         }
     }
@@ -1820,7 +1828,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         setLoadingState(true, "Sending");
-        updateStatus("Sending message...");
+        // updateStatus("Sending message..."); // Status updated by setLoadingState
 
         // --- Prepare payload for backend ---
         const payload = {
@@ -1955,7 +1963,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const newName = currentChatNameInput.value.trim();
         setLoadingState(true, "Saving Name");
-        updateStatus(`Saving name for chat ${currentChatId}...`);
+        // updateStatus(`Saving name for chat ${currentChatId}...`); // Status updated by setLoadingState
         try {
             const response = await fetch(`/api/chat/${currentChatId}/name`, {
                 method: 'PUT',
@@ -1975,8 +1983,23 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error saving chat name:', error);
             updateStatus(`Error saving name: ${error.message}`, true);
+            // Revert model selector on error
+            if (currentChatId) {
+                 // Need to fetch chat details to get the current model
+                 fetch(`/api/chat/${currentChatId}`)
+                     .then(response => response.json())
+                     .then(data => {
+                         modelSelector.value = data.details.model_name || defaultModel;
+                     })
+                     .catch(error => {
+                         console.error("Error fetching chat details for model revert:", error);
+                         modelSelector.value = defaultModel; // Fallback
+                     });
+             } else {
+                 modelSelector.value = defaultModel; // Fallback if no current chat
+             }
         } finally {
-            setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
         }
     }
     async function handleDeleteChat(chatId, listItemElement) {
@@ -1991,7 +2014,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         setLoadingState(true, "Deleting Chat");
-        updateStatus(`Deleting chat ${chatId}...`);
+        // updateStatus(`Deleting chat ${chatId}...`); // Status updated by setLoadingState
         try {
             // AWAIT the fetch call to ensure the backend deletion completes before proceeding
             const response = await fetch(`/api/chat/${chatId}`, {
@@ -2027,7 +2050,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // The list will only be reloaded on success or if the current chat is deleted.
             // This seems correct.
         } finally {
-            setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
         }
     }
 
@@ -2079,8 +2102,8 @@ document.addEventListener('DOMContentLoaded', () => {
          }
 
         const newModel = modelSelector.value;
-        updateStatus(`Updating model to ${newModel}...`);
         setLoadingState(true, "Updating Model");
+        // updateStatus(`Updating model to ${newModel}...`); // Status updated by setLoadingState
         try {
             const response = await fetch(`/api/chat/${currentChatId}/model`, {
                 method: 'PUT',
@@ -2115,7 +2138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  modelSelector.value = defaultModel; // Fallback if no current chat
              }
         } finally {
-            setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
         }
     }
 
@@ -2146,7 +2169,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /** Handles changes to the Files plugin toggle switch. */
     function handleFilesPluginToggle() {
-        isFilePluginEnabled = filesPluginToggle.checked;
+        isFilesPluginEnabled = filesPluginToggle.checked;
         localStorage.setItem(FILES_PLUGIN_ENABLED_KEY, isFilePluginEnabled); // Persist toggle state
         updatePluginUI(); // Update UI visibility
         updateStatus(`Files plugin ${isFilePluginEnabled ? 'enabled' : 'disabled'}.`);
@@ -2503,7 +2526,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`[DEBUG] startNewNote called. isLoading: ${isLoading}`); // Added log
         if (isLoading) return;
         setLoadingState(true, "Creating Note");
-        updateStatus("Creating new note...");
+        // updateStatus("Creating new note..."); // Status updated by setLoadingState
         notesTextarea.value = ""; // Clear textarea while creating
         notesPreview.innerHTML = ""; // Clear preview while creating
         currentNoteNameInput.value = "New Note"; // Set default name
@@ -2533,7 +2556,7 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.removeItem(CURRENT_NOTE_ID_KEY); // Clear persisted ID on error
             console.error(`[DEBUG] startNewNote: Error occurred, currentNoteId set to null.`); // Added log
         } finally {
-            setLoadingState(false);
+            setLoadingState(false); // This one is NOT commented out.
             console.log(`[DEBUG] startNewNote finally block. isLoading: ${isLoading}`); // Added log
         }
     }
@@ -2549,7 +2572,7 @@ document.addEventListener('DOMContentLoaded', () => {
         //      return; // Avoid reloading if already on this note
         // }
         setLoadingState(true, "Loading Note");
-        updateStatus(`Loading note ${noteId}...`);
+        // updateStatus(`Loading note ${noteId}...`); // Status updated by setLoadingState
         notesTextarea.value = ""; // Clear textarea while loading
         notesPreview.innerHTML = ""; // Clear preview while loading
         currentNoteNameInput.value = ""; // Clear name while loading
@@ -2594,7 +2617,7 @@ document.addEventListener('DOMContentLoaded', () => {
             switchNoteMode('edit');
             notesTextarea.disabled = true; // Disable input on fatal error
         } finally {
-            // REMOVED: setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
             // console.log("[DEBUG] setLoadingState(false) called in loadNote finally block."); // Added log
         }
     }
@@ -2608,7 +2631,7 @@ document.addEventListener('DOMContentLoaded', () => {
              return;
         }
         setLoadingState(true, "Saving Note");
-        updateStatus(`Saving note ${currentNoteId}...`);
+        // updateStatus(`Saving note ${currentNoteId}...`); // Status updated by setLoadingState
 
         const noteName = currentNoteNameInput.value.trim();
         const noteContent = notesTextarea.value;
@@ -2635,14 +2658,15 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(`Error saving note ${currentNoteId}:`, error);
             updateStatus(`Error saving note: ${error.message}`, true);
         } finally {
-            setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
             console.log(`[DEBUG] saveNote finally block. isLoading: ${isLoading}`); // Added log
         }
     }
 
     /** Loads all saved notes and populates the list in the sidebar. */
     async function loadSavedNotes() {
-        updateStatus("Loading saved notes...");
+        setLoadingState(true, "Loading Notes"); // <-- Added setLoadingState(true)
+        // updateStatus("Loading saved notes..."); // Status updated by setLoadingState
         // console.log("[DEBUG] loadSavedNotes called."); // Reduced verbosity
         try {
             const response = await fetch('/api/notes'); // GET /api/notes
@@ -2710,7 +2734,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // console.log("[DEBUG] loadSavedNotes caught an error."); // Reduced verbosity
             throw error;
         } finally {
-            // REMOVED: setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
             // console.log("[DEBUG] setLoadingState(false) called in loadSavedNotes finally block."); // Added log
         }
     }
@@ -2723,7 +2747,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         setLoadingState(true, "Deleting Note");
-        updateStatus(`Deleting note ${noteId}...`);
+        // updateStatus(`Deleting note ${noteId}...`); // Status updated by setLoadingState
         try {
             const response = await fetch(`/api/note/${noteId}`, { // DELETE /api/note/<id>
                 method: 'DELETE'
@@ -2761,7 +2785,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  notesTextarea.disabled = true;
             }
         } finally {
-            setLoadingState(false);
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
         }
     }
 
