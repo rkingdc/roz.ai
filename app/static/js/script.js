@@ -239,6 +239,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const notesModeButtons = document.getElementById('notes-mode-buttons'); // Container for mode buttons
     const editNoteButton = document.getElementById('edit-note-btn');
     const viewNoteButton = document.getElementById('view-note-btn');
+    const markdownTipsButton = document.getElementById('markdown-tips-btn'); // New: Markdown Tips button
+
+    // New Markdown Tips Modal References
+    const markdownTipsModal = document.getElementById('markdown-tips-modal');
+    const closeMarkdownTipsModalButton = document.getElementById('close-markdown-tips-modal');
 
 
     // Application State (Re-declare or ensure access to global state if needed)
@@ -338,6 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
         saveNoteNameButton.disabled = loading; // New: Disable Save Note Name button
         editNoteButton.disabled = loading; // Disable notes mode buttons
         viewNoteButton.disabled = loading; // Disable notes mode buttons
+        markdownTipsButton.disabled = loading; // New: Disable markdown tips button
+        console.log(`[DEBUG] setLoadingState (Notes Tab): newNoteButton disabled=${newNoteButton.disabled}, saveNoteNameButton disabled=${saveNoteNameButton.disabled}, editNoteButton disabled=${editNoteButton.disabled}, viewNoteButton disabled=${viewNoteButton.disabled}, markdownTipsButton disabled=${markdownTipsButton.disabled}`); // Added log
 
 
         // Sidebar/Modal/Settings elements
@@ -388,7 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
              saveNoteNameButton.disabled = true; // Disable Save Note Name button
              editNoteButton.disabled = true; // Disable notes mode buttons when on chat tab
              viewNoteButton.disabled = true; // Disable notes mode buttons when on chat tab
-             console.log(`[DEBUG] setLoadingState (Chat Tab): newNoteButton disabled=${newNoteButton.disabled}, saveNoteNameButton disabled=${saveNoteNameButton.disabled}, editNoteButton disabled=${editNoteButton.disabled}, viewNoteButton disabled=${viewNoteButton.disabled}`); // Added log
+             markdownTipsButton.disabled = true; // New: Disable markdown tips button when on chat tab
+             console.log(`[DEBUG] setLoadingState (Chat Tab): newNoteButton disabled=${newNoteButton.disabled}, saveNoteNameButton disabled=${saveNoteNameButton.disabled}, editNoteButton disabled=${editNoteButton.disabled}, viewNoteButton disabled=${viewNoteButton.disabled}, markdownTipsButton disabled=${markdownTipsButton.disabled}`); // Added log
         } else if (currentTab === 'notes') {
              // saveNoteButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-1"></i> ${operation}...` : '<i class="fas fa-save mr-1"></i> Save Note'; // Button moved
              sendButton.innerHTML = '<i class="fas fa-paper-plane"></i> Send'; // Reset chat button if on notes tab
@@ -397,7 +405,8 @@ document.addEventListener('DOMContentLoaded', () => {
              saveNoteNameButton.disabled = loading; // Enable/Disable Save Note Name button
              editNoteButton.disabled = loading; // Enable/Disable notes mode buttons
              viewNoteButton.disabled = loading; // Enable/Disable notes mode buttons
-             console.log(`[DEBUG] setLoadingState (Notes Tab): newNoteButton disabled=${newNoteButton.disabled}, saveNoteNameButton disabled=${saveNoteNameButton.disabled}, editNoteButton disabled=${editNoteButton.disabled}, viewNoteButton disabled=${viewNoteButton.disabled}`); // Added log
+             markdownTipsButton.disabled = loading; // New: Enable/Disable markdown tips button
+             console.log(`[DEBUG] setLoadingState (Notes Tab): newNoteButton disabled=${newNoteButton.disabled}, saveNoteNameButton disabled=${saveNoteNameButton.disabled}, editNoteButton disabled=${editNoteButton.disabled}, viewNoteButton disabled=${viewNoteButton.disabled}, markdownTipsButton disabled=${markdownTipsButton.disabled}`); // Added log
         }
 
 
@@ -406,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             updateStatus("Idle");
             // Only focus if no modals are open and sidebars are not collapsed AND on the correct tab
-            if (manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
+            if (manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && markdownTipsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
                  if (currentTab === 'chat') {
                      messageInput.focus();
                  } else if (currentTab === 'notes') {
@@ -443,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem(storageKey, 'false');
         }
         // Only focus if no modals are open and sidebars are not collapsed AND on the correct tab
-        if (!collapsed && !isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
+        if (!collapsed && !isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && markdownTipsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
             setTimeout(() => {
                 if (currentTab === 'chat') {
                     messageInput.focus();
@@ -1256,19 +1265,24 @@ document.addEventListener('DOMContentLoaded', () => {
              // No specific element to focus in the manage files modal, maybe just ensure it's interactive
          } else if (modalElement === manageFilesModal) {
              // If the manage files modal was closed, ensure focus returns to message input (if on chat tab)
-             if (!isLoading && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
+             if (!isLoading && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && markdownTipsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
                  if (currentTab === 'chat') messageInput.focus();
              }
          } else if (modalElement === settingsModal) {
              // If the settings modal was closed, ensure focus returns to message input/notes textarea
-             if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
+             if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && markdownTipsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
                  if (currentTab === 'chat') messageInput.focus();
                  else if (currentTab === 'notes' && currentNoteMode === 'edit') notesTextarea.focus(); // Only focus textarea if in edit mode
+             }
+         } else if (modalElement === markdownTipsModal) { // New: Handle closing markdown tips modal
+             // If the markdown tips modal was closed, ensure focus returns to the notes textarea (if on notes tab and in edit mode)
+             if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
+                 if (currentTab === 'notes' && currentNoteMode === 'edit') notesTextarea.focus();
              }
          }
          else {
              // Default case, focus message input/notes textarea if no modals are open
-             if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
+             if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && markdownTipsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
                  if (currentTab === 'chat') messageInput.focus();
                  else if (currentTab === 'notes' && currentNoteMode === 'edit') notesTextarea.focus(); // Only focus textarea if in edit mode
              }
@@ -2178,6 +2192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('input-area').classList.remove('hidden'); // Show chat input area
             modelSelectorContainer.classList.remove('hidden'); // Show model selector
             notesModeButtons.classList.add('hidden'); // Hide notes mode buttons
+            markdownTipsButton.classList.add('hidden'); // New: Hide markdown tips button
 
             // Show chat sidebar content, hide notes sidebar content
             chatSidebarContent.classList.remove('hidden');
@@ -2219,6 +2234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
             modelSelectorContainer.classList.add('hidden'); // Hide model selector
             notesModeButtons.classList.remove('hidden'); // Show notes mode buttons
+            markdownTipsButton.classList.remove('hidden'); // New: Show markdown tips button
 
             // Hide chat sidebar content, show notes sidebar content
             chatSidebarContent.classList.add('hidden');
@@ -2652,6 +2668,24 @@ document.addEventListener('DOMContentLoaded', () => {
         notesPreview.innerHTML = String(marked.parse(markdownText, markedOptions));
     }
 
+    // --- New Markdown Tips Modal Functions ---
+
+    /** Shows the Markdown Tips modal. */
+    function showMarkdownTipsModal() {
+        if (isLoading) return;
+        // Only show if we are on the notes tab
+        if (currentTab !== 'notes') {
+             updateStatus("Markdown tips are only available in the Notes section.", true);
+             return;
+         }
+        markdownTipsModal.style.display = "block";
+    }
+
+    /** Closes the Markdown Tips modal. */
+    function closeMarkdownTipsModal() {
+        closeModal(markdownTipsModal); // Use generic close modal function
+    }
+
 
     // --- Event Listeners Setup (MUST be inside DOMContentLoaded) ---
     sendButton.addEventListener('click', sendMessage);
@@ -2750,6 +2784,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // New Notes Mode Button Listeners
     editNoteButton.addEventListener('click', () => switchNoteMode('edit'));
     viewNoteButton.addEventListener('click', () => switchNoteMode('view'));
+    markdownTipsButton.addEventListener('click', showMarkdownTipsModal); // New: Listener for Markdown Tips button
+
+    // New Markdown Tips Modal Listeners
+    closeMarkdownTipsModalButton.addEventListener('click', closeMarkdownTipsModal);
+    markdownTipsModal.addEventListener('click', (event) => {
+        if (event.target === markdownTipsModal) {
+            closeMarkdownTipsModal();
+        }
+    });
 
 
     // --- Initial Application Load (MUST be inside DOMContentLoaded) ---
@@ -2868,6 +2911,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  document.getElementById('input-area').classList.remove('hidden');
                  modelSelectorContainer.classList.remove('hidden'); // Show model selector
                  notesModeButtons.classList.add('hidden'); // Hide notes mode buttons
+                 markdownTipsButton.classList.add('hidden'); // New: Hide markdown tips button
                  chatSidebarContent.classList.remove('hidden'); // Show chat sidebar content
                  notesSidebarContent.classList.add('hidden'); // Hide notes sidebar content
                  sidebar.classList.remove('hidden'); // Ensure chat sidebar is visible
@@ -2915,6 +2959,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
                  modelSelectorContainer.classList.add('hidden'); // Hide model selector
                  notesModeButtons.classList.remove('hidden'); // Show notes mode buttons
+                 markdownTipsButton.classList.remove('hidden'); // New: Show markdown tips button
                  chatSidebarContent.classList.add('hidden'); // Hide chat sidebar content
                  notesSidebarContent.classList.remove('hidden'); // Show notes sidebar content
                  sidebar.classList.remove('hidden'); // Ensure chat sidebar is visible

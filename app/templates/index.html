@@ -113,6 +113,11 @@
                       <i class="fas fa-eye mr-1"></i> View
                     </button>
                 </div>
+                <!-- New Markdown Tips Button -->
+                <button id="markdown-tips-btn" class="ml-2 p-1 rounded text-rz-header-text hover:bg-rz-toolbar-field" title="Markdown Tips">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+                <!-- End New Markdown Tips Button -->
             </div>
             <!-- End Center container -->
 
@@ -399,6 +404,39 @@
         </div>
     </div>
 
+    <!-- New Markdown Tips Modal -->
+    <div id="markdown-tips-modal" class="modal">
+        <div class="modal-content max-w-xl w-full">
+            <div class="modal-header">
+                <h3 class="modal-title">Markdown Quick Tips</h3>
+                <button class="close-btn" id="close-markdown-tips-modal" title="Close">&times;</button>
+            </div>
+            <div class="modal-body prose dark:prose-invert max-w-none overflow-y-auto" style="max-height: 70vh;">
+                <p>Here are some common Markdown elements you can use in your notes:</p>
 
-</body>
-</html>
+                <h4>Headers</h4>
+                <p>Use `#` followed by a space for headers. The number of `#` determines the level (up to 6).</p>
+                <pre><code class="language-markdown"># Header 1
+## Header 2
+### Header 3</code></pre>
+
+                <h4>Emphasis</h4>
+                <p>Use asterisks or underscores for bold and italic text.</p>
+                <pre><code class="language-markdown">*italic text* or _italic text_
+**bold text** or __bold text__
+***bold and italic*** or ___bold and italic___</code></pre>
+
+                <h4>Lists</h4>
+                <p>Use asterisks (`*`), hyphens (`-`), or plus signs (`+`) for unordered lists, and numbers followed by a period for ordered lists. Indent items for nested lists.</p>
+                <pre><code class="language-markdown">* Item 1
+* Item 2
+  * Sub-item
+
+1. First item
+2. Second item
+   1. Sub-item</code></pre>
+
+                <h4>Code</h4>
+                <p>Use backticks (`) for inline code and triple backticks (```) for code blocks. You can specify a language after the opening triple backticks for syntax highlighting.</p>
+                <pre><code class="language-markdown">This is `inline code`.
+
