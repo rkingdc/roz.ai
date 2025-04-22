@@ -21,7 +21,7 @@ test:
 .PHONY: stop
 stop:
 	@echo "Stopping application..."
-	@-ps -aux | grep [a]ssistant | grep python | grep gunicorn  | awk '{print $2}' | xargs kill -2  2> /dev/null
+	@-ps -aux | grep [a]ssistant | grep python | grep gunicorn  | awk '{print $2}' | xargs kill -2  2> /dev_null
 	# Add cleanup for the temporary dev database file (useful if 'start-dev' was interrupted)
 	@echo "Cleaning up temporary dev database file..."
 	@rm -f $(DEV_DB_PATH)
