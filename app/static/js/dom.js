@@ -52,6 +52,15 @@ export const elements = {
     loadCalendarButton: null,
     calendarStatus: null,
     viewCalendarButton: null,
+    // Removed Web Search Plugin Section elements
+    // webSearchPluginSection: null,
+    // webSearchPluginHeader: null,
+    // webSearchPluginContent: null,
+    historyPluginSection: null, // Added history plugin elements
+    historyPluginHeader: null,
+    historyPluginContent: null,
+    noteHistoryList: null,
+
 
     // Main Content Area Elements
     chatSection: null,
@@ -191,6 +200,11 @@ export function populateElements() {
     elements.markdownTipsModal = document.getElementById('markdown-tips-modal');
     elements.closeMarkdownTipsModalButton = document.getElementById('close-markdown-tips-modal');
     elements.inputArea = document.getElementById('input-area');
+    elements.historyPluginSection = document.getElementById('history-plugin-section'); // Added history plugin elements
+    elements.historyPluginHeader = document.getElementById('history-plugin-header');
+    elements.historyPluginContent = document.getElementById('history-plugin-content');
+    elements.noteHistoryList = document.getElementById('note-history-list');
+
 
     // Basic check
     if (!elements.bodyElement || !elements.statusBar || !elements.chatbox) {

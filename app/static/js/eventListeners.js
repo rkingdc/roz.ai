@@ -478,7 +478,7 @@ function subscribeStateChangeListeners() {
     state.subscribe('currentTab', ui.handleStateChange_currentTab);
 
     // --- NEW: Subscribe UI to noteHistory state change ---
-    state.subscribe('noteHistory', ui.renderNoteHistory);
+    state.subscribe('noteHistory', ui.handleStateChange_noteHistory); // Corrected handler name
     // ----------------------------------------------------
 }
 

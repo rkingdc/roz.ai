@@ -188,6 +188,7 @@ export function renderSavedChats() {
 /**
  * Helper to create chat list item DOM element.
  * @param {Object} chat - The chat object { id, name, last_updated_at }.
+ * @returns {HTMLElement} The created div element.
  */
 function createChatItem(chat) {
     const { savedChatsList } = elements;
@@ -205,6 +206,7 @@ function createChatItem(chat) {
 
     const nameSpan = document.createElement('span');
     // Use only 'filename' class as per CORRECT HTML - color handled by CSS
+    // Remove truncate and flex-grow as they conflict with list-item's column flex
     nameSpan.classList.add('filename'); // Use specific class
     nameSpan.textContent = chat.name || `Chat ${chat.id}`;
     nameSpan.title = chat.name || `Chat ${chat.id}`; // Add title for tooltip
@@ -350,6 +352,7 @@ export function renderSavedNotes() {
 /**
  * Helper to create note list item DOM element.
  * @param {Object} note - The note object { id, name, last_saved_at }.
+ * @returns {HTMLElement} The created div element.
  */
 function createNoteItem(note) {
     const { savedNotesList } = elements;
@@ -367,6 +370,7 @@ function createNoteItem(note) {
 
     const nameSpan = document.createElement('span');
     // Use only 'filename' class as per provided HTML - color handled by CSS
+    // Remove truncate and flex-grow as they conflict with list-item's column flex
     nameSpan.classList.add('filename'); // Use specific class
     nameSpan.textContent = note.name || `Note ${note.id}`;
     nameSpan.title = note.name || `Note ${note.id}`; // Add title for tooltip
@@ -490,6 +494,11 @@ export function renderNoteContent() {
         // Update preview based on current mode and content
         updateNotesPreview(); // This function already reads from state and renders preview
     }
+
+
+    // --- NEW: Render Note History ---
+    // renderNoteHistory(); // Ensure history is rendered when note content/details change - This is now triggered by handleStateChange_noteHistory
+    // --------------------------------
 }
 
 
@@ -950,6 +959,14 @@ export function toggleCalendarPlugin() {
     setPluginSectionCollapsed(elements.calendarPluginHeader, elements.calendarPluginContent, !isCollapsed, config.CALENDAR_PLUGIN_COLLAPSED_KEY);
 }
 
+/** Toggles the History Plugin section. */
+export function toggleHistoryPlugin() {
+    if (!elements.historyPluginHeader || !elements.historyPluginContent) return;
+    const isCollapsed = elements.historyPluginContent.classList.contains('hidden');
+    setPluginSectionCollapsed(elements.historyPluginHeader, elements.historyPluginContent, !isCollapsed, config.HISTORY_PLUGIN_COLLAPSED_KEY);
+}
+
+
 /**
  * Sets the collapsed state of a plugin section within the plugins sidebar.
  * @param {HTMLElement} headerElement - The header element of the plugin section.
@@ -983,72 +1000,67 @@ export function updatePluginUI() {
     if (!elements.filePluginSection || !elements.fileUploadSessionLabel || !elements.selectedFilesContainer ||
         !elements.calendarPluginSection || !elements.calendarToggleInputArea || !elements.webSearchToggleLabel ||
         !elements.uploadedFilesList || !elements.manageFilesList || !elements.calendarStatus || !elements.calendarToggle ||
-        !elements.viewCalendarButton || !elements.webSearchToggle) {
-        // console.warn("Missing elements for updatePluginUI."); // Avoid excessive logs during early init
+        !elements.viewCalendarButton || !elements.webSearchToggle || !elements.historyPluginSection || !elements.noteHistoryList ||
+        !elements.pluginsSidebar || !elements.pluginsToggleButton) {
+        console.warn("Missing core plugin elements for updatePluginUI.");
         return;
     }
 
-    // File Plugin
-    elements.filePluginSection.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
-    // Hide file upload label and selected files container if plugin is disabled
-    elements.fileUploadSessionLabel.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
-     // Only hide if plugin is disabled AND there are no attached/session files
-     const hasFilesToDisplay = state.attachedFiles.length > 0 || state.sessionFile !== null; // Read from state
-     if (!state.isFilePluginEnabled && !hasFilesToDisplay) { // Read from state
-             elements.selectedFilesContainer.classList.add('hidden');
-     }
-     // If plugin is enabled and there are files to display, ensure it's visible
-     if (state.isFilePluginEnabled && hasFilesToDisplay) { // Read from state
-          elements.selectedFilesContainer.classList.remove('hidden');
-     }
-     // If plugin is enabled but no files, hide it
-     if (state.isFilePluginEnabled && !hasFilesToDisplay) { // Read from state
-         elements.selectedFilesContainer.classList.add('hidden');
-     }
+    const isFileEnabled = state.isFilePluginEnabled;
+    const isCalendarEnabled = state.isCalendarPluginEnabled;
+    const isWebSearchPluginEnabled = state.isWebSearchPluginEnabled; // Use plugin enabled state for visibility
+    const activeTab = state.currentTab; // Read active tab from state
+
+    // Toggle visibility of entire plugin sections based on enabled state AND active tab
+    // File plugin is only visible in Chat tab if enabled
+    elements.filePluginSection.classList.toggle('hidden', !isFileEnabled || activeTab !== 'chat');
+    // Calendar plugin is only visible in Chat tab if enabled
+    elements.calendarPluginSection.classList.toggle('hidden', !isCalendarEnabled || activeTab !== 'chat');
+    // Web Search plugin section is REMOVED from sidebar, visibility handled by input area toggle label
+    // elements.webSearchPluginSection.classList.toggle('hidden', !isWebSearchPluginEnabled || activeTab !== 'chat');
+    // History plugin is only visible in Notes tab
+    elements.historyPluginSection.classList.toggle('hidden', activeTab !== 'notes');
 
 
-    // Calendar Plugin
-    elements.calendarPluginSection.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
-    // Hide calendar toggle input area if plugin is disabled
-    elements.calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
-
-
-    // Web Search Toggle (part of Chat input area)
-    elements.webSearchToggleLabel.classList.toggle('hidden', !state.isWebSearchPluginEnabled); // Read from state
-
-
-    // Re-render file lists if file plugin state changed
-    if (!state.isFilePluginEnabled) { // Read from state
-         elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
-         elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
-         // State clearing is handled by eventListeners.js reacting to toggle change
-         // renderAttachedAndSessionFiles(); // Called by renderUploadedFiles
-         // updateAttachButtonState(); // Called by renderUploadedFiles
+    // Update elements within the file plugin section (only relevant when visible)
+    if (isFileEnabled && activeTab === 'chat') {
+        renderUploadedFiles(); // Ensure file list is rendered if plugin is enabled and tab is chat
     } else {
-        // If plugin was just enabled, the file list will be rendered when loadUploadedFiles is called
-        // (triggered by eventListeners.js reacting to the toggle change).
+         // Clear file list if plugin is disabled or tab is not chat
+         if (elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">${isFileEnabled ? 'Switch to Chat tab to use Files plugin.' : 'Files plugin disabled.'}</p>`;
+         if (elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
+         renderAttachedAndSessionFiles(); // Clear attached/session file display
+         updateAttachButtonState(); // Disable attach buttons
     }
 
-    // Update calendar status if calendar plugin state changed
-    if (!state.isCalendarPluginEnabled) { // Read from state
-        elements.calendarStatus.textContent = "Status: Plugin disabled";
-        // State clearing is handled by eventListeners.js reacting to toggle change
-        elements.calendarToggle.checked = false; // Add null check
-        elements.viewCalendarButton.classList.add('hidden'); // Add null check
+    // Update elements within the calendar plugin section (only relevant when visible)
+     if (isCalendarEnabled && activeTab === 'chat') {
+        updateCalendarStatus(); // Ensure calendar status is updated if plugin is enabled and tab is chat
+     } else {
+         // Clear calendar status if plugin is disabled or tab is not chat
+         if (elements.calendarStatus) elements.calendarStatus.textContent = `Status: ${isCalendarEnabled ? 'Switch to Chat tab to use Calendar plugin.' : 'Plugin disabled'}`;
+         if (elements.viewCalendarButton) elements.viewCalendarButton.classList.add('hidden');
+         if (elements.calendarToggle) elements.calendarToggle.checked = false;
+     }
+
+    // Web Search plugin has no section in the sidebar, its toggle is in the input area.
+    // Its visibility is controlled by renderChatInputArea based on isWebSearchPluginEnabled.
+
+    // Update elements within the history plugin section (only relevant when visible)
+    if (activeTab === 'notes') {
+        renderNoteHistory(); // Ensure history is rendered when switching to notes tab
     } else {
-         // If plugin was just enabled, the status will be updated when loadCalendarEvents is called
-         // (triggered by eventListeners.js reacting to the toggle change).
+        // Clear history list if tab is not notes
+        if (elements.noteHistoryList) elements.noteHistoryList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Switch to Notes tab to view history.</p>`;
     }
 
-    // Update web search toggle state if plugin state changed
-     if (!state.isWebSearchPluginEnabled) { // Read from state
-         elements.webSearchToggle.checked = false; // Turn off toggle if plugin disabled
-     }
-     // The toggle's checked state is persisted/loaded in loadPersistedStates
-     // The actual checked state is read from state.isWebSearchEnabled by renderChatInputArea
+    // Ensure plugins sidebar itself is hidden if no plugins are visible on the current tab
+    // Web Search plugin doesn't make the sidebar visible on its own now.
+    const anyPluginSectionVisible = (isFileEnabled || isCalendarEnabled) && activeTab === 'chat' || activeTab === 'notes'; // History plugin is always visible on notes tab
+    if (elements.pluginsSidebar) elements.pluginsSidebar.classList.toggle('hidden', !anyPluginSectionVisible);
+    if (elements.pluginsToggleButton) elements.pluginsToggleButton.classList.toggle('hidden', !anyPluginSectionVisible);
 
-
-    // Render the chat input area elements based on plugin states
+    // Render the chat input area elements based on plugin states (includes web search toggle visibility)
     renderChatInputArea();
 }
 
@@ -1112,6 +1124,7 @@ export function renderChatInputArea() {
     }
 
     if (webSearchToggleLabel) { // Add null check
+        // Web search toggle label visibility is controlled by the plugin enabled state
         webSearchToggleLabel.classList.toggle('hidden', !state.isWebSearchPluginEnabled); // Read from state
     }
     if (webSearchToggle) { // Add null check
@@ -1177,11 +1190,11 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
 
     // Toggle header elements (Model Selector vs Notes Mode)
     if (modelSelectorContainer) {
-        modelSelectorContainer.classList.toggle('hidden', tab !== 'chat');
+        modelSelectorContainer.classList.toggle('hidden', tab === 'notes'); // Model selector only on chat tab
         console.log(`[DEBUG] ui.switchTab: modelSelectorContainer hidden: ${modelSelectorContainer.classList.contains('hidden')}`);
     }
     if (notesModeElements) {
-        notesModeElements.classList.toggle('hidden', tab !== 'notes');
+        notesModeElements.classList.toggle('hidden', tab === 'chat'); // Notes mode elements only on notes tab
         console.log(`[DEBUG] ui.switchTab: notesModeElements hidden: ${notesModeElements.classList.contains('hidden')}`);
     }
 
@@ -1210,6 +1223,7 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
         console.log(`[DEBUG] ui.switchTab: Rendering notes specific content.`);
         renderNoteContent(); // Reads state.noteContent, state.currentNoteId, state.isLoading
         setNoteMode(state.currentNoteMode); // Applies persisted/default mode from state
+        renderNoteHistory(); // Reads state.noteHistory, state.currentNoteId
     }
     console.log(`[DEBUG] ui.switchTab finished.`);
 }
@@ -1280,6 +1294,62 @@ export function updateNotesPreview() {
     // If in edit mode, the textarea is visible, no need to update preview constantly
     // The textarea value is updated directly by user input, which should ideally
     // also trigger a state update for noteContent.
+}
+
+/**
+ * Renders the note history list from the state.
+ */
+export function renderNoteHistory() {
+    const { noteHistoryList } = elements;
+    if (!noteHistoryList) return;
+
+    noteHistoryList.innerHTML = ''; // Clear current list
+
+    const history = state.noteHistory; // Read from state
+    const currentNoteId = state.currentNoteId; // Read current note ID for context
+
+    if (currentNoteId === null) {
+         noteHistoryList.innerHTML = '<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Select a note to view history.</p>';
+         return;
+    }
+
+    if (!history || history.length === 0) {
+        noteHistoryList.innerHTML = '<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No save history for this note.</p>';
+        return;
+    }
+
+    // History is already sorted by saved_at DESC from the backend query
+    history.forEach(entry => {
+        const listItem = document.createElement('div');
+        listItem.classList.add('list-item', 'history-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
+        listItem.dataset.historyId = entry.id;
+        // Optionally store the full entry data or just ID if needed for viewing past versions
+
+        // Name and Date (flex row)
+        const headerDiv = document.createElement('div');
+        headerDiv.classList.add('flex', 'justify-between', 'items-center');
+
+        const nameSpan = document.createElement('span');
+        nameSpan.classList.add('text-rz-sidebar-text', 'text-sm', 'truncate', 'flex-grow'); // Added truncate and flex-grow
+        // Display the name saved at that point in history, fallback to current note name if history name is null
+        nameSpan.textContent = entry.name || state.currentNoteName || 'Untitled';
+
+        headerDiv.appendChild(nameSpan);
+
+        // Timestamp div
+        const timestampDiv = document.createElement('div');
+        timestampDiv.classList.add('text-rz-sidebar-text', 'opacity-75', 'text-xs', 'ml-2', 'flex-shrink-0'); // Added flex-shrink-0
+        // Format timestamp nicely
+        const date = new Date(entry.saved_at);
+        timestampDiv.textContent = date.toLocaleString(); // Or use a more specific format
+
+        listItem.appendChild(headerDiv);
+        listItem.appendChild(timestampDiv);
+
+        noteHistoryList.appendChild(listItem);
+    });
+
+    // No active styling needed for history items based on the request, but could be added
 }
 
 
@@ -1420,5 +1490,11 @@ export function handleStateChange_currentNoteMode() {
     setNoteMode(state.currentNoteMode); // Applies the correct mode (edit/view)
     // renderNoteContent(); // Called by setNoteMode
 }
+
+// --- NEW: State Change Handler for Note History ---
+export function handleStateChange_noteHistory() {
+    renderNoteHistory(); // Re-render the history list when history state changes
+}
+// -------------------------------------------------
 
 // Add more handlers for other state changes as needed...
