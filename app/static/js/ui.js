@@ -250,7 +250,10 @@ export function renderSavedChats(chats) {
         return;
     }
 
-    chats.forEach(chat => createChatItem(chat)); // Use helper
+    // Sort chats by last_updated_at descending
+    const sortedChats = chats.sort((a, b) => new Date(b.last_updated_at) - new Date(a.last_updated_at));
+
+    sortedChats.forEach(chat => createChatItem(chat)); // Use helper
 
     // Update highlighting after rendering
     updateActiveChatListItem();
@@ -265,8 +268,13 @@ function createChatItem(chat) {
     if (!savedChatsList) return;
 
     const listItem = document.createElement('div');
-    listItem.classList.add('list-item', 'chat-list-item', 'flex', 'items-center', 'justify-between', 'p-2', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
+    // Removed flex, items-center, justify-between from listItem itself
+    listItem.classList.add('list-item', 'chat-list-item', 'p-2', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
     listItem.dataset.chatId = chat.id;
+
+    // Container for name and delete button (flex row)
+    const nameDeleteContainer = document.createElement('div');
+    nameDeleteContainer.classList.add('flex', 'items-center', 'justify-between', 'w-full');
 
     const nameSpan = document.createElement('span');
     nameSpan.classList.add('filename', 'text-sm', 'text-rz-sidebar-text', 'truncate', 'flex-grow'); // Added truncate and flex-grow
@@ -286,9 +294,36 @@ function createChatItem(chat) {
         }).catch(error => console.error("Failed to import api for delete:", error));
     });
 
+    nameDeleteContainer.appendChild(nameSpan);
+    nameDeleteContainer.appendChild(deleteButton); // Append delete button
 
-    listItem.appendChild(nameSpan);
-    listItem.appendChild(deleteButton); // Append delete button
+    // Add timestamp span
+    const timestampSpan = document.createElement('span');
+    timestampSpan.classList.add('timestamp', 'text-xs', 'text-rz-tab-background-text', 'mt-1'); // Added timestamp class and styling
+    try {
+        const date = new Date(chat.last_updated_at);
+        // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
+        const now = new Date();
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+
+        let formattedDate;
+        if (date.toDateString() === now.toDateString()) {
+            formattedDate = `Today, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+        } else if (date.toDateString() === yesterday.toDateString()) {
+            formattedDate = `Yesterday, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+        } else {
+            formattedDate = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        }
+        timestampSpan.textContent = formattedDate;
+    } catch (e) {
+        console.error("Error formatting date:", chat.last_updated_at, e);
+        timestampSpan.textContent = 'Invalid Date';
+    }
+
+
+    listItem.appendChild(nameDeleteContainer); // Append the container
+    listItem.appendChild(timestampSpan); // Append the timestamp
 
     // Add click listener to load chat
     listItem.addEventListener('click', () => {
@@ -342,7 +377,10 @@ export function renderSavedNotes(notes) {
         return;
     }
 
-    notes.forEach(note => createNoteItem(note)); // Use helper
+    // Sort notes by last_saved_at descending
+    const sortedNotes = notes.sort((a, b) => new Date(b.last_saved_at) - new Date(a.last_saved_at));
+
+    sortedNotes.forEach(note => createNoteItem(note)); // Use helper
 
     // Update highlighting after rendering
     updateActiveNoteListItem();
