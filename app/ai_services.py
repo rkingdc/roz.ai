@@ -1241,39 +1241,17 @@ def _prepare_chat_content(
                         "video/",
                         "application/pdf",
                         "text/",
-                    )  # Simplified check
+                    ) # Simplified check for inline data support
                     if mimetype.startswith(supported_mimetypes):
-                        try:
-                            with tempfile.NamedTemporaryFile(
-                                delete=False, suffix=f"_{secure_filename(filename)}"
-                            ) as temp_file:
-                                temp_file.write(content_blob)
-                                temp_filepath = temp_file.name
-                                temp_files_to_clean.append(temp_filepath)
-                            uploaded_file = client.files.upload(
-                                file=temp_filepath,
-                                config={
-                                    "display_name": filename,
-                                    "mime_type": mimetype,
-                                },
-                            )
-                            current_turn_parts.append(uploaded_file)  # Add File object
-                            logger.info(
-                                f"Attached session file '{filename}' via File API."
-                            )
-                        except Exception as upload_err:
-                            logger.error(
-                                f"Failed to upload session file '{filename}': {upload_err}",
-                                exc_info=True,
-                            )
-                            current_turn_parts.append(
-                                Part(
-                                    text=f"[System: Error uploading session file '{filename}'. {type(upload_err).__name__}]"
-                                )
-                            )
+                        # Create an inline data Part directly
+                        inline_part = Part(inline_data=Content(data=content_blob, mime_type=mimetype))
+                        current_turn_parts.append(inline_part)
+                        logger.info(
+                            f"Attached session file '{filename}' ({mimetype}) as inline data."
+                        )
                     else:
                         logger.warning(
-                            f"Session file attachment via File API not supported for mimetype: {mimetype}"
+                            f"Session file attachment as inline data not supported for mimetype: {mimetype}"
                         )
                         current_turn_parts.append(
                             Part(
