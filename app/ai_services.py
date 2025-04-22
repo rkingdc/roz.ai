@@ -9,6 +9,7 @@ from google.genai.types import (
     GenerateContentResponse,
     Blob,       # Import Blob for inline data
     Candidate,  # Import Candidate for error response structure
+    FileData,   # Import FileData for referencing uploaded files
 )
 import binascii # Import binascii for the correct exception type
 from flask import current_app, g  # Import g for request context caching
@@ -1159,11 +1160,11 @@ def _prepare_chat_content(
                                         "mime_type": mimetype,
                                     },
                                 )
-                                current_turn_parts.append(
-                                    uploaded_file
-                                )  # Add File object
+                                # Create a Part with FileData referencing the uploaded file URI
+                                file_data_part = Part(file_data=FileData(mime_type=mimetype, file_uri=uploaded_file.uri))
+                                current_turn_parts.append(file_data_part)
                                 logger.info(
-                                    f"Attached DB file '{filename}' via File API."
+                                    f"Attached DB file '{filename}' via File API using URI: {uploaded_file.uri}"
                                 )
                             except Exception as upload_err:
                                 logger.error(
