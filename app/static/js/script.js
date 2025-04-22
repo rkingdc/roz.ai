@@ -1639,7 +1639,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             // console.log(`[DEBUG] Chat data fetched successfully for chat ${chatId}.`); // Reduced verbosity
 
-            currentChatId = chatId;
+            currentChatId = data.details.id; // Ensure currentChatId is set from the loaded data
             // console.log(`[DEBUG] currentChatId set to ${currentChatId}.`); // Reduced verbosity
 
             clearChatbox(); // Clear the loading message
@@ -1703,7 +1703,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // console.log(`[DEBUG] updateActiveChatListItem called for chat ${chatId}.`); // Reduced verbosity
 
 
-            updateStatus(`Chat ${chatId} loaded.`);
+            updateStatus(`Chat ${currentChatId} loaded.`); // Use currentChatId here
             // console.log(`[DEBUG] loadChat(${chatId}) finished successfully.`); // Reduced verbosity
 
 
@@ -2289,26 +2289,50 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Ensure chat sidebar is visible if not collapsed
                 sidebar.classList.remove('hidden');
 
-                // Load chat data if not already loaded or if switching back
-                if (currentChatId === null) {
-                     console.log("[DEBUG] switchTab (chat): No currentChatId, loading initial chat."); // Added log
-                     // This case should ideally be handled by initializeApp, but as a fallback
-                     try {
-                         await loadSavedChats();
-                         const firstChatElement = savedChatsList.querySelector('.list-item');
-                         if (firstChatElement) {
-                             await loadChat(parseInt(firstChatElement.dataset.chatId));
-                         } else {
-                             await startNewChat();
-                         }
-                     } catch (error) {
-                         console.error("[DEBUG] switchTab (chat): Error during initial chat load:", error);
-                         // Error handling is done within loadChat/startNewChat, just log here
-                     }
-                } else {
-                     console.log(`[DEBUG] switchTab (chat): currentChatId is ${currentChatId}, ensuring highlight.`); // Added log
-                     // If chat is already loaded, just ensure highlighting is correct
-                     updateActiveChatListItem();
+                // Load chat data
+                console.log("[DEBUG] switchTab (chat): Loading chat data..."); // Added log
+                try {
+                    await loadSavedChats(); // Always load the list of chats first
+
+                    if (currentChatId !== null) {
+                        console.log(`[DEBUG] switchTab (chat): currentChatId is ${currentChatId}, attempting to load it.`); // Added log
+                        // Load the persisted chat if one exists
+                        await loadChat(currentChatId); // This will also call updateActiveChatListItem
+                        console.log(`[DEBUG] loadChat(${currentChatId}) completed.`); // Added log
+                    } else {
+                        console.log("[DEBUG] No currentChatId, loading most recent or creating new."); // Added log
+                        // If no persisted chat, try to load the most recent one from the list
+                        const firstChatElement = savedChatsList.querySelector('.list-item');
+                        if (firstChatElement) {
+                            const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
+                            console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`); // Added log
+                            await loadChat(mostRecentChatId); // This will also call updateActiveChatListItem
+                            console.log(`[DEBUG] loadChat(${mostRecentChatId}) completed.`); // Added log
+                        } else {
+                            console.log("[DEBUG] No saved chats found, starting new chat."); // Added log
+                            // If no saved chats at all, start a new one
+                            await startNewChat(); // This will also call loadChat and updateActiveChatListItem
+                            console.log("[DEBUG] startNewChat completed."); // Added log
+                        }
+                    }
+
+                    // After loadChat/startNewChat completes, currentChatId should be set
+                    console.log(`[DEBUG] switchTab (chat): Finished loading chat. Final currentChatId: ${currentChatId}`); // Added log
+
+
+                } catch (error) {
+                    console.error("[DEBUG] switchTab (chat): Error during chat load:", error); // Added log
+                    // Error handling is done within loadChat/startNewChat, just log here
+                    // Ensure UI is in a safe state (e.g., clear chatbox, disable input)
+                    clearChatbox();
+                    addMessage('system', `[Error loading chats: ${error.message}]`, true);
+                    currentChatId = null; // Ensure state is null
+                    currentChatNameInput.value = '';
+                    currentChatIdDisplay.textContent = 'ID: -';
+                    modelSelector.value = defaultModel;
+                    updateActiveChatListItem(); // Remove highlight
+                    localStorage.removeItem(currentChatId); // Clear persisted ID on error
+                    // Note: Plugin UI update and input disabling are handled by setLoadingState(false) in finally
                 }
 
 
@@ -2539,9 +2563,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Apply the current mode after loading content
             switchNoteMode(currentNoteMode); // Apply the mode that was active before loading
 
-            updateStatus(`Note ${noteId} loaded.`);
+            updateStatus(`Note ${currentNoteId} loaded.`); // Use currentNoteId here
             updateActiveNoteListItem(); // Highlight the loaded note in the list
-            localStorage.setItem(CURRENT_NOTE_ID_KEY, noteId); // Persist current note ID
+            localStorage.setItem(CURRENT_NOTE_ID_KEY, currentNoteId); // Persist current note ID
 
         } catch (error) {
             console.error(`Error loading note ${noteId}:`, error);
