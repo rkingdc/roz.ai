@@ -30,9 +30,12 @@ class Config:
     DB_NAME = os.environ.get('DATABASE_NAME', 'assistant_chat_v8.db')
     logger.info(f"Database name configured as: {DB_NAME} (from DATABASE_NAME env var or default)")
 
-    # DATABASE_URI is not strictly needed if DB_NAME holds the full path
-    # Keeping it for potential compatibility, but DB_NAME is the source of truth for sqlite3.connect
-    DATABASE_URI = DB_NAME
+    # Define the SQLAlchemy Database URI based on DB_NAME
+    # Ensure it's treated as a file path URI for SQLite
+    SQLALCHEMY_DATABASE_URI = f'sqlite:///{os.path.abspath(DB_NAME)}'
+    logger.info(f"SQLAlchemy Database URI set to: {SQLALCHEMY_DATABASE_URI}")
+
+    # DATABASE_URI = DB_NAME # Remove old/redundant key
 
 
     # File Uploads (Using BLOB storage now, UPLOAD_FOLDER not needed)
