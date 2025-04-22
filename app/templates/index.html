@@ -188,7 +188,8 @@
             <!-- Textarea for Markdown Input -->
             <!-- Added flex-grow and overflow-auto to make textarea fill its container and scroll -->
             <!-- Added note-mode-element class for JS toggling -->
-            <textarea id="notes-textarea" class="note-mode-element flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white font-mono text-sm resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
+            {# Removed focus:ring-blue-500 focus:border-blue-500 #}
+            <textarea id="notes-textarea" class="note-mode-element flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
 
             <!-- Preview Area -->
             <!-- Added flex-grow and overflow-y-auto to make preview fill its container and scroll -->
