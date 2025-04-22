@@ -1152,22 +1152,22 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
     // Toggle main content sections
     if (chatSection) {
         chatSection.classList.toggle('hidden', tab !== 'chat');
-        console.log(`[DEBUG] ui.switchTab: chatSection hidden: ${chatSection.classList.contains('hidden')}`);
+        console.log(`[DEBUG] ui.switchTab: chatSection hidden: ${chatSection.classList.contains('hidden')}, classList: ${chatSection.classList}`); // Add classList log
     }
     if (notesSection) {
         notesSection.classList.toggle('hidden', tab !== 'notes');
-        console.log(`[DEBUG] ui.switchTab: notesSection hidden: ${notesSection.classList.contains('hidden')}`);
+        console.log(`[DEBUG] ui.switchTab: notesSection hidden: ${notesSection.classList.contains('hidden')}, classList: ${notesSection.classList}`); // Add classList log
     }
 
 
     // Toggle sidebar content sections
     if (chatSidebarContent) {
         chatSidebarContent.classList.toggle('hidden', tab !== 'chat');
-        console.log(`[DEBUG] ui.switchTab: chatSidebarContent hidden: ${chatSidebarContent.classList.contains('hidden')}`);
+        console.log(`[DEBUG] ui.switchTab: chatSidebarContent hidden: ${chatSidebarContent.classList.contains('hidden')}, classList: ${chatSidebarContent.classList}`); // Add classList log
     }
     if (notesSidebarContent) {
         notesSidebarContent.classList.toggle('hidden', tab !== 'notes');
-        console.log(`[DEBUG] ui.switchTab: notesSidebarContent hidden: ${notesSidebarContent.classList.contains('hidden')}`);
+        console.log(`[DEBUG] ui.switchTab: notesSidebarContent hidden: ${notesSidebarContent.classList.contains('hidden')}, classList: ${notesSidebarContent.classList}`); // Add classList log
     }
 
 
@@ -1193,24 +1193,6 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
     renderCurrentChatDetails(); // Reads state.currentChatName, state.currentChatId, state.currentChatModel
     renderCurrentNoteDetails(); // Reads state.currentNoteName, state.currentNoteId
     console.log(`[DEBUG] ui.switchTab: Current item details rendered.`);
-
-
-    // REMOVED: Redundant sidebar content visibility logic
-    /*
-    // Ensure sidebar content visibility matches the active tab if sidebar is open
-    if (sidebar && !sidebar.classList.contains('collapsed')) { // Add null check
-        console.log(`[DEBUG] switchTab: Sidebar is not collapsed, ensuring correct content is visible.`);
-        if (tab === 'chat') {
-            if (chatSidebarContent) chatSidebarContent.classList.remove('hidden'); // Add null check
-            if (notesSidebarContent) notesSidebarContent.classList.add('hidden'); // Add null check
-        } else { // tab === 'notes'
-            if (notesSidebarContent) notesSidebarContent.classList.remove('hidden'); // Add null check
-            if (chatSidebarContent) chatSidebarContent.classList.add('hidden'); // Add null check
-        }
-    } else {
-         console.log(`[DEBUG] switchTab: Sidebar is collapsed, content visibility not explicitly set.`);
-    }
-    */
 
 
     // Render content specific to the new tab based on state
