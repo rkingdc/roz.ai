@@ -1150,26 +1150,26 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
 
 
     // Toggle main content sections
-    chatSection.classList.toggle('hidden', tab !== 'chat');
-    notesSection.classList.toggle('hidden', tab !== 'notes');
-    console.log(`[DEBUG] switchTab: Main sections updated. Chat hidden: ${chatSection.classList.contains('hidden')}, Notes hidden: ${notesSection.classList.contains('hidden')}`);
+    if (chatSection) chatSection.classList.toggle('hidden', tab !== 'chat'); // Add null check
+    if (notesSection) notesSection.classList.toggle('hidden', tab !== 'notes'); // Add null check
+    console.log(`[DEBUG] switchTab: Main sections updated. Chat hidden: ${chatSection?.classList.contains('hidden')}, Notes hidden: ${notesSection?.classList.contains('hidden')}`);
 
 
     // Toggle sidebar content sections
-    chatSidebarContent.classList.toggle('hidden', tab !== 'chat');
-    notesSidebarContent.classList.toggle('hidden', tab !== 'notes');
-    console.log(`[DEBUG] switchTab: Sidebar content updated. Chat hidden: ${chatSidebarContent.classList.contains('hidden')}, Notes hidden: ${notesSidebarContent.classList.contains('hidden')}`);
+    if (chatSidebarContent) chatSidebarContent.classList.toggle('hidden', tab !== 'chat'); // Add null check
+    if (notesSidebarContent) notesSidebarContent.classList.toggle('hidden', tab !== 'notes'); // Add null check
+    console.log(`[DEBUG] switchTab: Sidebar content updated. Chat hidden: ${chatSidebarContent?.classList.contains('hidden')}, Notes hidden: ${notesSidebarContent?.classList.contains('hidden')}`);
 
 
     // Toggle header elements (Model Selector vs Notes Mode)
-    modelSelectorContainer.classList.toggle('hidden', tab !== 'chat');
-    notesModeElements.classList.toggle('hidden', tab !== 'notes');
-    console.log(`[DEBUG] switchTab: Header elements updated. Model hidden: ${modelSelectorContainer.classList.contains('hidden')}, Notes mode hidden: ${notesModeElements.classList.contains('hidden')}`);
+    if (modelSelectorContainer) modelSelectorContainer.classList.toggle('hidden', tab !== 'chat'); // Add null check
+    if (notesModeElements) notesModeElements.classList.toggle('hidden', tab !== 'notes'); // Add null check
+    console.log(`[DEBUG] switchTab: Header elements updated. Model hidden: ${modelSelectorContainer?.classList.contains('hidden')}, Notes mode hidden: ${notesModeElements?.classList.contains('hidden')}`);
 
 
     // Toggle input area visibility (Chat needs it, Notes uses textarea directly)
-    inputArea.classList.toggle('hidden', tab !== 'chat');
-    console.log(`[DEBUG] switchTab: Input area hidden: ${inputArea.classList.contains('hidden')}`);
+    if (inputArea) inputArea.classList.toggle('hidden', tab !== 'chat'); // Add null check
+    console.log(`[DEBUG] switchTab: Input area hidden: ${inputArea?.classList.contains('hidden')}`);
 
 
     // Update current item display in sidebar header based on state
@@ -1179,14 +1179,14 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
 
 
     // Ensure sidebar content visibility matches the active tab if sidebar is open
-    if (!sidebar.classList.contains('collapsed')) {
+    if (sidebar && !sidebar.classList.contains('collapsed')) { // Add null check
         console.log(`[DEBUG] switchTab: Sidebar is not collapsed, ensuring correct content is visible.`);
         if (tab === 'chat') {
-            chatSidebarContent.classList.remove('hidden');
-            notesSidebarContent.classList.add('hidden');
+            if (chatSidebarContent) chatSidebarContent.classList.remove('hidden'); // Add null check
+            if (notesSidebarContent) notesSidebarContent.classList.add('hidden'); // Add null check
         } else { // tab === 'notes'
-            notesSidebarContent.classList.remove('hidden');
-            chatSidebarContent.classList.add('hidden');
+            if (notesSidebarContent) notesSidebarContent.classList.remove('hidden'); // Add null check
+            if (chatSidebarContent) chatSidebarContent.classList.add('hidden'); // Add null check
         }
     } else {
          console.log(`[DEBUG] switchTab: Sidebar is collapsed, content visibility not explicitly set.`);
@@ -1287,6 +1287,7 @@ export function openModal(modalElement) {
     if (modalElement) {
         modalElement.classList.add('show');
         if (elements.bodyElement) elements.bodyElement.classList.add('modal-open'); // Add null check
+        console.log(`[DEBUG] Modal opened: ${modalElement.id}`); // Add logging
     }
 }
 
@@ -1302,6 +1303,7 @@ export function closeModal(modalElement) {
         if (!anyModalOpen) {
              if (elements.bodyElement) elements.bodyElement.classList.remove('modal-open'); // Add null check
         }
+        console.log(`[DEBUG] Modal closed: ${modalElement.id}`); // Add logging
     }
 }
 

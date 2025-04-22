@@ -73,6 +73,7 @@ function notify(eventType, data) {
         // console.log(`[DEBUG] Notifications disabled, skipping event: ${eventType}`);
         return;
     }
+    // console.log(`[DEBUG] Notifying event: ${eventType}`); // Add logging here
     if (listeners.has(eventType)) {
         listeners.get(eventType).forEach(listener => {
             try {
@@ -89,6 +90,7 @@ function notify(eventType, data) {
  */
 export function disableNotifications() {
     notificationsEnabled = false;
+    console.log("[DEBUG] State notifications disabled."); // Add logging
 }
 
 /**
@@ -96,6 +98,7 @@ export function disableNotifications() {
  */
 export function enableNotifications() {
     notificationsEnabled = true;
+    console.log("[DEBUG] State notifications enabled."); // Add logging
 }
 
 /**
@@ -103,6 +106,7 @@ export function enableNotifications() {
  * Useful for initial render after loading state.
  */
 export function notifyAll() {
+    console.log("[DEBUG] Notifying all state changes."); // Add logging
     // Explicitly notify for each state property that UI might depend on
     notify('currentChatId', currentChatId);
     notify('currentNoteId', currentNoteId);
@@ -331,6 +335,7 @@ export function setWebSearchEnabled(enabled) {
 export function setCurrentTab(tab) {
     if (currentTab !== tab) {
         currentTab = tab;
+        console.log(`[DEBUG] State: currentTab set to ${currentTab}`); // Add logging here
         notify('currentTab', currentTab);
     }
 }
