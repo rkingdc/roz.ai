@@ -2092,7 +2092,7 @@ document.addEventListener('DOMContentLoaded', () => {
                          modelSelector.value = data.details.model_name || defaultModel;
                      })
                      .catch(error => {
-                         console.error("Error fetching chat details for model reset:", error);
+                         console.error("Error fetching chat details for model revert:", error);
                          modelSelector.value = defaultModel; // Fallback
                      });
              } else {
@@ -2315,7 +2315,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Load chat data
                 console.log("[DEBUG] switchTab (chat): Loading chat data..."); // Added log
                 try {
-                    await loadSavedChats(); // Always load the list of chats first
+                    // loadSavedChats() is now called in initializeApp, no need to call here again
+                    // await loadSavedChats(); // Always load the list of chats first
 
                     let chatToLoadId = currentChatId; // Start with the persisted ID
 
@@ -2392,8 +2393,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Load notes data
                 console.log("[DEBUG] switchTab (notes): Loading notes data..."); // Added log
                 try {
-                     await loadSavedNotes(); // Load the list of notes
-                     console.log("[DEBUG] loadSavedNotes completed.");
+                     // loadSavedNotes() is now called in initializeApp, no need to call here again
+                     // await loadSavedNotes(); // Load the list of notes
+                     // console.log("[DEBUG] loadSavedNotes completed.");
 
                      if (currentNoteId !== null) {
                          console.log(`[DEBUG] switchTab (notes): currentNoteId is ${currentNoteId}, attempting to load it.`); // Added log
@@ -2957,7 +2959,8 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("[DEBUG] initializeApp called."); // Added log
         // Set initial status
         updateStatus("Initializing application...");
-        // REMOVED: setLoadingState(true, "Initializing"); // Set loading state at the very beginning
+        // Set loading state at the very beginning of initialization
+        setLoadingState(true, "Initializing"); // <-- ADDED THIS BACK
         console.log("[DEBUG] Initializing state set."); // Added log
 
         try {
@@ -3029,6 +3032,15 @@ document.addEventListener('DOMContentLoaded', () => {
             currentNoteMode = (persistedNoteMode === 'edit' || persistedNoteMode === 'view') ? persistedNoteMode : 'edit';
             console.log(`[DEBUG] Persisted note mode loaded: ${currentNoteMode}.`);
 
+            // --- Load sidebar lists regardless of initial tab ---
+            // These functions manage their own loading state internally
+            // The overall isLoading state set at the start of initializeApp will cover these
+            await loadSavedChats();
+            console.log("[DEBUG] loadSavedChats completed in initializeApp.");
+            await loadSavedNotes();
+            console.log("[DEBUG] loadSavedNotes completed in initializeApp.");
+            // --- End Load sidebar lists ---
+
 
             // Load data based on the initial tab
             // Use switchTab to handle the initial load based on the persisted tab
@@ -3054,6 +3066,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             console.log("[DEBUG] initializeApp finally block entered."); // Added log
             // setLoadingState(false) is now handled by switchTab's finally block
+            // REMOVED: setLoadingState(false); // <-- REMOVED THIS LINE as switchTab handles the final state reset
             console.log("[DEBUG] setLoadingState(false) is handled by switchTab finally block."); // Added log
         }
     }
