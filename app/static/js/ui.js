@@ -215,12 +215,8 @@ function createChatItem(chat) {
     deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per CORRECT HTML
     deleteButton.title = `Delete "${chat.name || `Chat ${chat.id}`}"`;
     // Event listener remains here, but calls API function
-    deleteButton.addEventListener('click', (event) => {
-        event.stopPropagation(); // Prevent triggering the list item click
-        import('./api.js').then(api => {
-            api.handleDeleteChat(chat.id); // Call API, state will update, UI will re-render
-        }).catch(error => console.error("Failed to import api for delete:", error));
-    });
+    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
+    // deleteButton.addEventListener('click', (event) => { ... });
 
     nameDeleteContainer.appendChild(nameSpan);
     nameDeleteContainer.appendChild(deleteButton); // Append delete button
@@ -257,14 +253,8 @@ function createChatItem(chat) {
     listItem.appendChild(timestampDiv); // Append the timestamp div
 
     // Add click listener to load chat
-    listItem.addEventListener('click', () => {
-         if (chat.id != state.currentChatId) {
-             // Use a dynamic import for api to avoid circular dependency if api imports ui
-             import('./api.js').then(api => {
-                 api.loadChat(chat.id); // Call API, state will update, UI will re-render
-             }).catch(error => console.error("Failed to import api for load chat:", error));
-         }
-    });
+    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
+    // listItem.addEventListener('click', () => { ... });
 
     savedChatsList.appendChild(listItem);
 }
@@ -388,12 +378,8 @@ function createNoteItem(note) {
     deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per provided HTML
     deleteButton.title = `Delete "${note.name || `Note ${note.id}`}"`;
     // Event listener remains here, but calls API function
-    deleteButton.addEventListener('click', (event) => {
-        event.stopPropagation(); // Prevent triggering the list item click
-         import('./api.js').then(api => {
-            api.handleDeleteNote(note.id); // Call API, state will update, UI will re-render
-        }).catch(error => console.error("Failed to import api for delete:", error));
-    });
+    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
+    // deleteButton.addEventListener('click', (event) => { ... });
 
     nameDeleteContainer.appendChild(nameSpan);
     nameDeleteContainer.appendChild(deleteButton); // Append delete button
@@ -429,13 +415,8 @@ function createNoteItem(note) {
     listItem.appendChild(timestampDiv); // Append the timestamp div
 
     // Add click listener to load note
-    listItem.addEventListener('click', () => {
-         if (note.id != state.currentNoteId) {
-             import('./api.js').then(api => {
-                 api.loadNote(note.id); // Call API, state will update, UI will re-render
-             }).catch(error => console.error("Failed to import api for load note:", error));
-         }
-    });
+    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
+    // listItem.addEventListener('click', () => { ... });
 
     savedNotesList.appendChild(listItem);
 }
@@ -562,13 +543,13 @@ function createSidebarFileItem(file, isSelected) {
     const itemDiv = document.createElement('div');
     // Add 'list-item' class and remove conflicting layout/padding classes
     // Remove flex, items-center, p-1, truncate, flex-grow as they conflict with list-item's column flex
-    itemDiv.classList.add('list-item', 'file-list-item', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
+    itemDiv.classList.add('list-item', 'file-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover'); // Removed flex, items-center, truncate, flex-grow, p-1
     itemDiv.dataset.fileId = file.id;
     itemDiv.dataset.filename = file.filename;
     itemDiv.dataset.hasSummary = file.has_summary; // Store summary status
     // Add 'active' class if currently selected in the sidebar
     if (isSelected) {
-        item.classList.add('active'); // Corrected: Use itemDiv instead of item
+        itemDiv.classList.add('active'); // Corrected: Use itemDiv instead of item
     }
 
 
@@ -704,14 +685,9 @@ function createModalFileItem(file) {
     summaryButton.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1');
     summaryButton.innerHTML = '<i class="fas fa-list-alt"></i>';
     summaryButton.title = file.has_summary ? 'View/Edit Summary' : 'Generate Summary';
-    // Event listener remains here, calls API function
-    summaryButton.addEventListener('click', (e) => {
-         e.stopPropagation(); // Prevent triggering item click
-         import('./api.js').then(api => {
-            api.fetchSummary(file.id); // Call API, state will update
-            showModal(elements.summaryModal, 'files', 'chat'); // Show modal immediately
-         }).catch(error => console.error("Failed to import api for summary:", error));
-    });
+    // Event listener remains here, calls API function and shows modal
+    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
+    // summaryButton.addEventListener('click', (e) => { ... });
 
     // Delete Button
     const deleteButton = document.createElement('button');
@@ -719,12 +695,8 @@ function createModalFileItem(file) {
     deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
     deleteButton.title = 'Delete File';
     // Event listener remains here, calls API function
-    deleteButton.addEventListener('click', (e) => {
-         e.stopPropagation(); // Prevent triggering item click
-         import('./api.js').then(api => {
-            api.deleteFile(file.id); // Call the API function, state will update, UI will re-render
-         }).catch(error => console.error("Failed to import api for delete:", error));
-    });
+    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
+    // deleteButton.addEventListener('click', (e) => { ... });
 
     actionsCol.appendChild(summaryButton);
     actionsCol.appendChild(deleteButton);
@@ -944,12 +916,12 @@ export function setSidebarCollapsed(sidebarElement, toggleButton, isCollapsed, l
 
 /** Toggles the left sidebar (chat/notes list). */
 export function toggleLeftSidebar() {
-    toggleSidebar(elements.sidebar, elements.sidebarToggleButton, config.SIDEBAR_COLLAPSED_KEY, 'sidebar');
+    setSidebarCollapsed(elements.sidebar, elements.sidebarToggleButton, !elements.sidebar.classList.contains('collapsed'), config.SIDEBAR_COLLAPSED_KEY, 'sidebar');
 }
 
 /** Toggles the right sidebar (plugins). */
 export function toggleRightSidebar() {
-    toggleSidebar(elements.pluginsSidebar, elements.pluginsToggleButton, config.PLUGINS_COLLAPSED_KEY, 'plugins');
+    setSidebarCollapsed(elements.pluginsSidebar, elements.pluginsToggleButton, !elements.pluginsSidebar.classList.contains('collapsed'), config.PLUGINS_COLLAPSED_KEY, 'plugins');
 }
 
 /** Toggles the File Plugin section. */
