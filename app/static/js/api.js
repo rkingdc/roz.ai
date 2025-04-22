@@ -1,8 +1,8 @@
 // js/api.js
 import { elements } from './dom.js';
 import * as state from './state.js';
-import * as ui from './ui.js';
-import { escapeHtml } from './utils.js';
+import * as ui from './ui.js'; // Import all functions from ui.js
+import { escapeHtml, formatFileSize } from './utils.js'; // Import utility functions
 import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js';
 
 // --- File API ---
@@ -59,21 +59,9 @@ export async function loadUploadedFiles() {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const files = await response.json();
 
-        uploadedFilesList.innerHTML = '';
-        manageFilesList.innerHTML = '';
+        // Call UI function to render the lists
+        ui.renderUploadedFiles(files);
 
-        if (files.length === 0) {
-            uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No files uploaded yet.</p>`;
-            manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">No files uploaded yet.</p>`;
-        } else {
-            files.forEach(file => {
-                const isSelected = state.selectedFiles.some(f => f.id === file.id);
-                // --- Create Sidebar List Item ---
-                createSidebarFileItem(file, isSelected);
-                // --- Create Modal List Item ---
-                createModalFileItem(file, isSelected);
-            });
-        }
         ui.updateStatus("Uploaded files loaded.");
     } catch (error) {
         console.error('Error loading uploaded files:', error);
@@ -85,128 +73,6 @@ export async function loadUploadedFiles() {
         // Only turn off loading if this function set it
         if (!wasLoading) ui.setLoadingState(false);
     }
-}
-
-// Helper to create sidebar file item
-function createSidebarFileItem(file, isSelected) {
-    const { uploadedFilesList } = elements;
-    if (!uploadedFilesList) return;
-
-    const itemDiv = document.createElement('div');
-    itemDiv.classList.add('file-list-item', 'flex', 'items-center', 'p-1', 'border-b', 'border-rz-sidebar-border', 'last:border-b-0');
-    itemDiv.dataset.fileId = file.id;
-    itemDiv.dataset.filename = file.filename;
-    itemDiv.classList.toggle('active-selection', isSelected);
-
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.value = file.id;
-    checkbox.classList.add('file-checkbox', 'mr-2');
-    checkbox.title = "Select file for attachment";
-    checkbox.checked = isSelected;
-    checkbox.addEventListener('change', handleSidebarFileCheckboxChange); // Attach listener
-
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = file.filename;
-    nameSpan.classList.add('filename', 'truncate', 'flex-grow', 'text-sm', 'text-rz-sidebar-text');
-    nameSpan.title = file.filename;
-
-    itemDiv.appendChild(checkbox);
-    itemDiv.appendChild(nameSpan);
-    uploadedFilesList.appendChild(itemDiv);
-}
-
-// Helper to handle sidebar checkbox change
-function handleSidebarFileCheckboxChange(e) {
-    const checkbox = e.target;
-    const fileId = parseInt(checkbox.value);
-    const listItem = checkbox.closest('.file-list-item');
-    const filename = listItem?.dataset.filename;
-    if (!listItem || !filename) return;
-
-    // Find the corresponding item in the modal list
-    const modalItem = elements.manageFilesList?.querySelector(`.file-list-item[data-file-id="${fileId}"]`);
-
-    if (checkbox.checked) {
-        // Add a placeholder entry, type will be determined later when attach button clicked
-        state.addSelectedFile({ id: fileId, filename: filename, type: 'pending' });
-        listItem.classList.add('active-selection');
-        modalItem?.classList.add('active-selection'); // Sync modal styling
-    } else {
-        // Remove ALL entries for this file ID from selectedFiles
-        state.removeSelectedFileById(fileId);
-        listItem.classList.remove('active-selection');
-        modalItem?.classList.remove('active-selection'); // Sync modal styling
-    }
-    ui.renderSelectedFiles(); // Update the display below the message input
-}
-
-
-// Helper to create modal file item
-function createModalFileItem(file, isSelected) {
-    const { manageFilesList } = elements;
-     if (!manageFilesList) return;
-
-    const itemDiv = document.createElement('div');
-    itemDiv.classList.add('file-list-item', 'grid', 'grid-cols-12', 'gap-2', 'items-center', 'p-2', 'border-b', 'border-gray-200', 'last:border-b-0', 'text-sm');
-    itemDiv.dataset.fileId = file.id;
-    itemDiv.dataset.filename = file.filename;
-    itemDiv.dataset.hasSummary = file.has_summary;
-    itemDiv.classList.toggle('active-selection', isSelected); // Keep styling sync
-
-    // Col 1: Filename and Type
-    const fileInfoDiv = document.createElement('div');
-    fileInfoDiv.classList.add('col-span-5', 'flex', 'flex-col', 'min-w-0');
-    fileInfoDiv.innerHTML = `
-        <span class="filename truncate font-medium" title="${escapeHtml(file.filename)}">${escapeHtml(file.filename)}</span>
-        <span class="file-type-display text-xs text-gray-500">Type: ${escapeHtml(file.mimetype ? file.mimetype.split('/')[1] || file.mimetype : 'unknown')}</span>
-    `;
-
-    // Col 2: Upload Date and Summary Status
-    const detailsDiv = document.createElement('div');
-    detailsDiv.classList.add('col-span-4', 'flex', 'flex-col', 'min-w-0');
-    let formattedDate = 'Date N/A';
-    if (file.uploaded_at) {
-        try {
-            const date = new Date(file.uploaded_at.replace(' ', 'T')); // Try to make it ISO-like
-            if (!isNaN(date.getTime())) {
-                 formattedDate = date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-            }
-        } catch (e) { /* Ignore date parsing errors */ }
-    }
-    detailsDiv.innerHTML = `
-        <span class="text-xs text-gray-500">Uploaded: ${formattedDate}</span>
-        <span class="text-xs ${file.has_summary ? 'text-green-600' : 'text-gray-500'}">${file.has_summary ? 'Summary: Yes' : 'Summary: No'}</span>
-    `;
-
-    // Col 3: Actions
-    const actionsDiv = document.createElement('div');
-    actionsDiv.classList.add('col-span-3', 'flex', 'items-center', 'justify-end', 'gap-1');
-
-    const summaryBtn = document.createElement('button');
-    summaryBtn.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1');
-    summaryBtn.innerHTML = '<i class="fas fa-file-alt"></i>';
-    summaryBtn.title = file.has_summary ? "View/Edit Summary" : "Generate Summary";
-    summaryBtn.onclick = (e) => {
-        e.stopPropagation();
-        showSummaryModal(file.id, file.filename); // Call function below
-    };
-    actionsDiv.appendChild(summaryBtn);
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.classList.add('btn', 'btn-outline', 'btn-xs', 'delete-btn', 'p-1');
-    deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-    deleteBtn.title = "Delete File";
-    deleteBtn.onclick = (e) => {
-        e.stopPropagation();
-        deleteFile(file.id); // Call API function
-    };
-    actionsDiv.appendChild(deleteBtn);
-
-    itemDiv.appendChild(fileInfoDiv);
-    itemDiv.appendChild(detailsDiv);
-    itemDiv.appendChild(actionsDiv);
-    manageFilesList.appendChild(itemDiv);
 }
 
 
@@ -229,7 +95,7 @@ export async function handleFileUpload(event) {
     let fileCount = 0;
     for (const file of files) {
         if (file.size > MAX_FILE_SIZE_BYTES) {
-            alert(`Skipping "${file.name}": File is too large (${ui.formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`);
+            alert(`Skipping "${file.name}": File is too large (${formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`);
             continue;
         }
         formData.append('file', file);
@@ -468,14 +334,9 @@ export async function loadSavedChats() {
         const response = await fetch('/api/chats');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const chats = await response.json();
-        elements.savedChatsList.innerHTML = ''; // Clear loading message
+        state.setSavedChats(chats); // Store chats in state
+        ui.renderSavedChats(state.savedChats); // Use UI function to render
 
-        if (chats.length === 0) {
-            elements.savedChatsList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved chats yet.</p>`;
-        } else {
-            chats.forEach(chat => createChatItem(chat)); // Use helper
-        }
-        ui.updateActiveChatListItem(); // Highlight after loading
         ui.updateStatus("Saved chats loaded.");
     } catch (error) {
         console.error('Error loading saved chats:', error);
@@ -485,54 +346,6 @@ export async function loadSavedChats() {
     } finally {
         if (!wasLoading) ui.setLoadingState(false);
     }
-}
-
-// Helper to create chat list item
-function createChatItem(chat) {
-    const { savedChatsList } = elements;
-    if (!savedChatsList) return;
-
-    const listItem = document.createElement('div');
-    listItem.classList.add('list-item', 'chat-list-item');
-    listItem.dataset.chatId = chat.id;
-
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = chat.name || `Chat ${chat.id}`;
-    nameSpan.classList.add('filename');
-    nameSpan.title = chat.name || `Chat ${chat.id}`;
-
-    const timestampElement = document.createElement('div');
-    let formattedDate = 'Date N/A';
-    try {
-        const date = new Date(chat.last_updated_at);
-        formattedDate = date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-    } catch (e) { /* ignore */ }
-    timestampElement.textContent = `Last updated: ${formattedDate}`;
-    timestampElement.classList.add('text-xs', 'text-rz-tab-background-text', 'mt-0.5');
-
-    const deleteButton = document.createElement('button');
-    deleteButton.classList.add('delete-btn');
-    deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>';
-    deleteButton.title = "Delete Chat";
-    deleteButton.onclick = (e) => {
-        e.stopPropagation();
-        handleDeleteChat(chat.id, listItem); // Call handler below
-    };
-
-    const nameContainer = document.createElement('div');
-    nameContainer.classList.add('name-container');
-    nameContainer.appendChild(nameSpan);
-    nameContainer.appendChild(deleteButton);
-
-    listItem.appendChild(nameContainer);
-    listItem.appendChild(timestampElement);
-
-    listItem.onclick = () => {
-        if (chat.id != state.currentChatId) {
-            loadChat(chat.id); // Load this chat
-        }
-    };
-    savedChatsList.appendChild(listItem);
 }
 
 
@@ -580,6 +393,7 @@ export async function loadChat(chatId) {
         const data = await response.json();
 
         state.setCurrentChatId(data.details.id); // Set current chat ID *first*
+        localStorage.setItem('currentChatId', data.details.id); // Persist
         console.log(`[DEBUG] currentChatId set to ${state.currentChatId}.`);
 
         ui.clearChatbox(); // Clear loading message
@@ -621,6 +435,7 @@ export async function loadChat(chatId) {
 
         // Reset state on error
         state.setCurrentChatId(null);
+        localStorage.removeItem('currentChatId');
         if(elements.currentChatNameInput) elements.currentChatNameInput.value = '';
         if(elements.currentChatIdDisplay) elements.currentChatIdDisplay.textContent = 'ID: -';
         if(elements.modelSelector) elements.modelSelector.value = elements.modelSelector.options[0]?.value || '';
@@ -818,16 +633,15 @@ export async function handleDeleteChat(chatId, listItemElement) {
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         ui.updateStatus(`Chat ${chatId} deleted.`);
-        listItemElement?.remove(); // Remove from UI list
-
-        if (!elements.savedChatsList?.querySelector('.list-item')) {
-             if(elements.savedChatsList) elements.savedChatsList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved chats yet.</p>`;
-        }
+        // Remove from state first
+        state.setSavedChats(state.savedChats.filter(chat => chat.id !== chatId));
+        ui.renderSavedChats(state.savedChats); // Re-render list
 
         if (chatId == state.currentChatId) {
             await startNewChat(); // Start a new chat if the current one was deleted
         } else {
-            await loadSavedChats(); // Otherwise, just reload the list
+            // If a different chat was deleted, just ensure the list is updated (done by renderSavedChats)
+            ui.updateActiveChatListItem(); // Re-highlight the current one
         }
     } catch (error) {
         console.error(`Error deleting chat ${chatId}:`, error);
@@ -847,7 +661,16 @@ export async function handleModelChange() {
     const newModel = elements.modelSelector?.value;
     if (!newModel) return;
 
-    const originalModel = state.currentChatId ? (await fetch(`/api/chat/${state.currentChatId}`).then(res => res.json()).catch(() => ({ details: {} }))).details.model_name : elements.modelSelector.options[0]?.value;
+    // Fetch current model before attempting update in case of error
+    let originalModel = elements.modelSelector?.value; // Assume current UI value is correct initially
+    if (state.currentChatId) {
+        try {
+            const chatDetails = await fetch(`/api/chat/${state.currentChatId}`).then(res => res.json()).catch(() => ({ details: {} }));
+            originalModel = chatDetails.details.model_name || originalModel;
+        } catch (e) {
+            console.warn("Could not fetch current model name before update attempt:", e);
+        }
+    }
 
 
     ui.setLoadingState(true, "Updating Model");
@@ -887,14 +710,9 @@ export async function loadSavedNotes() {
          const response = await fetch('/api/notes');
          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
          const notes = await response.json();
-         elements.savedNotesList.innerHTML = ''; // Clear loading
+         state.setSavedNotes(notes); // Store notes in state
+         ui.renderSavedNotes(state.savedNotes); // Use UI function to render
 
-         if (notes.length === 0) {
-             elements.savedNotesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved notes yet.</p>`;
-         } else {
-             notes.forEach(note => createNoteItem(note)); // Use helper
-         }
-         ui.updateActiveNoteListItem(); // Highlight
          ui.updateStatus("Saved notes loaded.");
      } catch (error) {
          console.error('Error loading saved notes:', error);
@@ -906,54 +724,6 @@ export async function loadSavedNotes() {
      }
 }
 
-// Helper to create note list item
-function createNoteItem(note) {
-    const { savedNotesList } = elements;
-    if (!savedNotesList) return;
-
-    const listItem = document.createElement('div');
-    listItem.classList.add('list-item', 'note-list-item');
-    listItem.dataset.noteId = note.id;
-
-    const nameSpan = document.createElement('span');
-    nameSpan.textContent = note.name || `Note ${note.id}`;
-    nameSpan.classList.add('filename');
-    nameSpan.title = note.name || `Note ${note.id}`;
-
-    const timestampElement = document.createElement('div');
-    let formattedDate = 'Date N/A';
-     try {
-        const date = new Date(note.last_saved_at);
-        formattedDate = date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-    } catch (e) { /* ignore */ }
-    timestampElement.textContent = `Last saved: ${formattedDate}`;
-    timestampElement.classList.add('text-xs', 'text-rz-tab-background-text', 'mt-0.5');
-
-    const deleteButton = document.createElement('button');
-    deleteButton.classList.add('delete-btn');
-    deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>';
-    deleteButton.title = "Delete Note";
-    deleteButton.onclick = (e) => {
-        e.stopPropagation();
-        handleDeleteNote(note.id, listItem); // Call handler below
-    };
-
-    const nameContainer = document.createElement('div');
-    nameContainer.classList.add('name-container');
-    nameContainer.appendChild(nameSpan);
-    nameContainer.appendChild(deleteButton);
-
-    listItem.appendChild(nameContainer);
-    listItem.appendChild(timestampElement);
-
-    listItem.onclick = () => {
-        if (note.id != state.currentNoteId) {
-            loadNote(note.id); // Load this note
-        }
-    };
-    savedNotesList.appendChild(listItem);
-}
-
 
 /** Creates a new note entry and loads it. */
 export async function startNewNote() {
@@ -963,11 +733,12 @@ export async function startNewNote() {
     if(elements.notesTextarea) {
         elements.notesTextarea.value = "";
         elements.notesTextarea.placeholder = "Creating new note...";
+        elements.notesTextarea.disabled = false; // Ensure enabled for new note
     }
     if(elements.notesPreview) elements.notesPreview.innerHTML = "";
     if(elements.currentNoteNameInput) elements.currentNoteNameInput.value = "New Note";
     if(elements.currentNoteIdDisplay) elements.currentNoteIdDisplay.textContent = "ID: -";
-    ui.switchNoteMode('edit'); // Always start in edit mode
+    ui.setNoteMode('edit'); // Always start in edit mode
 
     try {
         const response = await fetch('/api/notes', { method: 'POST' });
@@ -983,6 +754,7 @@ export async function startNewNote() {
         if(elements.notesTextarea) {
             elements.notesTextarea.value = `[Error creating new note: ${error.message}]`;
             elements.notesTextarea.placeholder = "Could not create note.";
+            elements.notesTextarea.disabled = true; // Disable on error
         }
          if(elements.notesPreview) elements.notesPreview.innerHTML = `<p class="text-red-500">Error creating new note: ${escapeHtml(error.message)}</p>`;
         ui.updateStatus("Error creating new note.", true);
@@ -1001,6 +773,7 @@ export async function loadNote(noteId) {
     if(elements.notesTextarea) {
         elements.notesTextarea.value = "";
         elements.notesTextarea.placeholder = "Loading note...";
+        elements.notesTextarea.disabled = false; // Enable while loading
     }
     if(elements.notesPreview) elements.notesPreview.innerHTML = "";
     if(elements.currentNoteNameInput) elements.currentNoteNameInput.value = "";
@@ -1025,7 +798,7 @@ export async function loadNote(noteId) {
         }
 
         // Apply the current mode *after* loading content
-        ui.switchNoteMode(state.currentNoteMode); // Applies persisted/default mode
+        ui.setNoteMode(state.currentNoteMode); // Applies persisted/default mode
 
         ui.updateStatus(`Note ${state.currentNoteId} loaded.`);
         ui.updateActiveNoteListItem(); // Highlight
@@ -1035,6 +808,7 @@ export async function loadNote(noteId) {
         if(elements.notesTextarea) {
             elements.notesTextarea.value = `[Error loading note ${noteId}: ${error.message}]`;
             elements.notesTextarea.placeholder = "Could not load note.";
+            elements.notesTextarea.disabled = true; // Disable on error
         }
         if(elements.notesPreview) elements.notesPreview.innerHTML = `<p class="text-red-500">Error loading note: ${escapeHtml(error.message)}</p>`;
         ui.updateStatus(`Error loading note ${noteId}.`, true);
@@ -1043,8 +817,8 @@ export async function loadNote(noteId) {
         if(elements.currentNoteNameInput) elements.currentNoteNameInput.value = '';
         if(elements.currentNoteIdDisplay) elements.currentNoteIdDisplay.textContent = 'ID: -';
         ui.updateActiveNoteListItem(); // Remove highlight
-        ui.switchNoteMode('edit'); // Default to edit mode on error
-        if(elements.notesTextarea) elements.notesTextarea.disabled = true;
+        ui.setNoteMode('edit'); // Default to edit mode on error
+        // Textarea is already disabled above
         throw error; // Re-throw for switchTab to handle
     } finally {
         ui.setLoadingState(false);
@@ -1096,13 +870,15 @@ export async function handleDeleteNote(noteId, listItemElement) {
         const response = await fetch(`/api/note/${noteId}`, { method: 'DELETE' });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         ui.updateStatus(`Note ${noteId} deleted.`);
-        listItemElement?.remove(); // Remove from UI list
+        // Remove from state first
+        state.setSavedNotes(state.savedNotes.filter(note => note.id !== noteId));
+        ui.renderSavedNotes(state.savedNotes); // Re-render list
 
         // If the deleted note was the currently active one, load another or start new
         if (noteId == state.currentNoteId) {
             state.setCurrentNoteId(null); // Clear current note state
             localStorage.removeItem('currentNoteId');
-            await loadSavedNotes(); // Reload the list first
+            // loadSavedNotes already re-rendered the list
             const firstNoteElement = elements.savedNotesList?.querySelector('.list-item');
             if (firstNoteElement) {
                 await loadNote(parseInt(firstNoteElement.dataset.noteId));
@@ -1110,16 +886,19 @@ export async function handleDeleteNote(noteId, listItemElement) {
                 await startNewNote(); // Create and load a new note
             }
         } else {
-            await loadSavedNotes(); // Otherwise, just reload the list
+            // If a different note was deleted, just ensure the list is updated (done by renderSavedNotes)
+            ui.updateActiveNoteListItem(); // Re-highlight the current one
         }
     } catch (error) {
         console.error(`Error deleting note ${noteId}:`, error);
         ui.updateStatus(`Error deleting note: ${error.message}`, true);
         if (noteId == state.currentNoteId) {
-             if(elements.notesTextarea) elements.notesTextarea.value = `[Error deleting note ${noteId}: ${error.message}]`;
+             if(elements.notesTextarea) {
+                 elements.notesTextarea.value = `[Error deleting note ${noteId}: ${error.message}]`;
+                 elements.notesTextarea.disabled = true;
+             }
              if(elements.notesPreview) elements.notesPreview.innerHTML = `<p class="text-red-500">Error deleting note: ${escapeHtml(error.message)}</p>`;
-             ui.switchNoteMode('edit');
-             if(elements.notesTextarea) elements.notesTextarea.disabled = true;
+             ui.setNoteMode('edit'); // Default to edit mode on error
         }
         // Reload list on failure
         await loadSavedNotes();
@@ -1153,9 +932,9 @@ export async function loadInitialChatData() {
     // If no persisted chat or loading failed, load most recent or start new
     if (chatToLoadId === null) {
         console.log("[DEBUG] loadInitialChatData: No valid currentChatId, loading most recent or creating new.");
-        const firstChatElement = elements.savedChatsList?.querySelector('.list-item');
-        if (firstChatElement) {
-            const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
+        const firstChat = state.savedChats.length > 0 ? state.savedChats[0] : null; // Get from state
+        if (firstChat) {
+            const mostRecentChatId = firstChat.id;
             console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`);
             await loadChat(mostRecentChatId);
         } else {
@@ -1184,9 +963,9 @@ export async function loadInitialNotesData() {
         }
     } else {
         console.log("[DEBUG] loadInitialNotesData: No currentNoteId, loading most recent or creating new.");
-        const firstNoteElement = elements.savedNotesList?.querySelector('.list-item');
-        if (firstNoteElement) {
-            const mostRecentNoteId = parseInt(firstNoteElement.dataset.noteId);
+        const firstNote = state.savedNotes.length > 0 ? state.savedNotes[0] : null; // Get from state
+        if (firstNote) {
+            const mostRecentNoteId = firstNote.id;
             console.log(`[DEBUG] Loading most recent note: ${mostRecentNoteId}`);
             await loadNote(mostRecentNoteId);
         } else {
@@ -1197,9 +976,9 @@ export async function loadInitialNotesData() {
 
     // Ensure the correct note mode is applied after loading
     if (state.currentNoteId === null) {
-         ui.switchNoteMode('edit'); // Default to edit if no note could be loaded/created
+         ui.setNoteMode('edit'); // Default to edit if no note could be loaded/created
     } else {
-         ui.switchNoteMode(state.currentNoteMode); // Apply persisted/default mode
+         ui.setNoteMode(state.currentNoteMode); // Apply persisted/default mode
     }
 
     console.log(`[DEBUG] loadInitialNotesData finished. Final currentNoteId: ${state.currentNoteId}`);

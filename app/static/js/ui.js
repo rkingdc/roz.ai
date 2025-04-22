@@ -250,48 +250,58 @@ export function renderSavedChats(chats) {
         return;
     }
 
-    chats.forEach(chat => {
-        const listItem = document.createElement('div');
-        listItem.classList.add('list-item', 'chat-list-item', 'flex', 'items-center', 'justify-between', 'p-2', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
-        listItem.dataset.chatId = chat.id;
-
-        const nameSpan = document.createElement('span');
-        nameSpan.classList.add('filename', 'text-sm', 'text-rz-sidebar-text', 'truncate', 'flex-grow'); // Added truncate and flex-grow
-        nameSpan.textContent = chat.name || `Chat ${chat.id}`;
-
-        // Add delete button
-        const deleteButton = document.createElement('button');
-        deleteButton.classList.add('delete-btn', 'text-red-500', 'hover:text-red-700', 'ml-2', 'flex-shrink-0'); // Added ml-2 and flex-shrink-0
-        deleteButton.innerHTML = '<i class="fas fa-trash-alt text-xs"></i>';
-        deleteButton.title = `Delete "${chat.name || `Chat ${chat.id}`}"`;
-        deleteButton.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent triggering the list item click
-            // Use a dynamic import for api to avoid circular dependency if api imports ui
-            import('./api.js').then(api => {
-                api.handleDeleteChat(chat.id, listItem);
-            }).catch(error => console.error("Failed to import api for delete:", error));
-        });
-
-
-        listItem.appendChild(nameSpan);
-        listItem.appendChild(deleteButton); // Append delete button
-
-        // Add click listener to load chat
-        listItem.addEventListener('click', () => {
-             if (chat.id != state.currentChatId) {
-                 // Use a dynamic import for api to avoid circular dependency if api imports ui
-                 import('./api.js').then(api => {
-                     api.loadChat(chat.id); // Load this chat
-                 }).catch(error => console.error("Failed to import api for load chat:", error));
-             }
-        });
-
-        savedChatsList.appendChild(listItem);
-    });
+    chats.forEach(chat => createChatItem(chat)); // Use helper
 
     // Update highlighting after rendering
     updateActiveChatListItem();
 }
+
+/**
+ * Helper to create chat list item DOM element.
+ * @param {Object} chat - The chat object { id, name, last_updated_at }.
+ */
+function createChatItem(chat) {
+    const { savedChatsList } = elements;
+    if (!savedChatsList) return;
+
+    const listItem = document.createElement('div');
+    listItem.classList.add('list-item', 'chat-list-item', 'flex', 'items-center', 'justify-between', 'p-2', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
+    listItem.dataset.chatId = chat.id;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.classList.add('filename', 'text-sm', 'text-rz-sidebar-text', 'truncate', 'flex-grow'); // Added truncate and flex-grow
+    nameSpan.textContent = chat.name || `Chat ${chat.id}`;
+
+    // Add delete button
+    const deleteButton = document.createElement('button');
+    deleteButton.classList.add('delete-btn', 'text-red-500', 'hover:text-red-700', 'ml-2', 'flex-shrink-0'); // Added ml-2 and flex-shrink-0
+    deleteButton.innerHTML = '<i class="fas fa-trash-alt text-xs"></i>';
+    deleteButton.title = `Delete "${chat.name || `Chat ${chat.id}`}"`;
+    deleteButton.addEventListener('click', (event) => {
+        event.stopPropagation(); // Prevent triggering the list item click
+        // Use a dynamic import for api to avoid circular dependency if api imports ui
+        import('./api.js').then(api => {
+            api.handleDeleteChat(chat.id, listItem);
+        }).catch(error => console.error("Failed to import api for delete:", error));
+    });
+
+
+    listItem.appendChild(nameSpan);
+    listItem.appendChild(deleteButton); // Append delete button
+
+    // Add click listener to load chat
+    listItem.addEventListener('click', () => {
+         if (chat.id != state.currentChatId) {
+             // Use a dynamic import for api to avoid circular dependency if api imports ui
+             import('./api.js').then(api => {
+                 api.loadChat(chat.id); // Load this chat
+             }).catch(error => console.error("Failed to import api for load chat:", error));
+         }
+    });
+
+    savedChatsList.appendChild(listItem);
+}
+
 
 /** Updates the highlighting for the currently active chat list item. */
 export function updateActiveChatListItem() {
@@ -331,47 +341,57 @@ export function renderSavedNotes(notes) {
         return;
     }
 
-    notes.forEach(note => {
-        const listItem = document.createElement('div');
-        listItem.classList.add('list-item', 'note-list-item', 'flex', 'items-center', 'justify-between', 'p-2', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
-        listItem.dataset.noteId = note.id;
-
-        const nameSpan = document.createElement('span');
-        nameSpan.classList.add('filename', 'text-sm', 'text-rz-sidebar-text', 'truncate', 'flex-grow'); // Added truncate and flex-grow
-        nameSpan.textContent = note.name || `Note ${note.id}`;
-
-        // Add delete button
-        const deleteButton = document.createElement('button');
-        deleteButton.classList.add('delete-btn', 'text-red-500', 'hover:text-red-700', 'ml-2', 'flex-shrink-0'); // Added ml-2 and flex-shrink-0
-        deleteButton.innerHTML = '<i class="fas fa-trash-alt text-xs"></i>';
-        deleteButton.title = `Delete "${note.name || `Note ${note.id}`}"`;
-        deleteButton.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent triggering the list item click
-             // Use a dynamic import for api to avoid circular dependency if api imports ui
-            import('./api.js').then(api => {
-                api.handleDeleteNote(note.id, listItem);
-            }).catch(error => console.error("Failed to import api for delete:", error));
-        });
-
-        listItem.appendChild(nameSpan);
-        listItem.appendChild(deleteButton); // Append delete button
-
-        // Add click listener to load note
-        listItem.addEventListener('click', () => {
-             if (note.id != state.currentNoteId) {
-                 // Use a dynamic import for api to avoid circular dependency if api imports ui
-                 import('./api.js').then(api => {
-                     api.loadNote(note.id); // Load this note
-                 }).catch(error => console.error("Failed to import api for load note:", error));
-             }
-        });
-
-        savedNotesList.appendChild(listItem);
-    });
+    notes.forEach(note => createNoteItem(note)); // Use helper
 
     // Update highlighting after rendering
     updateActiveNoteListItem();
 }
+
+/**
+ * Helper to create note list item DOM element.
+ * @param {Object} note - The note object { id, name, last_saved_at }.
+ */
+function createNoteItem(note) {
+    const { savedNotesList } = elements;
+    if (!savedNotesList) return;
+
+    const listItem = document.createElement('div');
+    listItem.classList.add('list-item', 'note-list-item', 'flex', 'items-center', 'justify-between', 'p-2', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
+    listItem.dataset.noteId = note.id;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.classList.add('filename', 'text-sm', 'text-rz-sidebar-text', 'truncate', 'flex-grow'); // Added truncate and flex-grow
+    nameSpan.textContent = note.name || `Note ${note.id}`;
+
+    // Add delete button
+    const deleteButton = document.createElement('button');
+    deleteButton.classList.add('delete-btn', 'text-red-500', 'hover:text-red-700', 'ml-2', 'flex-shrink-0'); // Added ml-2 and flex-shrink-0
+    deleteButton.innerHTML = '<i class="fas fa-trash-alt text-xs"></i>';
+    deleteButton.title = `Delete "${note.name || `Note ${note.id}`}"`;
+    deleteButton.addEventListener('click', (event) => {
+        event.stopPropagation(); // Prevent triggering the list item click
+         // Use a dynamic import for api to avoid circular dependency if api imports ui
+        import('./api.js').then(api => {
+            api.handleDeleteNote(note.id, listItem);
+        }).catch(error => console.error("Failed to import api for delete:", error));
+    });
+
+    listItem.appendChild(nameSpan);
+    listItem.appendChild(deleteButton); // Append delete button
+
+    // Add click listener to load note
+    listItem.addEventListener('click', () => {
+         if (note.id != state.currentNoteId) {
+             // Use a dynamic import for api to avoid circular dependency if api imports ui
+             import('./api.js').then(api => {
+                 api.loadNote(note.id); // Load this note
+             }).catch(error => console.error("Failed to import api for load note:", error));
+         }
+    });
+
+    savedNotesList.appendChild(listItem);
+}
+
 
 /** Updates the highlighting for the currently active note list item. */
 export function updateActiveNoteListItem() {
@@ -409,11 +429,8 @@ export function renderUploadedFiles(files) {
 
     files.forEach(file => {
         const isSelected = state.selectedFiles.some(sf => sf.id === file.id);
-        const sidebarItem = createSidebarFileItem(file, isSelected);
-        const modalItem = createModalFileItem(file, isSelected);
-
-        uploadedFilesList.appendChild(sidebarItem);
-        manageFilesList.appendChild(modalItem);
+        createSidebarFileItem(file, isSelected); // Use helper
+        createModalFileItem(file, isSelected); // Use helper
     });
 
     // After rendering, update the display of selected files in the input area
@@ -427,6 +444,9 @@ export function renderUploadedFiles(files) {
  * @returns {HTMLElement} The created div element.
  */
 function createSidebarFileItem(file, isSelected) {
+    const { uploadedFilesList } = elements;
+    if (!uploadedFilesList) return;
+
     const itemDiv = document.createElement('div');
     itemDiv.classList.add('file-list-item', 'flex', 'items-center', 'p-1', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
     itemDiv.dataset.fileId = file.id;
@@ -437,17 +457,7 @@ function createSidebarFileItem(file, isSelected) {
     checkbox.type = 'checkbox';
     checkbox.classList.add('file-checkbox', 'mr-2');
     checkbox.checked = isSelected;
-    checkbox.addEventListener('change', () => {
-        if (checkbox.checked) {
-            state.addSelectedFile({ id: file.id, filename: file.filename, type: 'permanent' }); // Mark as permanent attachment
-        } else {
-            state.removeSelectedFileById(file.id);
-        }
-        renderSelectedFiles(); // Re-render the selected files display
-        // Also update the corresponding checkbox in the modal if it exists
-        const modalCheckbox = elements.manageFilesList?.querySelector(`.file-list-item[data-file-id="${file.id}"] .file-checkbox`);
-        if (modalCheckbox) modalCheckbox.checked = checkbox.checked;
-    });
+    checkbox.addEventListener('change', handleSidebarFileCheckboxChange); // Attach listener
 
     const nameSpan = document.createElement('span');
     nameSpan.classList.add('filename', 'text-sm', 'text-rz-sidebar-text', 'truncate', 'flex-grow'); // Added truncate and flex-grow
@@ -473,21 +483,56 @@ function createSidebarFileItem(file, isSelected) {
     });
 
 
-    return itemDiv;
+    uploadedFilesList.appendChild(itemDiv);
 }
+
+/**
+ * Helper to handle sidebar file checkbox change.
+ * @param {Event} e - The change event.
+ */
+function handleSidebarFileCheckboxChange(e) {
+    const checkbox = e.target;
+    const fileId = parseInt(checkbox.closest('.file-list-item')?.dataset.fileId); // Get ID from dataset
+    const listItem = checkbox.closest('.file-list-item');
+    const filename = listItem?.dataset.filename;
+    if (!listItem || !filename || isNaN(fileId)) return;
+
+    // Find the corresponding item in the modal list
+    const modalItem = elements.manageFilesList?.querySelector(`.file-list-item[data-file-id="${fileId}"]`);
+    const modalCheckbox = modalItem?.querySelector('.file-checkbox');
+
+    if (checkbox.checked) {
+        // Add a placeholder entry, type will be determined later when attach button clicked
+        state.addSelectedFile({ id: fileId, filename: filename, type: 'pending' });
+        listItem.classList.add('active-selection');
+        if (modalItem) modalItem.classList.add('active-selection'); // Sync modal styling
+        if (modalCheckbox) modalCheckbox.checked = true; // Sync modal checkbox
+    } else {
+        // Remove ALL entries for this file ID from selectedFiles
+        state.removeSelectedFileById(fileId);
+        listItem.classList.remove('active-selection');
+        if (modalItem) modalItem.classList.remove('active-selection'); // Sync modal styling
+        if (modalCheckbox) modalCheckbox.checked = false; // Sync modal checkbox
+    }
+    renderSelectedFiles(); // Update the display below the message input
+}
+
 
 /**
  * Creates a DOM element for a file item in the Manage Files modal list.
  * @param {Object} file - The file object { id, filename, mimetype, filesize, has_summary, uploaded_at }.
  * @param {boolean} isSelected - Whether the file is currently selected.
- * @returns {HTMLElement} The created div element.
  */
 function createModalFileItem(file, isSelected) {
+    const { manageFilesList } = elements;
+     if (!manageFilesList) return;
+
     const itemDiv = document.createElement('div');
-    itemDiv.classList.add('file-list-item', 'grid', 'grid-cols-12', 'gap-2', 'items-center', 'p-2', 'border-b', 'border-gray-200');
+    itemDiv.classList.add('file-list-item', 'grid', 'grid-cols-12', 'gap-2', 'items-center', 'p-2', 'border-b', 'border-gray-200', 'last:border-b-0', 'text-sm');
     itemDiv.dataset.fileId = file.id;
     itemDiv.dataset.filename = file.filename;
-    itemDiv.dataset.hasSummary = file.has_summary; // Store summary status
+    itemDiv.dataset.hasSummary = file.has_summary;
+    itemDiv.classList.toggle('active-selection', isSelected); // Keep styling sync
 
     // Checkbox (col-span-1)
     const checkboxCol = document.createElement('div');
@@ -496,17 +541,7 @@ function createModalFileItem(file, isSelected) {
     checkbox.type = 'checkbox';
     checkbox.classList.add('file-checkbox');
     checkbox.checked = isSelected;
-     checkbox.addEventListener('change', () => {
-        if (checkbox.checked) {
-            state.addSelectedFile({ id: file.id, filename: file.filename, type: 'permanent' }); // Mark as permanent attachment
-        } else {
-            state.removeSelectedFileById(file.id);
-        }
-        renderSelectedFiles(); // Re-render the selected files display
-         // Also update the corresponding checkbox in the sidebar
-        const sidebarCheckbox = elements.uploadedFilesList?.querySelector(`.file-list-item[data-file-id="${file.id}"] .file-checkbox`);
-        if (sidebarCheckbox) sidebarCheckbox.checked = checkbox.checked;
-    });
+     checkbox.addEventListener('change', handleModalFileCheckboxChange); // Attach listener
     checkboxCol.appendChild(checkbox);
 
     // Filename (col-span-6)
@@ -529,7 +564,8 @@ function createModalFileItem(file, isSelected) {
     summaryButton.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1');
     summaryButton.innerHTML = '<i class="fas fa-list-alt"></i>';
     summaryButton.title = file.has_summary ? 'View/Edit Summary' : 'Generate Summary';
-    summaryButton.addEventListener('click', () => {
+    summaryButton.addEventListener('click', (e) => {
+         e.stopPropagation(); // Prevent triggering item click
          // Use a dynamic import for api to avoid circular dependency if api imports ui
         import('./api.js').then(api => {
             api.showSummaryModal(file.id, file.filename);
@@ -541,7 +577,8 @@ function createModalFileItem(file, isSelected) {
     deleteButton.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1', 'text-red-500', 'hover:text-red-700');
     deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
     deleteButton.title = 'Delete File';
-    deleteButton.addEventListener('click', () => {
+    deleteButton.addEventListener('click', (e) => {
+         e.stopPropagation(); // Prevent triggering item click
          // Use a dynamic import for api to avoid circular dependency if api imports ui
         import('./api.js').then(api => {
             api.deleteFile(file.id); // Call the API function
@@ -566,8 +603,39 @@ function createModalFileItem(file, isSelected) {
         }
     });
 
+    manageFilesList.appendChild(itemDiv);
+}
 
-    return itemDiv;
+/**
+ * Helper to handle modal file checkbox change.
+ * @param {Event} e - The change event.
+ */
+function handleModalFileCheckboxChange(e) {
+    const checkbox = e.target;
+    const fileId = parseInt(checkbox.closest('.file-list-item')?.dataset.fileId); // Get ID from dataset
+    const listItem = checkbox.closest('.file-list-item');
+    const filename = listItem?.dataset.filename;
+    if (!listItem || !filename || isNaN(fileId)) return;
+
+    // Find the corresponding item in the sidebar list
+    const sidebarItem = elements.uploadedFilesList?.querySelector(`.file-list-item[data-file-id="${fileId}"]`);
+    const sidebarCheckbox = sidebarItem?.querySelector('.file-checkbox');
+
+
+    if (checkbox.checked) {
+        // Add a placeholder entry, type will be determined later when attach button clicked
+        state.addSelectedFile({ id: fileId, filename: filename, type: 'pending' });
+        listItem.classList.add('active-selection');
+        if (sidebarItem) sidebarItem.classList.add('active-selection'); // Sync sidebar styling
+        if (sidebarCheckbox) sidebarCheckbox.checked = true; // Sync sidebar checkbox
+    } else {
+        // Remove ALL entries for this file ID from selectedFiles
+        state.removeSelectedFileById(fileId);
+        listItem.classList.remove('active-selection');
+        if (sidebarItem) sidebarItem.classList.remove('active-selection'); // Sync sidebar styling
+        if (sidebarCheckbox) sidebarCheckbox.checked = false; // Sync sidebar checkbox
+    }
+    renderSelectedFiles(); // Update the display below the message input
 }
 
 
