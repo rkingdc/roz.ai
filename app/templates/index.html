@@ -101,6 +101,17 @@
                     </select>
                 </div>
                 <!-- End Model Selector -->
+
+                <!-- New Notes Mode Button Group -->
+                <div id="notes-mode-buttons" class="inline-flex rounded-md shadow-sm hidden" role="group">
+                    <button type="button" id="edit-note-btn" class="btn-group-left active">
+                      <i class="fas fa-edit mr-1"></i> Edit
+                    </button>
+                    <button type="button" id="view-note-btn" class="btn-group-right">
+                      <i class="fas fa-eye mr-1"></i> View
+                    </button>
+                </div>
+                <!-- End Notes Mode Button Group -->
             </div>
             <!-- Keep the rest of the header content (settings, plugins toggles) -->
             <div class="flex items-center space-x-4">
@@ -156,25 +167,21 @@
         <!-- Notes Section -->
         <!-- Added flex-grow and overflow-hidden to make it fill available space -->
         <div id="notes-section" class="flex flex-col flex-grow p-4 overflow-hidden hidden">
-            <!-- Added flex-grow and overflow-hidden to make the content area fill space -->
-            <div class="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden">
-                <!-- Textarea for Markdown Input -->
-                <!-- Added flex-1 and overflow-hidden to make it fill space -->
-                <div class="flex-1 flex flex-col overflow-hidden">
-                    <label for="notes-textarea" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Markdown Input</label>
-                    <!-- Added flex-grow and overflow-auto to make textarea fill its container and scroll -->
-                    <textarea id="notes-textarea" class="flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white font-mono text-sm resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
-                </div>
-                <!-- Preview Area -->
-                <!-- Added flex-1 and overflow-hidden to make it fill space -->
-                <div class="flex-1 flex flex-col overflow-hidden">
-                     <label for="notes-preview" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preview</label>
-                    <!-- Added flex-grow and overflow-y-auto to make preview fill its container and scroll -->
-                    <div id="notes-preview" class="flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm overflow-y-auto prose dark:prose-invert max-w-none dark:bg-gray-800 dark:border-gray-600 dark:text-white">
-                        <!-- Markdown will be rendered here -->
-                    </div>
-                </div>
+            <!-- Removed the inner flex container that created side-by-side layout -->
+            <!-- Removed labels for Markdown Input and Preview -->
+
+            <!-- Textarea for Markdown Input -->
+            <!-- Added flex-grow and overflow-auto to make textarea fill its container and scroll -->
+            <!-- Added note-mode-element class for JS toggling -->
+            <textarea id="notes-textarea" class="note-mode-element flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white font-mono text-sm resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
+
+            <!-- Preview Area -->
+            <!-- Added flex-grow and overflow-y-auto to make preview fill its container and scroll -->
+            <!-- Added note-mode-element class for JS toggling -->
+            <div id="notes-preview" class="note-mode-element flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm overflow-y-auto prose dark:prose-invert max-w-none dark:bg-gray-800 dark:border-gray-600 dark:text-white hidden">
+                <!-- Markdown will be rendered here -->
             </div>
+
             <!-- Save Button - Moved to sidebar, but keeping this one for now if needed -->
             <!-- <div class="mt-4 flex justify-end flex-shrink-0">
                 <button id="save-note-button" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-700 dark:hover:bg-blue-800">

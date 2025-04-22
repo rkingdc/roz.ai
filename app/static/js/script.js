@@ -11,6 +11,7 @@ let isFilePluginEnabled = true; // Track Files plugin enabled state (default to 
 let isCalendarPluginEnabled = true; // Track Calendar plugin enabled state (default to true)
 let isWebSearchPluginEnabled = true; // New: Track Web Search plugin enabled state (default to true)
 let currentTab = 'chat'; // New: Track the currently active tab ('chat' or 'notes')
+let currentNoteMode = 'edit'; // New: Track the current mode for notes ('edit' or 'view')
 
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
@@ -23,6 +24,7 @@ const CALENDAR_PLUGIN_ENABLED_KEY = 'calendarPluginEnabled'; // New localStorage
 const WEB_SEARCH_PLUGIN_ENABLED_KEY = 'webSearchPluginEnabled'; // New: localStorage key for Web Search plugin
 const ACTIVE_TAB_KEY = 'activeTab'; // New: localStorage key for active tab
 const CURRENT_NOTE_ID_KEY = 'currentNoteId'; // New: localStorage key for current note ID
+const CURRENT_NOTE_MODE_KEY = 'currentNoteMode'; // New: localStorage key for current note mode
 
 
 const MAX_FILE_SIZE_MB = 10;
@@ -233,6 +235,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedNotesList = document.getElementById('saved-notes-list'); // New: Saved Notes list container
     const modelSelectorContainer = document.getElementById('model-selector-container'); // New: Container for model selector
 
+    // New Notes Mode Button References
+    const notesModeButtons = document.getElementById('notes-mode-buttons'); // Container for mode buttons
+    const editNoteButton = document.getElementById('edit-note-btn');
+    const viewNoteButton = document.getElementById('view-note-btn');
+
 
     // Application State (Re-declare or ensure access to global state if needed)
     // These are already declared globally, so no need to re-declare with `let` or `const`
@@ -248,6 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // let isCalendarPluginEnabled = true; // Already global
     // let isWebSearchPluginEnabled = true; // Already global
     // let currentTab = 'chat'; // Already global
+    // let currentNoteMode = 'edit'; // Already global
     let sessionFile = null; // Variable to store selected session file (can be local or global, let's keep global)
 
 
@@ -293,7 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     function setLoadingState(loading, operation = "Processing") {
-        console.log(`[DEBUG] setLoadingState called with loading=${loading}, operation=${operation}, currentTab=${currentTab}`); // Added log
+        console.log(`[DEBUG] setLoadingState called with loading=${loading}, operation=${operation}, currentTab=${currentTab}, currentNoteMode=${currentNoteMode}`); // Added log
         isLoading = loading;
         // Chat elements
         messageInput.disabled = loading;
@@ -309,11 +317,27 @@ document.addEventListener('DOMContentLoaded', () => {
         webSearchToggle.disabled = loading; // Disable the web search toggle next to input
 
         // Notes elements
-        notesTextarea.disabled = loading;
+        // Disable/Enable the *currently visible* notes element
+        if (currentTab === 'notes') {
+             if (currentNoteMode === 'edit') {
+                 notesTextarea.disabled = loading;
+                 notesPreview.disabled = true; // Preview is never editable
+             } else { // view mode
+                 notesTextarea.disabled = true; // Textarea is hidden/disabled
+                 notesPreview.disabled = true; // Preview is never editable
+             }
+        } else {
+             // If not on notes tab, disable both notes elements
+             notesTextarea.disabled = true;
+             notesPreview.disabled = true;
+        }
+
         // saveNoteButton.disabled = loading; // Disabled below based on tab
         newNoteButton.disabled = loading; // New: Disable New Note button
         currentNoteNameInput.disabled = loading; // New: Disable Current Note name input
         saveNoteNameButton.disabled = loading; // New: Disable Save Note Name button
+        editNoteButton.disabled = loading; // Disable notes mode buttons
+        viewNoteButton.disabled = loading; // Disable notes mode buttons
 
 
         // Sidebar/Modal/Settings elements
@@ -361,15 +385,19 @@ document.addEventListener('DOMContentLoaded', () => {
              sendButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-2"></i> ${operation}...` : '<i class="fas fa-paper-plane"></i> Send';
              newChatButton.disabled = loading; // Enable/Disable New Chat button
              newNoteButton.disabled = true; // Disable New Note button when on chat tab
-             saveNoteNameButton.disabled = true; // Disable Save Note Name button when on chat tab
-             console.log(`[DEBUG] setLoadingState (Chat Tab): newNoteButton disabled=${newNoteButton.disabled}, saveNoteNameButton disabled=${saveNoteNameButton.disabled}`); // Added log
+             saveNoteNameButton.disabled = true; // Disable Save Note Name button
+             editNoteButton.disabled = true; // Disable notes mode buttons when on chat tab
+             viewNoteButton.disabled = true; // Disable notes mode buttons when on chat tab
+             console.log(`[DEBUG] setLoadingState (Chat Tab): newNoteButton disabled=${newNoteButton.disabled}, saveNoteNameButton disabled=${saveNoteNameButton.disabled}, editNoteButton disabled=${editNoteButton.disabled}, viewNoteButton disabled=${viewNoteButton.disabled}`); // Added log
         } else if (currentTab === 'notes') {
              // saveNoteButton.innerHTML = loading ? `<i class="fas fa-spinner fa-spin mr-1"></i> ${operation}...` : '<i class="fas fa-save mr-1"></i> Save Note'; // Button moved
              sendButton.innerHTML = '<i class="fas fa-paper-plane"></i> Send'; // Reset chat button if on notes tab
              newChatButton.disabled = true; // Disable New Chat button when on notes tab
              newNoteButton.disabled = loading; // Enable/Disable New Note button
              saveNoteNameButton.disabled = loading; // Enable/Disable Save Note Name button
-             console.log(`[DEBUG] setLoadingState (Notes Tab): newNoteButton disabled=${newNoteButton.disabled}, saveNoteNameButton disabled=${saveNoteNameButton.disabled}`); // Added log
+             editNoteButton.disabled = loading; // Enable/Disable notes mode buttons
+             viewNoteButton.disabled = loading; // Enable/Disable notes mode buttons
+             console.log(`[DEBUG] setLoadingState (Notes Tab): newNoteButton disabled=${newNoteButton.disabled}, saveNoteNameButton disabled=${saveNoteNameButton.disabled}, editNoteButton disabled=${editNoteButton.disabled}, viewNoteButton disabled=${viewNoteButton.disabled}`); // Added log
         }
 
 
@@ -382,7 +410,13 @@ document.addEventListener('DOMContentLoaded', () => {
                  if (currentTab === 'chat') {
                      messageInput.focus();
                  } else if (currentTab === 'notes') {
-                     notesTextarea.focus();
+                     // Focus the visible notes element
+                     if (currentNoteMode === 'edit') {
+                         notesTextarea.focus();
+                     } else {
+                         // Cannot focus the preview div, maybe focus the notes section container?
+                         notesSection.focus(); // Or just do nothing
+                     }
                  }
             }
         }
@@ -414,7 +448,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (currentTab === 'chat') {
                     messageInput.focus();
                 } else if (currentTab === 'notes') {
-                    notesTextarea.focus();
+                     if (currentNoteMode === 'edit') {
+                         notesTextarea.focus();
+                     } else {
+                         // Cannot focus preview
+                     }
                 }
             }, 350); // Small delay to allow transition
         }
@@ -1225,14 +1263,14 @@ document.addEventListener('DOMContentLoaded', () => {
              // If the settings modal was closed, ensure focus returns to message input/notes textarea
              if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
                  if (currentTab === 'chat') messageInput.focus();
-                 else if (currentTab === 'notes') notesTextarea.focus();
+                 else if (currentTab === 'notes' && currentNoteMode === 'edit') notesTextarea.focus(); // Only focus textarea if in edit mode
              }
          }
          else {
              // Default case, focus message input/notes textarea if no modals are open
              if (!isLoading && manageFilesModal.style.display !== 'block' && urlModal.style.display !== 'block' && summaryModal.style.display !== 'block' && settingsModal.style.display !== 'block' && !bodyElement.classList.contains('sidebar-collapsed') && !bodyElement.classList.contains('plugins-collapsed')) {
                  if (currentTab === 'chat') messageInput.focus();
-                 else if (currentTab === 'notes') notesTextarea.focus();
+                 else if (currentTab === 'notes' && currentNoteMode === 'edit') notesTextarea.focus(); // Only focus textarea if in edit mode
              }
          }
     }
@@ -2132,13 +2170,14 @@ document.addEventListener('DOMContentLoaded', () => {
         chatNavButton.classList.remove('active');
         notesNavButton.classList.remove('active');
 
-        // Hide/Show main content sections
+        // Hide/Show main content sections and header elements
         if (tabName === 'chat') {
             chatNavButton.classList.add('active');
             chatSection.classList.remove('hidden');
             notesSection.classList.add('hidden');
             document.getElementById('input-area').classList.remove('hidden'); // Show chat input area
             modelSelectorContainer.classList.remove('hidden'); // Show model selector
+            notesModeButtons.classList.add('hidden'); // Hide notes mode buttons
 
             // Show chat sidebar content, hide notes sidebar content
             chatSidebarContent.classList.remove('hidden');
@@ -2151,12 +2190,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentChatId === null) {
                  console.log("[DEBUG] switchTab (chat): No currentChatId, loading initial chat."); // Added log
                  // This case should ideally be handled by initializeApp, but as a fallback
-                 await loadSavedChats();
-                 const firstChatElement = savedChatsList.querySelector('.list-item');
-                 if (firstChatElement) {
-                     await loadChat(parseInt(firstChatElement.dataset.chatId));
-                 } else {
-                     await startNewChat();
+                 try {
+                     await loadSavedChats();
+                     const firstChatElement = savedChatsList.querySelector('.list-item');
+                     if (firstChatElement) {
+                         await loadChat(parseInt(firstChatElement.dataset.chatId));
+                     } else {
+                         await startNewChat();
+                     }
+                 } catch (error) {
+                     console.error("[DEBUG] switchTab (chat): Error during initial chat load:", error);
+                     // Error handling is done within loadChat/startNewChat, just log here
                  }
             } else {
                  console.log(`[DEBUG] switchTab (chat): currentChatId is ${currentChatId}, ensuring highlight.`); // Added log
@@ -2174,6 +2218,7 @@ document.addEventListener('DOMContentLoaded', () => {
             notesSection.classList.remove('hidden');
             document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
             modelSelectorContainer.classList.add('hidden'); // Hide model selector
+            notesModeButtons.classList.remove('hidden'); // Show notes mode buttons
 
             // Hide chat sidebar content, show notes sidebar content
             chatSidebarContent.classList.add('hidden');
@@ -2185,26 +2230,75 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Load notes data
             console.log("[DEBUG] switchTab (notes): Loading notes data..."); // Added log
-            await loadSavedNotes(); // Load the list of notes
-            if (currentNoteId === null) {
-                 console.log("[DEBUG] switchTab (notes): No currentNoteId, loading most recent or starting new."); // Added log
-                 // If no note is currently selected, load the most recent one or create a new one
-                 const firstNoteElement = savedNotesList.querySelector('.list-item');
-                 if (firstNoteElement) {
-                     await loadNote(parseInt(firstNoteElement.dataset.noteId));
+            try {
+                 await loadSavedNotes(); // Load the list of notes
+                 console.log("[DEBUG] loadSavedNotes completed.");
+
+                 if (currentNoteId !== null) {
+                     console.log(`[DEBUG] switchTab (notes): currentNoteId is ${currentNoteId}, attempting to load it.`); // Added log
+                     try {
+                         await loadNote(currentNoteId); // Load the persisted note
+                         console.log(`[DEBUG] loadNote(${currentNoteId}) completed.`);
+                     } catch (error) {
+                         console.warn(`[DEBUG] switchTab (notes): loadNote(${currentNoteId}) failed: ${error}. Starting new note.`);
+                         // If loading the persisted note fails (e.g., deleted), start a new one
+                         await startNewNote(); // Create and load a new note
+                         console.log("[DEBUG] switchTab (notes): startNewNote completed after load failure.");
+                     }
                  } else {
-                     await startNewNote(); // Create and load a new note
+                     console.log("[DEBUG] switchTab (notes): No currentNoteId, loading most recent or creating new.");
+                     const firstNoteElement = savedNotesList.querySelector('.list-item');
+                     if (firstNoteElement) {
+                         const mostRecentNoteId = parseInt(firstNoteElement.dataset.noteId);
+                         console.log(`[DEBUG] Loading most recent note: ${mostRecentNoteId}`);
+                         await loadNote(mostRecentNoteId);
+                         console.log(`[DEBUG] loadNote(${mostRecentNoteId}) completed.`);
+                     } else {
+                         console.log("[DEBUG] switchTab (notes): No saved notes found, starting new note.");
+                         await startNewNote(); // Create and load a new note
+                         console.log("[DEBUG] switchTab (notes): startNewNote completed.");
+                     }
                  }
-            } else {
-                 console.log(`[DEBUG] switchTab (notes): currentNoteId is ${currentNoteId}, loading it.`); // Added log
-                 // If a note is already selected, load its content
-                 await loadNote(currentNoteId);
+                 // After loadNote/startNewNote completes, currentNoteId should be set
+                 console.log(`[DEBUG] switchTab (notes): Finished loading note. Final currentNoteId: ${currentNoteId}`);
+
+                 // Ensure the correct note mode is applied after loading content
+                 // The mode is loaded in initializeApp, but we need to apply it here
+                 // if switching tabs. loadNote also calls switchNoteMode.
+                 // Let's ensure switchNoteMode is called *after* content is loaded.
+                 // loadNote already calls updateNotesPreview and switchNoteMode.
+                 // So, if loadNote succeeds, the mode is set. If it fails and startNewNote is called,
+                 // startNewNote calls loadNote, which sets the mode.
+                 // The only case is if loadSavedNotes fails entirely, then currentNoteId remains null.
+                 // In that case, we should default to edit mode.
+                 if (currentNoteId === null) {
+                     switchNoteMode('edit'); // Default to edit if no note could be loaded/created
+                 }
+
+
+            } catch (error) {
+                 console.error("[DEBUG] switchTab (notes): Error during initial notes load:", error);
+                 // Error handling is done within loadSavedNotes/loadNote/startNewNote, just log here
+                 // Ensure UI is in a safe state (e.g., edit mode, disabled)
+                 switchNoteMode('edit'); // Default to edit mode on error
+                 notesTextarea.value = `[Error loading notes: ${error.message}]`;
+                 notesPreview.innerHTML = `<p class="text-red-500">Error loading notes: ${escapeHtml(error.message)}</p>`;
+                 notesTextarea.disabled = true; // Disable input on fatal error
+                 currentNoteId = null; // Ensure state is null
+                 currentNoteNameInput.value = '';
+                 currentNoteIdDisplay.textContent = 'ID: -';
+                 updateActiveNoteListItem(); // Remove highlight
+                 localStorage.removeItem(CURRENT_NOTE_ID_KEY); // Clear persisted ID
             }
-            console.log(`[DEBUG] switchTab (notes): Finished loading note ${currentNoteId}.`); // Added log
 
 
-            // Focus notes textarea
-            notesTextarea.focus();
+            // Focus notes textarea (if in edit mode) or notes section (if in view mode)
+            if (currentNoteMode === 'edit') {
+                 notesTextarea.focus();
+            } else {
+                 // Cannot focus preview, maybe focus the section?
+                 notesSection.focus(); // Or just do nothing
+            }
         }
 
         // Update plugin UI visibility based on enabled state (some elements are chat-only)
@@ -2218,7 +2312,47 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log(`[DEBUG] switchTab finished for tab: ${tabName}. isLoading: ${isLoading}`); // Added log
     }
 
-    // --- Notes Feature Functions (MODIFIED for multiple notes) ---
+    // --- Notes Feature Functions (MODIFIED for multiple notes and mode toggle) ---
+
+    /** Switches the display mode for the notes section ('edit' or 'view'). */
+    function switchNoteMode(mode) {
+        console.log(`[DEBUG] switchNoteMode called for mode: ${mode}. Current mode: ${currentNoteMode}, isLoading: ${isLoading}`); // Added log
+        if (isLoading || currentNoteMode === mode) return;
+
+        currentNoteMode = mode;
+        localStorage.setItem(CURRENT_NOTE_MODE_KEY, mode); // Persist note mode
+        console.log(`[DEBUG] currentNoteMode set to: ${currentNoteMode}`); // Added log
+
+        // Update button styles
+        editNoteButton.classList.remove('active');
+        viewNoteButton.classList.remove('active');
+
+        // Show/Hide elements based on mode
+        if (mode === 'edit') {
+            editNoteButton.classList.add('active');
+            notesTextarea.classList.remove('hidden');
+            notesPreview.classList.add('hidden');
+            // Ensure textarea is enabled if not in a global loading state
+            if (!isLoading) {
+                 notesTextarea.disabled = false;
+                 notesTextarea.focus(); // Focus the textarea when switching to edit mode
+            }
+            notesPreview.disabled = true; // Preview is never editable
+
+        } else if (mode === 'view') {
+            viewNoteButton.classList.add('active');
+            notesTextarea.classList.add('hidden');
+            notesPreview.classList.remove('hidden');
+            // Disable textarea when hidden
+            notesTextarea.disabled = true;
+            notesPreview.disabled = true; // Preview is never editable
+
+            // Update the preview content
+            updateNotesPreview();
+        }
+        console.log(`[DEBUG] switchNoteMode finished for mode: ${mode}.`); // Added log
+    }
+
 
     /** Creates a new note entry and loads it. */
     async function startNewNote() {
@@ -2231,6 +2365,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentNoteNameInput.value = "New Note"; // Set default name
         currentNoteIdDisplay.textContent = "ID: -"; // Clear ID display
         notesTextarea.placeholder = "Creating new note...";
+        switchNoteMode('edit'); // Always switch to edit mode when creating a new note
 
         try {
             const response = await fetch('/api/notes', { // POST to /api/notes
@@ -2251,6 +2386,7 @@ document.addEventListener('DOMContentLoaded', () => {
             notesTextarea.placeholder = "Could not create note.";
             updateStatus("Error creating new note.", true);
             currentNoteId = null; // Ensure currentNoteId is null on error
+            localStorage.removeItem(CURRENT_NOTE_ID_KEY); // Clear persisted ID on error
             console.error(`[DEBUG] startNewNote: Error occurred, currentNoteId set to null.`); // Added log
         } finally {
             setLoadingState(false);
@@ -2275,6 +2411,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentNoteNameInput.value = ""; // Clear name while loading
         currentNoteIdDisplay.textContent = `ID: ${noteId}`; // Show ID while loading
         notesTextarea.placeholder = "Loading note...";
+        // Do NOT switch mode here. The mode should be preserved or loaded from localStorage.
+        // switchNoteMode('edit'); // <-- REMOVED: Mode should not be forced to edit on load
 
         try {
             const response = await fetch(`/api/note/${noteId}`); // GET /api/note/<id>
@@ -2287,9 +2425,11 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`[DEBUG] loadNote(${noteId}): Successfully fetched. Set currentNoteId to ${currentNoteId}`); // Added log
             currentNoteNameInput.value = data.name || ''; // Populate name input
             notesTextarea.value = data.content || ''; // Populate content textarea
-            // Trigger markdown preview update manually after loading
-            updateNotesPreview();
             notesTextarea.placeholder = "Start typing your markdown notes here...";
+
+            // Apply the current mode after loading content
+            switchNoteMode(currentNoteMode); // Apply the mode that was active before loading
+
             updateStatus(`Note ${noteId} loaded.`);
             updateActiveNoteListItem(); // Highlight the loaded note in the list
             localStorage.setItem(CURRENT_NOTE_ID_KEY, noteId); // Persist current note ID
@@ -2301,11 +2441,14 @@ document.addEventListener('DOMContentLoaded', () => {
             notesTextarea.placeholder = "Could not load note.";
             updateStatus(`Error loading note ${noteId}.`, true);
             currentNoteId = null; // Clear current note state on error
+            localStorage.removeItem(CURRENT_NOTE_ID_KEY); // Clear persisted ID
             console.error(`[DEBUG] loadNote(${noteId}): Error occurred, currentNoteId set to null.`); // Added log
             currentNoteNameInput.value = '';
             currentNoteIdDisplay.textContent = 'ID: -';
             updateActiveNoteListItem(); // Remove highlight
-            localStorage.removeItem(CURRENT_NOTE_ID_KEY); // Clear persisted ID
+            // Ensure UI is in edit mode and disabled on error
+            switchNoteMode('edit');
+            notesTextarea.disabled = true; // Disable input on fatal error
         } finally {
             setLoadingState(false);
             console.log(`[DEBUG] loadNote(${noteId}) finally block. isLoading: ${isLoading}`); // Added log
@@ -2466,6 +2609,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (noteId == currentNoteId) {
                  notesTextarea.value = `[Error deleting note ${noteId}: ${error.message}]`;
                  notesPreview.innerHTML = `<p class="text-red-500">Error deleting note: ${escapeHtml(error.message)}</p>`;
+                 // Ensure UI is in edit mode and disabled on error
+                 switchNoteMode('edit');
+                 notesTextarea.disabled = true;
             }
         } finally {
             setLoadingState(false);
@@ -2596,10 +2742,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // New Notes Feature Listeners
     chatNavButton.addEventListener('click', () => switchTab('chat'));
     notesNavButton.addEventListener('click', () => switchTab('notes'));
-    notesTextarea.addEventListener('input', updateNotesPreview); // Real-time markdown preview
+    notesTextarea.addEventListener('input', updateNotesPreview); // Real-time markdown preview (only visible in edit mode)
     // saveNoteButton.addEventListener('click', saveNote); // Button moved
     newNoteButton.addEventListener('click', startNewNote); // New: Listener for New Note button
     saveNoteNameButton.addEventListener('click', saveNote); // New: Save button in notes sidebar now saves the current note
+
+    // New Notes Mode Button Listeners
+    editNoteButton.addEventListener('click', () => switchNoteMode('edit'));
+    viewNoteButton.addEventListener('click', () => switchNoteMode('view'));
 
 
     // --- Initial Application Load (MUST be inside DOMContentLoaded) ---
@@ -2675,6 +2825,11 @@ document.addEventListener('DOMContentLoaded', () => {
             currentNoteId = persistedNoteId ? parseInt(persistedNoteId) : null;
             console.log(`[DEBUG] Persisted currentNoteId loaded: ${currentNoteId}.`);
 
+            // New: Load persisted note mode (default to 'edit')
+            const persistedNoteMode = localStorage.getItem(CURRENT_NOTE_MODE_KEY);
+            currentNoteMode = (persistedNoteMode === 'edit' || persistedNoteMode === 'view') ? persistedNoteMode : 'edit';
+            console.log(`[DEBUG] Persisted note mode loaded: ${currentNoteMode}.`);
+
 
             // Load data based on the initial tab
             if (currentTab === 'chat') {
@@ -2712,6 +2867,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  notesNavButton.classList.remove('active');
                  document.getElementById('input-area').classList.remove('hidden');
                  modelSelectorContainer.classList.remove('hidden'); // Show model selector
+                 notesModeButtons.classList.add('hidden'); // Hide notes mode buttons
                  chatSidebarContent.classList.remove('hidden'); // Show chat sidebar content
                  notesSidebarContent.classList.add('hidden'); // Hide notes sidebar content
                  sidebar.classList.remove('hidden'); // Ensure chat sidebar is visible
@@ -2737,6 +2893,8 @@ document.addEventListener('DOMContentLoaded', () => {
                      if (firstNoteElement) {
                          const mostRecentNoteId = parseInt(firstNoteElement.dataset.noteId);
                          console.log(`[DEBUG] Loading most recent note: ${mostRecentNoteId}`);
+                         await loadNote(mostRecentNoteId);
+                         console.log(`[DEBUG] loadNote(${mostRecentNoteId}) completed.`);
                      } else {
                          console.log("[DEBUG] No saved notes found, starting new note.");
                          await startNewNote(); // Create and load a new note
@@ -2746,6 +2904,8 @@ document.addEventListener('DOMContentLoaded', () => {
                  // After loadNote/startNewNote completes, currentNoteId should be set
                  console.log(`[DEBUG] initializeApp finished notes loading. Final currentNoteId: ${currentNoteId}`);
 
+                 // Apply the loaded or default note mode
+                 switchNoteMode(currentNoteMode); // This will also call updateNotesPreview if mode is 'view'
 
                  // Ensure notes section is visible and chat is hidden
                  chatSection.classList.add('hidden');
@@ -2754,6 +2914,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  notesNavButton.classList.add('active');
                  document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
                  modelSelectorContainer.classList.add('hidden'); // Hide model selector
+                 notesModeButtons.classList.remove('hidden'); // Show notes mode buttons
                  chatSidebarContent.classList.add('hidden'); // Hide chat sidebar content
                  notesSidebarContent.classList.remove('hidden'); // Show notes sidebar content
                  sidebar.classList.remove('hidden'); // Ensure chat sidebar is visible
