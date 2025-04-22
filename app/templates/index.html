@@ -90,6 +90,7 @@
 
     <main id="main-content">
         <!-- Header - Removed roz.ai h1 -->
+        {# Removed border-bottom border-gray-300 #}
         <header class="bg-rz-header text-white p-4 flex justify-between items-center flex-wrap flex-shrink-0">
             <!-- Removed h1 "roz.ai" -->
             <!-- Left Area (empty for now) -->
@@ -100,7 +101,8 @@
             <!-- Center Area (Model Selector OR Notes Mode Elements) -->
             <div class="flex items-center justify-center flex-grow">
                 <!-- Model Selector (Visible on Chat Tab) -->
-                 <div id="model-selector-container" class="flex items-center gap-2">
+                 {# Changed flex items-center gap-2 to flex flex-col items-center gap-1 #}
+                 <div id="model-selector-container" class="flex flex-col items-center gap-1">
                     <label for="model-selector" class="text-sm font-medium text-rz-header-text">Model:</label>
                     <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line w-32">
                         {% for model in available_models %}

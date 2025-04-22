@@ -113,14 +113,15 @@
      background-color: var(--rz-main-bg);
      min-width: 0;
 }
- #main-header {
+ #main-content header { /* Targeting the header within main-content */
      padding: 0.5rem 1rem;
-     border-bottom: 1px solid var(--rz-frame);
+     /* Changed border-bottom color to match sidebar border */
+     border-bottom: 1px solid var(--rz-sidebar-border);
      background-color: var(--rz-header-bg);
      color: var(--rz-header-text);
      display: flex;
      align-items: center;
-     justify-content: center;
+     justify-content: space-between; /* Use space-between to push items to ends */
      gap: 0.5rem;
      flex-shrink: 0;
 }
