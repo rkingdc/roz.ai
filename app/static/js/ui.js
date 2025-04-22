@@ -299,6 +299,7 @@ function createChatItem(chat) {
 
     // Add timestamp span
     const timestampSpan = document.createElement('span');
+    // Default color is text-rz-tab-background-text (greyish)
     timestampSpan.classList.add('timestamp', 'text-xs', 'text-rz-tab-background-text', 'mt-1'); // Added timestamp class and styling
     try {
         const date = new Date(chat.last_updated_at);
@@ -346,10 +347,22 @@ export function updateActiveChatListItem() {
 
     savedChatsList.querySelectorAll('.chat-list-item').forEach(item => {
         const chatId = parseInt(item.dataset.chatId);
+        const timestampSpan = item.querySelector('.timestamp'); // Find the timestamp span
+
         if (chatId === state.currentChatId) {
             item.classList.add('active-selection');
+            // Change timestamp color to gold when active
+            if (timestampSpan) {
+                timestampSpan.classList.add('text-rz-sidebar-text');
+                timestampSpan.classList.remove('text-rz-tab-background-text');
+            }
         } else {
             item.classList.remove('active-selection');
+            // Change timestamp color back to greyish when inactive
+            if (timestampSpan) {
+                timestampSpan.classList.remove('text-rz-sidebar-text');
+                timestampSpan.classList.add('text-rz-tab-background-text');
+            }
         }
     });
 }
@@ -671,8 +684,8 @@ function handleModalFileCheckboxChange(e) {
         // Remove ALL entries for this file ID from selectedFiles
         state.removeSelectedFileById(fileId);
         listItem.classList.remove('active-selection');
-        if (sidebarItem) sidebarItem.classList.remove('active-selection'); // Sync sidebar styling
-        if (sidebarCheckbox) sidebarCheckbox.checked = false; // Sync sidebar checkbox
+        if (modalItem) modalItem.classList.remove('active-selection'); // Sync modal styling
+        if (modalCheckbox) modalCheckbox.checked = false; // Sync modal checkbox
     }
     renderSelectedFiles(); // Update the display below the message input
 }
