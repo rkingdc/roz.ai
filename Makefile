@@ -147,8 +147,8 @@ clean:
 	@rm -rf $(VENV_DIR)
 	@rm -f $(PROD_DB) # Remove default prod db file if it exists
 	@rm -f /tmp/assistant_dev_db.sqlite # Remove temp dev db file
-	@rm -rf instance/ # Remove instance folder which might contain dev db
-	@rm -rf migrations/ # Remove migrations folder
+	@rm -rf instance/ # Remove instance folder which might contain dev db (e.g. flask.sqlite)
+	# Removed: @rm -rf migrations/ # Remove migrations folder
 	@find . -type f -name '*.pyc' -delete
 	@find . -type d -name '__pycache__' -delete
 	@echo "Clean complete."
