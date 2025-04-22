@@ -1,1 +1,473 @@
-<textarea id="notes-textarea" class="note-mode-element flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>roz.ai</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖖</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">  <!-- Link to your external CSS file -->
+    <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>    <!-- Link to your external JavaScript file -->
+    <script src="https://cdn.tailwindcss.com"></script>  <!-- Keep the Tailwind CDN link -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body class="bg-gray-100">
+
+    <button id="sidebar-toggle-btn" class="toggle-btn" title="Toggle Chat List">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+
+    <aside id="sidebar">
+        <!-- Moved button group here -->
+        <div class="flex items-center justify-between mb-4 whitespace-nowrap">
+             <h2 class="text-xl font-semibold">roz.ai</h2>
+             <div class="inline-flex rounded-md shadow-sm" role="group">
+                {# Changed classes to use custom btn-group styles #}
+                <button type="button" id="chat-nav-btn" class="btn-group-left active">
+                  Chat
+                </button>
+                <button type="button" id="notes-nav-btn" class="btn-group-right">
+                  Notes
+                </button>
+            </div>
+        </div>
+        <!-- End button group -->
+
+        <!-- Chat Sidebar Content -->
+        <div id="chat-sidebar-content">
+            <button id="new-chat-btn" class="btn btn-primary w-full mb-4 flex-shrink-0">
+                <i class="fas fa-plus"></i> New Chat
+            </button>
+            <div class="mb-4 p-3 bg-rz-frame rounded-lg border border-rz-sidebar-border shadow-sm flex-shrink-0">
+                <label for="current-chat-name" class="block text-sm font-medium text-rz-sidebar-text mb-1 whitespace-nowrap">Current Chat:</label>
+                <div class="flex gap-2 items-center">
+                     <input type="text" id="current-chat-name" class="chat-name-input flex-grow text-sm min-w-0" placeholder="Name this chat...">
+                     <button id="save-chat-name-btn" class="btn btn-outline p-1.5 flex-shrink-0" title="Save Name">
+                         <i class="fas fa-save text-sm"></i>
+                     </button>
+                </div>
+                <div id="current-chat-id-display" class="text-xs text-rz-tab-background-text mt-1 whitespace-nowrap">ID: -</div>
+            </div>
+            <div class="flex flex-col min-h-0 flex-grow sidebar-section-container">
+                <h3 class="text-lg font-medium mb-1 border-t border-rz-sidebar-border pt-3 flex-shrink-0 whitespace-nowrap">Saved Chats</h3>
+                <div id="saved-chats-list" class="sidebar-list">
+                    <p class="text-rz-sidebar-text opacity-75 text-sm p-1">Loading chats...</p>
+                </div>
+            </div>
+        </div>
+        <!-- End Chat Sidebar Content -->
+
+        <!-- Notes Sidebar Content (Initially Hidden) -->
+        <div id="notes-sidebar-content" class="hidden">
+             <button id="new-note-btn" class="btn btn-primary w-full mb-4 flex-shrink-0">
+                <i class="fas fa-plus"></i> New Note
+            </button>
+            <div class="mb-4 p-3 bg-rz-frame rounded-lg border border-rz-sidebar-border shadow-sm flex-shrink-0">
+                <label for="current-note-name" class="block text-sm font-medium text-rz-sidebar-text mb-1 whitespace-nowrap">Current Note:</label>
+                <div class="flex gap-2 items-center">
+                     {# Changed class from note-name-input to chat-name-input #}
+                     <input type="text" id="current-note-name" class="chat-name-input flex-grow text-sm min-w-0" placeholder="Name this note...">
+                     <button id="save-note-name-btn" class="btn btn-outline p-1.5 flex-shrink-0" title="Save Name">
+                         <i class="fas fa-save text-sm"></i>
+                     </button>
+                </div>
+                 <div id="current-note-id-display" class="text-xs text-rz-tab-background-text mt-1 whitespace-nowrap">ID: -</div>
+            </div>
+            <div class="flex flex-col min-h-0 flex-grow sidebar-section-container">
+                <h3 class="text-lg font-medium mb-1 border-t border-rz-sidebar-border pt-3 flex-shrink-0 whitespace-nowrap">Saved Notes</h3>
+                <div id="saved-notes-list" class="sidebar-list">
+                    <p class="text-rz-sidebar-text opacity-75 text-sm p-1">Loading notes...</p>
+                </div>
+            </div>
+        </div>
+        <!-- End Notes Sidebar Content -->
+
+    </aside>
+
+    <main id="main-content">
+        <!-- Header - Removed roz.ai h1 -->
+        {# Removed border-bottom border-gray-300 #}
+        <header class="bg-rz-header text-white p-4 flex justify-between items-center flex-wrap flex-shrink-0">
+            <!-- Removed h1 "roz.ai" -->
+            <!-- Left Area (empty for now) -->
+            <div class="flex items-center">
+                <!-- Optional: Logo or Title here -->
+            </div>
+
+            <!-- Center Area (Model Selector OR Notes Mode Elements) -->
+            <div class="flex items-center justify-center flex-grow">
+                <!-- Model Selector (Visible on Chat Tab) -->
+                 {# Changed flex flex-col items-center gap-1 back to flex items-center gap-2 #}
+                 <div id="model-selector-container" class="flex items-center gap-2">
+                    {# Removed the label element #}
+                    <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line">
+                        {% for model in available_models %}
+                            <option class="bg-rz-toolbar-field" value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Notes Mode Buttons + Markdown Tips (Visible on Notes Tab) -->
+                <div id="notes-mode-elements" class="flex items-center hidden">
+                     <div id="notes-mode-buttons" class="inline-flex rounded-md shadow-sm" role="group">
+                        <button type="button" id="edit-note-btn" class="btn-group-left active">
+                          <i class="fas fa-edit mr-1"></i> Edit
+                        </button>
+                        <button type="button" id="view-note-btn" class="btn-group-right">
+                          <i class="fas fa-eye mr-1"></i> View
+                        </button>
+                    </div>
+                    <button id="markdown-tips-btn" class="ml-2 p-1 rounded text-rz-sidebar-text hover:bg-rz-toolbar-field" title="Markdown Tips">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Area (Settings, Plugins Toggle) -->
+            <div class="flex items-center space-x-4">
+                <!-- Settings Button - Now in plugins sidebar header -->
+                <!-- <button id="settings-btn" class="p-1 rounded text-white hover:bg-gray-700" title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button> -->
+            </div>
+            <!-- End Right container -->
+        </header>
+        <!-- End Header -->
+
+
+        <!-- Chat Section -->
+        <div id="chat-section" class="flex flex-col flex-grow overflow-hidden">
+             <div id="chat-area" class="flex flex-col flex-grow overflow-hidden p-4">
+                <!-- Area to display the currently attached session file (MOVED BELOW) -->
+                <div id="chatbox" class="flex-grow overflow-y-auto mb-4 border border-gray-300 rounded-lg p-2 bg-white">
+                    <div class="system-msg p-4">Initializing chat...</div>
+                </div>
+            </div>
+            <div id="input-area" class="flex flex-col gap-2 p-4 border-t border-gray-300 bg-gray-100 flex-shrink-0">
+                 <!-- Container for ALL attached files (session + plugin) -->
+                 <div id="selected-files-container" class="hidden"></div>
+                 <div id="input-controls" class="flex items-center gap-2">
+                    <!-- File upload trigger moved here -->
+                    <label class="btn btn-secondary btn-sm p-1 flex-shrink-0 self-end mb-1 me-1" id="file-upload-session-label" for="file-upload-session-input" title="Attach file to message" style="height: 42px; line-height: 1.5rem;">
+                        <i class="fas fa-paperclip"></i>
+                    </label>
+                   <div id="file-upload-session-container" class="hidden">
+        <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf">
+        <!-- Label moved to input-controls div -->
+        <!-- <div id="session-file-display"></div> --> <!-- This div is no longer used -->
+    </div>
+                    <textarea id="message-input" rows="2" class="flex-grow p-2 rounded-lg focus:outline-none resize-none text-sm border border-gray-300" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
+                    <div class="flex flex-col items-center self-end flex-shrink-0"> <!-- Container for button and checkbox -->
+                        <!-- Web Search Toggle - Visibility controlled by plugin setting -->
+                        <label class="toggle-switch text-xs mb-1" id="web-search-toggle-label" title="Include web search results in the AI's context">
+                            <input type="checkbox" id="web-search-toggle">
+                            <span class="toggle-slider"></span>
+                            Web Search
+                        </label>
+                        <button id="send-button" class="btn btn-primary w-full" style="height: 42px;">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+             <div id="status-bar" class="text-xs px-4 py-1 flex-shrink-0">Status: Idle</div>
+        </div>
+        <!-- End Chat Section -->
+
+
+        <!-- Notes Section -->
+        <!-- Added flex-grow and overflow-hidden to make it fill available space -->
+        <div id="notes-section" class="flex flex-col flex-grow p-4 overflow-hidden hidden">
+            <!-- Removed the inner flex container that created side-by-side layout -->
+            <!-- Removed labels for Markdown Input and Preview -->
+
+            <!-- Textarea for Markdown Input -->
+            <!-- Added flex-grow and overflow-auto to make textarea fill its container and scroll -->
+            <!-- Added note-mode-element class for JS toggling -->
+            {# Removed focus:ring-blue-500 focus:border-blue-500 #}
+            <textarea id="notes-textarea" class="note-mode-element flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
+
+            <!-- Preview Area -->
+            <!-- Added flex-grow and overflow-y-auto to make preview fill its container and scroll -->
+            <!-- Added note-mode-element class for JS toggling -->
+            <div id="notes-preview" class="note-mode-element flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm overflow-y-auto prose dark:prose-invert max-w-none dark:bg-gray-800 dark:border-gray-600 dark:text-white hidden">
+                <!-- Markdown will be rendered here -->
+            </div>
+
+            <!-- Save Button - Moved to sidebar, but keeping this one for now if needed -->
+            <!-- <div class="mt-4 flex justify-end flex-shrink-0">
+                <button id="save-note-button" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-700 dark:hover:bg-blue-800">
+                    Save Note
+                </button>
+            </div> -->
+        </div>
+        <!-- End Notes Section -->
+
+    </main>
+
+    <aside id="plugins-sidebar">
+        <!-- New container for header and settings button -->
+        <div class="flex items-center justify-between mb-4 whitespace-nowrap">
+            <h2 class="text-xl font-semibold">Plugins</h2>
+            <!-- Settings Button - Moved here and restyled -->
+            <button id="settings-btn" class="p-1 rounded text-rz-sidebar-text hover:bg-rz-sidebar-border" title="Settings">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+        <!-- End New container -->
+
+        <div class="plugin-section flex flex-col" id="file-plugin-section">
+            <div class="plugin-header flex-shrink-0" id="file-plugin-header">
+                <span><i class="fas fa-file-alt mr-2"></i> Files</span>
+                <i class="fas fa-chevron-down toggle-icon"></i>
+            </div>
+            <div class="plugin-content flex flex-col p-2" id="file-plugin-content">
+                <!-- Removed Add New File(s) and Add URL buttons -->
+                <button id="manage-files-btn" class="btn btn-secondary btn-sm w-full mb-2">
+                    <i class="fas fa-folder-open mr-1"></i> Manage Files
+                </button>
+
+                <h4 class="text-sm font-medium text-rz-sidebar-text mb-1 flex-shrink-0">Uploaded Files:</h4>
+                 <!-- Added uploaded-files-list back here -->
+                <div id="uploaded-files-list" class="sidebar-list flex-grow overflow-y-auto border border-rz-sidebar-border rounded p-1 bg-rz-frame">
+                     <p class="text-rz-sidebar-text opacity-75 text-xs p-1">Loading files...</p>
+                </div>
+
+                <h4 class="text-sm font-medium text-rz-sidebar-text mb-1 mt-2 flex-shrink-0">Attach Selected:</h4>
+                <div class="flex gap-2 flex-shrink-0">
+                    <button id="attach-full-btn" class="btn btn-outline btn-sm flex-grow">
+                        <i class="fas fa-book-open"></i> Attach Full
+                    </button>
+                     <button id="attach-summary-btn" class="btn btn-outline btn-sm flex-grow">
+                        <i class="fas fa-list-alt"></i> Attach Summary
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="plugin-section flex-shrink-0" id="calendar-plugin-section">
+             <div class="plugin-header flex-shrink-0" id="calendar-plugin-header">
+                 <span><i class="fas fa-calendar-alt mr-2"></i> Google Calendar</span>
+                 <i class="fas fa-chevron-down toggle-icon"></i>
+            </div>
+            <div class="plugin-content p-2 hidden" id="calendar-plugin-content">
+                <button id="load-calendar-btn" class="btn btn-secondary btn-sm w-full mb-2">
+                    <i class="fas fa-calendar-days"></i> Load Upcoming Events
+                </button>
+                <button id="view-calendar-btn" class="btn btn-outline btn-sm w-full mb-2 hidden">
+                    <i class="fas fa-eye"></i> View Loaded Events
+                </button>
+                <label class="toggle-switch text-sm mt-1">
+                    <input type="checkbox" id="calendar-toggle">
+                    <span class="toggle-slider"></span>
+                    Include Context
+                </label>
+                <p id="calendar-status" class="text-xs text-rz-tab-background-text mt-2">Status: Not loaded</p>
+            </div>
+        </div>
+    </aside>
+
+    <button id="plugins-toggle-btn" class="toggle-btn" title="Toggle Plugins">
+        <i class="fas fa-chevron-right"></i>
+    </button>
+
+
+    <!-- New Manage Files Modal -->
+    <div id="manage-files-modal" class="modal">
+        <div class="modal-content max-w-2xl w-full"> <!-- Added max-w-2xl and w-full for better sizing -->
+            <div class="modal-header">
+                <h3 class="modal-title">Manage Files</h3>
+                <button class="close-btn" id="close-manage-files-modal" title="Close">&times;</button>
+            </div>
+            <div class="modal-body flex flex-col" style="max-height: 70vh;"> <!-- Added flex-col and max-height -->
+                <h4 class="text-sm font-medium text-gray-700 mb-2 flex-shrink-0">Uploaded Files:</h4>
+                <div id="manage-files-list" class="sidebar-list flex-grow overflow-y-auto border border-gray-300 rounded p-1 bg-white"> <!-- Added flex-grow, overflow-y-auto, border, rounded, p-1, bg-white -->
+                    <p class="text-gray-500 text-xs p-1">Loading files...</p>
+                </div>
+            </div>
+            <div class="modal-footer flex gap-2 flex-shrink-0"> <!-- Added flex and gap-2 -->
+                 <!-- Hidden file input for modal upload -->
+                <input type="file" id="file-upload-modal-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf" multiple class="hidden">
+                <label for="file-upload-modal-input" id="file-upload-modal-label" class="btn btn-secondary btn-sm flex-grow"> <!-- Added flex-grow -->
+                    <i class="fas fa-upload mr-1"></i> Add New File(s)
+                </label>
+                <button id="add-url-modal-btn" class="btn btn-secondary btn-sm flex-grow"> <!-- Added flex-grow -->
+                    <i class="fas fa-link mr-1"></i> Add URL
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="summary-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">File Summary</h3>
+                <button class="close-btn" id="close-summary-modal" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm mb-2">Filename: <strong id="summary-modal-filename"></strong></p>
+                <textarea id="summary-textarea" placeholder="Loading or generating summary..."></textarea>
+                <p id="summary-status" class="text-xs mt-1"></p>
+            </div>
+            <div class="modal-footer">
+                <button id="save-summary-btn" class="btn btn-primary btn-sm">
+                    <i class="fas fa-save mr-1"></i> Save Summary
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="calendar-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Loaded Calendar Events</h3>
+                <button class="close-btn" id="close-calendar-modal" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="calendar-modal-content" class="text-xs bg-white p-2 border border-rz-tab-line rounded"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Existing URL Input Modal (will be triggered from Manage Files Modal) -->
+    <div id="url-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Add File from URL</h3>
+                <button class="close-btn" id="close-url-modal" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label for="url-input" class="block text-sm font-medium text-gray-700 mb-1">Enter URL:</label>
+                <input type="text" id="url-input" class="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm" placeholder="e.g., https://example.com/document.txt">
+                <p id="url-status" class="text-xs mt-1"></p>
+            </div>
+            <div class="modal-footer">
+                <button id="fetch-url-btn" class="btn btn-primary btn-sm">
+                    <i class="fas fa-download mr-1"></i> Fetch and Add
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Settings</h3>
+                <button class="close-btn" id="close-settings-modal" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item flex items-center justify-between mb-4">
+                    <label for="streaming-toggle" class="text-sm font-medium text-gray-700">Stream Responses</label>
+                    <label class="toggle-switch text-sm">
+                        <input type="checkbox" id="streaming-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+
+                <!-- New Plugins Section -->
+                <div class="setting-section mt-4 pt-4 border-t border-gray-200">
+                    <h4 class="text-base font-semibold text-gray-800 mb-3">Plugins</h4>
+
+                    <div class="setting-item flex items-center justify-between mb-3">
+                        <label for="files-plugin-toggle" class="text-sm font-medium text-gray-700">Files Plugin</label>
+                        <label class="toggle-switch text-sm">
+                            <input type="checkbox" id="files-plugin-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="setting-item flex items-center justify-between mb-3">
+                        <label for="calendar-plugin-toggle" class="text-sm font-medium text-gray-700">Google Calendar Plugin</label>
+                        <label class="toggle-switch text-sm">
+                            <input type="checkbox" id="calendar-plugin-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <!-- New Web Search Plugin Toggle -->
+                    <div class="setting-item flex items-center justify-between mb-3">
+                        <label for="web-search-plugin-toggle" class="text-sm font-medium text-gray-700">Web Search Plugin</label>
+                        <label class="toggle-switch text-sm">
+                            <input type="checkbox" id="web-search-plugin-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <!-- End New Web Search Plugin Toggle -->
+
+                    <!-- Add more plugin toggles here later -->
+                </div>
+                <!-- End New Plugins Section -->
+
+            </div>
+            <div class="modal-footer justify-center">
+                 <p class="text-xs text-gray-500">Settings are saved automatically.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Markdown Tips Modal -->
+    <div id="markdown-tips-modal" class="modal">
+        <div class="modal-content max-w-xl w-full">
+            <div class="modal-header">
+                <h3 class="modal-title">Markdown Quick Tips</h3>
+                <button class="close-btn" id="close-markdown-tips-modal" title="Close">&times;</button>
+            </div>
+            <div class="modal-body prose dark:prose-invert max-w-none overflow-y-auto" style="max-height: 70vh;">
+                <p>Here are some common Markdown elements you can use in your notes:</p>
+
+                <h4>Headers</h4>
+                <p>Use `#` followed by a space for headers. The number of `#` determines the level (up to 6).</p>
+                <pre><code class="language-markdown"># Header 1
+## Header 2
+### Header 3</code></pre>
+
+                <h4>Emphasis</h4>
+                <p>Use asterisks or underscores for bold and italic text.</p>
+                <pre><code class="language-markdown">*italic text* or _italic text_
+**bold text** or __bold text__
+***bold and italic*** or ___bold and italic___</code></pre>
+
+                <h4>Lists</h4>
+                <p>Use asterisks (`*`), hyphens (`-`), or plus signs (`+`) for unordered lists, and numbers followed by a period for ordered lists. Indent items for nested lists.</p>
+                <pre><code class="language-markdown">* Item 1
+* Item 2
+  * Sub-item
+
+1. First item
+2. Second item
+   1. Sub-item</code></pre>
+
+                <h4>Code</h4>
+                <p>Use backticks (`) for inline code and triple backticks (```) for code blocks. You can specify a language after the opening triple backticks for syntax highlighting.</p>
+                <pre><code class="language-javascript">
+// Example code block
+function greet(name) {
+  console.log("Hello, " + name);
+}
+</code></pre>
+
+                <h4>Links</h4>
+                <p>Create links using `[Link Text](url)`.</p>
+                <pre><code class="language-markdown">[Visit Google](https://www.google.com)</code></pre>
+
+                <h4>Blockquotes</h4>
+                <p>Use `>` for blockquotes.</p>
+                <pre><code class="language-markdown">> This is a blockquote.</code></pre>
+
+                <h4>Horizontal Rule</h4>
+                <p>Use three or more hyphens (`---`), asterisks (`***`), or underscores (`___`) on a line by themselves.</p>
+                <pre><code class="language-markdown">---</code></pre>
+
+                <p>Remember to leave a blank line before and after block-level elements like headers, lists, and code blocks for proper rendering.</p>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
