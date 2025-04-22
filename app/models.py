@@ -2,8 +2,6 @@ from datetime import datetime, timezone # Use timezone-aware UTC
 from app import db # Import the db instance from app/__init__.py
 import os
 
-# DEFAULT_MODEL = os.environ.get('DEFAULT_MODEL', 'gemini-1.5-flash') # Remove redundant definition
-
 # Helper function for default timestamps
 def default_utcnow():
     return datetime.now(timezone.utc)
@@ -18,9 +16,6 @@ class Chat(db.Model):
     last_updated_at = db.Column(db.DateTime(timezone=True), nullable=False, default=default_utcnow, onupdate=default_utcnow) # Ensure timezone=True
     messages = db.relationship('Message', back_populates='chat', lazy=True, cascade="all, delete-orphan") # Use back_populates
 
-    # Remove explicit index, Alembic handles based on model definition + naming convention
-    # __table_args__ = (db.Index('idx_chats_last_updated', last_updated_at.desc()),)
-
 
 class Message(db.Model):
     __tablename__ = 'messages'
@@ -33,8 +28,6 @@ class Message(db.Model):
     # Define relationship back to Chat
     chat = db.relationship('Chat', back_populates='messages') # Use back_populates
 
-    # Remove explicit __table_args__ for indexes, use index=True on columns
-
 
 class File(db.Model):
     __tablename__ = 'files'
@@ -46,8 +39,6 @@ class File(db.Model):
     summary = db.Column(db.Text, nullable=True)
     uploaded_at = db.Column(db.DateTime(timezone=True), nullable=False, default=default_utcnow, index=True) # Added index=True, timezone=True
 
-    # Remove explicit __table_args__ for indexes, use index=True on columns
-
 
 class Note(db.Model):
     __tablename__ = 'notes'
@@ -57,4 +48,18 @@ class Note(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=default_utcnow) # Ensure timezone=True
     last_saved_at = db.Column(db.DateTime(timezone=True), nullable=False, default=default_utcnow, onupdate=default_utcnow, index=True) # Added index=True, timezone=True
 
-    # Remove explicit __table_args__ for index, use index=True on column
+    # Add relationship to NoteHistory
+    history = db.relationship('NoteHistory', back_populates='note', lazy=True, cascade="all, delete-orphan", order_by="NoteHistory.saved_at")
+
+
+class NoteHistory(db.Model):
+    __tablename__ = 'note_history'
+    id = db.Column(db.Integer, primary_key=True)
+    note_id = db.Column(db.Integer, db.ForeignKey('notes.id', ondelete='CASCADE'), nullable=False, index=True)
+    name = db.Column(db.String(150), nullable=True) # Store the name at this point in history
+    content = db.Column(db.Text, nullable=True) # Store the content at this point in history
+    saved_at = db.Column(db.DateTime(timezone=True), nullable=False, default=default_utcnow, index=True)
+
+    # Define relationship back to Note
+    note = db.relationship('Note', back_populates='history')
+

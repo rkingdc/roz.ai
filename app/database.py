@@ -7,7 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 # Import db instance and models
 from app import db
-from .models import Chat, Message, File, Note, default_utcnow # Removed DEFAULT_MODEL import
+from .models import Chat, Message, File, Note, NoteHistory, default_utcnow # Import NoteHistory
 
 logger = logging.getLogger(__name__)
 
@@ -381,7 +381,7 @@ def get_note_from_db(note_id):
         return None
 
 def save_note_to_db(note_id, name, content):
-    """Saves or updates a specific note entry by ID using the Note model."""
+    """Saves or updates a specific note entry by ID using the Note model, creating history."""
     try:
         note = db.session.get(Note, note_id)
         if not note:
@@ -389,10 +389,26 @@ def save_note_to_db(note_id, name, content):
             return False
 
         effective_name = name.strip() if name and name.strip() else f"Note {note_id}"
+
+        # Check if content or name has changed before saving history
+        content_changed = note.content != content
+        name_changed = note.name != effective_name
+
+        if content_changed or name_changed:
+            # Create a history entry *before* updating the note
+            history_entry = NoteHistory(
+                note_id=note.id,
+                name=note.name,      # Save the name *before* the update
+                content=note.content # Save the content *before* the update
+                # saved_at defaults to now()
+            )
+            db.session.add(history_entry)
+            logger.info(f"Created history entry for note ID {note_id} due to changes.")
+
+        # Update the note with new values
         note.name = effective_name
         note.content = content
         # last_saved_at is handled by onupdate in the model
-        # note.last_saved_at = default_utcnow() # Or manually set if needed
 
         logger.info(f"Attempting to save note content for ID: {note_id} (name: '{effective_name}')...")
         if _commit_session():
@@ -424,3 +440,25 @@ def delete_note_from_db(note_id):
         logger.error(f"Database error deleting note {note_id}: {e}", exc_info=True)
         db.session.rollback()
         return False
+
+# New function to get note history (optional, but useful for undo)
+def get_note_history_from_db(note_id, limit=None):
+    """Retrieves history entries for a specific note_id, ordered by saved_at."""
+    try:
+        query = NoteHistory.query.filter_by(note_id=note_id).order_by(NoteHistory.saved_at.desc())
+        if limit is not None:
+            query = query.limit(limit)
+        history_entries = query.all()
+
+        return [
+            {
+                'id': entry.id,
+                'note_id': entry.note_id,
+                'name': entry.name,
+                'content': entry.content,
+                'saved_at': entry.saved_at
+            } for entry in history_entries
+        ]
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting history for note {note_id}: {e}", exc_info=True)
+        return []
