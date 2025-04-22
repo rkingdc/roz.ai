@@ -1,7 +1,10 @@
 # app/__init__.py
 import os
 from flask import Flask
-import google.generativeai as genai
+from flask_sqlalchemy import SQLAlchemy # Import SQLAlchemy
+from flask_migrate import Migrate     # Import Migrate
+from sqlalchemy import MetaData       # Import MetaData for naming convention
+import google.generativeai as genai # Keep if needed elsewhere
 
 # Configure logging FIRST, at the application entry point
 import logging
@@ -9,7 +12,21 @@ import logging
 if not logging.getLogger(__name__).handlers:
     logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.info("Root logger configured to INFO level via basicConfig.")
+# logger.info("Root logger configured to INFO level via basicConfig.") # Comment out or adjust logging as needed
+
+
+# Define metadata with naming convention for Alembic/SQLAlchemy
+metadata = MetaData(naming_convention={
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s"
+})
+
+# Initialize extensions (outside the factory)
+db = SQLAlchemy(metadata=metadata)
+migrate = Migrate()
 
 
 def create_app(test_config=None):
