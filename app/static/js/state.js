@@ -4,22 +4,35 @@
 // Use 'export let' to allow them to be reassigned by other modules
 export let currentChatId = null;
 export let currentNoteId = null;
-export let isLoading = false;
-// Renamed selectedFiles to sidebarSelectedFiles for temporary selection in sidebar
-export let sidebarSelectedFiles = []; // Files temporarily selected in the sidebar for attachment
-export let attachedFiles = []; // Files permanently attached to the current chat session
-export let sessionFile = null; // File attached via paperclip for the current message only
+export let isLoading = false; // Global loading state
+export let statusMessage = "Idle"; // Global status message
+export let isErrorStatus = false; // Indicates if the status message is an error
+
+// Files temporarily selected in the sidebar for attachment (before clicking Attach button)
+export let sidebarSelectedFiles = [];
+// Files permanently attached to the current chat session (sent with every message until removed)
+export let attachedFiles = [];
+// File attached via paperclip for the current message only
+export let sessionFile = null; // File object { filename, mimetype, content }
 export let currentEditingFileId = null; // For summary modal
-export let calendarContext = null;
-export let isCalendarContextActive = false;
+
+export let calendarContext = null; // Loaded calendar events
+export let isCalendarContextActive = false; // Toggle state for including calendar context
+
+// Plugin enabled states (from settings)
 export let isStreamingEnabled = true;
 export let isFilePluginEnabled = true;
 export let isCalendarPluginEnabled = true;
 export let isWebSearchPluginEnabled = true;
+
+// Tab and Note Mode states
 export let currentTab = 'chat';
 export let currentNoteMode = 'edit';
-export let savedChats = []; // Add state variable for saved chats list
-export let savedNotes = []; // Add state variable for saved notes list
+
+// Lists of saved items
+export let savedChats = [];
+export let savedNotes = [];
+export let uploadedFiles = []; // List of files from the backend
 
 
 // Functions to update state
@@ -35,7 +48,22 @@ export function setCurrentNoteId(id) {
 
 export function setIsLoading(loading) {
     isLoading = loading;
+    // When loading starts, clear previous status unless it was an error
+    if (loading && !isErrorStatus) {
+        setStatusMessage("Busy...");
+    } else if (!loading && !isErrorStatus) {
+        // If loading finished without an explicit error status being set, revert to Idle
+         setStatusMessage("Idle");
+    }
+    // Note: updateStatus UI function will read these state variables
 }
+
+export function setStatusMessage(message, isError = false) {
+    statusMessage = message;
+    isErrorStatus = isError;
+    // Note: updateStatus UI function will read these state variables
+}
+
 
 // --- Functions for sidebarSelectedFiles ---
 export function setSidebarSelectedFiles(files) {
@@ -79,16 +107,7 @@ export function addAttachedFile(file) {
     }
 }
 
-// Corrected: removeAttachedFileById should filter by ID *and* Type if needed,
-// but the current UI removes all tags for a given ID. Let's keep it removing by ID for simplicity if needed elsewhere,
-// but the UI logic is more precise. Let's update this function to match the UI's removal logic.
-export function removeAttachedFileById(fileIdToRemove) {
-     // Reassign the array after filtering
-     // This removes ALL entries for a given fileId, regardless of type (full/summary)
-     attachedFiles = attachedFiles.filter(f => f.id !== fileIdToRemove);
-}
-
-// Added: A function to remove by ID and Type, to match the UI's remove button logic
+// Function to remove by ID and Type, to match the UI's remove button logic
 export function removeAttachedFileByIdAndType(fileIdToRemove, fileTypeToRemove) {
     attachedFiles = attachedFiles.filter(f => !(f.id === fileIdToRemove && f.type === fileTypeToRemove));
 }
@@ -98,8 +117,6 @@ export function removeAttachedFileByIdAndType(fileIdToRemove, fileTypeToRemove) 
 export function setSessionFile(file) {
     sessionFile = file;
 }
-
-// No specific removeSessionFile function needed, just call setSessionFile(null)
 
 
 export function setCurrentEditingFileId(id) {
@@ -145,4 +162,8 @@ export function setSavedChats(chats) {
 
 export function setSavedNotes(notes) {
     savedNotes = notes;
+}
+
+export function setUploadedFiles(files) {
+    uploadedFiles = files;
 }
