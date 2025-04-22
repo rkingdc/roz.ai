@@ -69,7 +69,8 @@
             <div class="mb-4 p-3 bg-rz-frame rounded-lg border border-rz-sidebar-border shadow-sm flex-shrink-0">
                 <label for="current-note-name" class="block text-sm font-medium text-rz-sidebar-text mb-1 whitespace-nowrap">Current Note:</label>
                 <div class="flex gap-2 items-center">
-                     <input type="text" id="current-note-name" class="note-name-input flex-grow text-sm min-w-0" placeholder="Name this note...">
+                     {# Changed class from note-name-input to chat-name-input #}
+                     <input type="text" id="current-note-name" class="chat-name-input flex-grow text-sm min-w-0" placeholder="Name this note...">
                      <button id="save-note-name-btn" class="btn btn-outline p-1.5 flex-shrink-0" title="Save Name">
                          <i class="fas fa-save text-sm"></i>
                      </button>
