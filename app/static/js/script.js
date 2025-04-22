@@ -284,14 +284,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // so they can be outside DOMContentLoaded, but they might be called
     // by code inside it.
     function updateStatus(message, isError = false) {
-        // Access statusBar inside the function, assuming it's defined in the DOMContentLoaded scope
-        const statusBar = document.getElementById('status-bar');
-        if (!statusBar) {
+        // Access statusBar inside the function, it's defined in the DOMContentLoaded scope
+        const statusBarElement = statusBar; // Use the variable from the outer scope
+
+        if (!statusBarElement) {
             console.error("Status bar element not found.");
             return;
         }
-        statusBar.textContent = `Status: ${message}`;
-        statusBar.className = `text-xs px-4 py-1 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50 border-t border-red-200' : 'text-rz-status-bar-text bg-rz-status-bar-bg border-t border-rz-frame'}`;
+        statusBarElement.textContent = `Status: ${message}`;
+        statusBarElement.className = `text-xs px-4 py-1 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50 border-t border-red-200' : 'text-rz-status-bar-text bg-rz-status-bar-bg border-t border-rz-frame'}`;
     }
 
     function formatFileSize(bytes) {
@@ -1564,6 +1565,10 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus("Error loading saved chats.", true);
             // console.log("[DEBUG] loadSavedChats caught an error."); // Reduced verbosity
             throw error; // Re-throw the error
+        } finally {
+            // console.log(`[DEBUG] loadSavedChats finally block entered.`); // Added log
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            // console.log("[DEBUG] setLoadingState(false) called in loadSavedChats finally block."); // Added log
         }
     }
 
@@ -1613,7 +1618,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus("Error creating new chat.", true);
             // No re-throw needed here, initializeApp's catch will handle it if this was the first chat
         } finally {
-            setLoadingState(false);
+            setLoadingState(false); // This one is NOT commented out.
         }
     }
     async function loadChat(chatId) {
@@ -1751,10 +1756,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             throw error; // Re-throw the error so initializeApp's catch block can handle it if this was the initial load
         } finally {
-            // console.log(`[DEBUG] loadChat(${chatId}) finally block entered.`); // Reduced verbosity
-            // Ensure loading state is false even if an error occurred during initialization
-            // setLoadingState(false); // This is now handled by loadChat/startNewChat's finally block
-            // console.log("[DEBUG] setLoadingState(false) is handled by loadChat/startNewChat finally block."); // Reduced verbosity
+            // console.log(`[DEBUG] loadChat(${chatId}) finally block entered.`); // Added log
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            // console.log("[DEBUG] setLoadingState(false) called in loadChat finally block."); // Added log
         }
     }
 
@@ -2539,8 +2543,9 @@ document.addEventListener('DOMContentLoaded', () => {
             switchNoteMode('edit');
             notesTextarea.disabled = true; // Disable input on fatal error
         } finally {
-            setLoadingState(false);
-            console.log(`[DEBUG] loadNote(${noteId}) finally block. isLoading: ${isLoading}`); // Added log
+            // console.log(`[DEBUG] loadNote(${noteId}) finally block. isLoading: ${isLoading}`); // Added log
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            // console.log("[DEBUG] setLoadingState(false) called in loadNote finally block."); // Added log
         }
     }
 
@@ -2654,6 +2659,10 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus("Error loading saved notes.", true);
             // console.log("[DEBUG] loadSavedNotes caught an error."); // Reduced verbosity
             throw error;
+        } finally {
+            // console.log(`[DEBUG] loadSavedNotes finally block entered.`); // Added log
+            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            // console.log("[DEBUG] setLoadingState(false) called in loadSavedNotes finally block."); // Added log
         }
     }
 
