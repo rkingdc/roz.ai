@@ -76,7 +76,7 @@ start: upgrade # Depends on upgrade now
 	fi; \
 	echo "Starting latest release: $(LATEST_RELEASE)"; \
 	# Change directory to the latest release and run the app using the venv python
-	@cd $(LATEST_RELEASE) && DATABASE_NAME="../$(PROD_DB)" $(GUNICORN_CMD)
+	@cd $(LATEST_RELEASE) && DATABASE_NAME="../../$(PROD_DB)" $(GUNICORN_CMD)
 
 test: install
 	@echo "Running tests..."
