@@ -1,4 +1,6 @@
 // js/app.js - Main Application Entry Point
+// This module initializes the application, sets up event listeners,
+// loads initial data, and triggers the initial UI render.
 
 import { elements, populateElements } from './dom.js';
 import * as state from './state.js';

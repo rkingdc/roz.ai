@@ -19,36 +19,35 @@ export function setupEventListeners() {
     // --- Chat Input & Sending ---
     elements.sendButton?.addEventListener('click', async () => {
         await api.sendMessage(); // Updates state (chatHistory, isLoading, statusMessage, sessionFile)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by sendMessage
         ui.handleStateChange_chatHistory();
         ui.handleStateChange_isLoading(); // Updates loading, status, attach buttons
         ui.handleStateChange_sessionFile(); // Updates attached/session file display
+        // Note: loadSavedChats is called within sendMessage, which triggers ui.handleStateChange_savedChats
     });
     elements.messageInput?.addEventListener('keypress', async (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            await api.sendMessage(); // Updates state
-            // Trigger UI updates based on state changes
-            ui.handleStateChange_chatHistory();
-            ui.handleStateChange_isLoading(); // Updates loading, status, attach buttons
-            ui.handleStateChange_sessionFile(); // Updates attached/session file display
+            await elements.sendButton?.click(); // Trigger send button click
         }
     });
     elements.modelSelector?.addEventListener('change', async () => {
         await api.handleModelChange(); // Updates state (currentChatModel, isLoading, statusMessage)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by handleModelChange
         ui.handleStateChange_currentChat(); // Updates chat details (name, id, model)
         ui.handleStateChange_isLoading(); // Updates loading, status, attach buttons
+        ui.handleStateChange_statusMessage(); // Ensure final status is shown
     });
 
     // --- Sidebar & Chat Management ---
     elements.sidebarToggleButton?.addEventListener('click', ui.toggleLeftSidebar); // UI-only toggle
     elements.newChatButton?.addEventListener('click', async () => {
         await api.startNewChat(); // Updates state (currentChatId, savedChats, chatHistory, isLoading, statusMessage, etc.)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by startNewChat
         ui.handleStateChange_savedChats(); // Updates chat list
         ui.handleStateChange_currentChat(); // Updates chat details, history, context UI
         ui.handleStateChange_isLoading(); // Updates loading, status, attach buttons
+        // Note: loadChat is called within startNewChat, which triggers file/calendar/websearch UI updates
     });
     elements.saveChatNameButton?.addEventListener('click', async () => {
         // Name is updated in state by input handler or here before API call
@@ -57,7 +56,7 @@ export function setupEventListeners() {
         ui.handleStateChange_currentChat(); // Update name display immediately
 
         await api.handleSaveChatName(); // Updates state (savedChats, isLoading, statusMessage)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by handleSaveChatName
         ui.handleStateChange_savedChats(); // Updates chat list (timestamp)
         ui.handleStateChange_isLoading(); // Updates loading, status, attach buttons
         ui.handleStateChange_statusMessage(); // Ensure final status is shown
@@ -83,7 +82,7 @@ export function setupEventListeners() {
         if (chatId === state.currentChatId) return;
 
         await api.loadChat(chatId); // Updates state (currentChatId, chatHistory, etc.)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by loadChat
         ui.handleStateChange_currentChat(); // Updates chat details, history, context UI
         ui.handleStateChange_isLoading(); // Updates loading, status, attach buttons
         ui.handleStateChange_uploadedFiles(); // Updates file lists
@@ -103,7 +102,7 @@ export function setupEventListeners() {
         if (isNaN(chatId)) return;
 
         await api.handleDeleteChat(chatId); // Updates state (savedChats, currentChatId, etc.)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by handleDeleteChat
         ui.handleStateChange_savedChats(); // Updates chat list
         // If current chat changed, handleStateChange_currentChat will be triggered by api.handleDeleteChat's call to loadChat/startNewChat
         ui.handleStateChange_isLoading(); // Updates loading, status
@@ -119,14 +118,14 @@ export function setupEventListeners() {
     // --- File Plugin Interactions ---
     elements.attachFullButton?.addEventListener('click', () => {
         api.attachSelectedFilesFull(); // Updates state (attachedFiles, sidebarSelectedFiles)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by attachSelectedFilesFull
         ui.handleStateChange_sidebarSelectedFiles(); // Updates sidebar highlighting and attach button state
         ui.handleStateChange_attachedFiles(); // Updates the tags below input
         ui.handleStateChange_statusMessage(); // Status message updated by API
     });
     elements.attachSummaryButton?.addEventListener('click', () => {
         api.attachSelectedFilesSummary(); // Updates state (attachedFiles, sidebarSelectedFiles)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by attachSelectedFilesSummary
         ui.handleStateChange_sidebarSelectedFiles(); // Updates sidebar highlighting and attach button state
         ui.handleStateChange_attachedFiles(); // Updates the tags below input
         ui.handleStateChange_statusMessage(); // Status message updated by API
@@ -247,10 +246,12 @@ export function setupEventListeners() {
         const filename = itemDiv.dataset.filename;
         if (isNaN(fileId) || !filename) return;
 
+        // Show modal immediately (UI concern)
+        ui.showModal(elements.summaryModal, 'files', 'chat');
+
         await api.fetchSummary(fileId); // Updates state (currentEditingFileId, summaryContent, isLoading, statusMessage)
         // UI updates for state changes are handled by UI reacting to state changes.
-        // Show modal is handled by the initial click listener for the button in createModalFileItem
-        // ui.showModal(elements.summaryModal, 'files', 'chat'); // This is called in createModalFileItem listener
+        // renderSummaryModalContent is called by handleStateChange_currentEditingFileId and handleStateChange_summaryContent
     });
 
     // Add click listener for modal file list delete button (delegated)
@@ -278,6 +279,7 @@ export function setupEventListeners() {
         // Read content from DOM input for immediate state update
         const updatedSummary = elements.summaryTextarea?.value || '';
         state.setSummaryContent(updatedSummary); // Update state immediately
+        ui.handleStateChange_summaryContent(); // Update modal UI immediately
 
         await api.saveSummary(); // Updates state (uploadedFiles, isLoading, statusMessage, summaryContent)
         // UI updates for uploadedFiles, isLoading, statusMessage, summaryContent are handled by UI reacting to state changes.
@@ -376,7 +378,7 @@ export function setupEventListeners() {
     });
     elements.newNoteButton?.addEventListener('click', async () => {
         await api.startNewNote(); // Updates state (currentNoteId, savedNotes, noteContent, isLoading, statusMessage, etc.)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by startNewNote
         ui.handleStateChange_savedNotes(); // Updates note list
         ui.handleStateChange_currentNote(); // Updates note details, content
         ui.handleStateChange_isLoading(); // Updates loading, status
@@ -389,7 +391,7 @@ export function setupEventListeners() {
     elements.saveNoteNameButton?.addEventListener('click', async () => {
         // Name is already in state from input handler
         await api.saveNote(); // Updates state (savedNotes, isLoading, statusMessage)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by saveNote
         ui.handleStateChange_savedNotes(); // Updates note list (timestamp)
         ui.handleStateChange_isLoading(); // Updates loading, status
         ui.handleStateChange_statusMessage(); // Ensure final status is shown
@@ -427,7 +429,7 @@ export function setupEventListeners() {
         if (noteId === state.currentNoteId) return;
 
         await api.loadNote(noteId); // Updates state (currentNoteId, noteContent, isLoading, statusMessage)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by loadNote
         ui.handleStateChange_currentNote(); // Updates note details, content
         ui.handleStateChange_isLoading(); // Updates loading, status
     });
@@ -443,7 +445,7 @@ export function setupEventListeners() {
         if (isNaN(noteId)) return;
 
         await api.handleDeleteNote(noteId); // Updates state (savedNotes, currentNoteId, noteContent, isLoading, statusMessage)
-        // Trigger UI updates based on state changes
+        // Trigger UI updates based on state changes caused by handleDeleteNote
         ui.handleStateChange_savedNotes(); // Updates note list
         // If current note changed, handleStateChange_currentNote will be triggered by api.handleDeleteNote's call to loadNote/startNewNote
         ui.handleStateChange_isLoading(); // Updates loading, status
