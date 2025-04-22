@@ -8,6 +8,7 @@ import * as ui from './ui.js'; // Import ui to call rendering functions
 import * as api from './api.js'; // Import api to call backend functions
 import * as state from './state.js'; // Import state to update state directly for UI-only changes or read values
 import * as config from './config.js'; // Import config
+import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js'; // Import file size constants
 import { formatFileSize } from './utils.js';
 import { escapeHtml } from './utils.js'; // Need escapeHtml for session file loading
 
