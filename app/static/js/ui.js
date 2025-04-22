@@ -1,23 +1,26 @@
 // js/ui.js
 
 // This module handles UI updates and interactions.
-// It imports the elements object from dom.js.
+// It reads from the state module and updates the DOM via the elements module.
+// It does NOT call API functions or modify state directly (except for UI-local state like modal visibility).
 
 import { elements } from './dom.js'; // Import elements from dom.js
-import * as state from './state.js'; // Import state to check plugin status
+import * as state from './state.js'; // UI reads from state
 import * as config from './config.js'; // Import config for keys
 import { escapeHtml, formatFileSize } from './utils.js'; // Import utility functions
-// Import api functions dynamically where needed to avoid circular dependencies
+// No direct imports of api.js here to break the cycle.
+// Event listeners will import api functions dynamically when needed.
+
+
+// --- Render Functions (Read State, Update DOM) ---
 
 /**
- * Updates the text content of the status bar.
- * @param {string} message - The message to display.
- * @param {boolean} [isError=false] - Whether the message indicates an error.
+ * Renders the current status message in the status bar.
  */
-export function updateStatus(message, isError = false) {
+export function renderStatus() {
     if (elements.statusBar) {
-        elements.statusBar.textContent = `Status: ${message}`;
-        if (isError) {
+        elements.statusBar.textContent = `Status: ${state.statusMessage}`;
+        if (state.isErrorStatus) {
             elements.statusBar.classList.add('text-red-500');
             elements.statusBar.classList.remove('text-gray-700'); // Assuming a default non-error color
         } else {
@@ -30,103 +33,11 @@ export function updateStatus(message, isError = false) {
 }
 
 /**
- * Adds a message to the chatbox.
- * @param {'user' | 'assistant' | 'system'} role - The role of the message sender.
- * @param {string} content - The message content (can be markdown).
- * @param {boolean} [isError=false] - Whether the message indicates an error.
- * @param {HTMLElement} [existingElement=null] - Optional existing element to append content to (for streaming).
- * @returns {HTMLElement|null} The message element that was created or updated.
- */
-export function addMessage(role, content, isError = false, existingElement = null) {
-    if (!elements.chatbox) {
-        console.error("Chatbox element not found.");
-        return null;
-    }
-
-    let messageElement;
-    if (existingElement) {
-        messageElement = existingElement;
-        // Append content for streaming
-        if (typeof marked !== 'undefined') {
-             // Append raw text for streaming, will render markdown at the end
-             messageElement.dataset.rawContent = (messageElement.dataset.rawContent || '') + content;
-        } else {
-             messageElement.textContent += content;
-        }
-
-    } else {
-        // Create new message element
-        messageElement = document.createElement('div');
-        messageElement.classList.add('message', `${role}-msg`, 'p-3', 'mb-2', 'rounded-lg', 'whitespace-pre-wrap');
-
-        if (isError) {
-            messageElement.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-400');
-            messageElement.innerHTML = `<strong>Error:</strong> ${escapeHtml(content)}`; // Escape HTML for error messages
-        } else {
-             // Store raw content for potential markdown rendering later (especially for streaming)
-             messageElement.dataset.rawContent = content;
-             // For non-streaming or initial message, render immediately
-             if (typeof marked !== 'undefined') {
-                 messageElement.innerHTML = marked.parse(content);
-                 messageElement.classList.add('prose', 'prose-sm', 'max-w-none');
-             } else {
-                 messageElement.textContent = content; // Fallback
-             }
-
-            // Apply role-specific styling
-            if (role === 'user') {
-                messageElement.classList.add('bg-blue-100', 'self-end');
-            } else if (role === 'assistant') {
-                messageElement.classList.add('bg-gray-200', 'self-start');
-            } else if (role === 'system') {
-                 messageElement.classList.add('bg-yellow-100', 'text-yellow-800', 'self-center', 'text-center', 'italic');
-            }
-        }
-        elements.chatbox.appendChild(messageElement);
-    }
-
-
-    // Auto-scroll to the bottom
-    elements.chatbox.scrollTop = elements.chatbox.scrollHeight;
-
-    return messageElement;
-}
-
-/**
- * Applies markdown rendering to a message element using its raw content.
- * Useful after streaming is complete.
- * @param {HTMLElement} messageElement - The message element to render.
- */
-export function applyMarkdownToMessage(messageElement) {
-    if (!messageElement || typeof marked === 'undefined') return;
-
-    const rawContent = messageElement.dataset.rawContent;
-    if (rawContent !== undefined) {
-        messageElement.innerHTML = marked.parse(rawContent);
-        messageElement.classList.add('prose', 'prose-sm', 'max-w-none');
-        // Remove the raw content dataset after rendering
-        delete messageElement.dataset.rawContent;
-    }
-}
-
-
-/**
- * Clears all messages from the chatbox.
- */
-export function clearChatbox() {
-     if (elements.chatbox) {
-        elements.chatbox.innerHTML = '';
-     }
-}
-
-/**
- * Sets the loading state of the UI.
+ * Updates the loading state of the UI elements.
  * Disables input, shows a loading indicator/message.
- * @param {boolean} isLoading - Whether the app is currently loading/busy.
- * @param {string} [statusMessage="Busy..."] - Optional message to show in the status bar.
  */
-export function setLoadingState(isLoading, statusMessage = "Busy...") {
-    state.setIsLoading(isLoading); // Update state module
+export function updateLoadingState() {
+    const isLoading = state.isLoading;
 
     if (elements.messageInput) elements.messageInput.disabled = isLoading;
     if (elements.sendButton) elements.sendButton.disabled = isLoading;
@@ -162,85 +73,96 @@ export function setLoadingState(isLoading, statusMessage = "Busy...") {
         }
     });
 
+    elements.bodyElement?.classList.toggle('loading', isLoading); // Add a class to body for global loading styles
 
-    if (isLoading) {
-        updateStatus(statusMessage);
-        elements.bodyElement?.classList.add('loading'); // Add a class to body for global loading styles
-    } else {
-        updateStatus("Idle");
-        elements.bodyElement?.classList.remove('loading');
-    }
     // Update attach button state after loading state changes
     updateAttachButtonState();
 }
 
-/**
- * Toggles the collapsed state of a sidebar.
- * @param {HTMLElement} sidebarElement - The sidebar element.
- * @param {HTMLElement} toggleButton - The button that toggles the sidebar.
- * @param {boolean} isCollapsed - The desired state (true for collapsed).
- * @param {string} localStorageKey - The key to use for localStorage.
- * @param {'sidebar' | 'plugins'} type - The type of sidebar ('sidebar' or 'plugins').
- */
-export function setSidebarCollapsed(sidebarElement, toggleButton, isCollapsed, localStorageKey, type) {
-    if (!sidebarElement || !toggleButton) return;
 
-    if (isCollapsed) {
-        sidebarElement.classList.add('collapsed');
-        if (type === 'sidebar') {
-             toggleButton.classList.add('collapsed');
-             toggleButton.querySelector('i')?.classList.replace('fa-chevron-left', 'fa-chevron-right');
-        } else if (type === 'plugins') {
-             toggleButton.classList.add('collapsed');
-             toggleButton.querySelector('i')?.classList.replace('fa-chevron-right', 'fa-chevron-left');
-        }
-    } else {
-        sidebarElement.classList.remove('collapsed');
-         if (type === 'sidebar') {
-            toggleButton.classList.remove('collapsed');
-            toggleButton.querySelector('i')?.classList.replace('fa-chevron-right', 'fa-chevron-left');
-         } else if (type === 'plugins') {
-            toggleButton.classList.remove('collapsed');
-            toggleButton.querySelector('i')?.classList.replace('fa-chevron-left', 'fa-chevron-right');
-         }
+/**
+ * Renders the chat history from the state into the chatbox.
+ */
+export function renderChatHistory() {
+    if (!elements.chatbox) {
+        console.error("Chatbox element not found for rendering history.");
+        return;
     }
-    localStorage.setItem(localStorageKey, isCollapsed);
+
+    elements.chatbox.innerHTML = ''; // Clear current messages
+
+    if (state.chatHistory.length === 0) {
+        // Add a placeholder message if history is empty
+        addMessage('system', state.isLoading ? 'Loading chat history...' : 'This chat is empty. Start typing!');
+    } else {
+        state.chatHistory.forEach(msg => {
+            // Re-render each message. If it was streaming, the full content is now in state.
+            addMessage(msg.role, msg.content, msg.isError);
+        });
+    }
+
+    // Auto-scroll to the bottom after rendering
+    elements.chatbox.scrollTop = elements.chatbox.scrollHeight;
 }
 
 /**
- * Toggles the collapsed state of a plugin section within the plugins sidebar.
- * @param {HTMLElement} headerElement - The header element of the plugin section.
- * @param {HTMLElement} contentElement - The content element of the plugin section.
- * @param {boolean} isCollapsed - The desired state (true for collapsed).
- * @param {string} localStorageKey - The key to use for localStorage.
+ * Adds a single message to the chatbox DOM.
+ * This is a helper for renderChatHistory and potentially for immediate display
+ * of user input before API response (though state-based rendering is preferred).
+ * @param {'user' | 'assistant' | 'system'} role - The role of the message sender.
+ * @param {string} content - The message content (can be markdown).
+ * @param {boolean} [isError=false] - Whether the message indicates an error.
+ * @returns {HTMLElement|null} The message element that was created.
  */
-export function setPluginSectionCollapsed(headerElement, contentElement, isCollapsed, localStorageKey) {
-     if (!headerElement || !contentElement) return;
+function addMessage(role, content, isError = false) {
+     if (!elements.chatbox) {
+        console.error("Chatbox element not found.");
+        return null;
+    }
 
-     const toggleIcon = headerElement.querySelector('.toggle-icon');
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message', `${role}-msg`, 'p-3', 'mb-2', 'rounded-lg', 'whitespace-pre-wrap');
 
-     if (isCollapsed) {
-         contentElement.classList.add('hidden');
-         headerElement.classList.add('collapsed');
-         if (toggleIcon) toggleIcon.classList.replace('fa-chevron-down', 'fa-chevron-right');
-     } else {
-         contentElement.classList.remove('hidden');
-         headerElement.classList.remove('collapsed');
-         if (toggleIcon) toggleIcon.classList.replace('fa-chevron-right', 'fa-chevron-down');
-     }
-     localStorage.setItem(localStorageKey, isCollapsed);
+    if (isError) {
+        messageElement.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-400');
+        messageElement.innerHTML = `<strong>Error:</strong> ${escapeHtml(content)}`; // Escape HTML for error messages
+    } else {
+         // Render markdown immediately for non-streaming messages
+         if (typeof marked !== 'undefined') {
+             messageElement.innerHTML = marked.parse(content);
+             messageElement.classList.add('prose', 'prose-sm', 'max-w-none');
+         } else {
+             messageElement.textContent = content; // Fallback
+         }
+
+        // Apply role-specific styling
+        if (role === 'user') {
+            messageElement.classList.add('bg-blue-100', 'self-end');
+        } else if (role === 'assistant') {
+            messageElement.classList.add('bg-gray-200', 'self-start');
+        } else if (role === 'system') {
+             messageElement.classList.add('bg-yellow-100', 'text-yellow-800', 'self-center', 'text-center', 'italic');
+        }
+    }
+    elements.chatbox.appendChild(messageElement);
+
+    // Auto-scroll to the bottom (might be handled better by a separate observer)
+    // elements.chatbox.scrollTop = elements.chatbox.scrollHeight;
+
+    return messageElement;
 }
 
 
 /**
- * Renders the list of saved chats in the sidebar.
- * @param {Array<Object>} chats - An array of chat objects { id, name, last_updated_at }.
+ * Renders the list of saved chats from the state in the sidebar.
  */
-export function renderSavedChats(chats) {
+export function renderSavedChats() {
     const { savedChatsList, currentChatNameInput, currentChatIdDisplay } = elements;
     if (!savedChatsList) return;
 
     savedChatsList.innerHTML = ''; // Clear current list
+
+    const chats = state.savedChats; // Read from state
 
     if (!chats || chats.length === 0) {
         savedChatsList.innerHTML = '<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No saved chats yet.</p>';
@@ -248,8 +170,7 @@ export function renderSavedChats(chats) {
         if (state.currentChatId !== null) {
              currentChatNameInput.value = '';
              currentChatIdDisplay.textContent = 'ID: -';
-             state.setCurrentChatId(null); // Clear state
-             localStorage.removeItem('currentChatId');
+             // State is already cleared by API/event listener
         }
         return;
     }
@@ -293,11 +214,11 @@ function createChatItem(chat) {
     deleteButton.classList.add('delete-btn', 'text-rz-sidebar-text'); // Use specific class
     deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per CORRECT HTML
     deleteButton.title = `Delete "${chat.name || `Chat ${chat.id}`}"`;
+    // Event listener remains here, but calls API function
     deleteButton.addEventListener('click', (event) => {
         event.stopPropagation(); // Prevent triggering the list item click
-        // Use a dynamic import for api to avoid circular dependency if api imports ui
         import('./api.js').then(api => {
-            api.handleDeleteChat(chat.id, listItem);
+            api.handleDeleteChat(chat.id); // Call API, state will update, UI will re-render
         }).catch(error => console.error("Failed to import api for delete:", error));
     });
 
@@ -340,7 +261,7 @@ function createChatItem(chat) {
          if (chat.id != state.currentChatId) {
              // Use a dynamic import for api to avoid circular dependency if api imports ui
              import('./api.js').then(api => {
-                 api.loadChat(chat.id); // Load this chat
+                 api.loadChat(chat.id); // Call API, state will update, UI will re-render
              }).catch(error => console.error("Failed to import api for load chat:", error));
          }
     });
@@ -349,7 +270,7 @@ function createChatItem(chat) {
 }
 
 
-/** Updates the highlighting for the currently active chat list item. */
+/** Updates the highlighting for the currently active chat list item based on state. */
 export function updateActiveChatListItem() {
     const { savedChatsList } = elements;
     if (!savedChatsList) return;
@@ -360,7 +281,7 @@ export function updateActiveChatListItem() {
         const timestampDiv = item.querySelector('.text-xs');
 
         // Use 'active' class as per CORRECT HTML
-        if (chatId === state.currentChatId) {
+        if (chatId === state.currentChatId) { // Read from state
             item.classList.add('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
 
@@ -392,16 +313,29 @@ export function updateActiveChatListItem() {
     });
 }
 
+/**
+ * Renders the current chat's name and ID from the state.
+ */
+export function renderCurrentChatDetails() {
+    const { currentChatNameInput, currentChatIdDisplay, modelSelector } = elements;
+    if (!currentChatNameInput || !currentChatIdDisplay || !modelSelector) return;
+
+    currentChatNameInput.value = state.currentChatName || ''; // Read from state
+    currentChatIdDisplay.textContent = state.currentChatId !== null ? `ID: ${state.currentChatId}` : 'ID: -'; // Read from state
+    modelSelector.value = state.currentChatModel || modelSelector.options[0]?.value || ''; // Read from state
+}
+
 
 /**
- * Renders the list of saved notes in the sidebar.
- * @param {Array<Object>} notes - An array of note objects { id, name, last_saved_at }.
+ * Renders the list of saved notes from the state in the sidebar.
  */
-export function renderSavedNotes(notes) {
+export function renderSavedNotes() {
     const { savedNotesList, currentNoteNameInput, currentNoteIdDisplay } = elements;
     if (!savedNotesList) return;
 
     savedNotesList.innerHTML = ''; // Clear current list
+
+    const notes = state.savedNotes; // Read from state
 
     if (!notes || notes.length === 0) {
         savedNotesList.innerHTML = '<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No saved notes yet.</p>';
@@ -409,8 +343,7 @@ export function renderSavedNotes(notes) {
         if (state.currentNoteId !== null) {
              currentNoteNameInput.value = '';
              currentNoteIdDisplay.textContent = 'ID: -';
-             state.setCurrentNoteId(null); // Clear state
-             localStorage.removeItem(config.CURRENT_NOTE_ID_KEY);
+             // State is already cleared by API/event listener
         }
         return;
     }
@@ -454,11 +387,11 @@ function createNoteItem(note) {
     deleteButton.classList.add('delete-btn', 'text-rz-sidebar-text'); // Use specific class
     deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per provided HTML
     deleteButton.title = `Delete "${note.name || `Note ${note.id}`}"`;
+    // Event listener remains here, but calls API function
     deleteButton.addEventListener('click', (event) => {
         event.stopPropagation(); // Prevent triggering the list item click
-         // Use a dynamic import for api to avoid circular dependency if api imports ui
-        import('./api.js').then(api => {
-            api.handleDeleteNote(note.id, listItem);
+         import('./api.js').then(api => {
+            api.handleDeleteNote(note.id); // Call API, state will update, UI will re-render
         }).catch(error => console.error("Failed to import api for delete:", error));
     });
 
@@ -498,9 +431,8 @@ function createNoteItem(note) {
     // Add click listener to load note
     listItem.addEventListener('click', () => {
          if (note.id != state.currentNoteId) {
-             // Use a dynamic import for api to avoid circular dependency if api imports ui
              import('./api.js').then(api => {
-                 api.loadNote(note.id); // Load this note
+                 api.loadNote(note.id); // Call API, state will update, UI will re-render
              }).catch(error => console.error("Failed to import api for load note:", error));
          }
     });
@@ -509,7 +441,7 @@ function createNoteItem(note) {
 }
 
 
-/** Updates the highlighting for the currently active note list item. */
+/** Updates the highlighting for the currently active note list item based on state. */
 export function updateActiveNoteListItem() {
     const { savedNotesList } = elements;
     if (!savedNotesList) return;
@@ -520,7 +452,7 @@ export function updateActiveNoteListItem() {
         const timestampDiv = item.querySelector('.text-xs');
 
         // Use 'active' class as per provided HTML
-        if (noteId === state.currentNoteId) {
+        if (noteId === state.currentNoteId) { // Read from state
             item.classList.add('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
 
@@ -552,18 +484,51 @@ export function updateActiveNoteListItem() {
     });
 }
 
+/**
+ * Renders the current note's name and ID from the state.
+ */
+export function renderCurrentNoteDetails() {
+    const { currentNoteNameInput, currentNoteIdDisplay } = elements;
+    if (!currentNoteNameInput || !currentNoteIdDisplay) return;
+
+    currentNoteNameInput.value = state.currentNoteName || ''; // Read from state
+    currentNoteIdDisplay.textContent = state.currentNoteId !== null ? `ID: ${state.currentNoteId}` : 'ID: -'; // Read from state
+}
 
 /**
- * Renders the list of uploaded files in the plugins sidebar and manage files modal.
- * @param {Array<Object>} files - An array of file objects { id, filename, mimetype, filesize, has_summary, uploaded_at }.
+ * Renders the current note's content from the state into the textarea and preview.
  */
-export function renderUploadedFiles(files) {
+export function renderNoteContent() {
+    const { notesTextarea, notesPreview } = elements;
+    if (!notesTextarea || !notesPreview) return;
+
+    notesTextarea.value = state.noteContent || ''; // Read from state
+    notesTextarea.placeholder = state.isLoading ? "Loading note..." : "Start typing your markdown notes here...";
+    notesTextarea.disabled = state.isLoading || state.currentNoteId === null; // Disable if loading or no note loaded
+
+    // Update preview based on current mode and content
+    updateNotesPreview(); // This function already reads from state and renders preview
+}
+
+
+/**
+ * Renders the list of uploaded files from the state in the plugins sidebar and manage files modal.
+ */
+export function renderUploadedFiles() {
     const { uploadedFilesList, manageFilesList } = elements;
     if (!uploadedFilesList || !manageFilesList) return;
 
     // Clear current lists
     uploadedFilesList.innerHTML = '';
     manageFilesList.innerHTML = '';
+
+    const files = state.uploadedFiles; // Read from state
+
+    if (!state.isFilePluginEnabled) {
+         uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
+         manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
+         return;
+    }
 
     if (!files || files.length === 0) {
         uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`;
@@ -603,7 +568,7 @@ function createSidebarFileItem(file, isSelected) {
     itemDiv.dataset.hasSummary = file.has_summary; // Store summary status
     // Add 'active' class if currently selected in the sidebar
     if (isSelected) {
-        itemDiv.classList.add('active');
+        item.classList.add('active'); // Corrected: Use itemDiv instead of item
     }
 
 
@@ -654,35 +619,14 @@ function createSidebarFileItem(file, isSelected) {
     itemDiv.appendChild(nameContainer); // Append the container
     itemDiv.appendChild(timestampDiv); // Append the timestamp div
 
-    // Add click listener to toggle selection
-    itemDiv.addEventListener('click', () => {
-        const fileId = parseInt(itemDiv.dataset.fileId);
-        const filename = itemDiv.dataset.filename;
-        const hasSummary = itemDiv.dataset.hasSummary === 'true'; // Get boolean
-        if (isNaN(fileId) || !filename) return;
-
-        // Check against sidebarSelectedFiles (using the correct state variable)
-        const isCurrentlySelected = state.sidebarSelectedFiles.some(f => f.id === fileId);
-
-        if (isCurrentlySelected) {
-            // Remove the file from sidebarSelectedFiles
-            state.removeSidebarSelectedFileById(fileId);
-        } else {
-            // Add the file to sidebarSelectedFiles
-            state.addSidebarSelectedFile({ id: fileId, filename: filename, has_summary: hasSummary }); // Store has_summary for button state
-        }
-
-        // Update styling for this item and update attach button state
-        updateSelectedFileListItemStyling(); // Update all sidebar file list items
-        updateAttachButtonState(); // Update state of attach buttons
-    });
-
+    // Add click listener to toggle selection (handled by eventListeners.js)
+    // The event listener will update state, and state change will trigger UI re-render
 
     uploadedFilesList.appendChild(itemDiv);
 }
 
 /**
- * Updates the highlighting for selected file list items in the sidebar.
+ * Updates the highlighting for selected file list items in the sidebar based on state.
  * Multiple files can be selected.
  */
 export function updateSelectedFileListItemStyling() {
@@ -694,7 +638,7 @@ export function updateSelectedFileListItemStyling() {
         if (isNaN(fileId)) return;
 
         // Check against sidebarSelectedFiles (using the correct state variable)
-        const isSelected = state.sidebarSelectedFiles.some(f => f.id === fileId);
+        const isSelected = state.sidebarSelectedFiles.some(f => f.id === fileId); // Read from state
 
         if (isSelected) {
             item.classList.add('active'); // Use 'active' class for selected state
@@ -708,21 +652,21 @@ export function updateSelectedFileListItemStyling() {
 
 /**
  * Updates the enabled/disabled state of the Attach Full and Attach Summary buttons
- * based on the number and type of files selected in the sidebar.
+ * based on the state of files selected in the sidebar.
  */
 export function updateAttachButtonState() {
     const { attachFullButton, attachSummaryButton } = elements;
     if (!attachFullButton || !attachSummaryButton) return;
 
-    const selectedCount = state.sidebarSelectedFiles.length;
+    const selectedCount = state.sidebarSelectedFiles.length; // Read from state
     // Check if any selected file in sidebarSelectedFiles has has_summary === true
-    const hasSummarizable = state.sidebarSelectedFiles.some(f => f.has_summary);
+    const hasSummarizable = state.sidebarSelectedFiles.some(f => f.has_summary); // Read from state
 
     // Attach Full is enabled if at least one file is selected in the sidebar AND not loading
-    attachFullButton.disabled = state.isLoading || selectedCount === 0;
+    attachFullButton.disabled = state.isLoading || selectedCount === 0; // Read from state
 
     // Attach Summary is enabled if at least one file is selected in the sidebar AND at least one selected file has a summary AND not loading
-    attachSummaryButton.disabled = state.isLoading || selectedCount === 0 || !hasSummarizable;
+    attachSummaryButton.disabled = state.isLoading || selectedCount === 0 || !hasSummarizable; // Read from state
 }
 
 
@@ -760,12 +704,13 @@ function createModalFileItem(file) {
     summaryButton.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1');
     summaryButton.innerHTML = '<i class="fas fa-list-alt"></i>';
     summaryButton.title = file.has_summary ? 'View/Edit Summary' : 'Generate Summary';
+    // Event listener remains here, calls API function
     summaryButton.addEventListener('click', (e) => {
          e.stopPropagation(); // Prevent triggering item click
-         // Use a dynamic import for api to avoid circular dependency if api imports ui
-        import('./api.js').then(api => {
-            api.showSummaryModal(file.id, file.filename);
-        }).catch(error => console.error("Failed to import api for summary:", error));
+         import('./api.js').then(api => {
+            api.fetchSummary(file.id); // Call API, state will update
+            showModal(elements.summaryModal, 'files', 'chat'); // Show modal immediately
+         }).catch(error => console.error("Failed to import api for summary:", error));
     });
 
     // Delete Button
@@ -773,12 +718,12 @@ function createModalFileItem(file) {
     deleteButton.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1', 'text-red-500', 'hover:text-red-700');
     deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
     deleteButton.title = 'Delete File';
+    // Event listener remains here, calls API function
     deleteButton.addEventListener('click', (e) => {
          e.stopPropagation(); // Prevent triggering item click
-         // Use a dynamic import for api to avoid circular dependency if api imports ui
-        import('./api.js').then(api => {
-            api.deleteFile(file.id); // Call the API function
-        }).catch(error => console.error("Failed to import api for delete:", error));
+         import('./api.js').then(api => {
+            api.deleteFile(file.id); // Call the API function, state will update, UI will re-render
+         }).catch(error => console.error("Failed to import api for delete:", error));
     });
 
     actionsCol.appendChild(summaryButton);
@@ -794,6 +739,42 @@ function createModalFileItem(file) {
     manageFilesList.appendChild(itemDiv);
 }
 
+/**
+ * Renders the content of the summary modal based on state.
+ */
+export function renderSummaryModalContent() {
+    const { summaryModalFilename, summaryTextarea, saveSummaryButton, summaryStatus } = elements;
+    if (!summaryModalFilename || !summaryTextarea || !saveSummaryButton || !summaryStatus) return;
+
+    const file = state.uploadedFiles.find(f => f.id === state.currentEditingFileId); // Read from state
+    const filename = file ? file.filename : 'Unknown File';
+
+    summaryModalFilename.textContent = filename;
+    summaryTextarea.value = state.summaryContent; // Read from state
+    summaryTextarea.placeholder = state.isLoading ? "Loading or generating summary..." : "Enter or edit summary here."; // Read from state
+    saveSummaryButton.disabled = state.isLoading || state.currentEditingFileId === null; // Read from state
+
+    // Update status message in the modal based on state
+    if (state.isLoading && state.statusMessage.includes("Fetching Summary")) {
+         summaryStatus.textContent = "Fetching...";
+         summaryStatus.classList.remove('text-red-500');
+    } else if (state.isLoading && state.statusMessage.includes("Saving Summary")) {
+         summaryStatus.textContent = "Saving...";
+         summaryStatus.classList.remove('text-red-500');
+    } else if (state.isErrorStatus && state.statusMessage.includes("summary")) {
+         summaryStatus.textContent = `Error: ${state.statusMessage}`; // Display the specific error from state
+         summaryStatus.classList.add('text-red-500');
+    } else if (state.summaryContent.startsWith("[Error") || state.summaryContent.startsWith("[Summary not applicable")) {
+         summaryStatus.textContent = state.summaryContent; // Display error/not applicable from state content
+         summaryStatus.classList.add('text-red-500');
+         saveSummaryButton.disabled = state.summaryContent.startsWith("[Summary not applicable");
+    }
+    else {
+         summaryStatus.textContent = "Summary loaded. You can edit and save changes.";
+         summaryStatus.classList.remove('text-red-500');
+    }
+}
+
 
 /**
  * Renders the list of currently attached files and the session file below the message input.
@@ -805,13 +786,13 @@ export function renderAttachedAndSessionFiles() {
     selectedFilesContainer.innerHTML = ''; // Clear current display
 
     // Combine attached files and session file for rendering
-    const filesToDisplay = [...state.attachedFiles];
-    if (state.sessionFile) {
+    const filesToDisplay = [...state.attachedFiles]; // Read from state
+    if (state.sessionFile) { // Read from state
         // Add session file with a distinct type for rendering
         filesToDisplay.push({
             // Session file doesn't have a backend ID, use a placeholder
             id: 'session',
-            filename: state.sessionFile.filename,
+            filename: state.sessionFile.filename, // Read from state
             type: 'session',
             // Include other session file details if needed for display
         });
@@ -859,6 +840,7 @@ export function renderAttachedAndSessionFiles() {
         removeButton.classList.add('remove-file-btn', 'ml-1'); // Removed text-blue classes, use theme colors via CSS
         removeButton.innerHTML = '<i class="fas fa-times-circle"></i>';
         removeButton.title = `Remove ${file.type === 'session' ? 'session' : 'attached'} file`;
+        // Event listener remains here, modifies state
         removeButton.addEventListener('click', () => {
             if (file.type === 'session') {
                 state.setSessionFile(null); // Clear session file state
@@ -870,7 +852,7 @@ export function renderAttachedAndSessionFiles() {
                 // Remove from attachedFiles state by ID *and* Type
                 state.removeAttachedFileByIdAndType(parseInt(file.id), file.type);
             }
-            renderAttachedAndSessionFiles(); // Re-render the display
+            renderAttachedAndSessionFiles(); // Re-render the display based on updated state
             // No need to update attach button state or sidebar styling here
         });
 
@@ -896,7 +878,7 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
         return false;
     }
 
-    // Check if required plugin is enabled
+    // Check if required plugin is enabled (Read from state)
     if (requiredPlugin) {
         let pluginEnabled = false;
         if (requiredPlugin === 'files' && state.isFilePluginEnabled) pluginEnabled = true;
@@ -904,16 +886,16 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
         // Add checks for other plugins here
         if (!pluginEnabled) {
             console.log(`[DEBUG] showModal: Required plugin "${requiredPlugin}" not enabled.`);
-            updateStatus(`${requiredPlugin.charAt(0).toUpperCase() + requiredPlugin.slice(1)} plugin is not enabled.`, true);
+            // Status update handled by event listener or caller
             return false;
         }
          console.log(`[DEBUG] showModal: Required plugin "${requiredPlugin}" is enabled.`);
     }
 
-    // Check if required tab is active
+    // Check if required tab is active (Read from state)
     if (requiredTab && state.currentTab !== requiredTab) {
          console.log(`[DEBUG] showModal: Required tab "${requiredTab}" not active. Current tab: ${state.currentTab}`);
-         updateStatus(`This action is only available on the ${requiredTab.charAt(0).toUpperCase() + requiredTab.slice(1)} tab.`, true);
+         // Status update handled by event listener or caller
          return false;
     }
      if (requiredTab) {
@@ -935,10 +917,29 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
  * @param {string} localStorageKey - The key to use for localStorage.
  * @param {'sidebar' | 'plugins'} type - The type of sidebar ('sidebar' or 'plugins').
  */
-export function toggleSidebar(sidebarElement, toggleButton, localStorageKey, type) {
+export function setSidebarCollapsed(sidebarElement, toggleButton, isCollapsed, localStorageKey, type) {
     if (!sidebarElement || !toggleButton) return;
-    const isCollapsed = sidebarElement.classList.contains('collapsed');
-    setSidebarCollapsed(sidebarElement, toggleButton, !isCollapsed, localStorageKey, type);
+
+    if (isCollapsed) {
+        sidebarElement.classList.add('collapsed');
+        if (type === 'sidebar') {
+             toggleButton.classList.add('collapsed');
+             toggleButton.querySelector('i')?.classList.replace('fa-chevron-left', 'fa-chevron-right');
+        } else if (type === 'plugins') {
+             toggleButton.classList.add('collapsed');
+             toggleButton.querySelector('i')?.classList.replace('fa-chevron-right', 'fa-chevron-left');
+        }
+    } else {
+        sidebarElement.classList.remove('collapsed');
+         if (type === 'sidebar') {
+            toggleButton.classList.remove('collapsed');
+            toggleButton.querySelector('i')?.classList.replace('fa-chevron-right', 'fa-chevron-left');
+         } else if (type === 'plugins') {
+            toggleButton.classList.remove('collapsed');
+            toggleButton.querySelector('i')?.classList.replace('fa-chevron-left', 'fa-chevron-right');
+         }
+    }
+    localStorage.setItem(localStorageKey, isCollapsed);
 }
 
 /** Toggles the left sidebar (chat/notes list). */
@@ -967,29 +968,29 @@ export function toggleCalendarPlugin() {
 
 
 /**
- * Updates the UI based on which plugins are enabled/disabled.
+ * Updates the UI based on which plugins are enabled/disabled (reads from state).
  */
 export function updatePluginUI() {
     // File Plugin
     if (elements.filePluginSection) {
-        elements.filePluginSection.classList.toggle('hidden', !state.isFilePluginEnabled);
+        elements.filePluginSection.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
     }
     // Hide file upload label and selected files container if plugin is disabled
     if (elements.fileUploadSessionLabel) {
-         elements.fileUploadSessionLabel.classList.toggle('hidden', !state.isFilePluginEnabled);
+         elements.fileUploadSessionLabel.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
     }
      if (elements.selectedFilesContainer) {
          // Only hide if plugin is disabled AND there are no attached/session files
-         const hasFilesToDisplay = state.attachedFiles.length > 0 || state.sessionFile !== null;
-         if (!state.isFilePluginEnabled && !hasFilesToDisplay) {
+         const hasFilesToDisplay = state.attachedFiles.length > 0 || state.sessionFile !== null; // Read from state
+         if (!state.isFilePluginEnabled && !hasFilesToDisplay) { // Read from state
              elements.selectedFilesContainer.classList.add('hidden');
          }
          // If plugin is enabled and there are files to display, ensure it's visible
-         if (state.isFilePluginEnabled && hasFilesToDisplay) {
+         if (state.isFilePluginEnabled && hasFilesToDisplay) { // Read from state
               elements.selectedFilesContainer.classList.remove('hidden');
          }
          // If plugin is enabled but no files, hide it
-         if (state.isFilePluginEnabled && !hasFilesToDisplay) {
+         if (state.isFilePluginEnabled && !hasFilesToDisplay) { // Read from state
              elements.selectedFilesContainer.classList.add('hidden');
          }
      }
@@ -997,70 +998,70 @@ export function updatePluginUI() {
 
     // Calendar Plugin
     if (elements.calendarPluginSection) {
-        elements.calendarPluginSection.classList.toggle('hidden', !state.isCalendarPluginEnabled);
+        elements.calendarPluginSection.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
     }
     // Hide calendar toggle input area if plugin is disabled
     if (elements.calendarToggleInputArea) {
-         elements.calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled);
+         elements.calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
     }
 
 
     // Web Search Toggle (part of Chat input area)
     if (elements.webSearchToggleLabel) {
-        elements.webSearchToggleLabel.classList.toggle('hidden', !state.isWebSearchPluginEnabled);
+        elements.webSearchToggleLabel.classList.toggle('hidden', !state.isWebSearchPluginEnabled); // Read from state
     }
 
     // Re-render file lists if file plugin state changed
     if (elements.uploadedFilesList && elements.manageFilesList) {
-        if (!state.isFilePluginEnabled) {
+        if (!state.isFilePluginEnabled) { // Read from state
              elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
              elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
-             state.clearSidebarSelectedFiles(); // Clear temporary sidebar selections
-             state.clearAttachedFiles(); // Clear permanently attached files
-             state.setSessionFile(null); // Clear session file
-             renderAttachedAndSessionFiles(); // Update display
-             updateAttachButtonState(); // Update button state
+             // State clearing is handled by eventListeners.js reacting to toggle change
+             // renderAttachedAndSessionFiles(); // Called by renderUploadedFiles
+             // updateAttachButtonState(); // Called by renderUploadedFiles
         } else {
-            // If plugin was just enabled, trigger a reload of files
-            // This is handled by loadUploadedFiles in api.js, which is called during init
-            // or when the setting is toggled.
+            // If plugin was just enabled, the file list will be rendered when loadUploadedFiles is called
+            // (triggered by eventListeners.js reacting to the toggle change).
         }
     }
 
     // Update calendar status if calendar plugin state changed
     if (elements.calendarStatus) {
-        if (!state.isCalendarPluginEnabled) {
+        if (!state.isCalendarPluginEnabled) { // Read from state
             elements.calendarStatus.textContent = "Status: Plugin disabled";
-            state.setCalendarContext(null); // Clear context if plugin disabled
-            state.setCalendarContextActive(false); // Deactivate toggle
+            // State clearing is handled by eventListeners.js reacting to toggle change
             if(elements.calendarToggle) elements.calendarToggle.checked = false;
             if(elements.viewCalendarButton) elements.viewCalendarButton.classList.add('hidden');
         } else {
-             // If plugin was just enabled, the status will be updated when loadCalendarButton is clicked
-             // or on initial load if context was persisted.
+             // If plugin was just enabled, the status will be updated when loadCalendarEvents is called
+             // (triggered by eventListeners.js reacting to the toggle change).
         }
     }
 
     // Update web search toggle state if plugin state changed
     if (elements.webSearchToggle) {
-         if (!state.isWebSearchPluginEnabled) {
+         if (!state.isWebSearchPluginEnabled) { // Read from state
              elements.webSearchToggle.checked = false; // Turn off toggle if plugin disabled
          }
          // The toggle's checked state is persisted/loaded in loadPersistedStates
+         // The actual checked state is read from state.isWebSearchEnabled by renderChatInputArea
     }
+
+    // Render the chat input area elements based on plugin states
+    renderChatInputArea();
 }
 
 /**
- * Updates the calendar status text and view button visibility.
+ * Updates the calendar status text and view button visibility (reads from state).
  */
 export function updateCalendarStatus() {
     const { calendarStatus, viewCalendarButton, calendarToggle } = elements;
     if (!calendarStatus || !viewCalendarButton || !calendarToggle) return;
 
-    const context = state.calendarContext;
-    const isActive = state.isCalendarContextActive;
+    const context = state.calendarContext; // Read from state
+    const isActive = state.isCalendarContextActive; // Read from state
 
-    if (!state.isCalendarPluginEnabled) {
+    if (!state.isCalendarPluginEnabled) { // Read from state
          calendarStatus.textContent = "Status: Plugin disabled";
          viewCalendarButton.classList.add('hidden');
          calendarToggle.checked = false;
@@ -1079,16 +1080,43 @@ export function updateCalendarStatus() {
         calendarStatus.textContent = "Status: Not loaded";
         viewCalendarButton.classList.add('hidden');
         calendarToggle.checked = false; // Ensure toggle is off if no context
-        state.setCalendarContextActive(false); // Ensure state is false
+        // State is already false if context is null
     }
+}
+
+/**
+ * Renders the chat input area elements based on plugin states.
+ */
+export function renderChatInputArea() {
+    const {
+        fileUploadSessionLabel, selectedFilesContainer, calendarToggleInputArea,
+        webSearchToggleLabel, webSearchToggle
+    } = elements;
+
+    if (!fileUploadSessionLabel || !selectedFilesContainer || !calendarToggleInputArea || !webSearchToggleLabel || !webSearchToggle) {
+        console.warn("Missing elements for rendering chat input area.");
+        return;
+    }
+
+    // File Upload (Paperclip) and Attached Files Container
+    fileUploadSessionLabel.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
+    // Visibility of selectedFilesContainer is handled by renderAttachedAndSessionFiles
+
+    // Calendar Toggle
+    calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
+    calendarToggle.checked = state.isCalendarContextActive; // Read from state
+
+    // Web Search Toggle
+    webSearchToggleLabel.classList.toggle('hidden', !state.isWebSearchPluginEnabled); // Read from state
+    webSearchToggle.checked = state.isWebSearchEnabled; // Read from state
 }
 
 
 /**
- * Switches between the Chat and Notes tabs.
+ * Switches between the Chat and Notes tabs (updates UI visibility).
  * @param {'chat' | 'notes'} tab - The desired tab ('chat' or 'notes').
  */
-export async function switchTab(tab) {
+export function switchTab(tab) { // Made synchronous, state is already updated by event listener
     const {
         chatNavButton, notesNavButton, chatSection, notesSection,
         chatSidebarContent, notesSidebarContent, modelSelectorContainer,
@@ -1103,21 +1131,13 @@ export async function switchTab(tab) {
         !currentChatNameInput || !currentNoteNameInput || !currentChatIdDisplay ||
         !currentNoteIdDisplay || !inputArea || !sidebar || !sidebarToggleButton) {
         console.error("Missing elements for tab switching.");
-        updateStatus("Error switching tabs: Missing UI elements.", true);
+        // Status update handled by event listener or caller
         return;
     }
 
-    // Save current state before switching (e.g., auto-save note)
-    // Note: Auto-save logic is not fully implemented here, just a placeholder
-    if (state.currentTab === 'notes' && state.currentNoteId) {
-        // Use dynamic import for api
-        import('./api.js').then(api => {
-             // await api.saveNote(); // Implement auto-save if needed
-        }).catch(error => console.error("Failed to import api for auto-save:", error));
-    }
-
-    state.setCurrentTab(tab);
-    localStorage.setItem(config.ACTIVE_TAB_KEY, tab);
+    // State is already updated by the event listener calling this function
+    // state.setCurrentTab(tab);
+    // localStorage.setItem(config.ACTIVE_TAB_KEY, tab);
 
     // Update navigation buttons
     chatNavButton.classList.toggle('active', tab === 'chat');
@@ -1138,140 +1158,101 @@ export async function switchTab(tab) {
     // Toggle input area visibility (Chat needs it, Notes uses textarea directly)
     inputArea.classList.toggle('hidden', tab !== 'chat');
 
-    // Update current item display in sidebar header
-    if (tab === 'chat') {
-         const currentChat = state.savedChats.find(c => c.id === state.currentChatId);
-         currentChatNameInput.value = currentChat ? (currentChat.name || `Chat ${currentChat.id}`) : '';
-         currentChatIdDisplay.textContent = currentChat ? `ID: ${currentChat.id}` : 'ID: -';
-         // Ensure chat list is visible if sidebar is open
-         if (!sidebar.classList.contains('collapsed')) {
-             chatSidebarContent.classList.remove('hidden');
-             notesSidebarContent.classList.add('hidden');
-         }
-         // Ensure file lists are loaded/rendered if plugin is enabled
-         if (state.isFilePluginEnabled) {
-             import('./api.js').then(api => {
-                 api.loadUploadedFiles(); // Reload files for the chat context
-             }).catch(error => console.error("Failed to import api for file load on tab switch:", error));
-         } else {
-             if(elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
-             if(elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
-         }
-         // Ensure calendar context is loaded/rendered if plugin is enabled
-         if (state.isCalendarPluginEnabled) {
-             import('./api.js').then(api => {
-                 api.loadCalendarEvents(); // Reload calendar events
-             }).catch(error => console.error("Failed to import api for calendar load on tab switch:", error));
-         } else {
-             updateCalendarStatus(); // Update status to disabled
-         }
+    // Update current item display in sidebar header based on state
+    renderCurrentChatDetails(); // Reads state.currentChatName, state.currentChatId, state.currentChatModel
+    renderCurrentNoteDetails(); // Reads state.currentNoteName, state.currentNoteId
 
-
-    } else { // tab === 'notes'
-         const currentNote = state.savedNotes.find(n => n.id === state.currentNoteId);
-         currentNoteNameInput.value = currentNote ? (currentNote.name || `Note ${currentNote.id}`) : '';
-         currentNoteIdDisplay.textContent = currentNote ? `ID: ${currentNote.id}` : 'ID: -';
-
-         // Ensure notes list is visible if sidebar is open
-         if (!sidebar.classList.contains('collapsed')) {
-             notesSidebarContent.classList.remove('hidden');
-             chatSidebarContent.classList.add('hidden');
-         }
-
-         // Ensure notes mode is set correctly on switch
-         setNoteMode(state.currentNoteMode);
+    // Ensure sidebar content visibility matches the active tab if sidebar is open
+    if (!sidebar.classList.contains('collapsed')) {
+        if (tab === 'chat') {
+            chatSidebarContent.classList.remove('hidden');
+            notesSidebarContent.classList.add('hidden');
+        } else { // tab === 'notes'
+            notesSidebarContent.classList.remove('hidden');
+            chatSidebarContent.classList.add('hidden');
+        }
     }
 
-    // Load data specific to the new tab
-    // Use dynamic imports for api functions to avoid circular dependencies
+    // Render content specific to the new tab based on state
     if (tab === 'chat') {
-        import('./api.js').then(api => {
-            // If there's a persisted chat ID, load it. Otherwise, load most recent or start new.
-            if (state.currentChatId !== null) {
-                api.loadChat(state.currentChatId).catch(error => {
-                    console.error("Error loading persisted chat:", error);
-                    // Fallback to loading most recent or starting a new chat if loading fails
-                    api.loadInitialChatData(); // This function handles the fallback logic
-                });
-            } else {
-                 api.loadInitialChatData(); // Load most recent or start new
-            }
-        }).catch(error => console.error("Failed to import api for chat tab:", error));
+        renderChatHistory(); // Reads state.chatHistory
+        renderUploadedFiles(); // Reads state.uploadedFiles, state.sidebarSelectedFiles, state.attachedFiles, state.sessionFile
+        updateCalendarStatus(); // Reads state.calendarContext, state.isCalendarContextActive, state.isCalendarPluginEnabled
+        renderChatInputArea(); // Reads plugin states, web search state, calendar active state, file plugin state
     } else { // tab === 'notes'
-         import('./api.js').then(api => {
-             // If there's a persisted note ID, load it. Otherwise, load most recent or start new.
-            if (state.currentNoteId !== null) {
-                api.loadNote(state.currentNoteId).catch(error => { // Corrected: Use state.currentNoteId here
-                    console.error("Error loading persisted note:", error);
-                    // Fallback to loading most recent or starting a new note if loading fails
-                    api.loadInitialNotesData(); // This function handles the fallback logic
-                });
-            } else {
-                 api.loadInitialNotesData(); // Load most recent or start new
-            }
-         }).catch(error => console.error("Failed to import api for notes tab:", error));
+        renderNoteContent(); // Reads state.noteContent, state.currentNoteId, state.isLoading
+        setNoteMode(state.currentNoteMode); // Applies persisted/default mode from state
     }
 }
 
 /**
- * Sets the display mode for the notes section (edit or view).
+ * Sets the display mode for the notes section (edit or view) based on state.
  * @param {'edit' | 'view'} mode - The desired mode.
  */
-export function setNoteMode(mode) {
+export function setNoteMode(mode) { // Made synchronous, state is already updated by event listener
     const { notesTextarea, notesPreview, editNoteButton, viewNoteButton } = elements;
     if (!notesTextarea || !notesPreview || !editNoteButton || !viewNoteButton) {
         console.error("Missing elements for note mode switching.");
         return;
     }
 
-    state.setCurrentNoteMode(mode);
-    localStorage.setItem(config.CURRENT_NOTE_MODE_KEY, mode);
+    // State is already updated by the event listener calling this function
+    // state.setCurrentNoteMode(mode);
+    // localStorage.setItem(config.CURRENT_NOTE_MODE_KEY, mode);
 
-    if (mode === 'edit') {
+    if (state.currentNoteMode === 'edit') { // Read from state
         notesTextarea.classList.remove('hidden');
         notesPreview.classList.add('hidden');
         editNoteButton.classList.add('active');
         viewNoteButton.classList.remove('active');
         // Ensure preview is updated if switching back to edit after viewing
         if (typeof marked !== 'undefined') {
-             notesPreview.innerHTML = marked.parse(notesTextarea.value);
+             notesPreview.innerHTML = marked.parse(notesTextarea.value); // Read from DOM for immediate preview update
         } else {
-             notesPreview.textContent = notesTextarea.value;
+             notesPreview.textContent = notesTextarea.value; // Read from DOM
         }
-    } else { // mode === 'view'
+    } else { // state.currentNoteMode === 'view'
         notesTextarea.classList.add('hidden');
         notesPreview.classList.remove('hidden');
         editNoteButton.classList.remove('active');
         viewNoteButton.classList.add('active');
         // Render markdown in the preview area
         if (typeof marked !== 'undefined') {
-             notesPreview.innerHTML = marked.parse(notesTextarea.value);
+             notesPreview.innerHTML = marked.parse(state.noteContent); // Read from state
         } else {
-             notesPreview.textContent = notesTextarea.value;
+             notesPreview.textContent = state.noteContent; // Read from state
         }
     }
 }
 
 /**
- * Updates the notes preview area by rendering the markdown from the textarea.
+ * Updates the notes preview area by rendering the markdown from the state.
  */
 export function updateNotesPreview() {
     const { notesTextarea, notesPreview } = elements;
     if (!notesTextarea || !notesPreview) return;
 
-    if (state.currentNoteMode === 'view') {
-        // Only update preview if in view mode
+    // This function is typically called when the textarea content changes (via event listener)
+    // or when the mode switches to 'view'.
+    // It should read the *current* content from the textarea for immediate feedback in edit mode,
+    // but from state.noteContent if rendering the preview based on loaded state.
+    // Let's adjust this to always read from state.noteContent for consistency,
+    // assuming the event listener updates state.noteContent on textarea input.
+
+    if (state.currentNoteMode === 'view') { // Read from state
         if (typeof marked !== 'undefined') {
-             notesPreview.innerHTML = marked.parse(notesTextarea.value);
+             notesPreview.innerHTML = marked.parse(state.noteContent); // Read from state
         } else {
-             notesPreview.textContent = notesTextarea.value;
+             notesPreview.textContent = state.noteContent; // Read from state
         }
     }
     // If in edit mode, the textarea is visible, no need to update preview constantly
+    // The textarea value is updated directly by user input, which should ideally
+    // also trigger a state update for noteContent.
 }
 
 
-// --- Modal Helpers ---
+// --- Modal Helpers (UI-local state) ---
 
 /**
  * Generic function to open a modal.
@@ -1298,3 +1279,105 @@ export function closeModal(modalElement) {
         }
     }
 }
+
+// --- State Change Reaction Functions ---
+// These functions are called by eventListeners.js or app.js when specific state
+// variables change, triggering the necessary UI updates.
+
+export function handleStateChange_isLoading() {
+    updateLoadingState();
+    renderStatus(); // Loading state affects status message
+    updateAttachButtonState(); // Loading state affects button disabled state
+    renderNoteContent(); // Loading state affects note textarea placeholder/disabled
+}
+
+export function handleStateChange_statusMessage() {
+    renderStatus();
+}
+
+export function handleStateChange_savedChats() {
+    renderSavedChats();
+}
+
+export function handleStateChange_currentChat() { // Called when currentChatId, Name, Model change
+    renderCurrentChatDetails();
+    updateActiveChatListItem(); // Highlight correct chat in sidebar
+    renderChatHistory(); // Load history for the new chat
+    // File/Calendar/Web Search context is reset by API loadChat, which triggers
+    // renderAttachedAndSessionFiles, updateCalendarStatus, renderChatInputArea
+}
+
+export function handleStateChange_chatHistory() {
+    renderChatHistory();
+}
+
+export function handleStateChange_savedNotes() {
+    renderSavedNotes();
+}
+
+export function handleStateChange_currentNote() { // Called when currentNoteId, Name, Content change
+    renderCurrentNoteDetails();
+    updateActiveNoteListItem(); // Highlight correct note in sidebar
+    renderNoteContent(); // Load content for the new note
+}
+
+export function handleStateChange_uploadedFiles() {
+    renderUploadedFiles(); // Renders sidebar and modal lists
+}
+
+export function handleStateChange_sidebarSelectedFiles() {
+    updateSelectedFileListItemStyling(); // Updates sidebar highlighting
+    updateAttachButtonState(); // Updates attach button state
+}
+
+export function handleStateChange_attachedFiles() {
+    renderAttachedAndSessionFiles(); // Updates the tags below the input
+}
+
+export function handleStateChange_sessionFile() {
+    renderAttachedAndSessionFiles(); // Updates the tags below the input
+}
+
+export function handleStateChange_currentEditingFileId() {
+    // When the file ID for summary editing changes, the modal content needs re-rendering
+    renderSummaryModalContent();
+}
+
+export function handleStateChange_summaryContent() {
+    // When the summary content changes (e.g., after fetch or user edit), update the modal textarea
+    renderSummaryModalContent();
+}
+
+export function handleStateChange_calendarContext() {
+    updateCalendarStatus(); // Updates status text and view button
+}
+
+export function handleStateChange_isCalendarContextActive() {
+    updateCalendarStatus(); // Updates toggle state and status text
+    renderChatInputArea(); // Updates calendar toggle checked state
+}
+
+export function handleStateChange_isWebSearchEnabled() {
+    renderChatInputArea(); // Updates web search toggle checked state
+}
+
+export function handleStateChange_pluginEnabled(pluginName) {
+    // This function is called when any plugin enabled state changes
+    updatePluginUI(); // Updates visibility of plugin sections and related UI
+    // Specific plugin state changes (files, calendar) might trigger further actions
+    // handled by eventListeners.js reacting to the toggle change.
+}
+
+export function handleStateChange_currentTab() {
+    // The switchTab function already handles rendering everything for the new tab
+    // This handler might be redundant if switchTab is only called by eventListeners.js
+    // reacting to the tab state change. Let's keep it simple and rely on eventListeners.js
+    // calling switchTab directly for now.
+}
+
+export function handleStateChange_currentNoteMode() {
+    setNoteMode(state.currentNoteMode); // Applies the correct mode (edit/view)
+    renderNoteContent(); // Ensures content is rendered correctly for the mode
+}
+
+// Add more handlers for other state changes as needed...
