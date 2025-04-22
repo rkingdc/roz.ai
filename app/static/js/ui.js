@@ -277,6 +277,7 @@ function createChatItem(chat) {
     nameDeleteContainer.classList.add('flex', 'items-center', 'justify-between', 'w-full');
 
     const nameSpan = document.createElement('span');
+    // Default color is text-rz-sidebar-text (gold)
     nameSpan.classList.add('filename', 'text-sm', 'text-rz-sidebar-text', 'truncate', 'flex-grow'); // Added truncate and flex-grow
     nameSpan.textContent = chat.name || `Chat ${chat.id}`;
 
@@ -347,20 +348,29 @@ export function updateActiveChatListItem() {
 
     savedChatsList.querySelectorAll('.chat-list-item').forEach(item => {
         const chatId = parseInt(item.dataset.chatId);
+        const filenameSpan = item.querySelector('.filename'); // Find the filename span
         const timestampSpan = item.querySelector('.timestamp'); // Find the timestamp span
 
         if (chatId === state.currentChatId) {
             item.classList.add('active-selection');
-            // Change timestamp color to gold when active
+            // Change text colors to active color (maroon) when active
+            if (filenameSpan) {
+                filenameSpan.classList.add('text-rz-sidebar-active-text');
+                filenameSpan.classList.remove('text-rz-sidebar-text');
+            }
             if (timestampSpan) {
-                timestampSpan.classList.add('text-rz-sidebar-text');
+                timestampSpan.classList.add('text-rz-sidebar-active-text');
                 timestampSpan.classList.remove('text-rz-tab-background-text');
             }
         } else {
             item.classList.remove('active-selection');
-            // Change timestamp color back to greyish when inactive
+            // Change text colors back to default when inactive
+            if (filenameSpan) {
+                filenameSpan.classList.remove('text-rz-sidebar-active-text');
+                filenameSpan.classList.add('text-rz-sidebar-text');
+            }
             if (timestampSpan) {
-                timestampSpan.classList.remove('text-rz-sidebar-text');
+                timestampSpan.classList.remove('text-rz-sidebar-active-text');
                 timestampSpan.classList.add('text-rz-tab-background-text');
             }
         }
