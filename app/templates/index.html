@@ -75,7 +75,8 @@
 </div>
                 <textarea id="message-input" rows="2" class="flex-grow p-2 rounded-lg focus:outline-none resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
                 <div class="flex flex-col items-center self-end flex-shrink-0"> <!-- Container for button and checkbox -->
-                    <label class="toggle-switch text-xs mb-1" title="Include web search results in the AI's context">
+                    <!-- Web Search Toggle - Visibility controlled by plugin setting -->
+                    <label class="toggle-switch text-xs mb-1" id="web-search-toggle-label" title="Include web search results in the AI's context">
                         <input type="checkbox" id="web-search-toggle">
                         <span class="toggle-slider"></span>
                         Web Search
@@ -146,8 +147,8 @@
         <i class="fas fa-chevron-right"></i>
     </button>
 
-    <!-- New Settings Button -->
-    <button id="settings-btn" class="settings-btn" title="Settings">
+    <!-- New Settings Button - Positioned in top right -->
+    <button id="settings-btn" class="settings-btn fixed top-2 right-2 z-50" title="Settings">
         <i class="fas fa-cog"></i>
     </button>
 
@@ -265,6 +266,16 @@
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
+
+                    <!-- New Web Search Plugin Toggle -->
+                    <div class="setting-item flex items-center justify-between mb-3">
+                        <label for="web-search-plugin-toggle" class="text-sm font-medium text-gray-700">Web Search Plugin</label>
+                        <label class="toggle-switch text-sm">
+                            <input type="checkbox" id="web-search-plugin-toggle">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <!-- End New Web Search Plugin Toggle -->
 
                     <!-- Add more plugin toggles here later -->
                 </div>

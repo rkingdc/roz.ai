@@ -8,14 +8,18 @@ let isCalendarContextActive = false; // Track calendar toggle state (next to mes
 let isStreamingEnabled = true; // Track streaming toggle state (default to true)
 let isFilePluginEnabled = true; // Track Files plugin enabled state (default to true)
 let isCalendarPluginEnabled = true; // Track Calendar plugin enabled state (default to true)
+let isWebSearchPluginEnabled = true; // New: Track Web Search plugin enabled state (default to true)
+
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
 const PLUGINS_COLLAPSED_KEY = 'pluginsCollapsed';
 const FILE_PLUGIN_COLLAPSED_KEY = 'filePluginCollapsed';
-const CALENDAR_PLUGIN_COLLAPSED_KEY = 'calendarPluginCollapsed'; // Corrected typo here
+const CALENDAR_PLUGIN_COLLAPSED_KEY = 'calendarPluginCollapsed';
 const STREAMING_ENABLED_KEY = 'streamingEnabled'; // New localStorage key for streaming
 const FILES_PLUGIN_ENABLED_KEY = 'filesPluginEnabled'; // New localStorage key for Files plugin
 const CALENDAR_PLUGIN_ENABLED_KEY = 'calendarPluginEnabled'; // New localStorage key for Calendar plugin
+const WEB_SEARCH_PLUGIN_ENABLED_KEY = 'webSearchPluginEnabled'; // New: localStorage key for Web Search plugin
+
 
 const MAX_FILE_SIZE_MB = 10;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -168,6 +172,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeCalendarModalButton = document.getElementById('close-calendar-modal');
     const calendarModalContent = document.getElementById('calendar-modal-content');
     const webSearchToggle = document.getElementById('web-search-toggle');
+    const webSearchToggleLabel = document.getElementById('web-search-toggle-label'); // New: Reference to the label wrapping the web search toggle
 
     // URL Feature References
     const urlModal = document.getElementById('url-modal');
@@ -194,12 +199,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Plugin Toggles in Settings Modal References
     const filesPluginToggle = document.getElementById('files-plugin-toggle');
     const calendarPluginToggle = document.getElementById('calendar-plugin-toggle');
+    const webSearchPluginToggle = document.getElementById('web-search-plugin-toggle'); // New: Reference to the web search plugin toggle in settings
+
 
     // DOM Elements to hide/show based on plugin settings References
     const filePluginSection = document.getElementById('file-plugin-section');
     const calendarPluginSection = document.getElementById('calendar-plugin-section');
     const fileUploadSessionLabel = document.getElementById('file-upload-session-label');
-    const calendarToggleInputArea = calendarToggle.closest('label');
+    const calendarToggleInputArea = calendarToggle.closest('label'); // This is the label next to the input
+
 
     // Session File Input Reference (This was the one causing the error)
     const fileUploadSessionInput = document.getElementById('file-upload-session-input');
@@ -216,6 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // let isStreamingEnabled = true; // Already global
     // let isFilePluginEnabled = true; // Already global
     // let isCalendarPluginEnabled = true; // Already global
+    // let isWebSearchPluginEnabled = true; // Already global
     let sessionFile = null; // Variable to store selected session file (can be local or global, let's keep global)
 
 
@@ -275,11 +284,12 @@ document.addEventListener('DOMContentLoaded', () => {
         loadCalendarButton.disabled = loading;
         calendarToggle.disabled = loading;
         viewCalendarButton.disabled = loading || !calendarContext;
-        webSearchToggle.disabled = loading;
+        webSearchToggle.disabled = loading; // Disable the web search toggle next to input
         settingsButton.disabled = loading; // Disable settings button when loading
         streamingToggle.disabled = loading; // Disable streaming toggle when loading
         filesPluginToggle.disabled = loading; // Disable files plugin toggle when loading
         calendarPluginToggle.disabled = loading; // Disable calendar plugin toggle when loading
+        webSearchPluginToggle.disabled = loading; // New: Disable web search plugin toggle when loading
 
 
         // Disable/Enable elements in the Manage Files Modal
@@ -1346,7 +1356,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             viewCalendarButton.classList.add('hidden');
             modelSelector.value = defaultModel;
-            webSearchToggle.checked = false; // Reset web search toggle
+            webSearchToggle.checked = false; // Reset web search toggle state for the new chat
 
             // Ensure plugin UI reflects the *current* enabled state (which wasn't reset)
             updatePluginUI();
@@ -1417,7 +1427,7 @@ document.addEventListener('DOMContentLoaded', () => {
             viewCalendarButton.classList.add('hidden');
             console.log(`[DEBUG] Calendar context reset for chat ${chatId}.`); // Added log
 
-            webSearchToggle.checked = false; // Reset web search toggle
+            webSearchToggle.checked = false; // Reset web search toggle state for the loaded chat
             console.log(`[DEBUG] Web search toggle reset for chat ${chatId}.`); // Added log
 
 
@@ -1478,7 +1488,7 @@ document.addEventListener('DOMContentLoaded', () => {
             calendarToggle.checked = isCalendarContextActive;
             updateCalendarStatus();
             viewCalendarButton.classList.add('hidden');
-            webSearchToggle.checked = false;
+            webSearchToggle.checked = false; // Reset web search toggle state on error
             console.log(`[DEBUG] Chat context reset again on error for chat ${chatId}.`); // Added log
 
 
@@ -1520,8 +1530,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Only include calendar context if the Calendar plugin is enabled AND the toggle is active AND context exists
         const calendarContextToSend = (isCalendarPluginEnabled && isCalendarContextActive && calendarContext) ? calendarContext : null;
 
-        // Web search is independent of other plugins, but still a plugin-like feature
-        const webSearchEnabledToSend = webSearchToggle.checked;
+        // Web search is only enabled if the plugin is enabled AND the user's toggle is checked
+        const webSearchEnabledToSend = isWebSearchPluginEnabled && webSearchToggle.checked;
 
 
         if (!message && filesToAttach.length === 0 && !sessionFileToSend && !calendarContextToSend && !webSearchEnabledToSend) {
@@ -1570,11 +1580,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 content: sessionFileToSend.content,
                 mimetype: sessionFileToSend.mimetype
             }] : [],
-            enable_web_search: webSearchEnabledToSend, // Add the web search flag
+            enable_web_search: webSearchEnabledToSend, // Add the web search flag (controlled by plugin setting AND user toggle)
             enable_streaming: isStreamingEnabled, // Add the streaming flag
             // Add plugin enabled states to the payload
             enable_files_plugin: isFilePluginEnabled,
-            enable_calendar_plugin: isCalendarPluginEnabled
+            enable_calendar_plugin: isCalendarPluginEnabled,
+            enable_web_search_plugin: isWebSearchPluginEnabled // New: Add web search plugin state
         };
 
         // Store session file temporarily to clear it in finally block
@@ -1802,6 +1813,7 @@ document.addEventListener('DOMContentLoaded', () => {
         streamingToggle.checked = isStreamingEnabled;
         filesPluginToggle.checked = isFilePluginEnabled;
         calendarPluginToggle.checked = isCalendarPluginEnabled;
+        webSearchPluginToggle.checked = isWebSearchPluginEnabled; // New: Update web search plugin toggle state
     }
 
     /** Closes the Settings modal. */
@@ -1861,6 +1873,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /** New: Handles changes to the Web Search plugin toggle switch. */
+    function handleWebSearchPluginToggle() {
+        isWebSearchPluginEnabled = webSearchPluginToggle.checked;
+        localStorage.setItem(WEB_SEARCH_PLUGIN_ENABLED_KEY, isWebSearchPluginEnabled); // Persist toggle state
+        updatePluginUI(); // Update UI visibility
+        updateStatus(`Web Search plugin ${isWebSearchPluginEnabled ? 'enabled' : 'disabled'}.`);
+        // If disabling, explicitly turn off the web search toggle next to the input
+        if (!isWebSearchPluginEnabled) {
+            webSearchToggle.checked = false;
+            // Trigger a change event on the webSearchToggle to ensure any listeners (if added later) are fired
+            // Although currently, the state is just read in sendMessage, this is good practice.
+            webSearchToggle.dispatchEvent(new Event('change'));
+        }
+    }
+
+
     /** Updates the visibility of plugin-related UI elements based on enabled state. */
     function updatePluginUI() {
         // Files Plugin UI
@@ -1880,6 +1908,15 @@ document.addEventListener('DOMContentLoaded', () => {
             calendarPluginSection.classList.add('hidden');
             calendarToggleInputArea.classList.add('hidden'); // Hide calendar toggle next to input
         }
+
+        // New: Web Search Plugin UI
+        // Hide/Show the label element that wraps the web search toggle input
+        if (isWebSearchPluginEnabled) {
+            webSearchToggleLabel.classList.remove('hidden');
+        } else {
+            webSearchToggleLabel.classList.add('hidden');
+        }
+
 
         // Note: The plugins sidebar itself (#plugins-sidebar) is controlled by pluginsToggleButton.
         // We don't hide the entire sidebar just because one plugin is off.
@@ -1967,6 +2004,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // New Plugin Toggle Listeners in Settings Modal
     filesPluginToggle.addEventListener('change', handleFilesPluginToggle);
     calendarPluginToggle.addEventListener('change', handleCalendarPluginToggle);
+    webSearchPluginToggle.addEventListener('change', handleWebSearchPluginToggle); // New: Listen to web search plugin toggle change
 
 
     // Model Selector Listener
@@ -1987,12 +2025,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const chatSidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true';
             const pluginSidebarCollapsed = localStorage.getItem(PLUGINS_COLLAPSED_KEY) === 'true';
             const filePluginCollapsed = localStorage.getItem(FILE_PLUGIN_COLLAPSED_KEY) === 'true';
-            // Corrected typo here: CALENDAR_PLUGIN_COLLABSED_KEY -> CALENDAR_PLUGIN_COLLAPSED_KEY
             const calendarPluginCollapsed = localStorage.getItem(CALENDAR_PLUGIN_COLLAPSED_KEY) === 'true';
             setSidebarCollapsed(sidebar, sidebarToggleButton, chatSidebarCollapsed, SIDEBAR_COLLAPSED_KEY, 'sidebar');
             setSidebarCollapsed(pluginsSidebar, pluginsToggleButton, pluginSidebarCollapsed, PLUGINS_COLLAPSED_KEY, 'plugins');
             setPluginSectionCollapsed(filePluginHeader, filePluginContent, filePluginCollapsed, FILE_PLUGIN_COLLAPSED_KEY);
-            setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY); // Corrected typo here
+            setPluginSectionCollapsed(calendarPluginHeader, calendarPluginContent, calendarPluginCollapsed, CALENDAR_PLUGIN_COLLAPSED_KEY);
             console.log("[DEBUG] Sidebar/Plugin collapse states loaded and applied."); // Added log
 
 
@@ -2021,6 +2058,12 @@ document.addEventListener('DOMContentLoaded', () => {
             isCalendarPluginEnabled = storedCalendarPluginState === null ? true : storedCalendarPluginState === 'true';
             calendarPluginToggle.checked = isCalendarPluginEnabled; // Update settings modal toggle
             console.log(`[DEBUG] Calendar plugin enabled state loaded: ${isCalendarPluginEnabled}.`); // Added log
+
+            // New: Load Web Search Plugin Enabled state (default to true if not found)
+            const storedWebSearchPluginState = localStorage.getItem(WEB_SEARCH_PLUGIN_ENABLED_KEY);
+            isWebSearchPluginEnabled = storedWebSearchPluginState === null ? true : storedWebSearchPluginState === 'true';
+            webSearchPluginToggle.checked = isWebSearchPluginEnabled; // Update settings modal toggle
+            console.log(`[DEBUG] Web Search plugin enabled state loaded: ${isWebSearchPluginEnabled}.`); // Added log
 
 
             // Update UI visibility based on loaded plugin states
