@@ -304,7 +304,7 @@ function createChatItem(chat) {
     // Use 'div' and specific classes as per CORRECT HTML - color handled by CSS
     const timestampDiv = document.createElement('div');
     // Default color is text-rz-tab-background-text (greyish) based on provided HTML
-    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-sidebar-text'); // Use specific classes and mt-0.5 - color handled by CSS
+    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-toolbar-field-text'); // Use specific classes and mt-0.5 - color handled by CSS
     try {
         const date = new Date(chat.last_updated_at);
         // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
@@ -457,7 +457,7 @@ function createNoteItem(note) {
     // Use 'div' and specific classes as per provided HTML - color handled by CSS
     const timestampDiv = document.createElement('div');
     // Default color is text-rz-tab-background-text (greyish) based on provided HTML
-    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-sidebar-text'); // Use specific classes and mt-0.5 - color handled by CSS
+    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-toolbar-field-text'); // Use specific classes and mt-0.5 - color handled by CSS
     try {
         const date = new Date(note.last_saved_at);
         // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
