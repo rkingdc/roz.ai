@@ -152,7 +152,8 @@ export function setLoadingState(isLoading, statusMessage = "Busy...") {
 
 
     // Disable/enable list items for chats/notes/files
-    document.querySelectorAll('.list-item, .file-list-item').forEach(item => {
+    // File list items now also use the .list-item class
+    document.querySelectorAll('.list-item').forEach(item => {
         if (isLoading) {
             item.classList.add('pointer-events-none', 'opacity-50');
         } else {
