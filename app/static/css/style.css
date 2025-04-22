@@ -261,153 +261,6 @@
  .selected-file-tag button:hover {
      color: var(--rz-toolbar-opaque);
 }
-/* Sidebar Toggle Buttons */
- .toggle-btn {
-     position: absolute;
-     top: 0.75rem;
-     z-index: 50;
-     background-color: var(--rz-sidebar-bg);
-     border: 1px solid var(--rz-sidebar-border);
-     padding: 0.75rem 0.5rem;
-     cursor: pointer;
-     transition: left 0.3s ease-in-out, right 0.3s ease-in-out, background-color 0.2s;
-     box-shadow: 0px 0px 5px rgba(0,0,0,0.1);
-}
- .toggle-btn i {
-     color: var(--rz-sidebar-text);
-     display: block;
-}
- .toggle-btn:hover {
-     background-color: var(--rz-sidebar-hover-bg);
-}
- #sidebar-toggle-btn {
-     left: 320px;
-     border-left: none;
-     border-top-right-radius: 0.375rem;
-     border-bottom-right-radius: 0.375rem;
-}
- body.sidebar-collapsed #sidebar-toggle-btn {
-     left: 0px;
-     border-left: 1px solid var(--rz-sidebar-border);
-     border-right: none;
-     border-top-left-radius: 0.375rem;
-     border-bottom-left-radius: 0.375rem;
-     border-top-right-radius: 0;
-     border-bottom-right-radius: 0;
-}
- #plugins-toggle-btn {
-     right: 300px;
-     border-right: none;
-     border-top-left-radius: 0.375rem;
-     border-bottom-left-radius: 0.375rem;
-}
- body.plugins-collapsed #plugins-toggle-btn {
-     right: 0px;
-     border-right: 1px solid var(--rz-sidebar-border);
-     border-left: none;
-     border-top-right-radius: 0.375rem;
-     border-bottom-right-radius: 0.375rem;
-     border-top-left-radius: 0;
-     border-bottom-left-radius: 0;
-}
-
-/* Settings Button (MODIFIED) */
- #settings-btn {
-     /* Removed position: fixed and related properties */
-     /* Positioning and sizing now handled by parent flexbox and Tailwind classes */
-     cursor: pointer;
-     transition: background-color 0.2s ease-in-out;
-     /* box-shadow: 0px 0px 5px rgba(0,0,0,0.1); /* Removed box-shadow for a flatter look */
-     display: flex; /* Use flex to center icon */
-     align-items: center;
-     justify-content: center;
-     /* Padding and border-radius are now handled by Tailwind classes in HTML */
-     /* Color is now handled by Tailwind classes in HTML */
-     /* Hover background is now handled by Tailwind classes in HTML */
-     border: none; /* Ensure no default button border */
-     background: none; /* Ensure no default button background */
-}
- #settings-btn i {
-     /* Color is now handled by Tailwind classes on the button itself */
-     /* color: var(--rz-sidebar-text); */
-     font-size: 1.2rem; /* Adjust icon size */
-}
-/* #settings-btn:hover { */
-    /* background-color: var(--rz-sidebar-hover-bg); /* Hover background is now handled by Tailwind */
-/* } */
- #settings-btn:disabled {
-     opacity: 0.6;
-     cursor: not-allowed;
-}
-
-
-/* Message Styling */
- .message {
-     padding: 0.75rem;
-     margin-bottom: 0.5rem;
-     border-radius: 0.5rem;
-     max-width: 85%;
-     word-wrap: break-word;
-     line-height: 1.5;
-}
- .user-msg {
-     margin-left: auto;
-     background-color: var(--rz-user-message-bg);
-     color: var(--rz-user-message-text);
-}
- .assistant-msg {
-     margin-right: auto;
-     background-color: var(--rz-assistant-message-bg);
-     color: var(--rz-assistant-message-text);
-}
- .error-msg {
-     margin-right: auto;
-     background-color: #fee2e2;
-     color: #991b1b;
-     font-style: italic;
-}
- .system-msg {
-     text-align: center;
-     font-size: 0.8rem;
-     color: #6b7280;
-     margin-bottom: 0.5rem;
-     white-space: pre-wrap;
-}
- .message pre {
-     margin-top: 0.5rem;
-     background-color: var(--rz-frame);
-     color: var(--rz-toolbar-field-text);
-     padding: 0.5rem;
-     border-radius: 0.25rem;
-}
-/* Attachment Icon Styling */
- .attachment-icon {
-     display: inline-flex;
-    /* Changed from block */
-     align-items: center;
-     gap: 0.25rem;
-     font-size: 0.8rem;
-     color: inherit;
-    /* Inherit color from message */
-     background-color: rgba(0, 0, 0, 0.05);
-     padding: 0.15rem 0.4rem;
-     border-radius: 0.25rem;
-     border: 1px solid rgba(0, 0, 0, 0.1);
-     margin-right: 0.3rem;
-    /* Space after icon block */
-     margin-bottom: 0.2rem;
-    /* Space below if wrapping */
-     vertical-align: middle;
-    /* Align with text */
-}
- .attachment-icon i {
-     opacity: 0.8;
-}
- .attachment-icon.error-marker {
-     color: #991b1b;
-     background-color: rgba(254, 202, 202, 0.4);
-     border-color: rgba(248, 113, 113, 0.5);
-}
 /* Scrollbar Styling */
  #chatbox::-webkit-scrollbar, #saved-chats-list::-webkit-scrollbar, #uploaded-files-list::-webkit-scrollbar, #selected-files-container::-webkit-scrollbar, #notes-textarea::-webkit-scrollbar, #notes-preview::-webkit-scrollbar, #manage-files-list::-webkit-scrollbar {
      width: 6px;
@@ -862,3 +715,55 @@
 /* Ensure the prose class is styled for dark mode if needed */
 /* Tailwind's default prose-invert handles this, but if you have custom prose styles,
    make sure they work in dark mode. */
+
+/* --- Fallback Markdown Styling for Notes Preview --- */
+/* These styles are added to ensure basic markdown elements are visible and structured
+   in the #notes-preview area, in case the 'prose' class is not fully effective
+   due to CSS conflicts or Tailwind configuration issues. */
+#notes-preview h1,
+#notes-preview h2,
+#notes-preview h3,
+#notes-preview h4,
+#notes-preview h5,
+#notes-preview h6 {
+    margin-top: 1.5em; /* Add space above headers */
+    margin-bottom: 0.5em; /* Add space below headers */
+    font-weight: bold; /* Ensure headers are bold */
+    line-height: 1.2; /* Adjust line height */
+}
+
+#notes-preview h1 { font-size: 2em; } /* Larger font for H1 */
+#notes-preview h2 { font-size: 1.5em; } /* Larger font for H2 */
+#notes-preview h3 { font-size: 1.25em; } /* Larger font for H3 */
+#notes-preview h4 { font-size: 1.1em; } /* Slightly larger font for H4 */
+/* H5 and H6 might just need bolding and margin */
+
+#notes-preview p {
+    margin-bottom: 1em; /* Add space below paragraphs */
+    line-height: 1.6; /* Improve readability */
+}
+
+#notes-preview ul,
+#notes-preview ol {
+    margin-top: 0.5em; /* Add space above lists */
+    margin-bottom: 1em; /* Add space below lists */
+    padding-left: 1.5em; /* Add padding for list markers */
+}
+
+#notes-preview ul {
+    list-style-type: disc; /* Use discs for unordered lists */
+}
+
+#notes-preview ol {
+    list-style-type: decimal; /* Use numbers for ordered lists */
+}
+
+#notes-preview li {
+    margin-bottom: 0.5em; /* Add space between list items */
+}
+
+/* Ensure code blocks and inline code styling from renderer is not overridden */
+/* The renderer already applies specific classes, so these fallback styles
+   should not interfere with the working code rendering. */
+
+/* --- End Fallback Markdown Styling --- */
