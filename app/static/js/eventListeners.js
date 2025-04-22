@@ -142,7 +142,8 @@ export function setupEventListeners() {
 
 
 /** Handles the session file input change event. */
-function handleSessionFileUpload(e) {
+async function handleSessionFileUpload(e) { // Made async to await ui import
+    const ui = await import('./ui.js'); // Dynamic import
     const file = e.target.files[0];
     // Clear any existing session file tag first
     // elements.selectedFilesContainer?.querySelector('.session-file-tag')?.remove(); // This is handled by renderAttachedAndSessionFiles
@@ -197,7 +198,8 @@ function handleSessionFileUpload(e) {
 
 
 /** Handles changes to the calendar context toggle switch. */
-function handleCalendarToggleChange() {
+async function handleCalendarToggleChange() { // Made async to await ui import
+    const ui = await import('./ui.js'); // Dynamic import
     if (!state.isCalendarPluginEnabled || state.currentTab !== 'chat') {
         if(elements.calendarToggle) elements.calendarToggle.checked = false; // Force off
         ui.updateStatus("Calendar context requires Calendar plugin enabled on Chat tab.", true);
@@ -210,7 +212,8 @@ function handleCalendarToggleChange() {
 }
 
 /** Handles changes to the streaming toggle switch. */
-function handleStreamingToggleChange() {
+async function handleStreamingToggleChange() { // Made async to await ui import
+    const ui = await import('./ui.js'); // Dynamic import
     const isEnabled = elements.streamingToggle?.checked ?? true;
     state.setStreamingEnabled(isEnabled); // Update state
     localStorage.setItem('streamingEnabled', isEnabled); // Persist
@@ -218,7 +221,8 @@ function handleStreamingToggleChange() {
 }
 
 /** Handles changes to the Files plugin toggle switch. */
-function handleFilesPluginToggleChange() {
+async function handleFilesPluginToggleChange() { // Made async to await ui import
+    const ui = await import('./ui.js'); // Dynamic import
     const isEnabled = elements.filesPluginToggle?.checked ?? true;
     state.setFilePluginEnabled(isEnabled); // Update state
     localStorage.setItem('filesPluginEnabled', isEnabled); // Persist
@@ -244,12 +248,13 @@ function handleFilesPluginToggleChange() {
 
     } else {
         // If enabling, reload the file lists
-        api.loadUploadedFiles();
+        await api.loadUploadedFiles(); // Await the API call
     }
 }
 
 /** Handles changes to the Calendar plugin toggle switch. */
-function handleCalendarPluginToggleChange() {
+async function handleCalendarPluginToggleChange() { // Made async to await ui import
+    const ui = await import('./ui.js'); // Dynamic import
     const isEnabled = elements.calendarPluginToggle?.checked ?? true;
     state.setCalendarPluginEnabled(isEnabled); // Update state
     localStorage.setItem('calendarPluginEnabled', isEnabled); // Persist
@@ -267,7 +272,8 @@ function handleCalendarPluginToggleChange() {
 }
 
 /** Handles changes to the Web Search plugin toggle switch. */
-function handleWebSearchPluginToggleChange() {
+async function handleWebSearchPluginToggleChange() { // Made async to await ui import
+    const ui = await import('./ui.js'); // Dynamic import
     const isEnabled = elements.webSearchPluginToggle?.checked ?? true;
     state.setWebSearchPluginEnabled(isEnabled); // Update state
     localStorage.setItem('webSearchPluginEnabled', isEnabled); // Persist

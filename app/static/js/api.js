@@ -1,7 +1,7 @@
 // js/api.js
 import { elements } from './dom.js';
 import * as state from './state.js';
-import * as ui from './ui.js'; // Import all functions from ui.js
+// REMOVED: import * as ui from './ui.js'; // Import all functions from ui.js
 import { escapeHtml, formatFileSize } from './utils.js'; // Import utility functions
 import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js';
 
@@ -9,6 +9,7 @@ import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js';
 
 /** Deletes a file from the backend and updates the UI lists. */
 export async function deleteFile(fileId) {
+    const ui = await import('./ui.js'); // Dynamic import
     if (state.isLoading) return;
     if (!confirm("Are you sure you want to delete this file? This action cannot be undone.")) {
         return;
@@ -46,6 +47,7 @@ export async function deleteFile(fileId) {
 
 /** Loads uploaded files and populates the lists in both the sidebar and the modal. */
 export async function loadUploadedFiles() {
+    const ui = await import('./ui.js'); // Dynamic import
     const { uploadedFilesList, manageFilesList } = elements;
     if (!uploadedFilesList || !manageFilesList) return;
 
@@ -89,6 +91,7 @@ export async function loadUploadedFiles() {
 
 /** Handles file upload triggered from the modal. */
 export async function handleFileUpload(event) {
+    const ui = await import('./ui.js'); // Dynamic import
     if (!state.isFilePluginEnabled || state.currentTab !== 'chat') {
         ui.updateStatus("File uploads only allowed when Files plugin is enabled and on Chat tab.", true);
         if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = '';
@@ -145,6 +148,7 @@ export async function handleFileUpload(event) {
 
 /** Adds a file by fetching content from a URL. */
 export async function addFileFromUrl(url) {
+     const ui = await import('./ui.js'); // Dynamic import
      if (state.isLoading) return;
      if (!state.isFilePluginEnabled || state.currentTab !== 'chat') {
          if(elements.urlStatus) {
@@ -196,6 +200,7 @@ export async function addFileFromUrl(url) {
 
 /** Shows the summary modal and fetches/displays the summary. */
 export async function showSummaryModal(fileId, filename) {
+    const ui = await import('./ui.js'); // Dynamic import
     // Use the generic showModal helper
     if (!ui.showModal(elements.summaryModal, 'files', 'chat')) return;
 
@@ -253,6 +258,7 @@ export async function showSummaryModal(fileId, filename) {
 
 /** Saves the edited summary. */
 export async function saveSummary() {
+    const ui = await import('./ui.js'); // Dynamic import
     if (!state.currentEditingFileId || state.isLoading) return;
     if (!state.isFilePluginEnabled || state.currentTab !== 'chat') {
          ui.updateStatus("Saving summaries requires Files plugin enabled on Chat tab.", true);
@@ -295,7 +301,8 @@ export async function saveSummary() {
 /**
  * Attaches selected files from the sidebar to the current chat as 'full' files.
  */
-export function attachSelectedFilesFull() {
+export async function attachSelectedFilesFull() {
+    const ui = await import('./ui.js'); // Dynamic import
     if (!state.isFilePluginEnabled || state.currentTab !== 'chat' || state.isLoading) {
         ui.updateStatus("Cannot attach files: Files plugin disabled, not on Chat tab, or busy.", true);
         return;
@@ -326,7 +333,8 @@ export function attachSelectedFilesFull() {
 /**
  * Attaches selected files from the sidebar to the current chat as 'summary' files.
  */
-export function attachSelectedFilesSummary() {
+export async function attachSelectedFilesSummary() {
+     const ui = await import('./ui.js'); // Dynamic import
      if (!state.isFilePluginEnabled || state.currentTab !== 'chat' || state.isLoading) {
         ui.updateStatus("Cannot attach files: Files plugin disabled, not on Chat tab, or busy.", true);
         return;
@@ -365,6 +373,7 @@ export function attachSelectedFilesSummary() {
 
 /** Fetches calendar events and updates state/UI. */
 export async function loadCalendarEvents() {
+    const ui = await import('./ui.js'); // Dynamic import
     if (state.isLoading) return;
     if (!state.isCalendarPluginEnabled || state.currentTab !== 'chat') {
         ui.updateStatus("Loading calendar events requires Calendar plugin enabled on Chat tab.", true);
@@ -401,6 +410,7 @@ export async function loadCalendarEvents() {
 
 /** Loads the list of saved chats into the sidebar. */
 export async function loadSavedChats() {
+    const ui = await import('./ui.js'); // Dynamic import
     if (!elements.savedChatsList) return;
 
     // Set loading only if not already loading (e.g., during init)
@@ -430,6 +440,7 @@ export async function loadSavedChats() {
 
 /** Starts a new chat session. */
 export async function startNewChat() {
+    const ui = await import('./ui.js'); // Dynamic import
     ui.setLoadingState(true, "Creating Chat");
     try {
         const response = await fetch('/api/chat', { method: 'POST' });
@@ -458,6 +469,7 @@ export async function startNewChat() {
 
 /** Loads a specific chat's history and details. */
 export async function loadChat(chatId) {
+    const ui = await import('./ui.js'); // Dynamic import
     console.log(`[DEBUG] loadChat(${chatId}) called.`);
     ui.setLoadingState(true, "Loading Chat");
     ui.clearChatbox();
@@ -488,7 +500,7 @@ export async function loadChat(chatId) {
         }
 
         // Reset chat-specific context states (files, calendar, web search toggle)
-        resetChatContext(); // Helper function below
+        await resetChatContext(); // Helper function below - Make it awaitable
 
         // Assuming the backend returns attached files with chat details
         if (data.details.attached_files) {
@@ -525,7 +537,7 @@ export async function loadChat(chatId) {
         if(elements.currentChatNameInput) elements.currentChatNameInput.value = '';
         if(elements.currentChatIdDisplay) elements.currentChatIdDisplay.textContent = 'ID: -';
         if(elements.modelSelector) elements.modelSelector.value = elements.modelSelector.options[0]?.value || '';
-        resetChatContext(); // Clear files, calendar, etc.
+        await resetChatContext(); // Clear files, calendar, etc. - Make it awaitable
         ui.updatePluginUI(); // Update UI based on cleared state
         ui.updateActiveChatListItem(); // Remove highlight
 
@@ -542,16 +554,15 @@ export async function loadChat(chatId) {
 }
 
 // Helper to reset context when switching chats or starting new
-function resetChatContext() {
-    // Corrected: Use the new state functions
+// Made async to allow dynamic import of ui
+async function resetChatContext() {
+    const ui = await import('./ui.js'); // Dynamic import
     state.clearSidebarSelectedFiles(); // Clear temporary sidebar selections
     state.clearAttachedFiles(); // Clear permanent file selections
     state.setSessionFile(null); // Clear session file state
 
-    // Corrected: Call the single function that renders both attached and session files
     ui.renderAttachedAndSessionFiles(); // Update attached files display
 
-    // Corrected: Update sidebar styling and button state based on cleared sidebar selection
     ui.updateSelectedFileListItemStyling(); // Update sidebar highlighting
     ui.updateAttachButtonState(); // Update attach button state
 
@@ -569,6 +580,7 @@ function resetChatContext() {
 
 /** Sends the user message and context to the backend. */
 export async function sendMessage() {
+    const ui = await import('./ui.js'); // Dynamic import
     if (state.isLoading || !state.currentChatId || state.currentTab !== 'chat') {
         ui.updateStatus("Cannot send: No active chat, busy, or not on Chat tab.", true);
         return;
@@ -694,6 +706,7 @@ export async function sendMessage() {
 
 /** Saves the current chat's name. */
 export async function handleSaveChatName() {
+    const ui = await import('./ui.js'); // Dynamic import
     if (state.isLoading || !state.currentChatId || state.currentTab !== 'chat') return;
 
     const newName = elements.currentChatNameInput?.value.trim() || 'New Chat';
@@ -720,6 +733,7 @@ export async function handleSaveChatName() {
 
 /** Deletes a chat. */
 export async function handleDeleteChat(chatId, listItemElement) {
+    const ui = await import('./ui.js'); // Dynamic import
     if (state.isLoading || state.currentTab !== 'chat') return;
 
     const chatName = listItemElement?.querySelector('span.filename')?.textContent || `Chat ${chatId}`;
@@ -757,6 +771,7 @@ export async function handleDeleteChat(chatId, listItemElement) {
 
 /** Handles changing the model for the current chat. */
 export async function handleModelChange() {
+    const ui = await import('./ui.js'); // Dynamic import
     if (!state.currentChatId || state.isLoading || state.currentTab !== 'chat') return;
 
     const newModel = elements.modelSelector?.value;
@@ -801,6 +816,7 @@ export async function handleModelChange() {
 
 /** Loads the list of saved notes into the sidebar. */
 export async function loadSavedNotes() {
+     const ui = await import('./ui.js'); // Dynamic import
      if (!elements.savedNotesList) return;
 
      const wasLoading = state.isLoading;
@@ -828,6 +844,7 @@ export async function loadSavedNotes() {
 
 /** Creates a new note entry and loads it. */
 export async function startNewNote() {
+    const ui = await import('./ui.js'); // Dynamic import
     console.log(`[DEBUG] startNewNote called.`);
     if (state.isLoading) return;
     ui.setLoadingState(true, "Creating Note");
@@ -868,6 +885,7 @@ export async function startNewNote() {
 
 /** Loads the content of a specific note. */
 export async function loadNote(noteId) {
+    const ui = await import('./ui.js'); // Dynamic import
     console.log(`[DEBUG] loadNote(${noteId}) called.`);
     if (state.isLoading) return;
     ui.setLoadingState(true, "Loading Note");
@@ -928,6 +946,7 @@ export async function loadNote(noteId) {
 
 /** Saves the current note content and name. */
 export async function saveNote() {
+    const ui = await import('./ui.js'); // Dynamic import
     console.log(`[DEBUG] saveNote called.`);
     if (state.isLoading || !state.currentNoteId || state.currentTab !== 'notes') {
         ui.updateStatus("Cannot save: No active note, busy, or not on Notes tab.", true);
@@ -961,6 +980,7 @@ export async function saveNote() {
 
 /** Deletes a specific note. */
 export async function handleDeleteNote(noteId, listItemElement) {
+    const ui = await import('./ui.js'); // Dynamic import
     if (state.isLoading || state.currentTab !== 'notes') return;
     const noteName = listItemElement?.querySelector('span.filename')?.textContent || `Note ${noteId}`;
     if (!confirm(`Are you sure you want to delete "${noteName}"? This cannot be undone.`)) {

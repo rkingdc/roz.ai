@@ -685,7 +685,7 @@ function createSidebarFileItem(file, isSelected) {
  * Updates the highlighting for selected file list items in the sidebar.
  * Multiple files can be selected.
  */
-function updateSelectedFileListItemStyling() {
+export function updateSelectedFileListItemStyling() {
     const { uploadedFilesList } = elements;
     if (!uploadedFilesList) return;
 
@@ -710,7 +710,7 @@ function updateSelectedFileListItemStyling() {
  * Updates the enabled/disabled state of the Attach Full and Attach Summary buttons
  * based on the number and type of files selected in the sidebar.
  */
-function updateAttachButtonState() {
+export function updateAttachButtonState() {
     const { attachFullButton, attachSummaryButton } = elements;
     if (!attachFullButton || !attachSummaryButton) return;
 
