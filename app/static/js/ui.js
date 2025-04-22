@@ -644,6 +644,9 @@ export function updateAttachButtonState() {
     const selectedCount = state.sidebarSelectedFiles.length; // Read from state
     // Check if any selected file in sidebarSelectedFiles has has_summary === true
     const hasSummarizable = state.sidebarSelectedFiles.some(f => f.has_summary); // Read from state
+    console.log(`[DEBUG] updateAttachButtonState: selectedCount=${selectedCount}, hasSummarizable=${hasSummarizable}, isLoading=${state.isLoading}`); // Log state
+    console.log(`[DEBUG] updateAttachButtonState: state.sidebarSelectedFiles=`, JSON.parse(JSON.stringify(state.sidebarSelectedFiles))); // Log selected files state (deep copy for logging)
+
 
     // Attach Full is enabled if at least one file is selected in the sidebar AND not loading
     attachFullButton.disabled = state.isLoading || selectedCount === 0; // Read from state

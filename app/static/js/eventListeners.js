@@ -128,15 +128,20 @@ export function setupEventListeners() {
 
         const fileId = parseInt(itemDiv.dataset.fileId);
         const filename = itemDiv.dataset.filename;
-        const hasSummary = itemDiv.dataset.hasSummary === 'true';
+        const hasSummaryDataset = itemDiv.dataset.hasSummary; // Get raw dataset value
+        const hasSummary = hasSummaryDataset === 'true'; // Convert to boolean
+        console.log(`[DEBUG] Sidebar file clicked: ID=${fileId}, Name=${filename}, Dataset hasSummary=${hasSummaryDataset}, Parsed hasSummary=${hasSummary}`); // Log values
         if (isNaN(fileId) || !filename) return;
 
         const isCurrentlySelected = state.sidebarSelectedFiles.some(f => f.id === fileId);
 
         if (isCurrentlySelected) {
+            console.log(`[DEBUG] Removing file ${fileId} from sidebar selection.`);
             state.removeSidebarSelectedFileById(fileId); // Update state (notifies sidebarSelectedFiles)
         } else {
-            state.addSidebarSelectedFile({ id: fileId, filename: filename, has_summary: hasSummary }); // Update state (notifies sidebarSelectedFiles)
+            const fileToAdd = { id: fileId, filename: filename, has_summary: hasSummary };
+            console.log(`[DEBUG] Adding file to sidebar selection:`, fileToAdd);
+            state.addSidebarSelectedFile(fileToAdd); // Update state (notifies sidebarSelectedFiles)
         }
         // UI updates are triggered by sidebarSelectedFiles notification
     });
