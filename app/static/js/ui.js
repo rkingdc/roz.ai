@@ -28,7 +28,7 @@ export function renderStatus() {
             elements.statusBar.classList.add('text-gray-700'); // Assuming a default non-error color
         }
     } else {
-        console.warn("Status bar element not found.");
+        console.warn("Status bar element not found for status update.");
     }
 }
 
@@ -39,6 +39,7 @@ export function renderStatus() {
 export function updateLoadingState() {
     const isLoading = state.isLoading;
 
+    // Add null checks for elements before accessing properties
     if (elements.messageInput) elements.messageInput.disabled = isLoading;
     if (elements.sendButton) elements.sendButton.disabled = isLoading;
     if (elements.newChatButton) elements.newChatButton.disabled = isLoading;
@@ -168,8 +169,8 @@ export function renderSavedChats() {
         savedChatsList.innerHTML = '<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No saved chats yet.</p>';
         // Reset current chat display if no chats exist and one was selected
         if (state.currentChatId !== null) {
-             currentChatNameInput.value = '';
-             currentChatIdDisplay.textContent = 'ID: -';
+             if (currentChatNameInput) currentChatNameInput.value = '';
+             if (currentChatIdDisplay) currentChatIdDisplay.textContent = 'ID: -';
              // State is already cleared by API/event listener
         }
         return;
@@ -308,11 +309,10 @@ export function updateActiveChatListItem() {
  */
 export function renderCurrentChatDetails() {
     const { currentChatNameInput, currentChatIdDisplay, modelSelector } = elements;
-    if (!currentChatNameInput || !currentChatIdDisplay || !modelSelector) return;
-
-    currentChatNameInput.value = state.currentChatName || ''; // Read from state
-    currentChatIdDisplay.textContent = state.currentChatId !== null ? `ID: ${state.currentChatId}` : 'ID: -'; // Read from state
-    modelSelector.value = state.currentChatModel || modelSelector.options[0]?.value || ''; // Read from state
+    // Add null checks for individual elements
+    if (currentChatNameInput) currentChatNameInput.value = state.currentChatName || ''; // Read from state
+    if (currentChatIdDisplay) currentChatIdDisplay.textContent = state.currentChatId !== null ? `ID: ${state.currentChatId}` : 'ID: -'; // Read from state
+    if (modelSelector) modelSelector.value = state.currentChatModel || modelSelector.options[0]?.value || ''; // Read from state
 }
 
 
@@ -331,8 +331,8 @@ export function renderSavedNotes() {
         savedNotesList.innerHTML = '<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No saved notes yet.</p>';
          // Reset current note display if no notes exist and one was selected
         if (state.currentNoteId !== null) {
-             currentNoteNameInput.value = '';
-             currentNoteIdDisplay.textContent = 'ID: -';
+             if (currentNoteNameInput) currentNoteNameInput.value = '';
+             if (currentNoteIdDisplay) currentNoteIdDisplay.textContent = 'ID: -';
              // State is already cleared by API/event listener
         }
         return;
@@ -470,10 +470,9 @@ export function updateActiveNoteListItem() {
  */
 export function renderCurrentNoteDetails() {
     const { currentNoteNameInput, currentNoteIdDisplay } = elements;
-    if (!currentNoteNameInput || !currentNoteIdDisplay) return;
-
-    currentNoteNameInput.value = state.currentNoteName || ''; // Read from state
-    currentNoteIdDisplay.textContent = state.currentNoteId !== null ? `ID: ${state.currentNoteId}` : 'ID: -'; // Read from state
+    // Add null checks for individual elements
+    if (currentNoteNameInput) currentNoteNameInput.value = state.currentNoteName || ''; // Read from state
+    if (currentNoteIdDisplay) currentNoteIdDisplay.textContent = state.currentNoteId !== null ? `ID: ${state.currentNoteId}` : 'ID: -'; // Read from state
 }
 
 /**
@@ -481,14 +480,16 @@ export function renderCurrentNoteDetails() {
  */
 export function renderNoteContent() {
     const { notesTextarea, notesPreview } = elements;
-    if (!notesTextarea || !notesPreview) return;
-
-    notesTextarea.value = state.noteContent || ''; // Read from state
-    notesTextarea.placeholder = state.isLoading ? "Loading note..." : "Start typing your markdown notes here...";
-    notesTextarea.disabled = state.isLoading || state.currentNoteId === null; // Disable if loading or no note loaded
-
-    // Update preview based on current mode and content
-    updateNotesPreview(); // This function already reads from state and renders preview
+    // Add null checks for individual elements
+    if (notesTextarea) {
+        notesTextarea.value = state.noteContent || ''; // Read from state
+        notesTextarea.placeholder = state.isLoading ? "Loading note..." : "Start typing your markdown notes here...";
+        notesTextarea.disabled = state.isLoading || state.currentNoteId === null; // Disable if loading or no note loaded
+    }
+    if (notesPreview) {
+        // Update preview based on current mode and content
+        updateNotesPreview(); // This function already reads from state and renders preview
+    }
 }
 
 
@@ -637,6 +638,7 @@ export function updateSelectedFileListItemStyling() {
  */
 export function updateAttachButtonState() {
     const { attachFullButton, attachSummaryButton } = elements;
+    // Add null checks for individual elements
     if (!attachFullButton || !attachSummaryButton) return;
 
     const selectedCount = state.sidebarSelectedFiles.length; // Read from state
@@ -685,7 +687,7 @@ function createModalFileItem(file) {
     summaryButton.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1');
     summaryButton.innerHTML = '<i class="fas fa-list-alt"></i>';
     summaryButton.title = file.has_summary ? 'View/Edit Summary' : 'Generate Summary';
-    // Event listener remains here, calls API function and shows modal
+    // Event listener remains here, but calls API function and shows modal
     // NOTE: This listener is now moved to eventListeners.js to centralize event handling
     // summaryButton.addEventListener('click', (e) => { ... });
 
@@ -694,7 +696,7 @@ function createModalFileItem(file) {
     deleteButton.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1', 'text-red-500', 'hover:text-red-700');
     deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
     deleteButton.title = 'Delete File';
-    // Event listener remains here, calls API function
+    // Event listener remains here, but calls API function
     // NOTE: This listener is now moved to eventListeners.js to centralize event handling
     // deleteButton.addEventListener('click', (e) => { ... });
 
@@ -716,6 +718,7 @@ function createModalFileItem(file) {
  */
 export function renderSummaryModalContent() {
     const { summaryModalFilename, summaryTextarea, saveSummaryButton, summaryStatus } = elements;
+    // Add null checks for individual elements
     if (!summaryModalFilename || !summaryTextarea || !saveSummaryButton || !summaryStatus) return;
 
     const file = state.uploadedFiles.find(f => f.id === state.currentEditingFileId); // Read from state
@@ -876,7 +879,7 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
 
     console.log(`[DEBUG] showModal: Checks passed. Adding 'show' class to modal.`);
     modalElement.classList.add('show');
-    elements.bodyElement?.classList.add('modal-open'); // Prevent body scroll
+    if (elements.bodyElement) elements.bodyElement.classList.add('modal-open'); // Add null check
     return true;
 }
 
@@ -894,20 +897,24 @@ export function setSidebarCollapsed(sidebarElement, toggleButton, isCollapsed, l
     if (isCollapsed) {
         sidebarElement.classList.add('collapsed');
         if (type === 'sidebar') {
+             const icon = toggleButton.querySelector('i');
+             if (icon) icon.classList.replace('fa-chevron-left', 'fa-chevron-right');
              toggleButton.classList.add('collapsed');
-             toggleButton.querySelector('i')?.classList.replace('fa-chevron-left', 'fa-chevron-right');
         } else if (type === 'plugins') {
+             const icon = toggleButton.querySelector('i');
+             if (icon) icon.classList.replace('fa-chevron-right', 'fa-chevron-left');
              toggleButton.classList.add('collapsed');
-             toggleButton.querySelector('i')?.classList.replace('fa-chevron-right', 'fa-chevron-left');
         }
     } else {
         sidebarElement.classList.remove('collapsed');
          if (type === 'sidebar') {
+            const icon = toggleButton.querySelector('i');
+            if (icon) icon.classList.replace('fa-chevron-right', 'fa-chevron-left');
             toggleButton.classList.remove('collapsed');
-            toggleButton.querySelector('i')?.classList.replace('fa-chevron-right', 'fa-chevron-left');
          } else if (type === 'plugins') {
+            const icon = toggleButton.querySelector('i');
+            if (icon) icon.classList.replace('fa-chevron-left', 'fa-chevron-right');
             toggleButton.classList.remove('collapsed');
-            toggleButton.querySelector('i')?.classList.replace('fa-chevron-left', 'fa-chevron-right');
          }
     }
     localStorage.setItem(localStorageKey, isCollapsed);
@@ -915,11 +922,13 @@ export function setSidebarCollapsed(sidebarElement, toggleButton, isCollapsed, l
 
 /** Toggles the left sidebar (chat/notes list). */
 export function toggleLeftSidebar() {
+    if (!elements.sidebar || !elements.sidebarToggleButton) return; // Add null check
     setSidebarCollapsed(elements.sidebar, elements.sidebarToggleButton, !elements.sidebar.classList.contains('collapsed'), config.SIDEBAR_COLLAPSED_KEY, 'sidebar');
 }
 
 /** Toggles the right sidebar (plugins). */
 export function toggleRightSidebar() {
+    if (!elements.pluginsSidebar || !elements.pluginsToggleButton) return; // Add null check
     setSidebarCollapsed(elements.pluginsSidebar, elements.pluginsToggleButton, !elements.pluginsSidebar.classList.contains('collapsed'), config.PLUGINS_COLLAPSED_KEY, 'plugins');
 }
 
@@ -937,20 +946,44 @@ export function toggleCalendarPlugin() {
     setPluginSectionCollapsed(elements.calendarPluginHeader, elements.calendarPluginContent, !isCollapsed, config.CALENDAR_PLUGIN_COLLAPSED_KEY);
 }
 
+/**
+ * Sets the collapsed state of a plugin section within the plugins sidebar.
+ * @param {HTMLElement} headerElement - The header element of the plugin section.
+ * @param {HTMLElement} contentElement - The content element of the plugin section.
+ * @param {boolean} isCollapsed - The desired state (true for collapsed).
+ * @param {string} localStorageKey - The key to use for localStorage.
+ */
+export function setPluginSectionCollapsed(headerElement, contentElement, isCollapsed, localStorageKey) {
+     if (!headerElement || !contentElement) return;
+
+     const toggleIcon = headerElement.querySelector('.toggle-icon');
+
+     if (isCollapsed) {
+         contentElement.classList.add('hidden');
+         headerElement.classList.add('collapsed');
+         if (toggleIcon) toggleIcon.classList.replace('fa-chevron-down', 'fa-chevron-right');
+     } else {
+         contentElement.classList.remove('hidden');
+         headerElement.classList.remove('collapsed');
+         if (toggleIcon) toggleIcon.classList.replace('fa-chevron-right', 'fa-chevron-down');
+     }
+     localStorage.setItem(localStorageKey, isCollapsed);
+}
+
 
 /**
  * Updates the UI based on which plugins are enabled/disabled (reads from state).
  */
 export function updatePluginUI() {
     // File Plugin
-    if (elements.filePluginSection) {
+    if (elements.filePluginSection) { // Add null check
         elements.filePluginSection.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
     }
     // Hide file upload label and selected files container if plugin is disabled
-    if (elements.fileUploadSessionLabel) {
+    if (elements.fileUploadSessionLabel) { // Add null check
          elements.fileUploadSessionLabel.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
     }
-     if (elements.selectedFilesContainer) {
+     if (elements.selectedFilesContainer) { // Add null check
          // Only hide if plugin is disabled AND there are no attached/session files
          const hasFilesToDisplay = state.attachedFiles.length > 0 || state.sessionFile !== null; // Read from state
          if (!state.isFilePluginEnabled && !hasFilesToDisplay) { // Read from state
@@ -968,22 +1001,22 @@ export function updatePluginUI() {
 
 
     // Calendar Plugin
-    if (elements.calendarPluginSection) {
+    if (elements.calendarPluginSection) { // Add null check
         elements.calendarPluginSection.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
     }
     // Hide calendar toggle input area if plugin is disabled
-    if (elements.calendarToggleInputArea) {
+    if (elements.calendarToggleInputArea) { // Add null check
          elements.calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
     }
 
 
     // Web Search Toggle (part of Chat input area)
-    if (elements.webSearchToggleLabel) {
+    if (elements.webSearchToggleLabel) { // Add null check
         elements.webSearchToggleLabel.classList.toggle('hidden', !state.isWebSearchPluginEnabled); // Read from state
     }
 
     // Re-render file lists if file plugin state changed
-    if (elements.uploadedFilesList && elements.manageFilesList) {
+    if (elements.uploadedFilesList && elements.manageFilesList) { // Add null checks
         if (!state.isFilePluginEnabled) { // Read from state
              elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
              elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
@@ -997,12 +1030,12 @@ export function updatePluginUI() {
     }
 
     // Update calendar status if calendar plugin state changed
-    if (elements.calendarStatus) {
+    if (elements.calendarStatus) { // Add null check
         if (!state.isCalendarPluginEnabled) { // Read from state
             elements.calendarStatus.textContent = "Status: Plugin disabled";
             // State clearing is handled by eventListeners.js reacting to toggle change
-            if(elements.calendarToggle) elements.calendarToggle.checked = false;
-            if(elements.viewCalendarButton) elements.viewCalendarButton.classList.add('hidden');
+            if(elements.calendarToggle) elements.calendarToggle.checked = false; // Add null check
+            if(elements.viewCalendarButton) elements.viewCalendarButton.classList.add('hidden'); // Add null check
         } else {
              // If plugin was just enabled, the status will be updated when loadCalendarEvents is called
              // (triggered by eventListeners.js reacting to the toggle change).
@@ -1010,7 +1043,7 @@ export function updatePluginUI() {
     }
 
     // Update web search toggle state if plugin state changed
-    if (elements.webSearchToggle) {
+    if (elements.webSearchToggle) { // Add null check
          if (!state.isWebSearchPluginEnabled) { // Read from state
              elements.webSearchToggle.checked = false; // Turn off toggle if plugin disabled
          }
@@ -1027,6 +1060,7 @@ export function updatePluginUI() {
  */
 export function updateCalendarStatus() {
     const { calendarStatus, viewCalendarButton, calendarToggle } = elements;
+    // Add null checks for individual elements
     if (!calendarStatus || !viewCalendarButton || !calendarToggle) return;
 
     const context = state.calendarContext; // Read from state
@@ -1061,25 +1095,28 @@ export function updateCalendarStatus() {
 export function renderChatInputArea() {
     const {
         fileUploadSessionLabel, selectedFilesContainer, calendarToggleInputArea,
-        webSearchToggleLabel, webSearchToggle
+        webSearchToggleLabel, webSearchToggle, calendarToggle
     } = elements;
 
-    if (!fileUploadSessionLabel || !selectedFilesContainer || !calendarToggleInputArea || !webSearchToggleLabel || !webSearchToggle) {
-        console.warn("Missing elements for rendering chat input area.");
-        return;
+    // Add null checks for individual elements
+    if (fileUploadSessionLabel) {
+        fileUploadSessionLabel.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
     }
-
-    // File Upload (Paperclip) and Attached Files Container
-    fileUploadSessionLabel.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
     // Visibility of selectedFilesContainer is handled by renderAttachedAndSessionFiles
 
-    // Calendar Toggle
-    calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
-    calendarToggle.checked = state.isCalendarContextActive; // Read from state
+    if (calendarToggleInputArea) { // Add null check
+        calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
+    }
+    if (calendarToggle) { // Add null check
+        calendarToggle.checked = state.isCalendarContextActive; // Read from state
+    }
 
-    // Web Search Toggle
-    webSearchToggleLabel.classList.toggle('hidden', !state.isWebSearchPluginEnabled); // Read from state
-    webSearchToggle.checked = state.isWebSearchEnabled; // Read from state
+    if (webSearchToggleLabel) { // Add null check
+        webSearchToggleLabel.classList.toggle('hidden', !state.isWebSearchPluginEnabled); // Read from state
+    }
+    if (webSearchToggle) { // Add null check
+        webSearchToggle.checked = state.isWebSearchEnabled; // Read from state
+    }
 }
 
 
@@ -1096,6 +1133,7 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
         currentNoteIdDisplay, inputArea, sidebar, sidebarToggleButton
     } = elements;
 
+    // Add null checks for individual elements
     if (!chatNavButton || !notesNavButton || !chatSection || !notesSection ||
         !chatSidebarContent || !notesSidebarContent || !modelSelectorContainer ||
         !notesModeElements || !messageInput || !notesTextarea || !notesPreview ||
@@ -1162,6 +1200,7 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
  */
 export function setNoteMode(mode) { // Made synchronous, state is already updated by event listener
     const { notesTextarea, notesPreview, editNoteButton, viewNoteButton } = elements;
+    // Add null checks for individual elements
     if (!notesTextarea || !notesPreview || !editNoteButton || !viewNoteButton) {
         console.error("Missing elements for note mode switching.");
         return;
@@ -1201,6 +1240,7 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
  */
 export function updateNotesPreview() {
     const { notesTextarea, notesPreview } = elements;
+    // Add null checks for individual elements
     if (!notesTextarea || !notesPreview) return;
 
     // This function is typically called when the textarea content changes (via event listener)
@@ -1232,7 +1272,7 @@ export function updateNotesPreview() {
 export function openModal(modalElement) {
     if (modalElement) {
         modalElement.classList.add('show');
-        elements.bodyElement?.classList.add('modal-open');
+        if (elements.bodyElement) elements.bodyElement.classList.add('modal-open'); // Add null check
     }
 }
 
@@ -1246,7 +1286,7 @@ export function closeModal(modalElement) {
          // Check if any other modals are open before removing modal-open class
         const anyModalOpen = document.querySelectorAll('.modal.show').length > 0;
         if (!anyModalOpen) {
-             elements.bodyElement?.classList.remove('modal-open');
+             if (elements.bodyElement) elements.bodyElement.classList.remove('modal-open'); // Add null check
         }
     }
 }
