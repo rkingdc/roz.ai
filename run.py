@@ -25,12 +25,22 @@ if __name__ == "__main__":
     # Get config values safely after app creation
     db_name = app.config.get('DB_NAME', 'unknown_db')
     host = os.environ.get('FLASK_RUN_HOST', '127.0.0.1')
-    port = int(os.environ.get('FLASK_RUN_PORT', 5678))
-    debug = app.config.get('DEBUG', False)
+    port = int(os.environ.get('FLASK_RUN_PORT', 5000)) # Default to 5000 for dev consistency
+    debug = app.config.get('DEBUG', False) # Get debug status from app config
+    is_dev_server = app.config.get('IS_DEV_SERVER', False) # Check if running via start-dev
 
-    logger.info(f"Starting Uvicorn server on http://{host}:{port} (DB: {db_name})")
-    # Use debug=True carefully in production
-    uvicorn.run(asgi_app, host=host, port=port, log_level="info", reload=debug)
+    logger.info(f"Starting Uvicorn server on http://{host}:{port} (DB: {db_name}, Debug: {debug}, Dev Server: {is_dev_server})")
+
+    # Enable reload only if DEBUG is True (typically set by FLASK_DEBUG or IS_DEV_SERVER)
+    # Use app factory pattern for uvicorn reload to work correctly
+    uvicorn.run(
+        "run:create_app", # Point to the factory function string
+        factory=True,     # Indicate using factory
+        host=host,
+        port=port,
+        log_level="info",
+        reload=debug      # Enable reload based on debug flag
+    )
 
 
 

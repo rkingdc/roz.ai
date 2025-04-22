@@ -21,56 +21,39 @@ def create_app(test_config=None):
         instance_relative_config=True
     )
 
-    # Load Configuration
-    app.config.from_object('app.config.Config')
-    if test_config is None:
-        app.config.from_pyfile('config.py', silent=True)
+    # --- Load Configuration ---
+    app.config.from_object('app.config.Config') # Load default config
+    app.config.from_pyfile('config.py', silent=True) # Load instance config if exists
+    # Load test config if passed in
     else:
         app.config.from_mapping(test_config)
 
-
-    # Ensure instance folder exists
+    # --- Ensure instance folder exists ---
     try:
         os.makedirs(app.instance_path)
         logger.info(f"Instance folder created at {app.instance_path}")
     except OSError:
-        logger.info(f"Instance folder found at {app.instance_path}")
+        # Already exists or other error, assume it's fine
+        logger.info(f"Instance folder found or not needed at {app.instance_path}")
 
-    # Configure Gemini API
-    #from . import ai_services
-    #ai_services.configure_gemini(app)
+    # --- Configure Logging (Re-check if needed after config load) ---
+    # You might want more sophisticated logging config based on app.config here
 
-    # Initialize Database
-    from . import database
-    # Override DB_NAME with DATABASE_URI from config
-    # This line seems redundant as DB_NAME is already set from DATABASE_NAME env var in config.py
-    # Keeping it for now, but it might be unnecessary.
-    app.config['DB_NAME'] = app.config['DATABASE_URI']
+    # --- Initialize Extensions with App ---
+    db.init_app(app)
+    migrate.init_app(app, db)
 
-    database.init_app(app)
+    # --- Import Models ---
+    # Import models AFTER db is initialized and associated with the app
+    # to ensure models are registered correctly with SQLAlchemy.
+    from . import models # noqa
 
-    # Initialize the database if using TEST_DATABASE
-    # Register function to delete the database file when the app context is torn down
-    # ONLY delete the file if TEST_DATABASE is true AND it's NOT the development server
-    @app.teardown_appcontext
-    def close_db_and_remove_db_file(e=None):
-        database.close_db()  # Close the database connection
-        # Check if TEST_DATABASE is true AND IS_DEV_SERVER is false
-        if app.config.get('TEST_DATABASE', False) and not app.config.get('IS_DEV_SERVER', False):
-            db_path = app.config.get('DATABASE_URI') # Use DATABASE_URI as it holds the path
-            if db_path and db_path != ':memory:': # Ensure it's a file path, not in-memory
-                try:
-                    os.remove(db_path)
-                    logger.debug(f"Deleted database file: {db_path}")
-                except FileNotFoundError:
-                    # File might have already been deleted by another teardown in debug mode
-                    logger.debug(f"Database file not found during deletion attempt: {db_path}")
-                except OSError as e:
-                    logger.warning(f"Failed to delete database file {db_path}: {e}")
+    # --- Configure Gemini API (if needed) ---
+    # from . import ai_services
+    # ai_services.configure_gemini(app) # Uncomment and adjust if needed
 
-
-    # Register Blueprints
-    from .routes import main_routes, chat_routes, file_routes
+    # --- Register Blueprints ---
+    from .routes import main_routes, chat_routes, file_routes # Keep existing
     app.register_blueprint(main_routes.bp)
     app.register_blueprint(chat_routes.bp)
     app.register_blueprint(file_routes.bp)
