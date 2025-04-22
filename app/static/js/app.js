@@ -19,7 +19,10 @@ async function initializeApp() {
 
     try {
         // --- Load and Set Initial States from localStorage ---
+        // Temporarily disable notifications during initial state load
+        state.disableNotifications();
         loadPersistedStates(); // Updates state
+        state.enableNotifications(); // Re-enable notifications
         console.log("[DEBUG] Persisted states loaded.");
 
         // --- Configure Marked.js ---
@@ -31,15 +34,6 @@ async function initializeApp() {
              state.setStatusMessage("Error: Markdown library not loaded.", true); // Update state
              // UI will react to statusMessage state change
         }
-
-        // --- Apply Initial UI States (based on persisted settings/sidebar state) ---
-        // These UI updates don't depend on loaded data, only on persisted settings/layout
-        ui.setSidebarCollapsed(elements.sidebar, elements.sidebarToggleButton, localStorage.getItem(config.SIDEBAR_COLLAPSED_KEY) === 'true', config.SIDEBAR_COLLAPSED_KEY, 'sidebar');
-        ui.setSidebarCollapsed(elements.pluginsSidebar, elements.pluginsToggleButton, localStorage.getItem(config.PLUGINS_COLLAPSED_KEY) === 'true', config.PLUGINS_COLLAPSED_KEY, 'plugins');
-        ui.setPluginSectionCollapsed(elements.filePluginHeader, elements.filePluginContent, localStorage.getItem(config.FILE_PLUGIN_COLLAPSED_KEY) === 'true', config.FILE_PLUGIN_COLLAPSED_KEY);
-        ui.setPluginSectionCollapsed(elements.calendarPluginHeader, elements.calendarPluginContent, localStorage.getItem(config.CALENDAR_PLUGIN_COLLAPSED_KEY) === 'true', config.CALENDAR_PLUGIN_COLLAPSED_KEY);
-        ui.updatePluginUI(); // Updates visibility based on loaded plugin enabled states
-        console.log("[DEBUG] Initial UI states applied.");
 
         // --- Load Core Data (Chat & Note Lists, then specific Chat/Note) ---
         // These API calls update the state.
@@ -59,8 +53,9 @@ async function initializeApp() {
 
         // --- Final Initial UI Render ---
         // After all initial data is loaded into state, trigger the full UI render for the active tab.
-        // ui.switchTab handles rendering all relevant sections based on the current state.
-        ui.switchTab(state.currentTab); // Renders UI based on the state populated above
+        // This will render the UI based on the state populated by loadPersistedStates and initial data loads.
+        // We notify all state changes that happened while notifications were disabled.
+        state.notifyAll(); // Trigger UI updates for all state that changed during loading
 
         console.log("[DEBUG] initializeApp finished successfully.");
         // Final status is set by the last API call or loadInitialData
@@ -98,13 +93,8 @@ function loadPersistedStates() {
     const persistedNoteMode = localStorage.getItem(config.CURRENT_NOTE_MODE_KEY);
     state.setCurrentNoteMode((persistedNoteMode === 'edit' || persistedNoteMode === 'view') ? persistedNoteMode : 'edit');
 
-    // Update settings modal toggles to reflect loaded state (UI concern, but done here for initial sync)
-    if(elements.streamingToggle) elements.streamingToggle.checked = state.isStreamingEnabled;
-    if(elements.filesPluginToggle) elements.filesPluginToggle.checked = state.isFilePluginEnabled;
-    if(elements.calendarPluginToggle) elements.calendarPluginToggle.checked = state.isCalendarPluginEnabled;
-    if(elements.webSearchPluginToggle) elements.webSearchPluginToggle.checked = state.isWebSearchPluginEnabled;
-    if(elements.calendarToggle) elements.calendarToggle.checked = state.isCalendarContextActive;
-    if(elements.webSearchToggle) elements.webSearchToggle.checked = state.isWebSearchEnabled; // Also load web search toggle state
+    // Load web search toggle state
+    state.setWebSearchEnabled(localStorage.getItem('webSearchEnabled') === 'true'); // Assuming you persist this
 }
 
 
@@ -116,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
     populateElements();
     console.log("DOM elements populated.");
 
-    // 2. Set up all event listeners
+    // 2. Set up all event listeners (which includes subscribing UI to state changes)
     setupEventListeners();
 
     // 3. Initialize the application state and load initial data

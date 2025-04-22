@@ -49,6 +49,7 @@ export let noteContent = '';
 // --- Observer Pattern ---
 // Map to store listeners for different state change events
 const listeners = new Map();
+let notificationsEnabled = true; // Flag to control notifications
 
 /**
  * Subscribes a listener function to a specific state change event.
@@ -68,6 +69,10 @@ export function subscribe(eventType, listener) {
  * @param {*} [data] - Optional data to pass to the listeners.
  */
 function notify(eventType, data) {
+    if (!notificationsEnabled) {
+        // console.log(`[DEBUG] Notifications disabled, skipping event: ${eventType}`);
+        return;
+    }
     if (listeners.has(eventType)) {
         listeners.get(eventType).forEach(listener => {
             try {
@@ -77,6 +82,59 @@ function notify(eventType, data) {
             }
         });
     }
+}
+
+/**
+ * Temporarily disables state change notifications.
+ */
+export function disableNotifications() {
+    notificationsEnabled = false;
+}
+
+/**
+ * Re-enables state change notifications.
+ */
+export function enableNotifications() {
+    notificationsEnabled = true;
+}
+
+/**
+ * Notifies all listeners for all current state values.
+ * Useful for initial render after loading state.
+ */
+export function notifyAll() {
+    // Explicitly notify for each state property that UI might depend on
+    notify('currentChatId', currentChatId);
+    notify('currentNoteId', currentNoteId);
+    notify('isLoading', isLoading);
+    notify('statusMessage', { message: statusMessage, isError: isErrorStatus });
+    notify('sidebarSelectedFiles', sidebarSelectedFiles);
+    notify('attachedFiles', attachedFiles);
+    notify('sessionFile', sessionFile);
+    notify('currentEditingFileId', currentEditingFileId);
+    notify('summaryContent', summaryContent);
+    notify('calendarContext', calendarContext);
+    notify('isCalendarContextActive', isCalendarContextActive);
+    notify('isStreamingEnabled', isStreamingEnabled);
+    notify('isFilePluginEnabled', isFilePluginEnabled);
+    notify('isCalendarPluginEnabled', isCalendarPluginEnabled);
+    notify('isWebSearchPluginEnabled', isWebSearchPluginEnabled);
+    notify('isWebSearchEnabled', isWebSearchEnabled);
+    notify('currentTab', currentTab);
+    notify('currentNoteMode', currentNoteMode);
+    notify('savedChats', savedChats);
+    notify('savedNotes', savedNotes);
+    notify('uploadedFiles', uploadedFiles);
+    notify('currentChatName', currentChatName);
+    notify('currentChatModel', currentChatModel);
+    notify('chatHistory', chatHistory);
+    notify('noteContent', noteContent);
+    notify('currentNoteName', currentNoteName);
+
+    // Also notify combined states if listeners are subscribed to them
+    notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel });
+    notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
+    notify('pluginEnabled', 'all'); // Generic notification for any plugin state change
 }
 
 
