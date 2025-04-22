@@ -90,9 +90,9 @@
         <!-- Header - Removed roz.ai h1 -->
         <header class="bg-rz-header text-white p-4 flex justify-between items-center flex-wrap flex-shrink-0">
             <!-- Removed h1 "roz.ai" -->
+            <!-- Left container (Model Selector) -->
             <div class="flex items-center">
-                 <!-- Model Selector - Moved here -->
-                <div id="model-selector-container" class="flex items-center gap-2 mr-4">
+                 <div id="model-selector-container" class="flex items-center gap-2 mr-4">
                     <label for="model-selector" class="text-sm font-medium text-rz-header-text">Model:</label>
                     <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line">
                         {% for model in available_models %}
@@ -100,9 +100,11 @@
                         {% endfor %}
                     </select>
                 </div>
-                <!-- End Model Selector -->
+            </div>
+            <!-- End Left container -->
 
-                <!-- New Notes Mode Button Group -->
+            <!-- Center container (Notes Mode Button Group) -->
+            <div class="flex items-center">
                 <div id="notes-mode-buttons" class="inline-flex rounded-md shadow-sm hidden" role="group">
                     <button type="button" id="edit-note-btn" class="btn-group-left active">
                       <i class="fas fa-edit mr-1"></i> Edit
@@ -111,15 +113,17 @@
                       <i class="fas fa-eye mr-1"></i> View
                     </button>
                 </div>
-                <!-- End Notes Mode Button Group -->
             </div>
-            <!-- Keep the rest of the header content (settings, plugins toggles) -->
+            <!-- End Center container -->
+
+            <!-- Right container (settings, plugins toggles) -->
             <div class="flex items-center space-x-4">
                 <!-- Settings Button - Now in plugins sidebar header -->
                 <!-- <button id="settings-btn" class="p-1 rounded text-white hover:bg-gray-700" title="Settings">
                     <i class="fas fa-cog"></i>
                 </button> -->
             </div>
+            <!-- End Right container -->
         </header>
         <!-- End Header -->
 
