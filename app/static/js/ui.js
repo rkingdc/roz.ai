@@ -753,20 +753,6 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
     return true;
 }
 
-/**
- * Hides a modal window.
- * @param {HTMLElement} modalElement - The modal element to hide.
- */
-export function closeModal(modalElement) {
-    if (modalElement) {
-        modalElement.classList.remove('show');
-         // Check if any other modals are open before removing modal-open class
-        const anyModalOpen = document.querySelectorAll('.modal.show').length > 0;
-        if (!anyModalOpen) {
-             elements.bodyElement?.classList.remove('modal-open');
-        }
-    }
-}
 
 /**
  * Toggles the collapsed state of a sidebar.
