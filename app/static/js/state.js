@@ -49,7 +49,7 @@ export function clearSidebarSelectedFiles() {
 }
 
 export function addSidebarSelectedFile(file) {
-    // Add the file if it's not already selected
+    // Add the file if it's not already selected (check by id)
     if (!sidebarSelectedFiles.some(f => f.id === file.id)) {
         sidebarSelectedFiles.push(file);
     }
@@ -73,21 +73,33 @@ export function clearAttachedFiles() {
 
 export function addAttachedFile(file) {
     // Add the file if it's not already attached (check by id and type)
+    // Type is important here ('full' or 'summary')
     if (!attachedFiles.some(f => f.id === file.id && f.type === file.type)) {
         attachedFiles.push(file);
     }
 }
 
-export function removeAttachedFileById(fileId) {
+// Corrected: removeAttachedFileById should filter by ID *and* Type if needed,
+// but the current UI removes all tags for a given ID. Let's keep it removing by ID for simplicity if needed elsewhere,
+// but the UI logic is more precise. Let's update this function to match the UI's removal logic.
+export function removeAttachedFileById(fileIdToRemove) {
      // Reassign the array after filtering
-     attachedFiles = attachedFiles.filter(f => f.id !== fileId);
+     // This removes ALL entries for a given fileId, regardless of type (full/summary)
+     attachedFiles = attachedFiles.filter(f => f.id !== fileIdToRemove);
+}
+
+// Added: A function to remove by ID and Type, to match the UI's remove button logic
+export function removeAttachedFileByIdAndType(fileIdToRemove, fileTypeToRemove) {
+    attachedFiles = attachedFiles.filter(f => !(f.id === fileIdToRemove && f.type === fileTypeToRemove));
 }
 
 
-// --- Function for sessionFile ---
+// --- Function for sessionFile (file attached for the current message) ---
 export function setSessionFile(file) {
     sessionFile = file;
 }
+
+// No specific removeSessionFile function needed, just call setSessionFile(null)
 
 
 export function setCurrentEditingFileId(id) {

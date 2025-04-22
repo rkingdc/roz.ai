@@ -809,7 +809,8 @@ export function renderAttachedAndSessionFiles() {
     if (state.sessionFile) {
         // Add session file with a distinct type for rendering
         filesToDisplay.push({
-            id: 'session', // Use a non-numeric ID for session file
+            // Session file doesn't have a backend ID, use a placeholder
+            id: 'session',
             filename: state.sessionFile.filename,
             type: 'session',
             // Include other session file details if needed for display
@@ -866,14 +867,11 @@ export function renderAttachedAndSessionFiles() {
                     elements.fileUploadSessionInput.value = '';
                 }
             } else { // Permanent file (full or summary)
-                // Remove from attachedFiles state
-                state.removeAttachedFileById(parseInt(file.id)); // Ensure ID is integer
-                // Note: This removes ALL attached types (full/summary) for this file ID.
-                // If you needed to remove only 'full' or 'summary', you'd need more complex state/logic.
-
-                 // Do NOT affect sidebar item styling here. Sidebar selection is independent.
+                // Remove from attachedFiles state by ID *and* Type
+                state.removeAttachedFileByIdAndType(parseInt(file.id), file.type);
             }
             renderAttachedAndSessionFiles(); // Re-render the display
+            // No need to update attach button state or sidebar styling here
         });
 
         fileTag.appendChild(filenameSpan);

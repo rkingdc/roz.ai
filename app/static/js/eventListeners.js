@@ -39,8 +39,9 @@ export function setupEventListeners() {
     elements.calendarPluginHeader?.addEventListener('click', ui.toggleCalendarPlugin);
 
     // --- File Plugin Interactions ---
-    elements.attachFullButton?.addEventListener('click', () => handleAttachFilesClick('full'));
-    elements.attachSummaryButton?.addEventListener('click', () => handleAttachFilesClick('summary'));
+    // Corrected: Call the API functions directly
+    elements.attachFullButton?.addEventListener('click', api.attachSelectedFilesFull);
+    elements.attachSummaryButton?.addEventListener('click', api.attachSelectedFilesSummary);
     elements.manageFilesButton?.addEventListener('click', () => ui.showModal(elements.manageFilesModal, 'files', 'chat')); // Use generic showModal
 
     // Session File Upload (Paperclip)
@@ -51,6 +52,7 @@ export function setupEventListeners() {
             ui.updateStatus("Files plugin is disabled in settings.", true);
         }
     });
+    // Corrected: Ensure the change listener calls the handler
     elements.fileUploadSessionInput?.addEventListener('change', handleSessionFileUpload);
 
 
@@ -119,8 +121,9 @@ export function setupEventListeners() {
             elements.currentNoteNameInput.blur();
         }
     });
-    elements.editNoteButton?.addEventListener('click', () => ui.switchNoteMode('edit'));
-    elements.viewNoteButton?.addEventListener('click', () => ui.switchNoteMode('view'));
+    // Corrected: Use ui.setNoteMode instead of ui.switchNoteMode
+    elements.editNoteButton?.addEventListener('click', () => ui.setNoteMode('edit'));
+    elements.viewNoteButton?.addEventListener('click', () => ui.setNoteMode('view'));
     elements.markdownTipsButton?.addEventListener('click', () => ui.showModal(elements.markdownTipsModal, null, 'notes')); // Show tips modal only on notes tab
     elements.closeMarkdownTipsModalButton?.addEventListener('click', () => ui.closeModal(elements.markdownTipsModal));
     elements.markdownTipsModal?.addEventListener('click', (event) => {
@@ -134,60 +137,26 @@ export function setupEventListeners() {
 // --- Event Handler Helper Functions ---
 
 /** Handles attaching selected files (full or summary). */
-function handleAttachFilesClick(type) {
-    if (!state.isFilePluginEnabled || state.currentTab !== 'chat') {
-        ui.updateStatus("Attaching files requires Files plugin enabled on Chat tab.", true);
-        return;
-    }
-
-    // Get the visually selected file list items from the sidebar
-    const selectedSidebarItems = elements.uploadedFilesList?.querySelectorAll('.file-list-item.active');
-
-    if (!selectedSidebarItems || selectedSidebarItems.length === 0) {
-        ui.updateStatus("No files visually selected in the sidebar to attach.", true);
-        return;
-    }
-
-    let addedCount = 0;
-    selectedSidebarItems.forEach(item => {
-        const fileId = parseInt(item.dataset.fileId);
-        const filename = item.dataset.filename;
-        if (!isNaN(fileId) && filename) {
-            // Add the file to state.selectedFiles with the specified type
-            // state.addSelectedFile handles adding or updating if already present
-            state.addSelectedFile({ id: fileId, filename: filename, type: type });
-            addedCount++;
-        }
-    });
-
-    // After adding to state, unselect the files in the sidebar
-    selectedSidebarItems.forEach(item => {
-        item.classList.remove('active');
-    });
-
-    ui.renderSelectedFiles(); // Update the display below the message input
-    if (addedCount > 0) {
-        ui.updateStatus(`${addedCount} file(s) added as ${type} for the next message.`);
-    }
-}
+// This function is no longer needed here as the API functions handle the state and UI updates directly.
+// The event listeners now call api.attachSelectedFilesFull and api.attachSelectedFilesSummary.
 
 
 /** Handles the session file input change event. */
 function handleSessionFileUpload(e) {
     const file = e.target.files[0];
     // Clear any existing session file tag first
-    elements.selectedFilesContainer?.querySelector('.session-file-tag')?.remove();
+    // elements.selectedFilesContainer?.querySelector('.session-file-tag')?.remove(); // This is handled by renderAttachedAndSessionFiles
     state.setSessionFile(null); // Clear state first
 
     if (!file) {
-        ui.renderSelectedFiles(); // Re-render to update container visibility
+        ui.renderAttachedAndSessionFiles(); // Re-render to update container visibility and remove old tag
         return;
     }
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
         alert(`Skipping "${file.name}": File is too large (${formatFileSize(file.size)}). Max size is ${MAX_FILE_SIZE_MB} MB.`);
         if(elements.fileUploadSessionInput) elements.fileUploadSessionInput.value = ''; // Reset file input
-        ui.renderSelectedFiles();
+        ui.renderAttachedAndSessionFiles(); // Re-render to ensure no tag is shown
         return;
     }
 
@@ -207,7 +176,8 @@ function handleSessionFileUpload(e) {
             mimetype: file.type,
             content: event.target.result // Base64 content
         });
-        ui.renderSessionFileTag(); // Render the tag using state data
+        // Corrected: Call the single function that renders all attached/session files
+        ui.renderAttachedAndSessionFiles(); // Render the tag using state data
     }
     reader.onerror = function(error) {
         loadingTag.remove();
@@ -220,7 +190,7 @@ function handleSessionFileUpload(e) {
 
         state.setSessionFile(null);
         if(elements.fileUploadSessionInput) elements.fileUploadSessionInput.value = '';
-        ui.renderSelectedFiles();
+        ui.renderAttachedAndSessionFiles(); // Re-render to ensure no tag is shown
     }
     reader.readAsDataURL(file); // Read as Base64
 }
@@ -257,19 +227,20 @@ function handleFilesPluginToggleChange() {
 
     // If disabling, clear related state and UI elements
     if (!isEnabled) {
-        state.clearSelectedFiles();
+        state.clearSidebarSelectedFiles(); // Corrected: Use clearSidebarSelectedFiles
+        state.clearAttachedFiles(); // Corrected: Use clearAttachedFiles
         state.setSessionFile(null);
-        ui.renderSelectedFiles(); // Clears tags
-        ui.renderSessionFileTag(); // Removes session tag
+        ui.renderAttachedAndSessionFiles(); // Corrected: Use renderAttachedAndSessionFiles
         if(elements.fileUploadSessionInput) elements.fileUploadSessionInput.value = '';
         // Clear file lists
         if(elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
         if(elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
 
-        // Also clear visual selection in the sidebar
+        // Also clear visual selection in the sidebar (redundant with clearSidebarSelectedFiles + renderUploadedFiles, but safe)
         elements.uploadedFilesList?.querySelectorAll('.file-list-item.active').forEach(item => {
             item.classList.remove('active');
         });
+        ui.updateAttachButtonState(); // Update button state
 
     } else {
         // If enabling, reload the file lists

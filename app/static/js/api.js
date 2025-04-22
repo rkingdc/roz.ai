@@ -22,9 +22,20 @@ export async function deleteFile(fileId) {
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         ui.updateStatus(`File ${fileId} deleted.`);
-        await loadUploadedFiles(); // Reload file lists
-        state.removeSelectedFileById(fileId); // Remove from selected state
-        ui.renderSelectedFiles(); // Update attached files display
+
+        // Remove from state lists
+        state.removeSidebarSelectedFileById(fileId); // Remove from sidebar selection state
+        // Corrected: Use the function that removes by ID from attachedFiles
+        state.removeAttachedFileById(fileId); // Remove from attached state
+        if (state.sessionFile && state.sessionFile.id === fileId) { // Check if it's the session file
+             state.setSessionFile(null);
+        }
+
+        await loadUploadedFiles(); // Reload file lists (this calls renderUploadedFiles)
+        // renderAttachedAndSessionFiles is called by renderUploadedFiles
+        // updateSelectedFileListItemStyling is called by renderUploadedFiles
+        // updateAttachButtonState is called by renderUploadedFiles
+
     } catch (error) {
         console.error('Error deleting file:', error);
         ui.updateStatus(`Error deleting file: ${error.message}`, true);
@@ -60,7 +71,7 @@ export async function loadUploadedFiles() {
         const files = await response.json();
 
         // Call UI function to render the lists
-        ui.renderUploadedFiles(files);
+        ui.renderUploadedFiles(files); // This function now handles sidebar selection highlighting and attached/session file display
 
         ui.updateStatus("Uploaded files loaded.");
     } catch (error) {
@@ -126,7 +137,7 @@ export async function handleFileUpload(event) {
         console.error('Error uploading files:', error);
         ui.updateStatus(`Error uploading files: ${error.message}`, true);
     } finally {
-        await loadUploadedFiles(); // Reload lists
+        await loadUploadedFiles(); // Reload lists (this calls renderUploadedFiles)
         ui.setLoadingState(false);
         if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = ''; // Reset input
     }
@@ -169,7 +180,7 @@ export async function addFileFromUrl(url) {
          ui.updateStatus(`Successfully added file from URL: ${data.filename}`);
          if(elements.urlStatus) elements.urlStatus.textContent = `Successfully added file: ${data.filename}`;
          if(elements.urlInput) elements.urlInput.value = ''; // Clear input
-         await loadUploadedFiles(); // Reload lists
+         await loadUploadedFiles(); // Reload lists (this calls renderUploadedFiles)
          ui.closeModal(elements.urlModal); // Close the URL modal
      } catch (error) {
          console.error('Error adding file from URL:', error);
@@ -267,7 +278,7 @@ export async function saveSummary() {
         }
         ui.updateStatus("Summary saved successfully.");
         if(elements.summaryStatus) elements.summaryStatus.textContent = "Summary saved!";
-        await loadUploadedFiles(); // Reload file lists to update summary status display
+        await loadUploadedFiles(); // Reload file lists to update summary status display (calls renderUploadedFiles)
         ui.closeModal(elements.summaryModal);
     } catch (error) {
         console.error("Error saving summary:", error);
@@ -279,6 +290,74 @@ export async function saveSummary() {
     } finally {
         ui.setLoadingState(false);
     }
+}
+
+/**
+ * Attaches selected files from the sidebar to the current chat as 'full' files.
+ */
+export function attachSelectedFilesFull() {
+    if (!state.isFilePluginEnabled || state.currentTab !== 'chat' || state.isLoading) {
+        ui.updateStatus("Cannot attach files: Files plugin disabled, not on Chat tab, or busy.", true);
+        return;
+    }
+    if (state.sidebarSelectedFiles.length === 0) {
+        ui.updateStatus("No files selected in the sidebar to attach.", true);
+        return;
+    }
+
+    // Add selected files to the attachedFiles state with type 'full'
+    state.sidebarSelectedFiles.forEach(file => {
+        // Ensure we don't add duplicates (same file ID, same type)
+        if (!state.attachedFiles.some(f => f.id === file.id && f.type === 'full')) {
+             state.addAttachedFile({ id: file.id, filename: file.filename, type: 'full' });
+        }
+    });
+
+    // Clear the temporary sidebar selection
+    state.clearSidebarSelectedFiles();
+
+    // Update the UI
+    ui.updateSelectedFileListItemStyling(); // Remove highlighting from sidebar
+    ui.renderAttachedAndSessionFiles(); // Render the newly attached files below input
+    ui.updateAttachButtonState(); // Disable attach buttons
+    ui.updateStatus(`Attached ${state.attachedFiles.length} file(s) (full content).`); // Status message might need refinement
+}
+
+/**
+ * Attaches selected files from the sidebar to the current chat as 'summary' files.
+ */
+export function attachSelectedFilesSummary() {
+     if (!state.isFilePluginEnabled || state.currentTab !== 'chat' || state.isLoading) {
+        ui.updateStatus("Cannot attach files: Files plugin disabled, not on Chat tab, or busy.", true);
+        return;
+    }
+    if (state.sidebarSelectedFiles.length === 0) {
+        ui.updateStatus("No files selected in the sidebar to attach.", true);
+        return;
+    }
+    // Check if any selected file actually has a summary
+    const filesWithSummary = state.sidebarSelectedFiles.filter(file => file.has_summary);
+    if (filesWithSummary.length === 0) {
+         ui.updateStatus("None of the selected files have a summary to attach.", true);
+         return;
+    }
+
+    // Add selected files with summaries to the attachedFiles state with type 'summary'
+    filesWithSummary.forEach(file => {
+        // Ensure we don't add duplicates (same file ID, same type)
+        if (!state.attachedFiles.some(f => f.id === file.id && f.type === 'summary')) {
+            state.addAttachedFile({ id: file.id, filename: file.filename, type: 'summary' });
+        }
+    });
+
+    // Clear the temporary sidebar selection
+    state.clearSidebarSelectedFiles();
+
+    // Update the UI
+    ui.updateSelectedFileListItemStyling(); // Remove highlighting from sidebar
+    ui.renderAttachedAndSessionFiles(); // Render the newly attached files below input
+    ui.updateAttachButtonState(); // Disable attach buttons
+    ui.updateStatus(`Attached ${filesWithSummary.length} file(s) (summary).`); // Status message might need refinement
 }
 
 
@@ -408,15 +487,22 @@ export async function loadChat(chatId) {
             data.history.forEach(msg => ui.addMessage(msg.role, msg.content));
         }
 
-        // Reset chat-specific context
+        // Reset chat-specific context states (files, calendar, web search toggle)
         resetChatContext(); // Helper function below
+
+        // Assuming the backend returns attached files with chat details
+        if (data.details.attached_files) {
+             state.setAttachedFiles(data.details.attached_files);
+        } else {
+             state.clearAttachedFiles();
+        }
 
         // Ensure plugin UI reflects current enabled state
         ui.updatePluginUI();
 
         // Load files list if plugin is enabled
         if (state.isFilePluginEnabled) {
-            await loadUploadedFiles(); // Load files for the new chat context
+            await loadUploadedFiles(); // Load files for the new chat context (calls renderUploadedFiles)
         } else {
              if(elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
              if(elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
@@ -439,16 +525,16 @@ export async function loadChat(chatId) {
         if(elements.currentChatNameInput) elements.currentChatNameInput.value = '';
         if(elements.currentChatIdDisplay) elements.currentChatIdDisplay.textContent = 'ID: -';
         if(elements.modelSelector) elements.modelSelector.value = elements.modelSelector.options[0]?.value || '';
-        resetChatContext();
-        ui.updatePluginUI();
+        resetChatContext(); // Clear files, calendar, etc.
+        ui.updatePluginUI(); // Update UI based on cleared state
         ui.updateActiveChatListItem(); // Remove highlight
-        ui.updateStatus(`Error loading chat ${chatId}.`, true);
 
         // Clear file lists if plugin enabled
         if (state.isFilePluginEnabled) {
             if(elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
             if(elements.manageFilesList) elements.manageFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
         }
+        ui.updateStatus(`Error loading chat ${chatId}.`, true);
         throw error; // Re-throw for initializeApp or switchTab to handle
     } finally {
         ui.setLoadingState(false);
@@ -457,9 +543,18 @@ export async function loadChat(chatId) {
 
 // Helper to reset context when switching chats or starting new
 function resetChatContext() {
-    state.clearSelectedFiles(); // Clear permanent file selections
+    // Corrected: Use the new state functions
+    state.clearSidebarSelectedFiles(); // Clear temporary sidebar selections
+    state.clearAttachedFiles(); // Clear permanent file selections
     state.setSessionFile(null); // Clear session file state
-    ui.renderSessionFileTag(); // Remove session tag (renderSelectedFiles called within)
+
+    // Corrected: Call the single function that renders both attached and session files
+    ui.renderAttachedAndSessionFiles(); // Update attached files display
+
+    // Corrected: Update sidebar styling and button state based on cleared sidebar selection
+    ui.updateSelectedFileListItemStyling(); // Update sidebar highlighting
+    ui.updateAttachButtonState(); // Update attach button state
+
     if(elements.fileUploadSessionInput) elements.fileUploadSessionInput.value = ''; // Reset file input
 
     state.setCalendarContext(null);
@@ -481,8 +576,8 @@ export async function sendMessage() {
 
     const message = elements.messageInput?.value.trim() || '';
 
-    // Filter selectedFiles to only include those marked for attachment
-    const filesToAttach = state.isFilePluginEnabled ? state.selectedFiles.filter(f => f.type !== 'pending') : [];
+    // Files to send are the permanently attached files PLUS the session file
+    const filesToAttach = state.isFilePluginEnabled ? state.attachedFiles : []; // Corrected: Use state.attachedFiles
     const sessionFileToSend = state.isFilePluginEnabled ? state.sessionFile : null;
     const calendarContextToSend = (state.isCalendarPluginEnabled && state.isCalendarContextActive && state.calendarContext) ? state.calendarContext : null;
     const webSearchEnabledToSend = state.isWebSearchPluginEnabled && elements.webSearchToggle?.checked;
@@ -497,8 +592,14 @@ export async function sendMessage() {
     // Display user message + UI markers immediately
     let displayMessage = message || "(Context attached)";
     let uiMarkers = "";
-    if (filesToAttach.length > 0) uiMarkers += filesToAttach.map(f => `\\[UI-MARKER:file:${f.filename}:${f.type}\\]`).join('');
-    if (sessionFileToSend) uiMarkers += `\\[UI-MARKER:file:${sessionFileToSend.filename}:session\\]`;
+    // Add markers for attached files
+    if (filesToAttach.length > 0) {
+        uiMarkers += filesToAttach.map(f => `\\[UI-MARKER:file:${f.filename}:${f.type}\\]`).join('');
+    }
+    // Add marker for session file
+    if (sessionFileToSend) {
+        uiMarkers += `\\[UI-MARKER:file:${sessionFileToSend.filename}:session\\]`;
+    }
     if (calendarContextToSend) uiMarkers += `\\[UI-MARKER:calendar\\]`;
     if (webSearchEnabledToSend) uiMarkers += `\\[UI-MARKER:websearch\\]`;
     displayMessage = uiMarkers + (uiMarkers ? "\n" : "") + displayMessage;
@@ -509,9 +610,11 @@ export async function sendMessage() {
     const payload = {
         chat_id: state.currentChatId,
         message: message,
-        attached_files: filesToAttach,
-        calendar_context: calendarContextToSend,
+        // Send attached files (full/summary)
+        attached_files: filesToAttach.map(f => ({ id: f.id, type: f.type })), // Send only id and type for attached files
+        // Send session file (content included)
         session_files: sessionFileToSend ? [{ filename: sessionFileToSend.filename, content: sessionFileToSend.content, mimetype: sessionFileToSend.mimetype }] : [],
+        calendar_context: calendarContextToSend,
         enable_web_search: webSearchEnabledToSend,
         enable_streaming: state.isStreamingEnabled,
         enable_files_plugin: state.isFilePluginEnabled,
@@ -520,6 +623,7 @@ export async function sendMessage() {
     };
 
     const sentSessionFile = state.sessionFile; // Store to clear later
+
     let assistantMessageElement = null;
 
     try {
@@ -558,16 +662,13 @@ export async function sendMessage() {
 
         await loadSavedChats(); // Reload chats to update timestamp
 
-        // Clear ALL selected files (state and UI) after successful send
-        state.clearSelectedFiles();
-        ui.renderSelectedFiles();
-        elements.uploadedFilesList?.querySelectorAll('.file-checkbox').forEach(checkbox => {
-            checkbox.checked = false;
-            checkbox.closest('.file-list-item')?.classList.remove('active-selection');
-        });
-        elements.manageFilesList?.querySelectorAll('.file-list-item').forEach(item => {
-            item.classList.remove('active-selection');
-        });
+        // Clear temporary sidebar selection after successful send
+        state.clearSidebarSelectedFiles();
+        ui.updateSelectedFileListItemStyling(); // Remove highlighting from sidebar
+        ui.updateAttachButtonState(); // Update button state
+
+        // Do NOT clear attachedFiles here. They persist per chat.
+        // Only clear the session file.
 
     } catch (error) {
         console.error('Error sending message:', error);
@@ -583,8 +684,8 @@ export async function sendMessage() {
         // Clear the session file state and tag if it was the one sent
         if (sentSessionFile && state.sessionFile === sentSessionFile) {
              state.setSessionFile(null);
-             ui.renderSessionFileTag(); // This calls renderSelectedFiles internally
-             if(elements.fileUploadSessionInput) elements.fileUploadSessionInput.value = '';
+             ui.renderAttachedAndSessionFiles(); // Update display to remove session file tag
+             if(elements.fileUploadSessionInput) elements.fileUploadSessionInput.value = ''; // Reset input
         }
         ui.setLoadingState(false);
     }
