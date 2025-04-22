@@ -1,7 +1,7 @@
 // js/eventListeners.js
 // This module sets up all event listeners and acts as the orchestrator.
 // It captures user interactions, calls API functions or state setters,
-// and then triggers UI rendering functions based on state changes.
+// and subscribes UI rendering functions to state changes.
 
 import { elements } from './dom.js';
 import * as ui from './ui.js'; // Import ui to call rendering functions
@@ -16,14 +16,14 @@ import { escapeHtml } from './utils.js'; // Need escapeHtml for session file loa
  * MUST be called after DOMContentLoaded and populateElements.
  */
 export function setupEventListeners() {
+    // --- Subscribe UI Renderers to State Changes ---
+    subscribeStateChangeListeners();
+    console.log("UI subscribed to state changes.");
+
     // --- Chat Input & Sending ---
     elements.sendButton?.addEventListener('click', async () => {
         await api.sendMessage(); // Updates state (chatHistory, isLoading, statusMessage, sessionFile)
-        // Trigger UI updates based on state changes caused by sendMessage
-        ui.handleStateChange_chatHistory();
-        ui.handleStateChange_isLoading(); // Updates loading, status, attach buttons
-        ui.handleStateChange_sessionFile(); // Updates attached/session file display
-        // Note: loadSavedChats is called within sendMessage, which triggers ui.handleStateChange_savedChats
+        // UI updates are triggered by state notifications within api.sendMessage
     });
     elements.messageInput?.addEventListener('keypress', async (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -33,37 +33,26 @@ export function setupEventListeners() {
     });
     elements.modelSelector?.addEventListener('change', async () => {
         await api.handleModelChange(); // Updates state (currentChatModel, isLoading, statusMessage)
-        // Trigger UI updates based on state changes caused by handleModelChange
-        ui.handleStateChange_currentChat(); // Updates chat details (name, id, model)
-        ui.handleStateChange_isLoading(); // Updates loading, status, attach buttons
-        ui.handleStateChange_statusMessage(); // Ensure final status is shown
+        // UI updates are triggered by state notifications within api.handleModelChange
     });
 
     // --- Sidebar & Chat Management ---
     elements.sidebarToggleButton?.addEventListener('click', ui.toggleLeftSidebar); // UI-only toggle
     elements.newChatButton?.addEventListener('click', async () => {
         await api.startNewChat(); // Updates state (currentChatId, savedChats, chatHistory, isLoading, statusMessage, etc.)
-        // Trigger UI updates based on state changes caused by startNewChat
-        ui.handleStateChange_savedChats(); // Updates chat list
-        ui.handleStateChange_currentChat(); // Updates chat details, history, context UI
-        ui.handleStateChange_isLoading(); // Updates loading, status, attach buttons
-        // Note: loadChat is called within startNewChat, which triggers file/calendar/websearch UI updates
+        // UI updates are triggered by state notifications within api.startNewChat
     });
     elements.saveChatNameButton?.addEventListener('click', async () => {
         // Name is updated in state by input handler or here before API call
         const newName = elements.currentChatNameInput?.value.trim() || 'New Chat';
-        state.setCurrentChatName(newName); // Update state immediately
-        ui.handleStateChange_currentChat(); // Update name display immediately
+        state.setCurrentChatName(newName); // Update state immediately (notifies currentChatName, currentChat)
 
         await api.handleSaveChatName(); // Updates state (savedChats, isLoading, statusMessage)
-        // Trigger UI updates based on state changes caused by handleSaveChatName
-        ui.handleStateChange_savedChats(); // Updates chat list (timestamp)
-        ui.handleStateChange_isLoading(); // Updates loading, status, attach buttons
-        ui.handleStateChange_statusMessage(); // Ensure final status is shown
+        // UI updates are triggered by state notifications within api.handleSaveChatName
     });
     elements.currentChatNameInput?.addEventListener('input', (e) => { // Add input listener for name
-        state.setCurrentChatName(e.target.value); // Update state
-        ui.handleStateChange_currentChat(); // Update name display immediately
+        state.setCurrentChatName(e.target.value); // Update state (notifies currentChatName, currentChat)
+        // UI updates are triggered by state notifications
     });
     elements.currentChatNameInput?.addEventListener('keypress', async (e) => {
         if (e.key === 'Enter') {
@@ -82,13 +71,7 @@ export function setupEventListeners() {
         if (chatId === state.currentChatId) return;
 
         await api.loadChat(chatId); // Updates state (currentChatId, chatHistory, etc.)
-        // Trigger UI updates based on state changes caused by loadChat
-        ui.handleStateChange_currentChat(); // Updates chat details, history, context UI
-        ui.handleStateChange_isLoading(); // Updates loading, status, attach buttons
-        ui.handleStateChange_uploadedFiles(); // Updates file lists
-        ui.handleStateChange_calendarContext(); // Updates calendar status
-        ui.handleStateChange_isCalendarContextActive(); // Updates calendar toggle
-        ui.handleStateChange_isWebSearchEnabled(); // Updates web search toggle
+        // UI updates are triggered by state notifications within api.loadChat
     });
     // Add click listener for delete chat button (delegated)
     elements.savedChatsList?.addEventListener('click', async (event) => {
@@ -102,11 +85,7 @@ export function setupEventListeners() {
         if (isNaN(chatId)) return;
 
         await api.handleDeleteChat(chatId); // Updates state (savedChats, currentChatId, etc.)
-        // Trigger UI updates based on state changes caused by handleDeleteChat
-        ui.handleStateChange_savedChats(); // Updates chat list
-        // If current chat changed, handleStateChange_currentChat will be triggered by api.handleDeleteChat's call to loadChat/startNewChat
-        ui.handleStateChange_isLoading(); // Updates loading, status
-        ui.handleStateChange_statusMessage(); // Ensure final status is shown
+        // UI updates are triggered by state notifications within api.handleDeleteChat
     });
 
 
@@ -118,22 +97,16 @@ export function setupEventListeners() {
     // --- File Plugin Interactions ---
     elements.attachFullButton?.addEventListener('click', () => {
         api.attachSelectedFilesFull(); // Updates state (attachedFiles, sidebarSelectedFiles)
-        // Trigger UI updates based on state changes caused by attachSelectedFilesFull
-        ui.handleStateChange_sidebarSelectedFiles(); // Updates sidebar highlighting and attach button state
-        ui.handleStateChange_attachedFiles(); // Updates the tags below input
-        ui.handleStateChange_statusMessage(); // Status message updated by API
+        // UI updates are triggered by state notifications within api.attachSelectedFilesFull
     });
     elements.attachSummaryButton?.addEventListener('click', () => {
         api.attachSelectedFilesSummary(); // Updates state (attachedFiles, sidebarSelectedFiles)
-        // Trigger UI updates based on state changes caused by attachSelectedFilesSummary
-        ui.handleStateChange_sidebarSelectedFiles(); // Updates sidebar highlighting and attach button state
-        ui.handleStateChange_attachedFiles(); // Updates the tags below input
-        ui.handleStateChange_statusMessage(); // Status message updated by API
+        // UI updates are triggered by state notifications within api.attachSelectedFilesSummary
     });
     elements.manageFilesButton?.addEventListener('click', () => {
         ui.showModal(elements.manageFilesModal, 'files', 'chat'); // UI-only modal show
         // File list rendering in modal is handled by ui.renderUploadedFiles,
-        // which is called when state.uploadedFiles changes (e.g., by api.loadUploadedFiles)
+        // which is triggered by state.uploadedFiles notification (e.g., from api.loadUploadedFiles)
     });
 
     // Session File Upload (Paperclip)
@@ -141,8 +114,8 @@ export function setupEventListeners() {
         if (state.isFilePluginEnabled && state.currentTab === 'chat') {
             elements.fileUploadSessionInput?.click();
         } else if (!state.isFilePluginEnabled) {
-            state.setStatusMessage("Files plugin is disabled in settings.", true); // Update state
-            ui.handleStateChange_statusMessage(); // Explicitly trigger UI update
+            state.setStatusMessage("Files plugin is disabled in settings.", true); // Update state (notifies statusMessage)
+            // UI update is triggered by statusMessage notification
         }
     });
     elements.fileUploadSessionInput?.addEventListener('change', handleSessionFileUpload); // Handler updates state and triggers UI
@@ -160,13 +133,11 @@ export function setupEventListeners() {
         const isCurrentlySelected = state.sidebarSelectedFiles.some(f => f.id === fileId);
 
         if (isCurrentlySelected) {
-            state.removeSidebarSelectedFileById(fileId); // Update state
+            state.removeSidebarSelectedFileById(fileId); // Update state (notifies sidebarSelectedFiles)
         } else {
-            state.addSidebarSelectedFile({ id: fileId, filename: filename, has_summary: hasSummary }); // Update state
+            state.addSidebarSelectedFile({ id: fileId, filename: filename, has_summary: hasSummary }); // Update state (notifies sidebarSelectedFiles)
         }
-
-        // Trigger UI updates based on state change
-        ui.handleStateChange_sidebarSelectedFiles(); // Updates sidebar highlighting and attach button state
+        // UI updates are triggered by sidebarSelectedFiles notification
     });
 
 
@@ -177,8 +148,8 @@ export function setupEventListeners() {
     });
     elements.fileUploadModalInput?.addEventListener('change', async (event) => {
         await api.handleFileUpload(event); // Updates state (uploadedFiles, isLoading, statusMessage)
-        // UI updates for uploadedFiles, isLoading, statusMessage are handled by UI reacting to state changes.
-        // Closing modal after successful upload should be handled here or by reacting to state
+        // UI updates are triggered by state notifications.
+        // Closing modal after successful upload should be handled here based on state.
         if (!state.isErrorStatus) { // Check state after API call
              ui.closeModal(elements.manageFilesModal);
         }
@@ -212,7 +183,7 @@ export function setupEventListeners() {
             elements.urlStatus.classList.remove('text-red-500');
         }
         await api.addFileFromUrl(url); // Updates state (uploadedFiles, isLoading, statusMessage)
-        // UI updates for uploadedFiles, isLoading, statusMessage are handled by UI reacting to state changes.
+        // UI updates are triggered by state notifications.
         // Status update for URL modal is handled by API's setStatus, which updates state.statusMessage
         // We need a way for the modal to specifically show the status related to the URL fetch.
         // This might require adding modal-specific status state or reading the global status carefully.
@@ -250,8 +221,8 @@ export function setupEventListeners() {
         ui.showModal(elements.summaryModal, 'files', 'chat');
 
         await api.fetchSummary(fileId); // Updates state (currentEditingFileId, summaryContent, isLoading, statusMessage)
-        // UI updates for state changes are handled by UI reacting to state changes.
-        // renderSummaryModalContent is called by handleStateChange_currentEditingFileId and handleStateChange_summaryContent
+        // UI updates are triggered by state notifications.
+        // renderSummaryModalContent is called by currentEditingFileId and summaryContent notifications
     });
 
     // Add click listener for modal file list delete button (delegated)
@@ -266,7 +237,7 @@ export function setupEventListeners() {
         if (isNaN(fileId)) return;
 
         await api.deleteFile(fileId); // Updates state (uploadedFiles, sidebarSelectedFiles, attachedFiles, sessionFile, isLoading, statusMessage)
-        // UI updates for state changes are handled by UI reacting to state changes.
+        // UI updates are triggered by state notifications.
     });
 
 
@@ -278,11 +249,11 @@ export function setupEventListeners() {
     elements.saveSummaryButton?.addEventListener('click', async () => {
         // Read content from DOM input for immediate state update
         const updatedSummary = elements.summaryTextarea?.value || '';
-        state.setSummaryContent(updatedSummary); // Update state immediately
-        ui.handleStateChange_summaryContent(); // Update modal UI immediately
+        state.setSummaryContent(updatedSummary); // Update state immediately (notifies summaryContent)
+        // UI update is triggered by summaryContent notification
 
         await api.saveSummary(); // Updates state (uploadedFiles, isLoading, statusMessage, summaryContent)
-        // UI updates for uploadedFiles, isLoading, statusMessage, summaryContent are handled by UI reacting to state changes.
+        // UI updates are triggered by state notifications.
         // Closing modal after successful save should be handled here.
         if (!state.isErrorStatus) { // Check global state after API call
              ui.closeModal(elements.summaryModal);
@@ -290,15 +261,15 @@ export function setupEventListeners() {
     });
     // Summary textarea input updates state.summaryContent - handler already does this and calls ui.renderSummaryModalContent
     elements.summaryTextarea?.addEventListener('input', (e) => {
-        state.setSummaryContent(e.target.value); // Update state
-        ui.renderSummaryModalContent(); // Call UI function to update modal preview/content
+        state.setSummaryContent(e.target.value); // Update state (notifies summaryContent)
+        // UI update is triggered by summaryContent notification
     });
 
 
     // --- Calendar Plugin Interactions ---
     elements.loadCalendarButton?.addEventListener('click', async () => {
         await api.loadCalendarEvents(); // Updates state (calendarContext, isLoading, statusMessage)
-        // UI updates for calendarContext, isLoading, statusMessage are handled by UI reacting to state changes.
+        // UI updates are triggered by state notifications.
     });
     elements.calendarToggle?.addEventListener('change', handleCalendarToggleChange); // Handler updates state and triggers UI
     elements.viewCalendarButton?.addEventListener('click', () => {
@@ -321,9 +292,8 @@ export function setupEventListeners() {
     elements.calendarPluginToggle?.addEventListener('change', handleCalendarPluginToggleChange); // Handler updates state and triggers UI
     elements.webSearchPluginToggle?.addEventListener('change', handleWebSearchPluginToggleChange); // Handler updates state and triggers UI
     elements.webSearchToggle?.addEventListener('change', (e) => {
-        state.setWebSearchEnabled(e.target.checked); // Update state
-        // UI will react to state change (renderChatInputArea)
-        ui.handleStateChange_isWebSearchEnabled(); // Explicitly trigger UI update
+        state.setWebSearchEnabled(e.target.checked); // Update state (notifies isWebSearchEnabled)
+        // UI update is triggered by isWebSearchEnabled notification
     });
 
 
@@ -347,11 +317,10 @@ export function setupEventListeners() {
             }).catch(error => console.error("Failed to import api for auto-save:", error));
         }
 
-        state.setCurrentTab(tab); // Update state
+        state.setCurrentTab(tab); // Update state (notifies currentTab)
         localStorage.setItem(config.ACTIVE_TAB_KEY, tab); // Persist
 
-        // Trigger UI update for tab switch immediately (shows correct sections, etc.)
-        ui.switchTab(state.currentTab);
+        // UI update for tab switch is triggered by currentTab notification
 
         // Load data for the new tab if needed
         if (tab === 'chat') {
@@ -359,42 +328,33 @@ export function setupEventListeners() {
             // It also loads savedChats and uploadedFiles if needed
             await api.loadInitialChatData(); // Updates state
             // UI updates triggered by state changes within loadInitialChatData (loadChat, startNewChat)
-            // These will call handleStateChange_currentChat, handleStateChange_savedChats, handleStateChange_uploadedFiles, etc.
         } else { // tab === 'notes'
             // loadInitialNotesData checks if currentNoteId is null and loads accordingly
             // It also loads savedNotes if needed
             await api.loadInitialNotesData(); // Updates state
             // UI updates triggered by state changes within loadInitialNotesData (loadNote, startNewNote)
-            // These will call handleStateChange_currentNote, handleStateChange_savedNotes, etc.
         }
     }
 
     // --- Notes Interactions ---
     // Note textarea input updates state.noteContent - handler already does this and calls ui.updateNotesPreview
     elements.notesTextarea?.addEventListener('input', (e) => {
-        state.setNoteContent(e.target.value); // Update state
-        ui.updateNotesPreview(); // Call UI function to update preview immediately in edit mode
-        // UI will react to state change (renderNoteContent, updateNotesPreview)
+        state.setNoteContent(e.target.value); // Update state (notifies noteContent, currentNote)
+        // UI update is triggered by state notifications
     });
     elements.newNoteButton?.addEventListener('click', async () => {
         await api.startNewNote(); // Updates state (currentNoteId, savedNotes, noteContent, isLoading, statusMessage, etc.)
-        // Trigger UI updates based on state changes caused by startNewNote
-        ui.handleStateChange_savedNotes(); // Updates note list
-        ui.handleStateChange_currentNote(); // Updates note details, content
-        ui.handleStateChange_isLoading(); // Updates loading, status
+        // UI updates are triggered by state notifications.
     });
     // Note name input updates state.currentNoteName
     elements.currentNoteNameInput?.addEventListener('input', (e) => {
-        state.setCurrentNoteName(e.target.value); // Update state
-        ui.renderCurrentNoteDetails(); // Update name display in sidebar header
+        state.setCurrentNoteName(e.target.value); // Update state (notifies currentNoteName, currentNote)
+        // UI update is triggered by state notifications
     });
     elements.saveNoteNameButton?.addEventListener('click', async () => {
         // Name is already in state from input handler
         await api.saveNote(); // Updates state (savedNotes, isLoading, statusMessage)
-        // Trigger UI updates based on state changes caused by saveNote
-        ui.handleStateChange_savedNotes(); // Updates note list (timestamp)
-        ui.handleStateChange_isLoading(); // Updates loading, status
-        ui.handleStateChange_statusMessage(); // Ensure final status is shown
+        // UI updates are triggered by state notifications.
     });
     elements.currentNoteNameInput?.addEventListener('keypress', async (e) => {
         if (e.key === 'Enter') {
@@ -403,14 +363,12 @@ export function setupEventListeners() {
         }
     });
     elements.editNoteButton?.addEventListener('click', () => {
-        state.setCurrentNoteMode('edit'); // Update state
-        // UI will react to state change (setNoteMode)
-        ui.handleStateChange_currentNoteMode(); // Explicitly trigger UI update
+        state.setCurrentNoteMode('edit'); // Update state (notifies currentNoteMode)
+        // UI update is triggered by currentNoteMode notification
     });
     elements.viewNoteButton?.addEventListener('click', () => {
-        state.setCurrentNoteMode('view'); // Update state
-        // UI will react to state change (setNoteMode)
-        ui.handleStateChange_currentNoteMode(); // Explicitly trigger UI update
+        state.setCurrentNoteMode('view'); // Update state (notifies currentNoteMode)
+        // UI update is triggered by currentNoteMode notification
     });
     elements.markdownTipsButton?.addEventListener('click', () => ui.showModal(elements.markdownTipsModal, null, 'notes')); // UI-only modal show
     elements.closeMarkdownTipsModalButton?.addEventListener('click', () => ui.closeModal(elements.markdownTipsModal)); // UI-only modal close
@@ -429,9 +387,7 @@ export function setupEventListeners() {
         if (noteId === state.currentNoteId) return;
 
         await api.loadNote(noteId); // Updates state (currentNoteId, noteContent, isLoading, statusMessage)
-        // Trigger UI updates based on state changes caused by loadNote
-        ui.handleStateChange_currentNote(); // Updates note details, content
-        ui.handleStateChange_isLoading(); // Updates loading, status
+        // UI updates are triggered by state notifications.
     });
     // Add click listener for delete note button (delegated)
     elements.savedNotesList?.addEventListener('click', async (event) => {
@@ -445,15 +401,53 @@ export function setupEventListeners() {
         if (isNaN(noteId)) return;
 
         await api.handleDeleteNote(noteId); // Updates state (savedNotes, currentNoteId, noteContent, isLoading, statusMessage)
-        // Trigger UI updates based on state changes caused by handleDeleteNote
-        ui.handleStateChange_savedNotes(); // Updates note list
-        // If current note changed, handleStateChange_currentNote will be triggered by api.handleDeleteNote's call to loadNote/startNewNote
-        ui.handleStateChange_isLoading(); // Updates loading, status
-        ui.handleStateChange_statusMessage(); // Ensure final status is shown
+        // UI updates are triggered by state notifications.
     });
 
 
     console.log("Event listeners set up.");
+}
+
+
+/**
+ * Subscribes UI rendering functions to state changes.
+ * This function is called once during setupEventListeners.
+ */
+function subscribeStateChangeListeners() {
+    // Subscribe UI functions to state changes they should react to
+    state.subscribe('isLoading', ui.handleStateChange_isLoading);
+    state.subscribe('statusMessage', ui.handleStateChange_statusMessage);
+
+    state.subscribe('savedChats', ui.handleStateChange_savedChats);
+    state.subscribe('currentChat', ui.handleStateChange_currentChat); // Combined chat details
+    state.subscribe('chatHistory', ui.handleStateChange_chatHistory);
+
+    state.subscribe('savedNotes', ui.handleStateChange_savedNotes);
+    state.subscribe('currentNote', ui.handleStateChange_currentNote); // Combined note details
+    state.subscribe('noteContent', ui.handleStateChange_currentNote); // Note content changes also trigger currentNote handler
+    state.subscribe('currentNoteMode', ui.handleStateChange_currentNoteMode);
+
+    state.subscribe('uploadedFiles', ui.handleStateChange_uploadedFiles);
+    state.subscribe('sidebarSelectedFiles', ui.handleStateChange_sidebarSelectedFiles);
+    state.subscribe('attachedFiles', ui.handleStateChange_attachedFiles);
+    state.subscribe('sessionFile', ui.handleStateChange_sessionFile);
+
+    state.subscribe('currentEditingFileId', ui.handleStateChange_currentEditingFileId);
+    state.subscribe('summaryContent', ui.handleStateChange_summaryContent);
+
+    state.subscribe('calendarContext', ui.handleStateChange_calendarContext);
+    state.subscribe('isCalendarContextActive', ui.handleStateChange_isCalendarContextActive);
+    state.subscribe('isWebSearchEnabled', ui.handleStateChange_isWebSearchEnabled);
+
+    // Generic plugin enabled state change handler
+    state.subscribe('pluginEnabled', ui.handleStateChange_pluginEnabled);
+
+    // Note: currentTab change is handled directly by the handleTabSwitchClick function
+    // calling ui.switchTab, as it needs to orchestrate loading data *before* rendering.
+    // A state notification for currentTab could be added, but ui.switchTab would need
+    // to be refactored to only handle rendering, and the data loading would need to
+    // happen elsewhere reacting to the state change. The current approach is simpler
+    // for tab switching which involves significant data loading.
 }
 
 
@@ -464,8 +458,8 @@ export function setupEventListeners() {
 async function handleSessionFileUpload(e) {
     const file = e.target.files[0];
 
-    state.setSessionFile(null); // Clear state first
-    // UI will react to this state change to remove the old tag (via handleStateChange_sessionFile)
+    state.setSessionFile(null); // Clear state first (notifies sessionFile)
+    // UI will react to this state change to remove the old tag
 
     if (!file) {
         // If no file selected (e.g., user cancelled), state is already null, UI is updated.
@@ -498,8 +492,7 @@ async function handleSessionFileUpload(e) {
             mimetype: file.type,
             content: event.target.result // Base64 content
         });
-        // UI will react to state change (renderAttachedAndSessionFiles)
-        ui.handleStateChange_sessionFile(); // Explicitly trigger UI update
+        // UI update is triggered by sessionFile notification
     }
     reader.onerror = function(error) {
         loadingTag.remove();
@@ -512,10 +505,9 @@ async function handleSessionFileUpload(e) {
         elements.selectedFilesContainer?.prepend(errorTag);
         setTimeout(() => errorTag.remove(), 3000);
 
-        state.setSessionFile(null); // Ensure state is null on error
+        state.setSessionFile(null); // Ensure state is null on error (notifies sessionFile)
         if(elements.fileUploadSessionInput) elements.fileUploadSessionInput.value = ''; // Reset input
-        // UI will react to state change (renderAttachedAndSessionFiles)
-        ui.handleStateChange_sessionFile(); // Explicitly trigger UI update
+        // UI update is triggered by sessionFile notification
     }
     reader.readAsDataURL(file); // Read as Base64
 }
@@ -525,98 +517,79 @@ async function handleSessionFileUpload(e) {
 function handleCalendarToggleChange() {
     if (!state.isCalendarPluginEnabled || state.currentTab !== 'chat') {
         if(elements.calendarToggle) elements.calendarToggle.checked = false; // Force off
-        state.setStatusMessage("Calendar context requires Calendar plugin enabled on Chat tab.", true); // Update state
-        ui.handleStateChange_statusMessage(); // Explicitly trigger UI update
+        state.setStatusMessage("Calendar context requires Calendar plugin enabled on Chat tab.", true); // Update state (notifies statusMessage)
+        // UI update is triggered by statusMessage notification
         return;
     }
     const isActive = elements.calendarToggle?.checked || false;
-    state.setCalendarContextActive(isActive); // Update state
+    state.setCalendarContextActive(isActive); // Update state (notifies isCalendarContextActive)
     localStorage.setItem('calendarContextActive', isActive); // Persist
-    // UI will react to state change (isCalendarContextActive, calendarContext)
-    ui.handleStateChange_isCalendarContextActive(); // Explicitly trigger UI update
+    // UI update is triggered by isCalendarContextActive notification
 }
 
 /** Handles changes to the streaming toggle switch. */
 function handleStreamingToggleChange() {
     const isEnabled = elements.streamingToggle?.checked ?? true;
-    state.setStreamingEnabled(isEnabled); // Update state
+    state.setStreamingEnabled(isEnabled); // Update state (notifies isStreamingEnabled, pluginEnabled)
     localStorage.setItem('streamingEnabled', isEnabled); // Persist
-    state.setStatusMessage(`Streaming responses ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state
-    // UI will react to state change (statusMessage)
-    ui.handleStateChange_statusMessage(); // Explicitly trigger UI update
+    state.setStatusMessage(`Streaming responses ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state (notifies statusMessage)
+    // UI updates are triggered by state notifications
 }
 
 /** Handles changes to the Files plugin toggle switch. */
 async function handleFilesPluginToggleChange() {
     const isEnabled = elements.filesPluginToggle?.checked ?? true;
-    state.setFilePluginEnabled(isEnabled); // Update state
+    state.setFilePluginEnabled(isEnabled); // Update state (notifies isFilePluginEnabled, pluginEnabled)
     localStorage.setItem('filesPluginEnabled', isEnabled); // Persist
-    state.setStatusMessage(`Files plugin ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state
+    state.setStatusMessage(`Files plugin ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state (notifies statusMessage)
 
-    // Trigger UI updates based on state change
-    ui.handleStateChange_pluginEnabled('files'); // Updates UI visibility
+    // UI updates are triggered by state notifications (isFilePluginEnabled, statusMessage)
 
     // If disabling, clear related state
     if (!isEnabled) {
-        state.clearSidebarSelectedFiles(); // Update state
-        state.clearAttachedFiles(); // Update state
-        state.setSessionFile(null); // Update state
-        // UI will react to these state changes (sidebarSelectedFiles, attachedFiles, sessionFile)
-        // ui.handleStateChange_sidebarSelectedFiles(); // Called by handleStateChange_pluginEnabled -> updatePluginUI -> renderUploadedFiles
-        // ui.handleStateChange_attachedFiles(); // Called by handleStateChange_pluginEnabled -> updatePluginUI -> renderAttachedAndSessionFiles
+        state.clearSidebarSelectedFiles(); // Update state (notifies sidebarSelectedFiles)
+        state.clearAttachedFiles(); // Update state (notifies attachedFiles)
+        state.setSessionFile(null); // Update state (notifies sessionFile)
         if(elements.fileUploadSessionInput) elements.fileUploadSessionInput.value = ''; // Reset input
     } else {
         // If enabling, reload the file lists
         await api.loadUploadedFiles(); // Updates state.uploadedFiles, isLoading, statusMessage
-        // UI will react to these state changes
-        // ui.handleStateChange_uploadedFiles(); // Called by api.loadUploadedFiles -> setUploadedFiles
-        // ui.handleStateChange_isLoading(); // Called by api.loadUploadedFiles -> setLoading
-        // ui.handleStateChange_statusMessage(); // Called by api.loadUploadedFiles -> setStatus
+        // UI updates are triggered by state notifications.
     }
-    ui.handleStateChange_statusMessage(); // Ensure final status is shown
 }
 
 /** Handles changes to the Calendar plugin toggle switch. */
 async function handleCalendarPluginToggleChange() {
     const isEnabled = elements.calendarPluginToggle?.checked ?? true;
-    state.setCalendarPluginEnabled(isEnabled); // Update state
+    state.setCalendarPluginEnabled(isEnabled); // Update state (notifies isCalendarPluginEnabled, pluginEnabled)
     localStorage.setItem('calendarPluginEnabled', isEnabled); // Persist
-    state.setStatusMessage(`Calendar plugin ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state
+    state.setStatusMessage(`Calendar plugin ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state (notifies statusMessage)
 
-    // Trigger UI updates based on state change
-    ui.handleStateChange_pluginEnabled('calendar'); // Updates UI visibility
+    // UI updates are triggered by state notifications (isCalendarPluginEnabled, statusMessage)
 
     // If disabling, clear calendar context state
     if (!isEnabled) {
-        state.setCalendarContext(null); // Update state
-        state.setCalendarContextActive(false); // Update state
+        state.setCalendarContext(null); // Update state (notifies calendarContext)
+        state.setCalendarContextActive(false); // Update state (notifies isCalendarContextActive)
         if(elements.calendarToggle) elements.calendarToggle.checked = false; // Update DOM directly for immediate feedback
-        // UI will react to these state changes (calendarContext, isCalendarContextActive)
-        // ui.handleStateChange_calendarContext(); // Called by handleStateChange_pluginEnabled -> updatePluginUI -> updateCalendarStatus
-        // ui.handleStateChange_isCalendarContextActive(); // Called by handleStateChange_pluginEnabled -> updatePluginUI -> updateCalendarStatus
     }
     // No need to reload anything when enabling, just allows usage.
-    ui.handleStateChange_statusMessage(); // Ensure final status is shown
 }
 
 /** Handles changes to the Web Search plugin toggle switch. */
 async function handleWebSearchPluginToggleChange() {
     const isEnabled = elements.webSearchPluginToggle?.checked ?? true;
-    state.setWebSearchPluginEnabled(isEnabled); // Update state
+    state.setWebSearchPluginEnabled(isEnabled); // Update state (notifies isWebSearchPluginEnabled, pluginEnabled)
     localStorage.setItem('webSearchPluginEnabled', isEnabled); // Persist
-    state.setStatusMessage(`Web Search plugin ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state
+    state.setStatusMessage(`Web Search plugin ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state (notifies statusMessage)
 
-    // Trigger UI updates based on state change
-    ui.handleStateChange_pluginEnabled('websearch'); // Updates UI visibility
+    // UI updates are triggered by state notifications (isWebSearchPluginEnabled, statusMessage)
 
     // If disabling, ensure the input area toggle state is also off
     if (!isEnabled) {
-        state.setWebSearchEnabled(false); // Update state
+        state.setWebSearchEnabled(false); // Update state (notifies isWebSearchEnabled)
         if (elements.webSearchToggle) {
             elements.webSearchToggle.checked = false; // Update DOM directly for immediate feedback
         }
-        // UI will react to state change (isWebSearchEnabled)
-        // ui.handleStateChange_isWebSearchEnabled(); // Called by handleStateChange_pluginEnabled -> updatePluginUI -> renderChatInputArea
     }
-    ui.handleStateChange_statusMessage(); // Ensure final status is shown
 }

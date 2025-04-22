@@ -93,11 +93,12 @@ export function renderChatHistory() {
 
     if (state.chatHistory.length === 0) {
         // Add a placeholder message if history is empty
-        addMessage('system', state.isLoading ? 'Loading chat history...' : 'This chat is empty. Start typing!');
+        // Read loading state for placeholder text
+        addMessageToDom('system', state.isLoading ? 'Loading chat history...' : 'This chat is empty. Start typing!');
     } else {
         state.chatHistory.forEach(msg => {
             // Re-render each message. If it was streaming, the full content is now in state.
-            addMessage(msg.role, msg.content, msg.isError);
+            addMessageToDom(msg.role, msg.content, msg.isError);
         });
     }
 
@@ -107,14 +108,13 @@ export function renderChatHistory() {
 
 /**
  * Adds a single message to the chatbox DOM.
- * This is a helper for renderChatHistory and potentially for immediate display
- * of user input before API response (though state-based rendering is preferred).
+ * This is a helper for renderChatHistory. It reads message data from its parameters.
  * @param {'user' | 'assistant' | 'system'} role - The role of the message sender.
  * @param {string} content - The message content (can be markdown).
  * @param {boolean} [isError=false] - Whether the message indicates an error.
  * @returns {HTMLElement|null} The message element that was created.
  */
-function addMessage(role, content, isError = false) {
+function addMessageToDom(role, content, isError = false) {
      if (!elements.chatbox) {
         console.error("Chatbox element not found.");
         return null;
@@ -815,17 +815,16 @@ export function renderAttachedAndSessionFiles() {
         // Event listener remains here, modifies state
         removeButton.addEventListener('click', () => {
             if (file.type === 'session') {
-                state.setSessionFile(null); // Clear session file state
+                state.setSessionFile(null); // Clear session file state (notifies sessionFile)
                 // Also reset the file input element
                 if (elements.fileUploadSessionInput) { // Use elements.fileUploadSessionInput
                     elements.fileUploadSessionInput.value = '';
                 }
             } else { // Permanent file (full or summary)
                 // Remove from attachedFiles state by ID *and* Type
-                state.removeAttachedFileByIdAndType(parseInt(file.id), file.type);
+                state.removeAttachedFileByIdAndType(parseInt(file.id), file.type); // Notifies attachedFiles
             }
-            renderAttachedAndSessionFiles(); // Re-render the display based on updated state
-            // No need to update attach button state or sidebar styling here
+            // UI update is triggered by state notifications
         });
 
         fileTag.appendChild(filenameSpan);
@@ -1253,18 +1252,22 @@ export function closeModal(modalElement) {
 }
 
 // --- State Change Reaction Functions ---
-// These functions are called by eventListeners.js or app.js when specific state
+// These functions are called by eventListeners.js when specific state
 // variables change, triggering the necessary UI updates.
 
 export function handleStateChange_isLoading() {
     updateLoadingState();
-    renderStatus(); // Loading state affects status message
-    updateAttachButtonState(); // Loading state affects button disabled state
+    // renderStatus(); // Called by handleStateChange_statusMessage
+    // updateAttachButtonState(); // Called by updateLoadingState
     renderNoteContent(); // Loading state affects note textarea placeholder/disabled
 }
 
 export function handleStateChange_statusMessage() {
     renderStatus();
+    // renderSummaryModalContent(); // Status message can affect modal status display
+    // renderUrlModalContent(); // Status message can affect modal status display
+    // Note: Modal status updates are handled within renderSummaryModalContent/renderUrlModalContent
+    // which are triggered by other state changes (e.g., currentEditingFileId, summaryContent, isLoading)
 }
 
 export function handleStateChange_savedChats() {
@@ -1274,9 +1277,9 @@ export function handleStateChange_savedChats() {
 export function handleStateChange_currentChat() { // Called when currentChatId, Name, Model change
     renderCurrentChatDetails();
     updateActiveChatListItem(); // Highlight correct chat in sidebar
-    renderChatHistory(); // Load history for the new chat
-    // File/Calendar/Web Search context is reset by API loadChat, which triggers
-    // renderAttachedAndSessionFiles, updateCalendarStatus, renderChatInputArea
+    // renderChatHistory(); // Called by handleStateChange_chatHistory
+    // File/Calendar/Web Search context UI is updated by renderChatInputArea, updateCalendarStatus
+    // which are triggered by pluginEnabled, calendarContext, isCalendarContextActive, isWebSearchEnabled notifications
 }
 
 export function handleStateChange_chatHistory() {
@@ -1349,7 +1352,7 @@ export function handleStateChange_currentTab() {
 
 export function handleStateChange_currentNoteMode() {
     setNoteMode(state.currentNoteMode); // Applies the correct mode (edit/view)
-    renderNoteContent(); // Ensures content is rendered correctly for the mode
+    // renderNoteContent(); // Called by setNoteMode
 }
 
 // Add more handlers for other state changes as needed...

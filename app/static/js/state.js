@@ -46,68 +46,122 @@ export let currentNoteName = ''; // Already exists, but adding for clarity
 export let noteContent = '';
 
 
+// --- Observer Pattern ---
+// Map to store listeners for different state change events
+const listeners = new Map();
+
+/**
+ * Subscribes a listener function to a specific state change event.
+ * @param {string} eventType - The type of state change (e.g., 'isLoading', 'chatHistory').
+ * @param {function} listener - The function to call when the state changes.
+ */
+export function subscribe(eventType, listener) {
+    if (!listeners.has(eventType)) {
+        listeners.set(eventType, []);
+    }
+    listeners.get(eventType).push(listener);
+}
+
+/**
+ * Notifies all listeners subscribed to a specific state change event.
+ * @param {string} eventType - The type of state change.
+ * @param {*} [data] - Optional data to pass to the listeners.
+ */
+function notify(eventType, data) {
+    if (listeners.has(eventType)) {
+        listeners.get(eventType).forEach(listener => {
+            try {
+                listener(data); // Pass data if provided
+            } catch (error) {
+                console.error(`Error in listener for event "${eventType}":`, error);
+            }
+        });
+    }
+}
+
+
 // Functions to update state
-// These functions modify the state variables *within* this module.
+// These functions modify the state variables *within* this module and notify listeners.
 
 export function setCurrentChatId(id) {
-    currentChatId = id;
+    if (currentChatId !== id) {
+        currentChatId = id;
+        notify('currentChatId', currentChatId);
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel }); // Notify combined chat state
+    }
 }
 
 export function setCurrentNoteId(id) {
-    currentNoteId = id;
+    if (currentNoteId !== id) {
+        currentNoteId = id;
+        notify('currentNoteId', currentNoteId);
+        notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent }); // Notify combined note state
+    }
 }
 
 export function setIsLoading(loading) {
-    isLoading = loading;
-    // When loading starts, clear previous status unless it was an error
-    if (loading && !isErrorStatus) {
-        setStatusMessage("Busy...");
-    } else if (!loading && !isErrorStatus) {
-        // If loading finished without an explicit error status being set, revert to Idle
-         setStatusMessage("Idle");
+    if (isLoading !== loading) {
+        isLoading = loading;
+        // When loading starts, clear previous status unless it was an error
+        if (loading && !isErrorStatus) {
+            setStatusMessage("Busy..."); // This will notify 'statusMessage'
+        } else if (!loading && !isErrorStatus && statusMessage === "Busy...") {
+            // If loading finished without an explicit error status being set, revert to Idle
+             setStatusMessage("Idle"); // This will notify 'statusMessage'
+        }
+        notify('isLoading', isLoading);
     }
-    // Note: updateStatus UI function will read these state variables
 }
 
 export function setStatusMessage(message, isError = false) {
-    statusMessage = message;
-    isErrorStatus = isError;
-    // Note: updateStatus UI function will read these state variables
+    if (statusMessage !== message || isErrorStatus !== isError) {
+        statusMessage = message;
+        isErrorStatus = isError;
+        notify('statusMessage', { message: statusMessage, isError: isErrorStatus });
+    }
 }
 
 
 // --- Functions for sidebarSelectedFiles ---
 export function setSidebarSelectedFiles(files) {
-    // This function is intended to replace the entire array
     sidebarSelectedFiles = files;
+    notify('sidebarSelectedFiles', sidebarSelectedFiles);
 }
 
 export function clearSidebarSelectedFiles() {
-    // Mutate the array in place
-    sidebarSelectedFiles.length = 0;
+    if (sidebarSelectedFiles.length > 0) {
+        sidebarSelectedFiles.length = 0;
+        notify('sidebarSelectedFiles', sidebarSelectedFiles);
+    }
 }
 
 export function addSidebarSelectedFile(file) {
     // Add the file if it's not already selected (check by id)
     if (!sidebarSelectedFiles.some(f => f.id === file.id)) {
         sidebarSelectedFiles.push(file);
+        notify('sidebarSelectedFiles', sidebarSelectedFiles);
     }
 }
 
 export function removeSidebarSelectedFileById(fileId) {
-     // Reassign the array after filtering
+     const initialLength = sidebarSelectedFiles.length;
      sidebarSelectedFiles = sidebarSelectedFiles.filter(f => f.id !== fileId);
+     if (sidebarSelectedFiles.length !== initialLength) {
+        notify('sidebarSelectedFiles', sidebarSelectedFiles);
+     }
 }
 
 // --- Functions for attachedFiles (files attached to the chat session) ---
 export function setAttachedFiles(files) {
-    // This function is intended to replace the entire array
     attachedFiles = files;
+    notify('attachedFiles', attachedFiles);
 }
 
 export function clearAttachedFiles() {
-    // Mutate the array in place
-    attachedFiles.length = 0;
+    if (attachedFiles.length > 0) {
+        attachedFiles.length = 0;
+        notify('attachedFiles', attachedFiles);
+    }
 }
 
 export function addAttachedFile(file) {
@@ -115,92 +169,148 @@ export function addAttachedFile(file) {
     // Type is important here ('full' or 'summary')
     if (!attachedFiles.some(f => f.id === file.id && f.type === file.type)) {
         attachedFiles.push(file);
+        notify('attachedFiles', attachedFiles);
     }
 }
 
 // Function to remove by ID and Type, to match the UI's remove button logic
 export function removeAttachedFileByIdAndType(fileIdToRemove, fileTypeToRemove) {
+    const initialLength = attachedFiles.length;
     attachedFiles = attachedFiles.filter(f => !(f.id === fileIdToRemove && f.type === fileTypeToRemove));
+    if (attachedFiles.length !== initialLength) {
+        notify('attachedFiles', attachedFiles);
+    }
 }
 
 // Function to remove by ID (removes all types for that ID)
 export function removeAttachedFileById(fileIdToRemove) {
+     const initialLength = attachedFiles.length;
      attachedFiles = attachedFiles.filter(f => f.id !== fileIdToRemove);
+     if (attachedFiles.length !== initialLength) {
+        notify('attachedFiles', attachedFiles);
+     }
 }
 
 
 // --- Function for sessionFile (file attached for the current message) ---
 export function setSessionFile(file) {
-    sessionFile = file;
+    if (sessionFile !== file) { // Check if the file object reference changed
+        sessionFile = file;
+        notify('sessionFile', sessionFile);
+    }
 }
 
 
 export function setCurrentEditingFileId(id) {
-    currentEditingFileId = id;
+    if (currentEditingFileId !== id) {
+        currentEditingFileId = id;
+        notify('currentEditingFileId', currentEditingFileId);
+    }
 }
 
 export function setSummaryContent(content) {
-    summaryContent = content;
+    if (summaryContent !== content) {
+        summaryContent = content;
+        notify('summaryContent', summaryContent);
+    }
 }
 
 
 export function setCalendarContext(context) {
-    calendarContext = context;
+    if (calendarContext !== context) { // Simple reference check
+        calendarContext = context;
+        notify('calendarContext', calendarContext);
+    }
 }
 
 export function setCalendarContextActive(active) {
-    isCalendarContextActive = active;
+    if (isCalendarContextActive !== active) {
+        isCalendarContextActive = active;
+        notify('isCalendarContextActive', isCalendarContextActive);
+    }
 }
 
 export function setStreamingEnabled(enabled) {
-    isStreamingEnabled = enabled;
+    if (isStreamingEnabled !== enabled) {
+        isStreamingEnabled = enabled;
+        notify('isStreamingEnabled', isStreamingEnabled);
+        notify('pluginEnabled', 'streaming'); // Notify generic plugin change
+    }
 }
 
 export function setFilePluginEnabled(enabled) {
-    isFilePluginEnabled = enabled;
+    if (isFilePluginEnabled !== enabled) {
+        isFilePluginEnabled = enabled;
+        notify('isFilePluginEnabled', isFilePluginEnabled);
+        notify('pluginEnabled', 'files'); // Notify generic plugin change
+    }
 }
 
 export function setCalendarPluginEnabled(enabled) {
-    isCalendarPluginEnabled = enabled;
+    if (isCalendarPluginEnabled !== enabled) {
+        isCalendarPluginEnabled = enabled;
+        notify('isCalendarPluginEnabled', isCalendarPluginEnabled);
+        notify('pluginEnabled', 'calendar'); // Notify generic plugin change
+    }
 }
 
 export function setWebSearchPluginEnabled(enabled) {
-    isWebSearchPluginEnabled = enabled;
+    if (isWebSearchPluginEnabled !== enabled) {
+        isWebSearchPluginEnabled = enabled;
+        notify('isWebSearchPluginEnabled', isWebSearchPluginEnabled);
+        notify('pluginEnabled', 'websearch'); // Notify generic plugin change
+    }
 }
 
 export function setWebSearchEnabled(enabled) {
-    isWebSearchEnabled = enabled;
+    if (isWebSearchEnabled !== enabled) {
+        isWebSearchEnabled = enabled;
+        notify('isWebSearchEnabled', isWebSearchEnabled);
+    }
 }
 
 
 export function setCurrentTab(tab) {
-    currentTab = tab;
+    if (currentTab !== tab) {
+        currentTab = tab;
+        notify('currentTab', currentTab);
+    }
 }
 
 export function setCurrentNoteMode(mode) {
-    currentNoteMode = mode;
+    if (currentNoteMode !== mode) {
+        currentNoteMode = mode;
+        notify('currentNoteMode', currentNoteMode);
+    }
 }
 
 // Add setter functions for saved lists
 export function setSavedChats(chats) {
-    savedChats = chats;
+    savedChats = chats; // Assume chats array is new or represents a change
+    notify('savedChats', savedChats);
 }
 
 export function setSavedNotes(notes) {
-    savedNotes = notes;
+    savedNotes = notes; // Assume notes array is new or represents a change
+    notify('savedNotes', savedNotes);
 }
 
 export function setUploadedFiles(files) {
-    uploadedFiles = files;
+    uploadedFiles = files; // Assume files array is new or represents a change
+    notify('uploadedFiles', uploadedFiles);
 }
 
 // --- Chat History Functions ---
 export function setChatHistory(history) {
-    chatHistory = history;
+    chatHistory = history; // Assume history array is new or represents a change
+    notify('chatHistory', chatHistory);
 }
 
 export function addMessageToHistory(message) {
     chatHistory.push(message);
+    // Notify that history has changed. Pass a copy or the new message if needed by listeners.
+    // For simplicity, just notify that the array content changed.
+    notify('chatHistory', chatHistory);
 }
 
 export function appendContentToLastMessage(content) {
@@ -209,24 +319,42 @@ export function appendContentToLastMessage(content) {
         // Ensure it's an assistant message and not an error
         if (lastMessage.role === 'assistant' && !lastMessage.isError) {
              lastMessage.content += content;
+             // Notify that history has changed.
+             notify('chatHistory', chatHistory);
         }
     }
 }
 
 // --- Chat Details Functions ---
 export function setCurrentChatName(name) {
-    currentChatName = name;
+    if (currentChatName !== name) {
+        currentChatName = name;
+        notify('currentChatName', currentChatName);
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel }); // Notify combined chat state
+    }
 }
 
 export function setCurrentChatModel(modelName) {
-    currentChatModel = modelName;
+    if (currentChatModel !== modelName) {
+        currentChatModel = modelName;
+        notify('currentChatModel', currentChatModel);
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel }); // Notify combined chat state
+    }
 }
 
 // --- Note Content Functions ---
 export function setNoteContent(content) {
-    noteContent = content;
+    if (noteContent !== content) {
+        noteContent = content;
+        notify('noteContent', noteContent);
+        notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent }); // Notify combined note state
+    }
 }
 
 export function setCurrentNoteName(name) {
-    currentNoteName = name;
+    if (currentNoteName !== name) {
+        currentNoteName = name;
+        notify('currentNoteName', currentNoteName);
+        notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent }); // Notify combined note state
+    }
 }
