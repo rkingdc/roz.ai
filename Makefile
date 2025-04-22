@@ -112,16 +112,16 @@ stop:
 	@echo "Cleaning up temporary dev database file..."
 	@rm -f /tmp/assistant_dev_db.sqlite # Hardcoded path from start-dev target
 
-# Target to start the application in development mode with a temporary file database using uvicorn
+# Target to start the application in development mode with a temporary file database using Flask's dev server
 start-dev: upgrade # Depends on upgrade now
-	@echo "Starting application in development mode with temporary file database using Uvicorn..."
+	@echo "Starting application in development mode with temporary file database using Flask's dev server..."
 	# Clean up previous temporary dev database file if it exists
 	@echo "Cleaning up temporary dev database file..."
 	@rm -f /tmp/assistant_dev_db.sqlite
 	# Migrations will create/update the temporary database file via 'make upgrade' dependency
-	@echo "Starting Uvicorn development server..."
-	# Start uvicorn using the import string run:asgi_app and set environment variables
-	@DATABASE_NAME=/tmp/assistant_dev_db.sqlite TEST_DATABASE=TRUE IS_DEV_SERVER=TRUE $(PYTHON) -m uvicorn run:asgi_app --host 127.0.0.1 --port 5000 --log-level info --reload
+	@echo "Starting Flask development server..."
+	# Start flask run with debug mode and set environment variables
+	@DATABASE_NAME=/tmp/assistant_dev_db.sqlite TEST_DATABASE=TRUE IS_DEV_SERVER=TRUE $(PYTHON) -m flask --app $(RUN_FILE) run --debug --port 5000
 
 
 # Target to display help
@@ -134,7 +134,7 @@ help:
 	# @echo "  make run       - (Removed, use start-dev)"
 	@echo "  make start     - Apply migrations and start gunicorn from the latest release bundle"
 	@echo "  make stop      - Stop the gunicorn application process started by 'make start'"
-	@echo "  make start-dev - Apply migrations and start the Uvicorn dev server with a temporary DB"
+	@echo "  make start-dev - Apply migrations and start the Flask dev server with a temporary DB"
 	@echo "  make test      - Run unit tests (requires install)"
 	@echo "  make lint      - Run linting checks (requires install)"
 	@echo "  make deploy    - Create a versioned release bundle in the 'releases/' directory"

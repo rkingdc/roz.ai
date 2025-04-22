@@ -2,7 +2,7 @@
 import logging
 import os
 # import uvicorn # Not needed here anymore, uvicorn is run from Makefile
-from asgiref.wsgi import WsgiToAsgi
+# from asgiref.wsgi import WsgiToAsgi # Not needed for start-dev anymore
 
 from app import create_app
 
@@ -11,9 +11,8 @@ logger = logging.getLogger(__name__)
 # Create the Flask app instance using the factory
 app = create_app()
 
-# Wrap the Flask (WSGI) app with WsgiToAsgi to create an ASGI app
-# This asgi_app object will be imported by uvicorn when run from the Makefile
-asgi_app = WsgiToAsgi(app)
+# The asgi_app wrapper is no longer needed in this file
+# asgi_app = WsgiToAsgi(app)
 
 # The __main__ block is removed as uvicorn will import and run asgi_app directly
 # if __name__ == "__main__":
