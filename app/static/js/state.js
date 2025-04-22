@@ -45,6 +45,11 @@ export let chatHistory = []; // Array of { role, content, isError }
 export let currentNoteName = ''; // Already exists, but adding for clarity
 export let noteContent = '';
 
+// Sidebar collapsed states
+export let isSidebarCollapsed = false;
+export let isPluginsCollapsed = false;
+export let isNotesSidebarCollapsed = false; // Assuming a separate notes sidebar state
+
 
 // --- Observer Pattern ---
 // Map to store listeners for different state change events
@@ -134,6 +139,10 @@ export function notifyAll() {
     notify('chatHistory', chatHistory);
     notify('noteContent', noteContent);
     notify('currentNoteName', currentNoteName);
+    notify('isSidebarCollapsed', isSidebarCollapsed); // Notify collapsed states
+    notify('isPluginsCollapsed', isPluginsCollapsed);
+    notify('isNotesSidebarCollapsed', isNotesSidebarCollapsed);
+
 
     // Also notify combined states if listeners are subscribed to them
     notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel });
@@ -420,4 +429,34 @@ export function setCurrentNoteName(name) {
         notify('currentNoteName', currentNoteName);
         notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent }); // Notify combined note state
     }
+}
+
+// --- Sidebar Collapsed State Functions ---
+export function setIsSidebarCollapsed(isCollapsed) {
+    if (isSidebarCollapsed !== isCollapsed) {
+        isSidebarCollapsed = isCollapsed;
+        notify('isSidebarCollapsed', isSidebarCollapsed);
+    }
+}
+
+export function setIsPluginsCollapsed(isCollapsed) {
+    if (isPluginsCollapsed !== isCollapsed) {
+        isPluginsCollapsed = isCollapsed;
+        notify('isPluginsCollapsed', isPluginsCollapsed);
+    }
+}
+
+export function setIsNotesSidebarCollapsed(isCollapsed) {
+    if (isNotesSidebarCollapsed !== isCollapsed) {
+        isNotesSidebarCollapsed = isCollapsed;
+        notify('isNotesSidebarCollapsed', isNotesSidebarCollapsed);
+    }
+}
+
+// --- Note History State ---
+export let noteHistory = []; // History entries for the currently selected note
+
+export function setNoteHistory(history) {
+    noteHistory = history; // Assume history array is new or represents a change
+    notify('noteHistory', noteHistory);
 }

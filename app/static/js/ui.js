@@ -901,6 +901,7 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
  * Toggles the collapsed state of a sidebar.
  * @param {HTMLElement} sidebarElement - The sidebar element.
  * @param {HTMLElement} toggleButton - The button that toggles the sidebar.
+ * @param {boolean} isCollapsed - The desired state (true for collapsed).
  * @param {string} localStorageKey - The key to use for localStorage.
  * @param {'sidebar' | 'plugins'} type - The type of sidebar ('sidebar' or 'plugins').
  */
@@ -931,6 +932,12 @@ export function setSidebarCollapsed(sidebarElement, toggleButton, isCollapsed, l
          }
     }
     localStorage.setItem(localStorageKey, isCollapsed);
+    // Update state after updating DOM and localStorage
+    if (type === 'sidebar') {
+        state.setIsSidebarCollapsed(isCollapsed);
+    } else if (type === 'plugins') {
+        state.setIsPluginsCollapsed(isCollapsed);
+    }
 }
 
 /** Toggles the left sidebar (chat/notes list). */
@@ -989,6 +996,7 @@ export function setPluginSectionCollapsed(headerElement, contentElement, isColla
          if (toggleIcon) toggleIcon.classList.replace('fa-chevron-right', 'fa-chevron-down');
      }
      localStorage.setItem(localStorageKey, isCollapsed);
+     // No state update needed here, as plugin section collapse is purely UI/localStorage
 }
 
 
@@ -1028,7 +1036,7 @@ export function updatePluginUI() {
     } else {
          // Clear file list if plugin is disabled or tab is not chat
          if (elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">${isFileEnabled ? 'Switch to Chat tab to use Files plugin.' : 'Files plugin disabled.'}</p>`;
-         if (elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
+         if (elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">${isFileEnabled ? 'Switch to Chat tab to manage files.' : 'Files plugin disabled.'}</p>`;
          renderAttachedAndSessionFiles(); // Clear attached/session file display
          updateAttachButtonState(); // Disable attach buttons
     }

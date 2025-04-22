@@ -18,10 +18,16 @@ async function initializeApp() {
     // ui.updateStatus("Initializing application..."); // Removed direct call
 
     try {
+        // 1. Get references to all DOM elements and store them
+        populateElements();
+        console.log("DOM elements populated.");
+
         // --- Load and Set Initial States from localStorage ---
         // Temporarily disable notifications during initial state load
         state.disableNotifications();
-        loadPersistedStates(); // Updates state
+        loadPersistedStates(); // Updates state (non-UI related)
+        // UI-related collapsed states are loaded after elements are populated
+        loadCollapsedStates(); // Updates state and UI for collapsed elements
         state.enableNotifications(); // Re-enable notifications
         console.log("[DEBUG] Persisted states loaded.");
 
@@ -35,6 +41,11 @@ async function initializeApp() {
              // UI will react to statusMessage state change
         }
 
+        // --- Set up all event listeners (which includes subscribing UI to state changes) ---
+        setupEventListeners();
+        console.log("Event listeners set up.");
+
+
         // --- Load Core Data (Chat & Note Lists, then specific Chat/Note) ---
         // These API calls update the state.
         await api.loadSavedChats(); // Corrected function name based on api.js - Updates state.savedChats, isLoading, statusMessage
@@ -45,10 +56,10 @@ async function initializeApp() {
         // Load data for the initial tab based on persisted ID or default
         if (state.currentTab === 'chat') { // Use getter
              await api.loadInitialChatData(); // Updates state (currentChatId, chatHistory, attachedFiles, uploadedFiles, etc.)
-             // UI will react to these state changes (handleStateChange_currentChat, handleStateChange_uploadedFiles, etc.)
+             // UI updates triggered by state changes within loadInitialChatData (loadChat, startNewChat)
         } else { // state.currentTab === 'notes' // Use getter
              await api.loadInitialNotesData(); // Updates state (currentNoteId, noteContent, uploadedFiles, etc.)
-             // UI will react to these state changes (handleStateChange_currentNote, handleStateChange_uploadedFiles, etc.)
+             // UI updates triggered by state changes within loadInitialNotesData (loadNote, startNewNote)
         }
 
         // --- Final Initial UI Render ---
@@ -98,14 +109,7 @@ function loadPersistedStates() {
     // Load web search toggle state
     state.setWebSearchEnabled(localStorage.getItem('webSearchEnabled') === 'true'); // Assuming you persist this
 
-    // Load plugin collapsed states (UI concern, but loaded here)
-    // These setters are in ui.js, so we need to call them after elements are populated
-    // This loading will happen in initializeApp after populateElements
-    // state.setIsSidebarCollapsed(localStorage.getItem(config.SIDEBAR_COLLAPSED_KEY) === 'collapsed');
-    // state.setIsPluginsCollapsed(localStorage.getItem(config.PLUGINS_COLLAPSED_KEY) === 'collapsed');
-    // state.setIsFilePluginCollapsed(localStorage.getItem(config.FILE_PLUGIN_COLLAPSED_KEY) === 'collapsed'); // Assuming these exist
-    // state.setIsCalendarPluginCollapsed(localStorage.getItem(config.CALENDAR_PLUGIN_COLLAPSED_KEY) === 'collapsed'); // Assuming these exist
-    // state.setIsHistoryPluginCollapsed(localStorage.getItem(config.HISTORY_PLUGIN_COLLAPSED_KEY) === 'collapsed'); // Assuming these exist
+    // Collapsed states are handled by loadCollapsedStates after elements are populated
 }
 
 // Helper function to load collapsed states after elements are populated
@@ -120,12 +124,12 @@ function loadCollapsedStates() {
     // Load sidebar collapsed state
     const sidebarCollapsed = localStorage.getItem(config.SIDEBAR_COLLAPSED_KEY) === 'collapsed';
     ui.setSidebarCollapsed(elements.sidebar, elements.sidebarToggleButton, sidebarCollapsed, config.SIDEBAR_COLLAPSED_KEY, 'sidebar');
-    state.setIsSidebarCollapsed(sidebarCollapsed); // Update state
+    // state.setIsSidebarCollapsed is now called inside ui.setSidebarCollapsed
 
     // Load plugins sidebar collapsed state
     const pluginsCollapsed = localStorage.getItem(config.PLUGINS_COLLAPSED_KEY) === 'collapsed';
     ui.setSidebarCollapsed(elements.pluginsSidebar, elements.pluginsToggleButton, pluginsCollapsed, config.PLUGINS_COLLAPSED_KEY, 'plugins');
-    state.setIsPluginsCollapsed(pluginsCollapsed); // Update state
+    // state.setIsPluginsCollapsed is now called inside ui.setSidebarCollapsed
 
     // Load plugin section collapsed states
     const filePluginCollapsed = localStorage.getItem(config.FILE_PLUGIN_COLLAPSED_KEY) === 'collapsed';
