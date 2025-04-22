@@ -357,7 +357,7 @@ export async function attachSelectedFilesSummary() {
                         ? state.summaryContent // Use the specific error from fetchSummary/state
                         : `[Error: Failed to generate or verify summary for ${file.filename}]`; // Fallback error
                     console.error(`Summary generation failed for ${file.filename}: ${errorMsg}`);
-                    errors.push(`${file.filename}: ${errorMsg}`);
+                    errors.push(`${file.filename}: ${specificError}`); // Use specificError
                     summaryAvailable = false; // Ensure it's marked as failed
                 }
             } catch (error) { // This catch block handles errors *within the try block above*
@@ -828,6 +828,7 @@ export async function startNewNote() {
     state.setCurrentNoteId(null);
     state.setCurrentNoteName(''); // Assuming setCurrentNoteName in state.js
     state.setNoteContent(''); // Assuming setNoteContent in state.js
+    state.setNoteHistory([]); // Clear history for the new empty note
 
     try {
         const response = await fetch('/api/notes', { method: 'POST' });
@@ -860,6 +861,7 @@ export async function loadNote(noteId) {
 
     // Clear current note content state immediately
     state.setNoteContent(''); // Assuming setNoteContent in state.js
+    state.setNoteHistory([]); // Clear history while loading new note
 
     try {
         const response = await fetch(`/api/note/${noteId}`);
@@ -875,6 +877,9 @@ export async function loadNote(noteId) {
         state.setCurrentNoteName(data.name || '');
         state.setNoteContent(data.content || '');
 
+        // Load history for this note after loading the note itself
+        await loadNoteHistory(noteId); // Assuming loadNoteHistory exists and updates state.noteHistory
+
         setStatus(`Note ${state.currentNoteId} loaded.`);
 
     } catch (error) {
@@ -886,6 +891,7 @@ export async function loadNote(noteId) {
         localStorage.removeItem('currentNoteId');
         state.setCurrentNoteName('');
         state.setNoteContent(`[Error loading note ${noteId}: ${error.message}]`); // Put error in content state
+        state.setNoteHistory([]); // Clear history on error
 
         throw error; // Re-throw for switchTab to handle
     } finally {
@@ -921,6 +927,9 @@ export async function saveNote() {
         // Reload notes list state to update timestamp/name in sidebar
         await loadSavedNotes();
 
+        // Reload history for this note after saving
+        await loadNoteHistory(state.currentNoteId); // Assuming loadNoteHistory exists and updates state.noteHistory
+
     } catch (error) {
         console.error(`Error saving note ${state.currentNoteId}:`, error);
         setStatus(`Error saving note: ${error.message}`, true);
@@ -953,6 +962,7 @@ export async function handleDeleteNote(noteId) { // Removed listItemElement para
         if (noteId == state.currentNoteId) {
             state.setCurrentNoteId(null); // Clear current note state
             localStorage.removeItem('currentNoteId');
+            state.setNoteHistory([]); // Clear history for the deleted note
             // loadSavedNotes already re-rendered the list state
             const firstNote = state.savedNotes.length > 0 ? state.savedNotes[0] : null; // Get from updated state
             if (firstNote) {
@@ -975,6 +985,36 @@ export async function handleDeleteNote(noteId) { // Removed listItemElement para
     }
 }
 
+/** Loads the history of a specific note from the backend and updates state. */
+export async function loadNoteHistory(noteId) {
+    console.log(`[DEBUG] loadNoteHistory(${noteId}) called.`);
+    if (state.isLoading) {
+        console.log("[DEBUG] loadNoteHistory: App is busy, skipping history load.");
+        return; // Don't load history if app is busy
+    }
+    // Note: Loading state is handled by the caller (loadNote or saveNote)
+    // setStatus("Loading note history..."); // Status handled by caller
+
+    try {
+        const response = await fetch(`/api/notes/${noteId}/history`);
+        if (!response.ok) {
+             const errorData = await response.json();
+             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const history = await response.json();
+        state.setNoteHistory(history); // Update state (this notifies 'noteHistory')
+        console.log(`[DEBUG] loadNoteHistory(${noteId}) finished successfully. Loaded ${history.length} entries.`);
+        // Status handled by caller
+    } catch (error) {
+        console.error(`Error loading note history for ${noteId}:`, error);
+        state.setNoteHistory([]); // Clear history on error
+        // Status handled by caller
+        throw error; // Re-throw for caller to handle if needed
+    } finally {
+        // Loading state handled by caller
+    }
+}
+
 
 // --- Initial Data Loading ---
 
@@ -984,23 +1024,44 @@ export async function loadInitialChatData() {
     // await loadSavedChats(); // Load chat list state first
 
     let chatToLoadId = state.currentChatId; // Use persisted ID if available
+    let chatFoundInList = false;
 
+    // Check if the persisted ID exists in the already loaded list of chats
+    if (chatToLoadId !== null && state.savedChats.length > 0) {
+        chatFoundInList = state.savedChats.some(chat => chat.id === chatToLoadId);
+        if (!chatFoundInList) {
+            console.warn(`[DEBUG] loadInitialChatData: Persisted chat ID ${chatToLoadId} not found in saved chats list. Clearing persisted ID.`);
+            state.setCurrentChatId(null); // Clear the stale ID state
+            localStorage.removeItem('currentChatId');
+            chatToLoadId = null; // Ensure fallback logic triggers
+        } else {
+             console.log(`[DEBUG] loadInitialChatData: Persisted chat ID ${chatToLoadId} found in saved chats list.`);
+        }
+    } else if (chatToLoadId !== null && state.savedChats.length === 0) {
+         // If there's a persisted ID but no saved chats at all, it's definitely stale
+         console.warn(`[DEBUG] loadInitialChatData: Persisted chat ID ${chatToLoadId} found, but no saved chats exist. Clearing persisted ID.`);
+         state.setCurrentChatId(null); // Clear the stale ID state
+         localStorage.removeItem('currentChatId');
+         chatToLoadId = null; // Ensure fallback logic triggers
+    }
+
+
+    // If a valid persisted chat ID was found (or if chatToLoadId is now null after clearing stale ID)
     if (chatToLoadId !== null) {
-        console.log(`[DEBUG] loadInitialChatData: currentChatId is ${chatToLoadId}, attempting to load it.`);
+        console.log(`[DEBUG] loadInitialChatData: Attempting to load chat ID ${chatToLoadId}.`);
         try {
             await loadChat(chatToLoadId); // Attempt to load the persisted chat (updates state)
         } catch (error) {
             console.warn(`[DEBUG] loadInitialChatData: loadChat(${chatToLoadId}) failed: ${error}. Falling back.`);
-            state.setCurrentChatId(null); // Clear the failed ID state
-            localStorage.removeItem('currentChatId');
-            chatToLoadId = null; // Ensure fallback logic triggers
+            // Error handling in loadChat already clears state and localStorage
+            // chatToLoadId is effectively null now, fallback logic will trigger
         }
     }
 
-    // If no persisted chat or loading failed, load most recent or start new
-    if (chatToLoadId === null) {
-        console.log("[DEBUG] loadInitialChatData: No valid currentChatId, loading most recent or creating new.");
-        const firstChat = state.savedChats.length > 0 ? state.savedChats[0] : null; // Get from state
+    // If no valid persisted chat or loading failed, load most recent or start new
+    if (state.currentChatId === null) { // Check state.currentChatId after attempts
+        console.log("[DEBUG] loadInitialChatData: No valid currentChatId after attempts, loading most recent or creating new.");
+        const firstChat = state.savedChats.length > 0 ? state.savedChats[0] : null; // Get from state (already sorted by loadSavedChats)
         if (firstChat) {
             const mostRecentChatId = firstChat.id;
             console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`);
@@ -1019,19 +1080,44 @@ export async function loadInitialNotesData() {
     // await loadSavedNotes(); // Load notes list state first
 
     let noteToLoadId = state.currentNoteId; // Use persisted ID
+    let noteFoundInList = false;
 
+    // Check if the persisted ID exists in the already loaded list of notes
+    if (noteToLoadId !== null && state.savedNotes.length > 0) {
+        noteFoundInList = state.savedNotes.some(note => note.id === noteToLoadId);
+        if (!noteFoundInList) {
+            console.warn(`[DEBUG] loadInitialNotesData: Persisted note ID ${noteToLoadId} not found in saved notes list. Clearing persisted ID.`);
+            state.setCurrentNoteId(null); // Clear the stale ID state
+            localStorage.removeItem('currentNoteId');
+            noteToLoadId = null; // Ensure fallback logic triggers
+        } else {
+             console.log(`[DEBUG] loadInitialNotesData: Persisted note ID ${noteToLoadId} found in saved notes list.`);
+        }
+    } else if (noteToLoadId !== null && state.savedNotes.length === 0) {
+         // If there's a persisted ID but no saved notes at all, it's definitely stale
+         console.warn(`[DEBUG] loadInitialNotesData: Persisted note ID ${noteToLoadId} found, but no saved notes exist. Clearing persisted ID.`);
+         state.setCurrentNoteId(null); // Clear the stale ID state
+         localStorage.removeItem('currentNoteId');
+         noteToLoadId = null; // Ensure fallback logic triggers
+    }
+
+
+    // If a valid persisted note ID was found (or if noteToLoadId is now null after clearing stale ID)
     if (noteToLoadId !== null) {
-        console.log(`[DEBUG] loadInitialNotesData: currentNoteId is ${noteToLoadId}, attempting to load it.`);
+        console.log(`[DEBUG] loadInitialNotesData: Attempting to load note ID ${noteToLoadId}.`);
         try {
             await loadNote(noteToLoadId); // Attempt to load persisted note (updates state)
         } catch (error) {
             console.warn(`[DEBUG] loadInitialNotesData: loadNote(${noteToLoadId}) failed: ${error}. Starting new note.`);
-            await startNewNote(); // If load fails, start new (updates state)
-            noteToLoadId = state.currentNoteId; // Update ID to the newly created one in state
+            // Error handling in loadNote already clears state and localStorage
+            // noteToLoadId is effectively null now, fallback logic will trigger
         }
-    } else {
-        console.log("[DEBUG] loadInitialNotesData: No currentNoteId, loading most recent or creating new.");
-        const firstNote = state.savedNotes.length > 0 ? state.savedNotes[0] : null; // Get from state
+    }
+
+    // If no valid persisted note or loading failed, load most recent or start new
+    if (state.currentNoteId === null) { // Check state.currentNoteId after attempts
+        console.log("[DEBUG] loadInitialNotesData: No valid currentNoteId after attempts, loading most recent or creating new.");
+        const firstNote = state.savedNotes.length > 0 ? state.savedNotes[0] : null; // Get from state (already sorted by loadSavedNotes)
         if (firstNote) {
             const mostRecentNoteId = firstNote.id;
             console.log(`[DEBUG] Loading most recent note: ${mostRecentNoteId}`);
