@@ -12,6 +12,9 @@ export const WEB_SEARCH_PLUGIN_ENABLED_KEY = 'webSearchPluginEnabled';
 export const ACTIVE_TAB_KEY = 'activeTab';
 export const CURRENT_NOTE_ID_KEY = 'currentNoteId';
 export const CURRENT_NOTE_MODE_KEY = 'currentNoteMode';
+// --- NEW KEY ---
+export const HISTORY_PLUGIN_COLLAPSED_KEY = 'historyPluginCollapsed';
+// ---------------
 
 // File Settings
 export const MAX_FILE_SIZE_MB = 10;

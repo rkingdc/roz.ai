@@ -94,6 +94,14 @@ export function setupEventListeners() {
     elements.pluginsToggleButton?.addEventListener('click', ui.toggleRightSidebar); // UI-only toggle
     elements.filePluginHeader?.addEventListener('click', ui.toggleFilePlugin); // UI-only toggle
     elements.calendarPluginHeader?.addEventListener('click', ui.toggleCalendarPlugin); // UI-only toggle
+    // Add listener for history plugin header if it's collapsible
+    if (elements.historyPluginHeader && elements.historyPluginContent) {
+         elements.historyPluginHeader.addEventListener('click', () => {
+             const isCollapsed = elements.historyPluginContent.classList.contains('hidden');
+             ui.setPluginSectionCollapsed(elements.historyPluginHeader, elements.historyPluginContent, !isCollapsed, config.HISTORY_PLUGIN_COLLAPSED_KEY); // Assuming a new config key
+         });
+    }
+
 
     // --- File Plugin Interactions ---
     elements.attachFullButton?.addEventListener('click', () => {
@@ -112,9 +120,9 @@ export function setupEventListeners() {
 
     // Session File Upload (Paperclip)
     elements.fileUploadSessionLabel?.addEventListener('click', () => {
-        if (state.isFilePluginEnabled && state.currentTab === 'chat') {
+        if (state.isFilePluginEnabled && state.currentTab === 'chat') { // Use getters
             elements.fileUploadSessionInput?.click();
-        } else if (!state.isFilePluginEnabled) {
+        } else if (!state.isFilePluginEnabled) { // Use getter
             state.setStatusMessage("Files plugin is disabled in settings.", true); // Update state (notifies statusMessage)
             // UI update is triggered by statusMessage notification
         }
@@ -412,6 +420,21 @@ export function setupEventListeners() {
     });
 
 
+    // --- NEW: Add click listener for history list items (delegated) ---
+    elements.noteHistoryList?.addEventListener('click', async (event) => {
+        const listItem = event.target.closest('.history-list-item');
+        if (!listItem) return;
+        const historyId = parseInt(listItem.dataset.historyId);
+        if (isNaN(historyId)) return;
+
+        // TODO: Implement logic to load/view a specific history entry
+        // This will likely involve a new API endpoint and UI modal/display area
+        console.log(`[DEBUG] History item clicked: ID=${historyId}. Loading history version not yet implemented.`);
+        state.setStatusMessage(`Loading history version ${historyId} not yet implemented.`, true); // Update state
+    });
+    // -----------------------------------------------------------------
+
+
     console.log("Event listeners set up.");
 }
 
@@ -431,7 +454,9 @@ function subscribeStateChangeListeners() {
 
     state.subscribe('savedNotes', ui.handleStateChange_savedNotes);
     state.subscribe('currentNote', ui.handleStateChange_currentNote); // Combined note details
-    state.subscribe('noteContent', ui.handleStateChange_currentNote); // Note content changes also trigger currentNote handler
+    // --- REMOVED REDUNDANT SUBSCRIPTION ---
+    // state.subscribe('noteContent', ui.handleStateChange_currentNote); // Note content changes also trigger currentNote handler
+    // --------------------------------------
     state.subscribe('currentNoteMode', ui.handleStateChange_currentNoteMode);
 
     state.subscribe('uploadedFiles', ui.handleStateChange_uploadedFiles);
@@ -451,6 +476,10 @@ function subscribeStateChangeListeners() {
 
     // Subscribe the UI handler to the currentTab state change
     state.subscribe('currentTab', ui.handleStateChange_currentTab);
+
+    // --- NEW: Subscribe UI to noteHistory state change ---
+    state.subscribe('noteHistory', ui.renderNoteHistory);
+    // ----------------------------------------------------
 }
 
 
