@@ -87,9 +87,9 @@ function loadPersistedStates() {
     state.setCalendarContextActive(localStorage.getItem('calendarContextActive') === 'true');
     state.setStreamingEnabled(localStorage.getItem(config.STREAMING_ENABLED_KEY) === null ? true : localStorage.getItem(config.STREAMING_ENABLED_KEY) === 'true');
     state.setFilePluginEnabled(localStorage.getItem(config.FILES_PLUGIN_ENABLED_KEY) === null ? true : localStorage.getItem(config.FILES_PLUGIN_ENABLED_KEY) === 'true');
-    // --- CHANGE DEFAULT FOR CALENDAR PLUGIN ---
-    state.setCalendarPluginEnabled(localStorage.getItem(config.CALENDAR_PLUGIN_ENABLED_KEY) === null ? false : localStorage.getItem(config.CALENDAR_PLUGIN_ENABLED_KEY) === 'true');
-    // ------------------------------------------
+    // --- CHANGE DEFAULT FOR CALENDAR PLUGIN FROM FALSE TO TRUE ---
+    state.setCalendarPluginEnabled(localStorage.getItem(config.CALENDAR_PLUGIN_ENABLED_KEY) === null ? true : localStorage.getItem(config.CALENDAR_PLUGIN_ENABLED_KEY) === 'true');
+    // ------------------------------------------------------------
     state.setWebSearchPluginEnabled(localStorage.getItem(config.WEB_SEARCH_PLUGIN_ENABLED_KEY) === null ? true : localStorage.getItem(config.WEB_SEARCH_PLUGIN_ENABLED_KEY) === 'true');
 
     // Load initial tab
