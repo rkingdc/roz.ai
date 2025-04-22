@@ -2294,26 +2294,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     await loadSavedChats(); // Always load the list of chats first
 
-                    if (currentChatId !== null) {
-                        console.log(`[DEBUG] switchTab (chat): currentChatId is ${currentChatId}, attempting to load it.`); // Added log
-                        // Load the persisted chat if one exists
-                        await loadChat(currentChatId); // This will also call updateActiveChatListItem
-                        console.log(`[DEBUG] loadChat(${currentChatId}) completed.`); // Added log
-                    } else {
-                        console.log("[DEBUG] No currentChatId, loading most recent or creating new."); // Added log
-                        // If no persisted chat, try to load the most recent one from the list
-                        const firstChatElement = savedChatsList.querySelector('.list-item');
-                        if (firstChatElement) {
-                            const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
-                            console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`); // Added log
-                            await loadChat(mostRecentChatId); // This will also call updateActiveChatListItem
-                            console.log(`[DEBUG] loadChat(${mostRecentChatId}) completed.`); // Added log
-                        } else {
-                            console.log("[DEBUG] No saved chats found, starting new chat."); // Added log
-                            // If no saved chats at all, start a new one
-                            await startNewChat(); // This will also call loadChat and updateActiveChatListItem
-                            console.log("[DEBUG] startNewChat completed."); // Added log
+                    let chatToLoadId = currentChatId; // Start with the persisted ID
+
+                    if (chatToLoadId !== null) {
+                        console.log(`[DEBUG] switchTab (chat): currentChatId is ${chatToLoadId}, attempting to load it.`); // Added log
+                        try {
+                            await loadChat(chatToLoadId); // Attempt to load the persisted chat
+                            console.log(`[DEBUG] loadChat(${chatToLoadId}) completed successfully.`); // Added log
+                        } catch (error) {
+                            console.warn(`[DEBUG] switchTab (chat): loadChat(${chatToLoadId}) failed: ${error}. Falling back to most recent or new chat.`); // Added log
+                            // If loading the persisted chat fails, clear the ID and fall through to the next check
+                            currentChatId = null; // Ensure state is null
+                            localStorage.removeItem(currentChatId); // Clear persisted ID on error
+                            chatToLoadId = null; // Ensure the fallback logic is triggered
+                            // Error message is already added by loadChat's catch block
                         }
+                    }
+
+                    // If chatToLoadId is still null (either wasn't persisted or failed to load)
+                    if (chatToLoadId === null) {
+                         console.log("[DEBUG] No valid currentChatId, loading most recent or creating new."); // Added log
+                         const firstChatElement = savedChatsList.querySelector('.list-item');
+                         if (firstChatElement) {
+                             const mostRecentChatId = parseInt(firstChatElement.dataset.chatId);
+                             console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`); // Added log
+                             await loadChat(mostRecentChatId); // This will also call updateActiveChatListItem
+                             console.log(`[DEBUG] loadChat(${mostRecentChatId}) completed.`); // Added log
+                         } else {
+                             console.log("[DEBUG] No saved chats found, starting new chat."); // Added log
+                             await startNewChat(); // This will also call loadChat and updateActiveChatListItem
+                             console.log("[DEBUG] startNewChat completed."); // Added log
+                         }
                     }
 
                     // After loadChat/startNewChat completes, currentChatId should be set
@@ -2321,18 +2332,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
                 } catch (error) {
-                    console.error("[DEBUG] switchTab (chat): Error during chat load:", error); // Added log
-                    // Error handling is done within loadChat/startNewChat, just log here
-                    // Ensure UI is in a safe state (e.g., clear chatbox, disable input)
+                    console.error("[DEBUG] switchTab (chat): Error during chat load process:", error); // Added log
+                    // This catch block will only catch errors from loadSavedChats or unexpected errors
+                    // Error handling for loadChat failures is now inside the inner try/catch
                     clearChatbox();
-                    addMessage('system', `[Error loading chats: ${error.message}]`, true);
-                    currentChatId = null; // Ensure state is null
+                    addMessage('system', `[Error during chat load process: ${error.message}]`, true);
+                    currentChatId = null;
                     currentChatNameInput.value = '';
                     currentChatIdDisplay.textContent = 'ID: -';
                     modelSelector.value = defaultModel;
-                    updateActiveChatListItem(); // Remove highlight
-                    localStorage.removeItem(currentChatId); // Clear persisted ID on error
-                    // Note: Plugin UI update and input disabling are handled by setLoadingState(false) in finally
+                    updateActiveChatListItem();
+                    localStorage.removeItem(currentChatId);
+                    updateStatus("Error loading chats.", true);
                 }
 
 
