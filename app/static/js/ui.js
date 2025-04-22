@@ -2,7 +2,7 @@
 
 // This module handles UI updates and interactions.
 // It reads from the state module and updates the DOM via the elements module.
-// It does NOT call API functions or modify state directly (except for UI-local state like modal visibility).
+// It does NOT directly manipulate the DOM or call UI rendering functions.
 
 import { elements } from './dom.js'; // Import elements from dom.js
 import * as state from './state.js'; // UI reads from state
@@ -195,7 +195,7 @@ function createChatItem(chat) {
 
     const listItem = document.createElement('div');
     // Use 'active' class for selection as per CORRECT HTML
-    listItem.classList.add('list-item', 'chat-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
+    listItem.classList.add('list-item', 'chat-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover'); // Removed flex, items-center, truncate, flex-grow, p-1
     listItem.dataset.chatId = chat.id;
 
     // Container for name and delete button (flex row)
@@ -357,7 +357,7 @@ function createNoteItem(note) {
 
     const listItem = document.createElement('div');
     // Note items use 'active' class for selection as per provided HTML
-    listItem.classList.add('list-item', 'note-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
+    listItem.classList.add('list-item', 'note-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover'); // Removed flex, items-center, truncate, flex-grow, p-1
     listItem.dataset.noteId = note.id;
 
     // Container for name and delete button (flex row)
@@ -1121,7 +1121,7 @@ export function renderChatInputArea() {
  * @param {'chat' | 'notes'} tab - The desired tab ('chat' or 'notes').
  */
 export function switchTab(tab) { // Made synchronous, state is already updated by event listener
-    console.log(`[DEBUG] switchTab called for tab: ${tab}`); // Add log here
+    console.log(`[DEBUG] ui.switchTab called for tab: ${tab}`); // Add log here
     const {
         chatNavButton, notesNavButton, chatSection, notesSection,
         chatSidebarContent, notesSidebarContent, modelSelectorContainer,
@@ -1141,43 +1141,62 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
         return;
     }
 
-    console.log(`[DEBUG] switchTab: Toggling UI for tab: ${tab}`);
+    console.log(`[DEBUG] ui.switchTab: Toggling UI for tab: ${tab}`);
 
     // Update navigation buttons
     chatNavButton.classList.toggle('active', tab === 'chat');
     notesNavButton.classList.toggle('active', tab === 'notes');
-    console.log(`[DEBUG] switchTab: Nav buttons updated. Chat active: ${chatNavButton.classList.contains('active')}, Notes active: ${notesNavButton.classList.contains('active')}`);
+    console.log(`[DEBUG] ui.switchTab: Nav buttons updated. Chat active: ${chatNavButton.classList.contains('active')}, Notes active: ${notesNavButton.classList.contains('active')}`);
 
 
     // Toggle main content sections
-    if (chatSection) chatSection.classList.toggle('hidden', tab !== 'chat'); // Add null check
-    if (notesSection) notesSection.classList.toggle('hidden', tab !== 'notes'); // Add null check
-    console.log(`[DEBUG] switchTab: Main sections updated. Chat hidden: ${chatSection?.classList.contains('hidden')}, Notes hidden: ${notesSection?.classList.contains('hidden')}`);
+    if (chatSection) {
+        chatSection.classList.toggle('hidden', tab !== 'chat');
+        console.log(`[DEBUG] ui.switchTab: chatSection hidden: ${chatSection.classList.contains('hidden')}`);
+    }
+    if (notesSection) {
+        notesSection.classList.toggle('hidden', tab !== 'notes');
+        console.log(`[DEBUG] ui.switchTab: notesSection hidden: ${notesSection.classList.contains('hidden')}`);
+    }
 
 
     // Toggle sidebar content sections
-    if (chatSidebarContent) chatSidebarContent.classList.toggle('hidden', tab !== 'chat'); // Add null check
-    if (notesSidebarContent) notesSidebarContent.classList.toggle('hidden', tab !== 'notes'); // Add null check
-    console.log(`[DEBUG] switchTab: Sidebar content updated. Chat hidden: ${chatSidebarContent?.classList.contains('hidden')}, Notes hidden: ${notesSidebarContent?.classList.contains('hidden')}`);
+    if (chatSidebarContent) {
+        chatSidebarContent.classList.toggle('hidden', tab !== 'chat');
+        console.log(`[DEBUG] ui.switchTab: chatSidebarContent hidden: ${chatSidebarContent.classList.contains('hidden')}`);
+    }
+    if (notesSidebarContent) {
+        notesSidebarContent.classList.toggle('hidden', tab !== 'notes');
+        console.log(`[DEBUG] ui.switchTab: notesSidebarContent hidden: ${notesSidebarContent.classList.contains('hidden')}`);
+    }
 
 
     // Toggle header elements (Model Selector vs Notes Mode)
-    if (modelSelectorContainer) modelSelectorContainer.classList.toggle('hidden', tab !== 'chat'); // Add null check
-    if (notesModeElements) notesModeElements.classList.toggle('hidden', tab !== 'notes'); // Add null check
-    console.log(`[DEBUG] switchTab: Header elements updated. Model hidden: ${modelSelectorContainer?.classList.contains('hidden')}, Notes mode hidden: ${notesModeElements?.classList.contains('hidden')}`);
+    if (modelSelectorContainer) {
+        modelSelectorContainer.classList.toggle('hidden', tab !== 'chat');
+        console.log(`[DEBUG] ui.switchTab: modelSelectorContainer hidden: ${modelSelectorContainer.classList.contains('hidden')}`);
+    }
+    if (notesModeElements) {
+        notesModeElements.classList.toggle('hidden', tab !== 'notes');
+        console.log(`[DEBUG] ui.switchTab: notesModeElements hidden: ${notesModeElements.classList.contains('hidden')}`);
+    }
 
 
     // Toggle input area visibility (Chat needs it, Notes uses textarea directly)
-    if (inputArea) inputArea.classList.toggle('hidden', tab !== 'chat'); // Add null check
-    console.log(`[DEBUG] switchTab: Input area hidden: ${inputArea?.classList.contains('hidden')}`);
+    if (inputArea) {
+        inputArea.classList.toggle('hidden', tab !== 'chat');
+        console.log(`[DEBUG] ui.switchTab: inputArea hidden: ${inputArea.classList.contains('hidden')}`);
+    }
 
 
     // Update current item display in sidebar header based on state
     renderCurrentChatDetails(); // Reads state.currentChatName, state.currentChatId, state.currentChatModel
     renderCurrentNoteDetails(); // Reads state.currentNoteName, state.currentNoteId
-    console.log(`[DEBUG] switchTab: Current item details rendered.`);
+    console.log(`[DEBUG] ui.switchTab: Current item details rendered.`);
 
 
+    // REMOVED: Redundant sidebar content visibility logic
+    /*
     // Ensure sidebar content visibility matches the active tab if sidebar is open
     if (sidebar && !sidebar.classList.contains('collapsed')) { // Add null check
         console.log(`[DEBUG] switchTab: Sidebar is not collapsed, ensuring correct content is visible.`);
@@ -1191,21 +1210,22 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
     } else {
          console.log(`[DEBUG] switchTab: Sidebar is collapsed, content visibility not explicitly set.`);
     }
+    */
 
 
     // Render content specific to the new tab based on state
     if (tab === 'chat') {
-        console.log(`[DEBUG] switchTab: Rendering chat specific content.`);
+        console.log(`[DEBUG] ui.switchTab: Rendering chat specific content.`);
         renderChatHistory(); // Reads state.chatHistory
         renderUploadedFiles(); // Reads state.uploadedFiles, state.sidebarSelectedFiles, state.attachedFiles, state.sessionFile
         updateCalendarStatus(); // Reads state.calendarContext, state.isCalendarContextActive, state.isCalendarPluginEnabled
         renderChatInputArea(); // Reads plugin states, web search state, calendar active state, file plugin state
     } else { // tab === 'notes'
-        console.log(`[DEBUG] switchTab: Rendering notes specific content.`);
+        console.log(`[DEBUG] ui.switchTab: Rendering notes specific content.`);
         renderNoteContent(); // Reads state.noteContent, state.currentNoteId, state.isLoading
         setNoteMode(state.currentNoteMode); // Applies persisted/default mode from state
     }
-    console.log(`[DEBUG] switchTab finished.`);
+    console.log(`[DEBUG] ui.switchTab finished.`);
 }
 
 /**
@@ -1400,6 +1420,7 @@ export function handleStateChange_pluginEnabled(pluginName) {
 }
 
 export function handleStateChange_currentTab() {
+    console.log(`[DEBUG] handleStateChange_currentTab called. State.currentTab is ${state.currentTab}`); // Add log
     // The switchTab function already handles rendering everything for the new tab
     // This handler might be redundant if switchTab is only called by eventListeners.js
     // reacting to the tab state change. Let's keep it simple and rely on eventListeners.js
