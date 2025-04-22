@@ -698,6 +698,11 @@
      overflow: auto;
      background-color: rgba(48, 48, 63, 0.7);
 }
+
+.modal.show {
+    display: block; /* Make the modal visible when the 'show' class is added */
+}
+
  .modal-content {
      background-color: var(--rz-popup);
      margin: 10% auto;
