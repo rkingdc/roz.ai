@@ -2307,7 +2307,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  // Ensure UI is in a safe state (e.g., edit mode, disabled)
                  switchNoteMode('edit'); // Default to edit mode on error
                  notesTextarea.value = `[Error loading notes: ${error.message}]`;
-                 notesPreview.innerHTML = `<p class="text-red-500">Error loading notes: ${escapeHtml(error.message)}</p>`;
+                 notesPreview.innerHTML = `<p class="text-red-500">Error loading note: ${escapeHtml(error.message)}</p>`;
                  notesTextarea.disabled = true; // Disable input on fatal error
                  currentNoteId = null; // Ensure state is null
                  currentNoteNameInput.value = '';
