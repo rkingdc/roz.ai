@@ -91,12 +91,12 @@
         <header class="bg-rz-header text-white p-4 flex justify-between items-center flex-wrap flex-shrink-0">
             <!-- Removed h1 "roz.ai" -->
             <!-- Left container (Model Selector) -->
-            <div class="flex items-center justify-center">
-                 <div id="model-selector-container" class="flex items-center gap-2">
+            <div class="flex items-center">
+                 <div id="model-selector-container" class="flex items-center gap-2 mr-4">
                     <label for="model-selector" class="text-sm font-medium text-rz-header-text">Model:</label>
-                    <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line w-32">
+                    <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line">
                         {% for model in available_models %}
-                            <option class="bg-rz-toolbar-field" value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
+                            <option value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -438,29 +438,5 @@
 
                 <h4>Code</h4>
                 <p>Use backticks (`) for inline code and triple backticks (```) for code blocks. You can specify a language after the opening triple backticks for syntax highlighting.</p>
-                <pre><code class="language-javascript">
-// Example code block
-function greet(name) {
-  console.log("Hello, " + name);
-}
-</code></pre>
+                <pre><code class="language-markdown">This is `inline code`.
 
-                <h4>Links</h4>
-                <p>Create links using `[Link Text](url)`.</p>
-                <pre><code class="language-markdown">[Visit Google](https://www.google.com)</code></pre>
-
-                <h4>Blockquotes</h4>
-                <p>Use `>` for blockquotes.</p>
-                <pre><code class="language-markdown">> This is a blockquote.</code></pre>
-
-                <h4>Horizontal Rule</h4>
-                <p>Use three or more hyphens (`---`), asterisks (`***`), or underscores (`___`) on a line by themselves.</p>
-                <pre><code class="language-markdown">---</code></pre>
-
-                <p>Remember to leave a blank line before and after block-level elements like headers, lists, and code blocks for proper rendering.</p>
-            </div>
-        </div>
-    </div>
-
-</body>
-</html>
