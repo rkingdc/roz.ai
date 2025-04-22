@@ -304,7 +304,8 @@ function createChatItem(chat) {
     // Use 'div' and specific classes as per CORRECT HTML - color handled by CSS
     const timestampDiv = document.createElement('div');
     // Default color is text-rz-tab-background-text (greyish) based on provided HTML
-    timestampDiv.classList.add('text-xs', 'mt-0.5'); // Use specific classes and mt-0.5 - color handled by CSS
+    // Add the default color class here
+    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-tab-background-text'); // Use specific classes and mt-0.5 - color handled by CSS
     try {
         const date = new Date(chat.last_updated_at);
         // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
@@ -360,14 +361,22 @@ export function updateActiveChatListItem() {
             item.classList.add('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
 
-            // Timestamp color is handled by CSS rule .list-item.active .text-xs
-            // No need to toggle classes here
+            // When active, timestamp should be gold (text-rz-sidebar-text)
+            if (timestampDiv) {
+                timestampDiv.classList.add('text-rz-sidebar-text');
+                timestampDiv.classList.remove('text-rz-tab-background-text');
+            }
+            // Filename color is handled by CSS rule .list-item .filename (inherits from parent)
         } else {
             item.classList.remove('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
 
-            // Timestamp color is handled by CSS rule .list-item .text-xs (inherits from parent)
-            // No need to toggle classes here
+            // When inactive, timestamp should be greyish (text-rz-tab-background-text)
+            if (timestampDiv) {
+                timestampDiv.classList.remove('text-rz-sidebar-text');
+                timestampDiv.classList.add('text-rz-tab-background-text');
+            }
+            // Filename color is handled by CSS rule .list-item .filename (inherits from parent)
         }
     });
 }
@@ -449,7 +458,7 @@ function createNoteItem(note) {
     // Use 'div' and specific classes as per provided HTML - color handled by CSS
     const timestampDiv = document.createElement('div');
     // Default color is text-rz-tab-background-text (greyish) based on provided HTML
-    timestampDiv.classList.add('text-xs', 'mt-0.5'); // Use specific classes and mt-0.5 - color handled by CSS
+    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-tab-background-text'); // Use specific classes and mt-0.5 - color handled by CSS
     try {
         const date = new Date(note.last_saved_at);
         // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
@@ -504,14 +513,22 @@ export function updateActiveNoteListItem() {
             item.classList.add('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
 
-            // Timestamp color is handled by CSS rule .list-item.active .text-xs
-            // No need to toggle classes here
+            // When active, timestamp should be gold (text-rz-sidebar-text)
+            if (timestampDiv) {
+                timestampDiv.classList.add('text-rz-sidebar-text');
+                timestampDiv.classList.remove('text-rz-tab-background-text');
+            }
+             // Filename color is handled by CSS rule .list-item .filename (inherits from parent)
         } else {
             item.classList.remove('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
 
-            // Timestamp color is handled by CSS rule .list-item .text-xs (inherits from parent)
-            // No need to toggle classes here
+            // When inactive, timestamp should be greyish (text-rz-tab-background-text)
+            if (timestampDiv) {
+                timestampDiv.classList.remove('text-rz-sidebar-text');
+                timestampDiv.classList.add('text-rz-tab-background-text');
+            }
+            // Filename color is handled by CSS rule .list-item .filename (inherits from parent)
         }
     });
 }
@@ -1111,7 +1128,7 @@ export async function switchTab(tab) {
          import('./api.js').then(api => {
              // If there's a persisted note ID, load it. Otherwise, load most recent or start new.
             if (state.currentNoteId !== null) {
-                api.loadNote(state.currentNoteId).catch(error => {
+                api.loadNote(noteId).catch(error => { // Corrected: Use noteId here
                     console.error("Error loading persisted note:", error);
                     // Fallback to loading most recent or starting a new note if loading fails
                     api.loadInitialNotesData(); // This function handles the fallback logic

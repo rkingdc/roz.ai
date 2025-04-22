@@ -202,9 +202,11 @@
 .list-item .text-xs {
     color: var(--rz-tab-background-text); /* Default color for timestamp */
 }
+/* REMOVED: This rule was overriding the text-rz-sidebar-text class */
+/*
 .list-item.active .text-xs {
     color: var(--rz-sidebar-active-text); /* Active color for timestamp (Maroon) */
-}
+/* } */
 
 
  #chat-area {
