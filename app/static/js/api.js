@@ -339,22 +339,24 @@ export async function attachSelectedFilesSummary() {
                 await fetchSummary(fileId);
 
                 // Check state for the summary content after fetchSummary completes
-                // We need to find the updated file details from the main list now
+                // fetchSummary calls loadUploadedFiles on success, which updates state.uploadedFiles
                 const updatedFile = state.uploadedFiles.find(f => f.id === fileId);
-                if (updatedFile && updatedFile.has_summary && !state.summaryContent.startsWith('[Error')) {
+
+                // Primary check: Did the reloaded file data indicate a summary now exists?
+                if (updatedFile && updatedFile.has_summary) {
                     summaryAvailable = true; // Mark as available after successful generation
-                    setStatus(`Summary generated for ${file.filename}.`);
+                    setStatus(`Summary generated and verified for ${file.filename}.`);
                 } else {
-                    // If generation failed, the error is already in state.summaryContent from fetchSummary
+                    // If the file data wasn't updated, generation likely failed.
+                    // Use the summaryContent state for the specific error message if available.
                     const errorMsg = state.summaryContent.startsWith('[Error')
-                        ? state.summaryContent // Use the specific error from fetchSummary
-                        : `[Error: Failed to generate or validate summary for ${file.filename}]`; // Fallback generic error
-                    // We don't need to throw here, just record the error and ensure summaryAvailable is false
-                    console.error(`Summary generation failed for ${file.filename}: ${errorMsg}`);
+                        ? state.summaryContent // Use the specific error from fetchSummary/state
+                        : `[Error: Failed to generate or verify summary for ${file.filename}]`; // Fallback error
+                    console.error(`Summary generation failed or verification failed for ${file.filename}: ${errorMsg}`);
                     errors.push(`${file.filename}: ${errorMsg}`);
                     summaryAvailable = false; // Ensure it's marked as failed
                 }
-            } catch (error) {
+            } catch (error) { // This catch block handles errors *within the try block above*
                 // This catch block handles errors *within the try block above*,
                 // like issues finding the updatedFile or accessing properties.
                 // Errors from fetchSummary itself are handled by checking state.summaryContent.
