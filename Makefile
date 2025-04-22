@@ -2,12 +2,14 @@
 
 # Define variables
 # Define the path to the Python executable *inside* the virtual environment
+
+VENV_DIR := /home/roz/.venv/assistant
 PYTHON := $(VENV_DIR)/bin/python3 # Changed to python3
 PIP := $(VENV_DIR)/bin/pip3 # Changed to pip3
-VENV_DIR := .venv
 RUN_FILE := run.py
 SCHEMA_FILE := app/schema.sql
 REQUIREMENTS_FILE := requirements.txt
+PROD_DB := assistant_chat_v8.db
 TEST_DIR := tests
 LINT_DIR := app tests
 # Use a timestamp for the release directory name
@@ -53,7 +55,7 @@ start:
 	fi; \
 	echo "Starting latest release: $(LATEST_RELEASE)"; \
 	# Change directory to the latest release and run the app using the venv python
-	@cd $(LATEST_RELEASE) && $(PYTHON) $(RUN_FILE) # Now uses .venv/bin/python3
+	@cd $(LATEST_RELEASE) && DATABASE_NAME="../$(PROD_DB)" $(GUNICORN_CMD)
 
 test: install
 	@echo "Running tests..."
