@@ -300,7 +300,7 @@ function createChatItem(chat) {
 
     // Add timestamp span
     const timestampSpan = document.createElement('span');
-    // Default color is text-rz-tab-background-text (greyish)
+    // Default color is text-rz-tab-background-text (greyish) based on provided HTML
     timestampSpan.classList.add('timestamp', 'text-xs', 'text-rz-tab-background-text', 'mt-1'); // Added timestamp class and styling
     try {
         const date = new Date(chat.last_updated_at);
@@ -353,27 +353,24 @@ export function updateActiveChatListItem() {
 
         if (chatId === state.currentChatId) {
             item.classList.add('active-selection');
-            // Remove default text colors to allow inheritance from parent .active-selection
-            if (filenameSpan) {
-                filenameSpan.classList.remove('text-rz-sidebar-text');
-                filenameSpan.classList.remove('text-rz-sidebar-active-text'); // Ensure this is also removed
-            }
+            // When active, timestamp should be gold (text-rz-sidebar-text)
             if (timestampSpan) {
+                timestampSpan.classList.add('text-rz-sidebar-text');
                 timestampSpan.classList.remove('text-rz-tab-background-text');
-                timestampSpan.classList.remove('text-rz-sidebar-active-text'); // Ensure this is also removed
             }
+            // Filename should remain gold (text-rz-sidebar-text) - no change needed here
         } else {
             item.classList.remove('active-selection');
-            // Add default text colors back when inactive
-            if (filenameSpan) {
-                filenameSpan.classList.add('text-rz-sidebar-text');
-                filenameSpan.classList.remove('text-rz-sidebar-active-text'); // Ensure this is also removed
-            }
+            // When inactive, timestamp should be greyish (text-rz-tab-background-text)
             if (timestampSpan) {
+                timestampSpan.classList.remove('text-rz-sidebar-text');
                 timestampSpan.classList.add('text-rz-tab-background-text');
-                timestampSpan.classList.remove('text-rz-sidebar-active-text'); // Ensure this is also removed
             }
+            // Filename should remain gold (text-rz-sidebar-text) - no change needed here
         }
+        // Ensure the active text color class is removed from spans if it was ever added
+        if (filenameSpan) filenameSpan.classList.remove('text-rz-sidebar-active-text');
+        if (timestampSpan) timestampSpan.classList.remove('text-rz-sidebar-active-text');
     });
 }
 
@@ -1050,28 +1047,28 @@ export async function switchTab(tab) {
     // Use dynamic imports for api functions to avoid circular dependencies
     if (tab === 'chat') {
         import('./api.js').then(api => {
-            // If there's a persisted chat ID, load it. Otherwise, start a new chat.
+            // If there's a persisted chat ID, load it. Otherwise, load most recent or start new.
             if (state.currentChatId !== null) {
                 api.loadChat(state.currentChatId).catch(error => {
                     console.error("Error loading persisted chat:", error);
-                    // Fallback to starting a new chat if loading fails
-                    api.startNewChat();
+                    // Fallback to loading most recent or starting a new chat if loading fails
+                    api.loadInitialChatData(); // This function handles the fallback logic
                 });
             } else {
-                api.startNewChat();
+                 api.loadInitialChatData(); // Load most recent or start new
             }
         }).catch(error => console.error("Failed to import api for chat tab:", error));
     } else { // tab === 'notes'
          import('./api.js').then(api => {
-             // If there's a persisted note ID, load it. Otherwise, start a new note.
+             // If there's a persisted note ID, load it. Otherwise, load most recent or start new.
             if (state.currentNoteId !== null) {
                 api.loadNote(state.currentNoteId).catch(error => {
                     console.error("Error loading persisted note:", error);
-                    // Fallback to starting a new note if loading fails
-                    api.startNewNote();
+                    // Fallback to loading most recent or starting a new note if loading fails
+                    api.loadInitialNotesData(); // This function handles the fallback logic
                 });
             } else {
-                api.startNewNote();
+                 api.loadInitialNotesData(); // Load most recent or start new
             }
          }).catch(error => console.error("Failed to import api for notes tab:", error));
     }

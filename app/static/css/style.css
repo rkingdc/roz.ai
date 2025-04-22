@@ -182,7 +182,7 @@
 /* Added styling for the timestamp */
  .timestamp {
      font-size: 0.7rem; /* Smaller font size */
-     color: var(--rz-tab-background-text); /* Lighter color */
+     /* Default color is text-rz-tab-background-text (greyish) */
      margin-top: 0.25rem; /* Space above timestamp */
      display: block; /* Ensure it takes its own line */
 }
@@ -469,7 +469,7 @@
 }
  .list-item.active-selection { /* Ensure this class also works */
      background-color: var(--rz-sidebar-active-bg);
-     color: var(--rz-sidebar-active-text);
+     /* REMOVED: color: var(--rz-sidebar-active-text); */
      font-weight: 500;
 }
  .list-item .filename {
