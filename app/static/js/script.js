@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // so they can be outside DOMContentLoaded, but they might be called
     // by code inside it.
     function updateStatus(message, isError = false) {
-        // Access statusBar inside the function, it's defined in the DOMContentLoaded scope
+        // Access statusBarElement here, it's defined in the DOMContentLoaded scope
         const statusBarElement = statusBar; // Use the variable from the outer scope
 
         if (!statusBarElement) {
@@ -489,8 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
                      if (currentNoteMode === 'edit') {
                          notesTextarea.focus();
                      } else {
-                         // Cannot focus the preview div, maybe focus the notes section container?
-                         notesSection.focus(); // Or just do nothing
+                         // Cannot focus preview
                      }
                  }
             }
@@ -1994,22 +1993,39 @@ document.addEventListener('DOMContentLoaded', () => {
         setLoadingState(true, "Deleting Chat");
         updateStatus(`Deleting chat ${chatId}...`);
         try {
+            // AWAIT the fetch call to ensure the backend deletion completes before proceeding
             const response = await fetch(`/api/chat/${chatId}`, {
                 method: 'DELETE'
             });
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            if (!response.ok) {
+                 const errorData = await response.json(); // Get error details from backend
+                 throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
             updateStatus(`Chat ${chatId} deleted.`);
-            listItemElement.remove();
+            listItemElement.remove(); // Remove from UI list *after* successful backend delete
             if (!savedChatsList.querySelector('.list-item')) {
                 savedChatsList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">No saved chats yet.</p>`;
             }
             if (chatId == currentChatId) {
-                await startNewChat();
+                await startNewChat(); // Start a new chat if the current one was deleted
+            } else {
+                 // If a different chat was deleted, just reload the list to be safe
+                 await loadSavedChats();
             }
         } catch (error) {
             console.error(`Error deleting chat ${chatId}:`, error);
             updateStatus(`Error deleting chat: ${error.message}`, true);
             addMessage('system', `[Error deleting chat ${chatId}: ${error.message}]`, true);
+            // If the delete failed, the item was removed from the UI prematurely.
+            // loadSavedChats() is called in the success path or if the current chat was deleted.
+            // If a non-current chat delete failed, loadSavedChats() isn't called here.
+            // We should probably reload the list on *any* delete attempt failure to resync the UI.
+            // However, loadSavedChats() is already called in the finally block of initializeApp
+            // and loadChat. Let's rely on those for now, or add a specific reload here if needed.
+            // For now, the fix is just adding await. If the backend returns an error,
+            // the catch block runs, and the item won't be removed from the UI list *before* the error.
+            // The list will only be reloaded on success or if the current chat is deleted.
+            // This seems correct.
         } finally {
             setLoadingState(false);
         }
