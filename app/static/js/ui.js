@@ -1227,7 +1227,7 @@ export async function switchTab(tab) {
          import('./api.js').then(api => {
              // If there's a persisted note ID, load it. Otherwise, load most recent or start new.
             if (state.currentNoteId !== null) {
-                api.loadNote(noteId).catch(error => { // Corrected: Use noteId here
+                api.loadNote(state.currentNoteId).catch(error => { // Corrected: Use state.currentNoteId here
                     console.error("Error loading persisted note:", error);
                     // Fallback to loading most recent or starting a new note if loading fails
                     api.loadInitialNotesData(); // This function handles the fallback logic
