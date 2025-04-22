@@ -45,49 +45,107 @@
     </aside>
 
     <main id="main-content">
-        <div id="main-header">
-            <label for="model-selector" class="text-sm font-medium">Model:</label>
-            <select id="model-selector" class="model-selector">
-                {% for model in available_models %}
-                    <option value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div id="chat-area">
-            <!-- Area to display the currently attached session file (MOVED BELOW) -->
-            <div id="chatbox">
-                <div class="system-msg p-4">Initializing chat...</div>
-            </div>
-        </div>
-        <div id="input-area">
-             <!-- Container for ALL attached files (session + plugin) -->
-             <div id="selected-files-container" class="hidden"></div>
-             <div id="input-controls">
-                <!-- File upload trigger moved here -->
-                <label class="btn btn-secondary btn-sm p-1 flex-shrink-0 self-end mb-1 me-1" id="file-upload-session-label" for="file-upload-session-input" title="Attach file to message" style="height: 42px; line-height: 1.5rem;">
-                    <i class="fas fa-paperclip"></i>
-                </label>
-	       <div id="file-upload-session-container" class="hidden">
-    <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf">
-    <!-- Label moved to input-controls div -->
-    <!-- <div id="session-file-display"></div> --> <!-- This div is no longer used -->
-</div>
-                <textarea id="message-input" rows="2" class="flex-grow p-2 rounded-lg focus:outline-none resize-none text-sm" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
-                <div class="flex flex-col items-center self-end flex-shrink-0"> <!-- Container for button and checkbox -->
-                    <!-- Web Search Toggle - Visibility controlled by plugin setting -->
-                    <label class="toggle-switch text-xs mb-1" id="web-search-toggle-label" title="Include web search results in the AI's context">
-                        <input type="checkbox" id="web-search-toggle">
-                        <span class="toggle-slider"></span>
-                        Web Search
-                    </label>
-                    <button id="send-button" class="btn btn-primary w-full" style="height: 42px;">
-                        <i class="fas fa-paper-plane"></i> Send
+        <!-- Header with Nav Buttons and Model Selector -->
+        <header class="bg-rz-header text-white p-4 flex justify-between items-center flex-wrap flex-shrink-0">
+            <div class="flex items-center">
+                <!-- Add the button group here -->
+                <div class="inline-flex rounded-md shadow-sm mr-4" role="group">
+                    <button type="button" id="chat-nav-btn" class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-l-md hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-blue-500 dark:focus:text-white active">
+                      Chat
+                    </button>
+                    <button type="button" id="notes-nav-btn" class="px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-r-md hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-2 focus:ring-blue-700 focus:text-blue-700 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-blue-500 dark:focus:text-white">
+                      Notes
                     </button>
                 </div>
+                <!-- Keep the h1 -->
+                <h1 class="text-xl font-bold">roz.ai</h1>
+            </div>
+            <!-- Keep the rest of the header content (settings, plugins toggles) -->
+            <div class="flex items-center space-x-4">
+                <!-- Model Selector -->
+                <div class="flex items-center gap-2">
+                    <label for="model-selector" class="text-sm font-medium text-rz-header-text">Model:</label>
+                    <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line">
+                        {% for model in available_models %}
+                            <option value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
+                        {% endif %}>{{ model }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <!-- Settings Button - Now in plugins sidebar header -->
+                <!-- <button id="settings-btn" class="p-1 rounded text-white hover:bg-gray-700" title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button> -->
+            </div>
+        </header>
+        <!-- End Header -->
+
+
+        <!-- Chat Section -->
+        <div id="chat-section" class="flex flex-col flex-grow overflow-hidden">
+             <div id="chat-area" class="flex flex-col flex-grow overflow-hidden p-4">
+                <!-- Area to display the currently attached session file (MOVED BELOW) -->
+                <div id="chatbox" class="flex-grow overflow-y-auto mb-4 border border-gray-300 rounded-lg p-2 bg-white">
+                    <div class="system-msg p-4">Initializing chat...</div>
+                </div>
+            </div>
+            <div id="input-area" class="flex flex-col gap-2 p-4 border-t border-gray-300 bg-gray-100 flex-shrink-0">
+                 <!-- Container for ALL attached files (session + plugin) -->
+                 <div id="selected-files-container" class="hidden"></div>
+                 <div id="input-controls" class="flex items-center gap-2">
+                    <!-- File upload trigger moved here -->
+                    <label class="btn btn-secondary btn-sm p-1 flex-shrink-0 self-end mb-1 me-1" id="file-upload-session-label" for="file-upload-session-input" title="Attach file to message" style="height: 42px; line-height: 1.5rem;">
+                        <i class="fas fa-paperclip"></i>
+                    </label>
+                   <div id="file-upload-session-container" class="hidden">
+        <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf">
+        <!-- Label moved to input-controls div -->
+        <!-- <div id="session-file-display"></div> --> <!-- This div is no longer used -->
+    </div>
+                    <textarea id="message-input" rows="2" class="flex-grow p-2 rounded-lg focus:outline-none resize-none text-sm border border-gray-300" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
+                    <div class="flex flex-col items-center self-end flex-shrink-0"> <!-- Container for button and checkbox -->
+                        <!-- Web Search Toggle - Visibility controlled by plugin setting -->
+                        <label class="toggle-switch text-xs mb-1" id="web-search-toggle-label" title="Include web search results in the AI's context">
+                            <input type="checkbox" id="web-search-toggle">
+                            <span class="toggle-slider"></span>
+                            Web Search
+                        </label>
+                        <button id="send-button" class="btn btn-primary w-full" style="height: 42px;">
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+             <div id="status-bar" class="text-xs px-4 py-1 flex-shrink-0">Status: Idle</div>
+        </div>
+        <!-- End Chat Section -->
+
+
+        <!-- Notes Section -->
+        <div id="notes-section" class="flex flex-col flex-grow p-4 overflow-hidden hidden">
+            <div class="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden">
+                <!-- Textarea for Markdown Input -->
+                <div class="flex-1 flex flex-col overflow-hidden">
+                    <label for="notes-textarea" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Markdown Input</label>
+                    <textarea id="notes-textarea" class="flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white font-mono text-sm resize-none overflow-auto"></textarea>
+                </div>
+                <!-- Preview Area -->
+                <div class="flex-1 flex flex-col overflow-hidden">
+                     <label for="notes-preview" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preview</label>
+                    <div id="notes-preview" class="flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm overflow-y-auto prose dark:prose-invert max-w-none dark:bg-gray-800 dark:border-gray-600 dark:text-white">
+                        <!-- Markdown will be rendered here -->
+                    </div>
+                </div>
+            </div>
+            <!-- Save Button -->
+            <div class="mt-4 flex justify-end flex-shrink-0">
+                <button id="save-note-button" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-700 dark:hover:bg-blue-800">
+                    Save Note
+                </button>
             </div>
         </div>
-         <div id="status-bar" class="text-xs px-4 py-1 flex-shrink-0">Status: Idle</div>
+        <!-- End Notes Section -->
+
     </main>
 
     <aside id="plugins-sidebar">

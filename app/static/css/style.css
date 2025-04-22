@@ -409,19 +409,19 @@
      border-color: rgba(248, 113, 113, 0.5);
 }
 /* Scrollbar Styling */
- #chatbox::-webkit-scrollbar, #saved-chats-list::-webkit-scrollbar, #uploaded-files-list::-webkit-scrollbar, #selected-files-container::-webkit-scrollbar {
+ #chatbox::-webkit-scrollbar, #saved-chats-list::-webkit-scrollbar, #uploaded-files-list::-webkit-scrollbar, #selected-files-container::-webkit-scrollbar, #notes-textarea::-webkit-scrollbar, #notes-preview::-webkit-scrollbar, #manage-files-list::-webkit-scrollbar {
      width: 6px;
      height: 6px;
 }
- #chatbox::-webkit-scrollbar-track, #saved-chats-list::-webkit-scrollbar-track, #uploaded-files-list::-webkit-scrollbar-track, #selected-files-container::-webkit-scrollbar-track {
+ #chatbox::-webkit-scrollbar-track, #saved-chats-list::-webkit-scrollbar-track, #uploaded-files-list::-webkit-scrollbar-track, #selected-files-container::-webkit-scrollbar-track, #notes-textarea::-webkit-scrollbar-track, #notes-preview::-webkit-scrollbar-track, #manage-files-list::-webkit-scrollbar-track {
      background: var(--rz-popup);
      border-radius: 10px;
 }
- #chatbox::-webkit-scrollbar-thumb, #saved-chats-list::-webkit-scrollbar-thumb, #uploaded-files-list::-webkit-scrollbar-thumb, #selected-files-container::-webkit-scrollbar-thumb {
+ #chatbox::-webkit-scrollbar-thumb, #saved-chats-list::-webkit-scrollbar-thumb, #uploaded-files-list::-webkit-scrollbar-thumb, #selected-files-container::-webkit-scrollbar-thumb, #notes-textarea::-webkit-scrollbar-thumb, #notes-preview::-webkit-scrollbar-thumb, #manage-files-list::-webkit-scrollbar-thumb {
      background: var(--rz-tab-line);
      border-radius: 10px;
 }
- #chatbox::-webkit-scrollbar-thumb:hover, #saved-chats-list::-webkit-scrollbar-thumb:hover, #uploaded-files-list::-webkit-scrollbar-thumb:hover, #selected-files-container::-webkit-scrollbar-thumb:hover {
+ #chatbox::-webkit-scrollbar-thumb:hover, #saved-chats-list::-webkit-scrollbar-thumb:hover, #uploaded-files-list::-webkit-scrollbar-thumb:hover, #selected-files-container::-webkit-scrollbar-thumb:hover, #notes-textarea::-webkit-scrollbar-thumb:hover, #notes-preview::-webkit-scrollbar-thumb:hover, #manage-files-list::-webkit-scrollbar-thumb:hover {
      background: var(--rz-toolbar-text);
 }
 /* Sidebar Specific Styling */
@@ -801,3 +801,21 @@
      transform: translateX(14px);
 }
 
+/* New Styles for Nav Buttons */
+.rounded-l-md.active,
+.rounded-r-md.active {
+    background-color: #3b82f6; /* blue-500 */
+    color: white;
+    border-color: #3b82f6; /* blue-500 */
+}
+
+/* Add dark mode styles for active buttons */
+.dark .rounded-l-md.active,
+.dark .rounded-r-md.active {
+    background-color: #1d4ed8; /* blue-700 */
+    border-color: #1d4ed8; /* blue-700 */
+}
+
+/* Ensure the prose class is styled for dark mode if needed */
+/* Tailwind's default prose-invert handles this, but if you have custom prose styles,
+   make sure they work in dark mode. */
