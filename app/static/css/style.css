@@ -685,9 +685,9 @@
 }
  .btn-group-left.active,
  .btn-group-right.active {
-     background-color: var(--rz-button-primary-bg); /* Use primary bg for active */
-     color: var(--rz-button-primary-text); /* Use primary text for active */
-     border-color: var(--rz-button-primary-bg); /* Match border to background */
+     background-color: var(--rz-toolbar-text); /* Use dark goldenrod bg for active */
+     color: var(--rz-toolbar-field); /* Use deep maroon text for active */
+     border-color: var(--rz-toolbar-text); /* Match border to background */
      z-index: 10; /* Ensure active button overlaps adjacent border slightly */
 }
  .btn-group-left:disabled,
