@@ -138,8 +138,9 @@ export function setLoadingState(isLoading, statusMessage = "Busy...") {
     if (elements.currentNoteNameInput) elements.currentNoteNameInput.disabled = isLoading;
     if (elements.loadCalendarButton) elements.loadCalendarButton.disabled = isLoading;
     if (elements.manageFilesButton) elements.manageFilesButton.disabled = isLoading;
-    if (elements.attachFullButton) elements.attachFullButton.disabled = isLoading;
-    if (elements.attachSummaryButton) elements.attachSummaryButton.disabled = isLoading;
+    // Enable/disable Attach buttons based on sidebar selection state, not just overall loading
+    // if (elements.attachFullButton) elements.attachFullButton.disabled = isLoading;
+    // if (elements.attachSummaryButton) elements.attachSummaryButton.disabled = isLoading;
     if (elements.fetchUrlButton) elements.fetchUrlButton.disabled = isLoading;
     if (elements.saveSummaryButton) elements.saveSummaryButton.disabled = isLoading;
     if (elements.settingsButton) elements.settingsButton.disabled = isLoading;
@@ -169,6 +170,8 @@ export function setLoadingState(isLoading, statusMessage = "Busy...") {
         updateStatus("Idle");
         elements.bodyElement?.classList.remove('loading');
     }
+    // Update attach button state after loading state changes
+    updateAttachButtonState();
 }
 
 /**
@@ -569,19 +572,22 @@ export function renderUploadedFiles(files) {
     }
 
     files.forEach(file => {
-        const isSelected = state.selectedFiles.some(sf => sf.id === file.id);
-        createSidebarFileItem(file, isSelected); // Use helper
-        createModalFileItem(file, isSelected); // Use helper
+        // Check if the file is currently selected in the sidebar (using the correct state variable)
+        const isSidebarSelected = state.sidebarSelectedFiles.some(sf => sf.id === file.id);
+        createSidebarFileItem(file, isSidebarSelected); // Use helper
+        // Modal list doesn't use checkboxes for selection anymore, only for management actions
+        createModalFileItem(file); // Use helper
     });
 
-    // After rendering, update the display of selected files in the input area
-    renderSelectedFiles(); // Use state.selectedFiles directly
+    // After rendering, update the display of attached files and session file in the input area
+    renderAttachedAndSessionFiles(); // Use state.attachedFiles and state.sessionFile
+    updateAttachButtonState(); // Update state of attach buttons based on sidebar selection
 }
 
 /**
  * Creates a DOM element for a file item in the sidebar list.
  * @param {Object} file - The file object { id, filename, mimetype, filesize, has_summary }.
- * @param {boolean} isSelected - Whether the file is currently selected.
+ * @param {boolean} isSelected - Whether the file is currently selected in the sidebar.
  * @returns {HTMLElement} The created div element.
  */
 function createSidebarFileItem(file, isSelected) {
@@ -595,7 +601,7 @@ function createSidebarFileItem(file, isSelected) {
     itemDiv.dataset.fileId = file.id;
     itemDiv.dataset.filename = file.filename;
     itemDiv.dataset.hasSummary = file.has_summary; // Store summary status
-    // Add 'active' class if currently selected
+    // Add 'active' class if currently selected in the sidebar
     if (isSelected) {
         itemDiv.classList.add('active');
     }
@@ -652,21 +658,23 @@ function createSidebarFileItem(file, isSelected) {
     itemDiv.addEventListener('click', () => {
         const fileId = parseInt(itemDiv.dataset.fileId);
         const filename = itemDiv.dataset.filename;
+        const hasSummary = itemDiv.dataset.hasSummary === 'true'; // Get boolean
         if (isNaN(fileId) || !filename) return;
 
-        const isCurrentlySelected = state.selectedFiles.some(f => f.id === fileId);
+        // Check against sidebarSelectedFiles (using the correct state variable)
+        const isCurrentlySelected = state.sidebarSelectedFiles.some(f => f.id === fileId);
 
         if (isCurrentlySelected) {
-            // Remove the file from selectedFiles
-            state.removeSelectedFileById(fileId);
+            // Remove the file from sidebarSelectedFiles
+            state.removeSidebarSelectedFileById(fileId);
         } else {
-            // Add the file to selectedFiles (type will be determined later)
-            state.addSelectedFile({ id: fileId, filename: filename, type: 'pending' });
+            // Add the file to sidebarSelectedFiles
+            state.addSidebarSelectedFile({ id: fileId, filename: filename, has_summary: hasSummary }); // Store has_summary for button state
         }
 
-        // Update styling for this item and re-render selected files display
-        updateSelectedFileListItemStyling(); // Update all file list items
-        renderSelectedFiles(); // Update the display below the message input
+        // Update styling for this item and update attach button state
+        updateSelectedFileListItemStyling(); // Update all sidebar file list items
+        updateAttachButtonState(); // Update state of attach buttons
     });
 
 
@@ -674,7 +682,7 @@ function createSidebarFileItem(file, isSelected) {
 }
 
 /**
- * Updates the highlighting for selected file list items.
+ * Updates the highlighting for selected file list items in the sidebar.
  * Multiple files can be selected.
  */
 function updateSelectedFileListItemStyling() {
@@ -685,7 +693,8 @@ function updateSelectedFileListItemStyling() {
         const fileId = parseInt(item.dataset.fileId);
         if (isNaN(fileId)) return;
 
-        const isSelected = state.selectedFiles.some(f => f.id === fileId);
+        // Check against sidebarSelectedFiles (using the correct state variable)
+        const isSelected = state.sidebarSelectedFiles.some(f => f.id === fileId);
 
         if (isSelected) {
             item.classList.add('active'); // Use 'active' class for selected state
@@ -697,48 +706,31 @@ function updateSelectedFileListItemStyling() {
     });
 }
 
-
 /**
- * Helper to handle sidebar file checkbox change.
- * @param {Event} e - The change event.
+ * Updates the enabled/disabled state of the Attach Full and Attach Summary buttons
+ * based on the number and type of files selected in the sidebar.
  */
-// REMOVED: This function is no longer needed as checkboxes are removed from sidebar file list.
-/*
-function handleSidebarFileCheckboxChange(e) {
-    const checkbox = e.target;
-    const fileId = parseInt(checkbox.closest('.file-list-item')?.dataset.fileId); // Get ID from dataset
-    const listItem = checkbox.closest('.file-list-item');
-    const filename = listItem?.dataset.filename;
-    if (!listItem || !filename || isNaN(fileId)) return;
+function updateAttachButtonState() {
+    const { attachFullButton, attachSummaryButton } = elements;
+    if (!attachFullButton || !attachSummaryButton) return;
 
-    // Find the corresponding item in the modal list
-    const modalItem = elements.manageFilesList?.querySelector(`.file-list-item[data-file-id="${fileId}"]`);
-    const modalCheckbox = modalItem?.querySelector('.file-checkbox');
+    const selectedCount = state.sidebarSelectedFiles.length;
+    // Check if any selected file in sidebarSelectedFiles has has_summary === true
+    const hasSummarizable = state.sidebarSelectedFiles.some(f => f.has_summary);
 
-    if (checkbox.checked) {
-        // Add a placeholder entry, type will be determined later when attach button clicked
-        state.addSelectedFile({ id: fileId, filename: filename, type: 'pending' });
-        listItem.classList.add('active-selection');
-        if (modalItem) modalItem.classList.add('active-selection'); // Sync modal styling
-        if (modalCheckbox) modalCheckbox.checked = true; // Sync modal checkbox
-    } else {
-        // Remove ALL entries for this file ID from selectedFiles
-        state.removeSelectedFileById(fileId);
-        listItem.classList.remove('active-selection');
-        if (modalItem) modalItem.classList.remove('active-selection'); // Sync modal styling
-        if (modalCheckbox) modalCheckbox.checked = false; // Sync modal checkbox
-    }
-    renderSelectedFiles(); // Update the display below the message input
+    // Attach Full is enabled if at least one file is selected in the sidebar AND not loading
+    attachFullButton.disabled = state.isLoading || selectedCount === 0;
+
+    // Attach Summary is enabled if at least one file is selected in the sidebar AND at least one selected file has a summary AND not loading
+    attachSummaryButton.disabled = state.isLoading || selectedCount === 0 || !hasSummarizable;
 }
-*/
 
 
 /**
  * Creates a DOM element for a file item in the Manage Files modal list.
  * @param {Object} file - The file object { id, filename, mimetype, filesize, has_summary, uploaded_at }.
- * @param {boolean} isSelected - Whether the file is currently selected.
  */
-function createModalFileItem(file, isSelected) {
+function createModalFileItem(file) {
     const { manageFilesList } = elements;
      if (!manageFilesList) return;
 
@@ -747,21 +739,10 @@ function createModalFileItem(file, isSelected) {
     itemDiv.dataset.fileId = file.id;
     itemDiv.dataset.filename = file.filename;
     itemDiv.dataset.hasSummary = file.has_summary;
-    itemDiv.classList.toggle('active-selection', isSelected); // Keep styling sync
 
-    // Checkbox (col-span-1)
-    const checkboxCol = document.createElement('div');
-    checkboxCol.classList.add('col-span-1', 'flex', 'items-center');
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.classList.add('file-checkbox');
-    checkbox.checked = isSelected;
-     checkbox.addEventListener('change', handleModalFileCheckboxChange); // Attach listener
-    checkboxCol.appendChild(checkbox);
-
-    // Filename (col-span-6)
+    // Filename (col-span-7) - Increased span as checkbox is removed
     const nameCol = document.createElement('div');
-    nameCol.classList.add('col-span-6', 'text-sm', 'text-gray-800', 'truncate');
+    nameCol.classList.add('col-span-7', 'text-sm', 'text-gray-800', 'truncate');
     nameCol.textContent = file.filename;
     nameCol.title = file.filename; // Add tooltip
 
@@ -803,65 +784,40 @@ function createModalFileItem(file, isSelected) {
     actionsCol.appendChild(summaryButton);
     actionsCol.appendChild(deleteButton);
 
-    itemDiv.appendChild(checkboxCol);
+    // No checkbox column anymore
     itemDiv.appendChild(nameCol);
     itemDiv.appendChild(sizeCol);
     itemDiv.appendChild(actionsCol);
 
-     // Add click listener to toggle checkbox when clicking the item div (but not the checkbox or buttons)
-    itemDiv.addEventListener('click', (event) => {
-        // Check if the click target is the checkbox or any button within the actions column
-        const isActionElement = event.target === checkbox || actionsCol.contains(event.target);
-        if (!isActionElement) {
-            checkbox.checked = !checkbox.checked;
-            checkbox.dispatchEvent(new Event('change')); // Trigger the change event manually
-        }
-    });
+     // No click listener on the item div itself for modal items
 
     manageFilesList.appendChild(itemDiv);
 }
 
-/**
- * Helper to handle modal file checkbox change.
- * @param {Event} e - The change event.
- */
-function handleModalFileCheckboxChange(e) {
-    const checkbox = e.target;
-    const fileId = parseInt(checkbox.closest('.file-list-item')?.dataset.fileId); // Get ID from dataset
-    const listItem = checkbox.closest('.file-list-item');
-    const filename = listItem?.dataset.filename;
-    if (!listItem || !filename || isNaN(fileId)) return;
-
-    // Find the corresponding item in the sidebar list
-    const sidebarItem = elements.uploadedFilesList?.querySelector(`.file-list-item[data-file-id="${fileId}"]`);
-    const sidebarCheckbox = sidebarItem?.querySelector('.file-checkbox');
-
-
-    if (checkbox.checked) {
-        // Add the file to selectedFiles (type will be determined later)
-        state.addSelectedFile({ id: fileId, filename: filename, type: 'pending' }); // Use 'pending' type initially
-        listItem.classList.add('active-selection'); // Apply active styling in modal
-        // No sidebar sync needed here
-    } else {
-        // Remove ALL entries for this file ID from selectedFiles
-        state.removeSelectedFileById(fileId);
-        listItem.classList.remove('active-selection'); // Remove active styling in modal
-        // No sidebar sync needed here
-    }
-    renderSelectedFiles(); // Update the display below the message input
-}
-
 
 /**
- * Renders the list of currently selected files below the message input.
+ * Renders the list of currently attached files and the session file below the message input.
  */
-export function renderSelectedFiles() {
+export function renderAttachedAndSessionFiles() {
     const { selectedFilesContainer, fileUploadSessionInput } = elements;
     if (!selectedFilesContainer) return;
 
     selectedFilesContainer.innerHTML = ''; // Clear current display
 
-    if (state.selectedFiles.length === 0) {
+    // Combine attached files and session file for rendering
+    const filesToDisplay = [...state.attachedFiles];
+    if (state.sessionFile) {
+        // Add session file with a distinct type for rendering
+        filesToDisplay.push({
+            id: 'session', // Use a non-numeric ID for session file
+            filename: state.sessionFile.filename,
+            type: 'session',
+            // Include other session file details if needed for display
+        });
+    }
+
+
+    if (filesToDisplay.length === 0) {
         selectedFilesContainer.classList.add('hidden');
         // If session file was cleared, reset the input value
         if (!state.sessionFile && fileUploadSessionInput) {
@@ -872,12 +828,13 @@ export function renderSelectedFiles() {
 
     selectedFilesContainer.classList.remove('hidden');
 
-    state.selectedFiles.forEach(file => {
+    filesToDisplay.forEach(file => {
         const fileTag = document.createElement('span');
         // Use theme colors for tags
         fileTag.classList.add('selected-file-tag', 'inline-flex', 'items-center', 'text-xs', 'font-medium', 'px-2.5', 'py-0.5', 'rounded-full', 'mr-2', 'mb-1');
-        fileTag.dataset.fileId = file.id;
-        fileTag.dataset.fileType = file.type; // 'permanent' or 'session'
+        // Use data attributes to store file info for removal
+        fileTag.dataset.fileId = file.id; // Will be 'session' for session file
+        fileTag.dataset.fileType = file.type; // 'full', 'summary', or 'session'
 
         // Apply color based on type (using theme variables)
         if (file.type === 'session') {
@@ -885,7 +842,6 @@ export function renderSelectedFiles() {
         } else { // 'full' or 'summary'
              fileTag.classList.add('bg-rz-button-primary-bg', 'text-rz-button-primary-text');
         }
-
 
         const filenameSpan = document.createElement('span');
         filenameSpan.textContent = file.filename;
@@ -910,43 +866,20 @@ export function renderSelectedFiles() {
                     elements.fileUploadSessionInput.value = '';
                 }
             } else { // Permanent file (full or summary)
-                state.removeSelectedFileById(file.id);
-                 // Find the corresponding item in the modal list and uncheck/unselect it
-                 const modalItem = elements.manageFilesList?.querySelector(`.file-list-item[data-file-id="${file.id}"]`);
-                 if (modalItem) {
-                     const modalCheckbox = modalItem.querySelector('.file-checkbox');
-                     if (modalCheckbox) modalCheckbox.checked = false;
-                     modalItem.classList.remove('active-selection');
-                 }
+                // Remove from attachedFiles state
+                state.removeAttachedFileById(parseInt(file.id)); // Ensure ID is integer
+                // Note: This removes ALL attached types (full/summary) for this file ID.
+                // If you needed to remove only 'full' or 'summary', you'd need more complex state/logic.
+
                  // Do NOT affect sidebar item styling here. Sidebar selection is independent.
             }
-            renderSelectedFiles(); // Re-render the display
+            renderAttachedAndSessionFiles(); // Re-render the display
         });
 
         fileTag.appendChild(filenameSpan);
         fileTag.appendChild(removeButton);
         selectedFilesContainer.appendChild(fileTag);
     });
-}
-
-/**
- * Renders the session file tag specifically.
- * This is a helper to ensure the session file is always the only 'session' type file displayed.
- * Called when a session file is added or removed.
- */
-export function renderSessionFileTag() {
-    const sessionFile = state.sessionFile;
-    // Filter out any old session file tags before rendering the new one (or none)
-    // CORRECTED: Use the state function to remove the session file from the array
-    state.removeSessionFileFromSelected();
-
-    if (sessionFile) {
-        // Add the current session file to selectedFiles if it's not already there
-        if (!state.selectedFiles.some(f => f.type === 'session')) {
-             state.selectedFiles.push(sessionFile);
-        }
-    }
-    renderSelectedFiles(); // Re-render the entire selected files container
 }
 
 
@@ -1048,13 +981,18 @@ export function updatePluginUI() {
          elements.fileUploadSessionLabel.classList.toggle('hidden', !state.isFilePluginEnabled);
     }
      if (elements.selectedFilesContainer) {
-         // Only hide if plugin is disabled AND there are no selected files (to avoid hiding during transition)
-         if (!state.isFilePluginEnabled && state.selectedFiles.length === 0) {
+         // Only hide if plugin is disabled AND there are no attached/session files
+         const hasFilesToDisplay = state.attachedFiles.length > 0 || state.sessionFile !== null;
+         if (!state.isFilePluginEnabled && !hasFilesToDisplay) {
              elements.selectedFilesContainer.classList.add('hidden');
          }
-         // If plugin is enabled and there are selected files, ensure it's visible
-         if (state.isFilePluginEnabled && state.selectedFiles.length > 0) {
+         // If plugin is enabled and there are files to display, ensure it's visible
+         if (state.isFilePluginEnabled && hasFilesToDisplay) {
               elements.selectedFilesContainer.classList.remove('hidden');
+         }
+         // If plugin is enabled but no files, hide it
+         if (state.isFilePluginEnabled && !hasFilesToDisplay) {
+             elements.selectedFilesContainer.classList.add('hidden');
          }
      }
 
@@ -1079,8 +1017,11 @@ export function updatePluginUI() {
         if (!state.isFilePluginEnabled) {
              elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
              elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
-             state.clearSelectedFiles(); // Clear any selected files if plugin is disabled
-             renderSelectedFiles(); // Update display
+             state.clearSidebarSelectedFiles(); // Clear temporary sidebar selections
+             state.clearAttachedFiles(); // Clear permanently attached files
+             state.setSessionFile(null); // Clear session file
+             renderAttachedAndSessionFiles(); // Update display
+             updateAttachButtonState(); // Update button state
         } else {
             // If plugin was just enabled, trigger a reload of files
             // This is handled by loadUploadedFiles in api.js, which is called during init
@@ -1209,6 +1150,24 @@ export async function switchTab(tab) {
              chatSidebarContent.classList.remove('hidden');
              notesSidebarContent.classList.add('hidden');
          }
+         // Ensure file lists are loaded/rendered if plugin is enabled
+         if (state.isFilePluginEnabled) {
+             import('./api.js').then(api => {
+                 api.loadUploadedFiles(); // Reload files for the chat context
+             }).catch(error => console.error("Failed to import api for file load on tab switch:", error));
+         } else {
+             if(elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
+             if(elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
+         }
+         // Ensure calendar context is loaded/rendered if plugin is enabled
+         if (state.isCalendarPluginEnabled) {
+             import('./api.js').then(api => {
+                 api.loadCalendarEvents(); // Reload calendar events
+             }).catch(error => console.error("Failed to import api for calendar load on tab switch:", error));
+         } else {
+             updateCalendarStatus(); // Update status to disabled
+         }
+
 
     } else { // tab === 'notes'
          const currentNote = state.savedNotes.find(n => n.id === state.currentNoteId);
