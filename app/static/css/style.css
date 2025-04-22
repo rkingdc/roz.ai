@@ -268,11 +268,12 @@
     border-color: #f87171; /* Red-400 */
 }
 
-/* Ensure markdown elements within messages are styled appropriately */
+/* REMOVED: Ensure markdown elements within messages are styled appropriately */
 /* Tailwind's prose class is not applied here, so basic markdown needs styling */
+/*
 .message .message-content pre {
-    background-color: #1f2937; /* Dark gray */
-    color: #f9fafb; /* Light gray */
+    background-color: #1f2937;
+    color: #f9fafb;
     padding: 0.5rem;
     border-radius: 0.25rem;
     margin-top: 0.5rem;
@@ -282,8 +283,8 @@
 }
 
 .message .message-content code {
-    background-color: #e5e7eb; /* Light gray */
-    color: #1f2937; /* Dark gray */
+    background-color: #e5e7eb;
+    color: #1f2937;
     padding: 0.1rem 0.3rem;
     border-radius: 0.25rem;
     font-size: 0.85rem;
@@ -291,7 +292,7 @@
 }
 
 .message .message-content p {
-    margin-bottom: 0.5em; /* Space between paragraphs */
+    margin-bottom: 0.5em;
 }
 
 .message .message-content ul,
@@ -314,7 +315,7 @@
 }
 
 .message .message-content a {
-    color: var(--rz-toolbar-text); /* Link color */
+    color: var(--rz-toolbar-text);
     text-decoration: underline;
 }
 
@@ -331,7 +332,7 @@
     border-top: 1px solid var(--rz-tab-line);
     margin: 1em 0;
 }
-
+*/
 
 /* --- End Chat Message Styling --- */
 
@@ -858,7 +859,8 @@
 .dark .rounded-r-md.active {
     background-color: #1d4ed8; /* blue-700 */
     border-color: #1d4ed8; /* blue-700 */
-} */
+}
+*/
 
 /* Ensure the prose class is styled for dark mode if needed */
 /* Tailwind's default prose-invert handles this, but if you have custom prose styles,
