@@ -74,10 +74,10 @@ renderer.codespan = function(text) {
 // Define options for marked.parse
 // Use the custom renderer
 // Note: marked's default behavior for newlines is different from your original
-const markedOptions = {
-    renderer: renderer,
-    breaks: true
-};
+// const markedOptions = { // REMOVED: Will set globally
+//     renderer: renderer,
+//     breaks: true
+// };
 
 
 // --- Utility Functions ---
@@ -266,6 +266,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Default model value needs the selector to be available
     const defaultModel = modelSelector.value;
+
+    // --- Configure Marked.js globally ---
+    marked.setOptions({
+        renderer: renderer,
+        breaks: true,
+        // Add other options if needed, e.g., gfm: true (default), pedantic: false, sanitize: false
+        gfm: true // Ensure GitHub Flavored Markdown is enabled (usually default)
+    });
+    console.log("[DEBUG] Marked.js options set globally."); // Added log
 
 
     // --- Functions that access DOM elements (MUST be inside DOMContentLoaded or called from here) ---
@@ -669,7 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // For streaming, content is appended chunk by chunk, markdown applied at the end
             // This branch is for non-streaming or initial message creation
             // REMOVED escapeHtml here - let marked handle escaping within code blocks/spans
-            contentSpan.innerHTML = marked.parse(processedContent, markedOptions);
+            contentSpan.innerHTML = marked.parse(processedContent); // Use globally set options
 
 
             // Append the new message element to the chatbox
@@ -706,7 +715,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
         // Apply markdown parsing to the unescaped content
-        const parsedContent = marked.parse(processedContent, markedOptions);
+        const parsedContent = marked.parse(processedContent); // Use globally set options
 
         // Ensure the result is a string before setting innerHTML
         contentElement.innerHTML = String(parsedContent);
@@ -2270,9 +2279,9 @@ document.addEventListener('DOMContentLoaded', () => {
                          await loadNote(mostRecentNoteId);
                          console.log(`[DEBUG] loadNote(${mostRecentNoteId}) completed.`);
                      } else {
-                         console.log("[DEBUG] switchTab (notes): No saved notes found, starting new note.");
+                         console.log("[DEBUG] No saved notes found, starting new note.");
                          await startNewNote(); // Create and load a new note
-                         console.log("[DEBUG] switchTab (notes): startNewNote completed.");
+                         console.log("[DEBUG] startNewNote completed.");
                      }
                  }
                  // After loadNote/startNewNote completes, currentNoteId should be set
@@ -2663,9 +2672,10 @@ document.addEventListener('DOMContentLoaded', () => {
     /** Updates the markdown preview area based on the textarea content. */
     function updateNotesPreview() {
         const markdownText = notesTextarea.value;
-        // Use marked.parse with the custom renderer and options
+        // Use marked.parse with the globally set options
+        const renderedHtml = marked.parse(markdownText); // Pass only the text
         // Ensure the result is a string before setting innerHTML
-        notesPreview.innerHTML = String(marked.parse(markdownText, markedOptions));
+        notesPreview.innerHTML = String(renderedHtml);
     }
 
     // --- New Markdown Tips Modal Functions ---
