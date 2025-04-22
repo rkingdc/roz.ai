@@ -345,13 +345,23 @@ export async function attachSelectedFilesSummary() {
                     summaryAvailable = true; // Mark as available after successful generation
                     setStatus(`Summary generated for ${file.filename}.`);
                 } else {
-                    // Use the potentially updated summaryContent from state for the error message
-                    const errorMsg = state.summaryContent.startsWith('[Error') ? state.summaryContent : `Failed to generate summary for ${file.filename}`;
-                    throw new Error(errorMsg);
+                    // If generation failed, the error is already in state.summaryContent from fetchSummary
+                    const errorMsg = state.summaryContent.startsWith('[Error')
+                        ? state.summaryContent // Use the specific error from fetchSummary
+                        : `[Error: Failed to generate or validate summary for ${file.filename}]`; // Fallback generic error
+                    // We don't need to throw here, just record the error and ensure summaryAvailable is false
+                    console.error(`Summary generation failed for ${file.filename}: ${errorMsg}`);
+                    errors.push(`${file.filename}: ${errorMsg}`);
+                    summaryAvailable = false; // Ensure it's marked as failed
                 }
             } catch (error) {
-                console.error(`Error generating summary for ${file.filename}:`, error);
-                errors.push(`${file.filename}: ${error.message}`);
+                // This catch block handles errors *within the try block above*,
+                // like issues finding the updatedFile or accessing properties.
+                // Errors from fetchSummary itself are handled by checking state.summaryContent.
+                console.error(`Error during summary attachment logic for ${file.filename}:`, error);
+                // Use the caught error message if available, otherwise use the state message or a generic one
+                const specificError = error.message || (state.summaryContent.startsWith('[Error') ? state.summaryContent : `[Error: Unknown issue processing summary for ${file.filename}]`);
+                errors.push(`${file.filename}: ${specificError}`);
                 summaryAvailable = false; // Ensure it's not attached if generation failed
             }
         }
