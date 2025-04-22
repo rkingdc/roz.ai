@@ -2,8 +2,8 @@
 
 # Define variables
 # Define the path to the Python executable *inside* the virtual environment
-PYTHON := $(VENV_DIR)/bin/python
-PIP := $(PYTHON) -m pip
+PYTHON := $(VENV_DIR)/bin/python3 # Changed to python3
+PIP := $(VENV_DIR)/bin/pip3 # Changed to pip3
 VENV_DIR := .venv
 RUN_FILE := run.py
 SCHEMA_FILE := app/schema.sql
@@ -31,18 +31,18 @@ venv:
 
 install: venv
 	@echo "Installing dependencies..."
-	@$(PIP) install -r $(REQUIREMENTS_FILE)
+	@$(PIP) install -r $(REQUIREMENTS_FILE) # Now uses $(PIP) which is .venv/bin/pip3
 	@echo "Dependencies installed."
 
 init-db: install
 	@echo "Initializing the database..."
-	@$(PYTHON) -m flask --app $(RUN_FILE) init-db
+	@$(PYTHON) -m flask --app $(RUN_FILE) init-db # Now uses .venv/bin/python3
 	@echo "Database initialized."
 
 run: install init-db
 	@echo "Starting the development server..."
 	# Use flask run with the default database name (flaskr.sqlite in instance/)
-	@$(PYTHON) -m flask --app $(RUN_FILE) run --debug --port 5000
+	@$(PYTHON) -m flask --app $(RUN_FILE) run --debug --port 5000 # Now uses .venv/bin/python3
 
 # Modified start target to run from the latest release bundle
 start:
@@ -53,18 +53,18 @@ start:
 	fi; \
 	echo "Starting latest release: $(LATEST_RELEASE)"; \
 	# Change directory to the latest release and run the app using the venv python
-	@cd $(LATEST_RELEASE) && $(PYTHON) $(RUN_FILE)
+	@cd $(LATEST_RELEASE) && $(PYTHON) $(RUN_FILE) # Now uses .venv/bin/python3
 
 test: install
 	@echo "Running tests..."
-	@$(PYTHON) -m pytest $(TEST_DIR)
+	@$(PYTHON) -m pytest $(TEST_DIR) # Now uses .venv/bin/python3
 
 lint: install
 	@echo "Running linting..."
 	@$(PIP) install flake8 isort black > /dev/null # Ensure linters are installed silently
-	@$(VENV_DIR)/bin/flake8 $(LINT_DIR)
-	@$(VENV_DIR)/bin/isort --check-only $(LINT_DIR)
-	@$(VENV_DIR)/bin/black --check $(LINT_DIR)
+	@$(VENV_DIR)/bin/flake8 $(LINT_DIR) # This was already explicit, but let's keep it consistent
+	@$(VENV_DIR)/bin/isort --check-only $(LINT_DIR) # This was already explicit
+	@$(VENV_DIR)/bin/black --check $(LINT_DIR) # This was already explicit
 
 # New deploy target
 deploy: install
@@ -97,10 +97,10 @@ start-dev:
 	@rm -f /tmp/assistant_dev_db.sqlite
 	# Initialize the temporary database file
 	@echo "Initializing database..."
-	@DATABASE_NAME=/tmp/assistant_dev_db.sqlite $(PYTHON) -m flask --app $(RUN_FILE) init-db
+	@DATABASE_NAME=/tmp/assistant_dev_db.sqlite $(PYTHON) -m flask --app $(RUN_FILE) init-db # Now uses .venv/bin/python3
 	@echo "Starting Flask development server..."
 	# Start flask run with the temporary database name, TEST_DATABASE flag, IS_DEV_SERVER flag, and --debug flag
-	@DATABASE_NAME=/tmp/assistant_dev_db.sqlite TEST_DATABASE=TRUE IS_DEV_SERVER=TRUE $(PYTHON) -m flask --app $(RUN_FILE) run --debug --port 5000
+	@DATABASE_NAME=/tmp/assistant_dev_db.sqlite TEST_DATABASE=TRUE IS_DEV_SERVER=TRUE $(PYTHON) -m flask --app $(RUN_FILE) run --debug --port 5000 # Now uses .venv/bin/python3
 
 
 # Target to display help
