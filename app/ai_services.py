@@ -7,8 +7,10 @@ from google.genai.types import (
     Part,
     Content,
     GenerateContentResponse,
-
+    Blob,       # Import Blob for inline data
+    Candidate,  # Import Candidate for error response structure
 )
+import binascii # Import binascii for the correct exception type
 from flask import current_app, g  # Import g for request context caching
 import tempfile
 import os
@@ -574,12 +576,13 @@ Search Query:"""
 
 # --- Internal Helper for Streaming Error Handling ---
 def _yield_streaming_error(error_msg: str):
-    """Helper to yield an error message in a GenerateContentResponse structure for streaming."""
+    """Helper to yield an error message in a valid GenerateContentResponse structure for streaming."""
     logger.debug(f"Yielding streaming error: {error_msg}")
-    # Mimic the structure the route expects for error chunks
-    # Use prompt_feedback or a simple text part based on route handler's preference
-    # Using a simple text part might be easier for the client to parse consistently.
-    yield GenerateContentResponse(parts=[Part(text=error_msg)])
+    # Create a valid structure: Response -> Candidates -> Candidate -> Content -> Parts -> Part
+    error_part = Part(text=error_msg)
+    error_content = Content(parts=[error_part], role="model") # Assign role for Content
+    error_candidate = Candidate(content=error_content, finish_reason="ERROR") # Use ERROR finish reason
+    yield GenerateContentResponse(candidates=[error_candidate])
 
 
 # --- Chat Response Generation ---
@@ -1243,8 +1246,8 @@ def _prepare_chat_content(
                         "text/",
                     ) # Simplified check for inline data support
                     if mimetype.startswith(supported_mimetypes):
-                        # Create an inline data Part directly
-                        inline_part = Part(inline_data=Content(data=content_blob, mime_type=mimetype))
+                        # Create an inline data Part directly using Blob
+                        inline_part = Part(inline_data=Blob(mime_type=mimetype, data=content_blob))
                         current_turn_parts.append(inline_part)
                         logger.info(
                             f"Attached session file '{filename}' ({mimetype}) as inline data."
