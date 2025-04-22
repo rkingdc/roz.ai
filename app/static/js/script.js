@@ -2263,10 +2263,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadNote(noteId) {
         console.log(`[DEBUG] loadNote(${noteId}) called. Current note: ${currentNoteId}, isLoading: ${isLoading}`); // Added log
         if (isLoading) return;
-        if (noteId === currentNoteId) {
-             console.log(`[DEBUG] loadNote(${noteId}): Already the current note. Skipping reload.`); // Added log
-             return; // Avoid reloading if already on this note
-        }
+        // REMOVED: Early exit check - we want this to run fully when called
+        // if (noteId === currentNoteId) {
+        //      console.log(`[DEBUG] loadNote(${noteId}): Already the current note. Skipping reload.`); // Added log
+        //      return; // Avoid reloading if already on this note
+        // }
         setLoadingState(true, "Loading Note");
         updateStatus(`Loading note ${noteId}...`);
         notesTextarea.value = ""; // Clear textarea while loading
