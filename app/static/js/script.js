@@ -491,7 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
                      } else {
                          // Cannot focus preview
                      }
-                 }
+                }
             }
         }
     }
@@ -985,6 +985,8 @@ document.addEventListener('DOMContentLoaded', () => {
             manageFilesList.innerHTML = '<p class="text-red-500 text-xs p-1">Error loading files.</p>';
             updateStatus("Error loading files.", true);
             throw error; // Re-throw the error
+        } finally {
+            // REMOVED: setLoadingState(false);
         }
     }
 
@@ -1421,7 +1423,7 @@ document.addEventListener('DOMContentLoaded', () => {
             updateStatus(`Error loading calendar events: ${error.message}`, true);
             // No re-throw needed here as this is not part of the critical init path
         } finally {
-            setLoadingState(false);
+            // REMOVED: setLoadingState(false);
         }
     }
 
@@ -1565,8 +1567,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // console.log("[DEBUG] loadSavedChats caught an error."); // Reduced verbosity
             throw error; // Re-throw the error
         } finally {
-            // console.log(`[DEBUG] loadSavedChats finally block entered.`); // Added log
-            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            // REMOVED: setLoadingState(false); // <-- UNCOMMENTED THIS LINE
             // console.log("[DEBUG] setLoadingState(false) called in loadSavedChats finally block."); // Added log
         }
     }
@@ -1755,8 +1756,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             throw error; // Re-throw the error so initializeApp's catch block can handle it if this was the initial load
         } finally {
-            // console.log(`[DEBUG] loadChat(${chatId}) finally block entered.`); // Added log
-            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            // REMOVED: setLoadingState(false); // <-- UNCOMMENTED THIS LINE
             // console.log("[DEBUG] setLoadingState(false) called in loadChat finally block."); // Added log
         }
     }
@@ -2594,8 +2594,7 @@ document.addEventListener('DOMContentLoaded', () => {
             switchNoteMode('edit');
             notesTextarea.disabled = true; // Disable input on fatal error
         } finally {
-            // console.log(`[DEBUG] loadNote(${noteId}) finally block. isLoading: ${isLoading}`); // Added log
-            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            // REMOVED: setLoadingState(false); // <-- UNCOMMENTED THIS LINE
             // console.log("[DEBUG] setLoadingState(false) called in loadNote finally block."); // Added log
         }
     }
@@ -2711,8 +2710,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // console.log("[DEBUG] loadSavedNotes caught an error."); // Reduced verbosity
             throw error;
         } finally {
-            // console.log(`[DEBUG] loadSavedNotes finally block entered.`); // Added log
-            setLoadingState(false); // <-- UNCOMMENTED THIS LINE
+            // REMOVED: setLoadingState(false); // <-- UNCOMMENTED THIS LINE
             // console.log("[DEBUG] setLoadingState(false) called in loadSavedNotes finally block."); // Added log
         }
     }
