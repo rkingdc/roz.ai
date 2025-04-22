@@ -278,13 +278,13 @@ function createChatItem(chat) {
     nameDeleteContainer.classList.add('name-container'); // Use specific class
 
     const nameSpan = document.createElement('span');
-    // Use only 'filename' class as per CORRECT HTML
+    // Use only 'filename' class as per CORRECT HTML - color handled by CSS
     nameSpan.classList.add('filename'); // Use specific class
     nameSpan.textContent = chat.name || `Chat ${chat.id}`;
     nameSpan.title = chat.name || `Chat ${chat.id}`; // Add title for tooltip
 
     // Add delete button
-    // Use only 'delete-btn' class as per CORRECT HTML
+    // Use only 'delete-btn' class as per CORRECT HTML - color handled by CSS
     const deleteButton = document.createElement('button');
     deleteButton.classList.add('delete-btn'); // Use specific class
     deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per CORRECT HTML
@@ -301,10 +301,10 @@ function createChatItem(chat) {
     nameDeleteContainer.appendChild(deleteButton); // Append delete button
 
     // Add timestamp div
-    // Use 'div' and specific classes as per CORRECT HTML
+    // Use 'div' and specific classes as per CORRECT HTML - color handled by CSS
     const timestampDiv = document.createElement('div');
     // Default color is text-rz-tab-background-text (greyish) based on provided HTML
-    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-tab-background-text'); // Use specific classes and mt-0.5
+    timestampDiv.classList.add('text-xs', 'mt-0.5'); // Use specific classes and mt-0.5 - color handled by CSS
     try {
         const date = new Date(chat.last_updated_at);
         // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
@@ -360,22 +360,14 @@ export function updateActiveChatListItem() {
             item.classList.add('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
 
-            // When active, timestamp should be gold (text-rz-sidebar-text)
-            if (timestampDiv) {
-                timestampDiv.classList.add('text-rz-sidebar-text');
-                timestampDiv.classList.remove('text-rz-tab-background-text');
-            }
-            // Filename color is handled by CSS rule .list-item.active .filename
+            // Timestamp color is handled by CSS rule .list-item.active .text-xs
+            // No need to toggle classes here
         } else {
             item.classList.remove('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
 
-            // When inactive, timestamp should be greyish (text-rz-tab-background-text)
-            if (timestampDiv) {
-                timestampDiv.classList.remove('text-rz-sidebar-text');
-                timestampDiv.classList.add('text-rz-tab-background-text');
-            }
-            // Filename color is handled by CSS rule .filename
+            // Timestamp color is handled by CSS rule .list-item .text-xs (inherits from parent)
+            // No need to toggle classes here
         }
     });
 }
@@ -431,13 +423,13 @@ function createNoteItem(note) {
     nameDeleteContainer.classList.add('name-container'); // Use specific class
 
     const nameSpan = document.createElement('span');
-    // Use only 'filename' class as per provided HTML
+    // Use only 'filename' class as per provided HTML - color handled by CSS
     nameSpan.classList.add('filename'); // Use specific class
     nameSpan.textContent = note.name || `Note ${note.id}`;
     nameSpan.title = note.name || `Note ${note.id}`; // Add title for tooltip
 
     // Add delete button
-    // Use only 'delete-btn' class as per provided HTML
+    // Use only 'delete-btn' class as per provided HTML - color handled by CSS
     const deleteButton = document.createElement('button');
     deleteButton.classList.add('delete-btn'); // Use specific class
     deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per provided HTML
@@ -454,10 +446,10 @@ function createNoteItem(note) {
     nameDeleteContainer.appendChild(deleteButton); // Append delete button
 
     // Add timestamp div
-    // Use 'div' and specific classes as per provided HTML
+    // Use 'div' and specific classes as per provided HTML - color handled by CSS
     const timestampDiv = document.createElement('div');
     // Default color is text-rz-tab-background-text (greyish) based on provided HTML
-    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-tab-background-text'); // Use specific classes and mt-0.5
+    timestampDiv.classList.add('text-xs', 'mt-0.5'); // Use specific classes and mt-0.5 - color handled by CSS
     try {
         const date = new Date(note.last_saved_at);
         // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
@@ -512,22 +504,14 @@ export function updateActiveNoteListItem() {
             item.classList.add('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
 
-            // When active, timestamp should be gold (text-rz-sidebar-text)
-            if (timestampDiv) {
-                timestampDiv.classList.add('text-rz-sidebar-text');
-                timestampDiv.classList.remove('text-rz-tab-background-text');
-            }
-             // Filename color is handled by CSS rule .list-item.active .filename
+            // Timestamp color is handled by CSS rule .list-item.active .text-xs
+            // No need to toggle classes here
         } else {
             item.classList.remove('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
 
-            // When inactive, timestamp should be greyish (text-rz-tab-background-text)
-            if (timestampDiv) {
-                timestampDiv.classList.remove('text-rz-sidebar-text');
-                timestampDiv.classList.add('text-rz-tab-background-text');
-            }
-            // Filename color is handled by CSS rule .filename
+            // Timestamp color is handled by CSS rule .list-item .text-xs (inherits from parent)
+            // No need to toggle classes here
         }
     });
 }
