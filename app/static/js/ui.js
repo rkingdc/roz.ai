@@ -353,25 +353,25 @@ export function updateActiveChatListItem() {
 
         if (chatId === state.currentChatId) {
             item.classList.add('active-selection');
-            // Change text colors to active color (maroon) when active
+            // Remove default text colors to allow inheritance from parent .active-selection
             if (filenameSpan) {
-                filenameSpan.classList.add('text-rz-sidebar-active-text');
                 filenameSpan.classList.remove('text-rz-sidebar-text');
+                filenameSpan.classList.remove('text-rz-sidebar-active-text'); // Ensure this is also removed
             }
             if (timestampSpan) {
-                timestampSpan.classList.add('text-rz-sidebar-active-text');
                 timestampSpan.classList.remove('text-rz-tab-background-text');
+                timestampSpan.classList.remove('text-rz-sidebar-active-text'); // Ensure this is also removed
             }
         } else {
             item.classList.remove('active-selection');
-            // Change text colors back to default when inactive
+            // Add default text colors back when inactive
             if (filenameSpan) {
-                filenameSpan.classList.remove('text-rz-sidebar-active-text');
                 filenameSpan.classList.add('text-rz-sidebar-text');
+                filenameSpan.classList.remove('text-rz-sidebar-active-text'); // Ensure this is also removed
             }
             if (timestampSpan) {
-                timestampSpan.classList.remove('text-rz-sidebar-active-text');
                 timestampSpan.classList.add('text-rz-tab-background-text');
+                timestampSpan.classList.remove('text-rz-sidebar-active-text'); // Ensure this is also removed
             }
         }
     });
