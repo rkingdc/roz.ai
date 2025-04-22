@@ -263,7 +263,7 @@
 /* Style for system messages (like loading, errors) */
 .system-msg {
     font-style: italic;
-    color: var(--rz-tab-background-text);
+    color: var(--rz-toolbar-field-text); /* Use the toolbar field text color */
     text-align: center;
     margin: 0.5rem 0;
     font-size: 0.85rem;
