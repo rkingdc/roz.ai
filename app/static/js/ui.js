@@ -588,7 +588,8 @@ function createSidebarFileItem(file, isSelected) {
     if (!uploadedFilesList) return;
 
     const itemDiv = document.createElement('div');
-    itemDiv.classList.add('file-list-item', 'flex', 'items-center', 'p-1', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
+    // Add 'list-item' class and remove conflicting layout/padding classes
+    itemDiv.classList.add('list-item', 'file-list-item', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
     itemDiv.dataset.fileId = file.id;
     itemDiv.dataset.filename = file.filename;
     itemDiv.dataset.hasSummary = file.has_summary; // Store summary status
