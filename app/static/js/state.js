@@ -20,9 +20,8 @@ export let savedChats = []; // Add state variable for saved chats list
 export let savedNotes = []; // Add state variable for saved notes list
 
 
-// Functions to update state (optional, alternative is direct modification via export let)
-// It's often cleaner to manage state changes via functions if logic is complex.
-// For simple assignments, direct modification might be okay for smaller projects.
+// Functions to update state
+// These functions modify the state variables *within* this module.
 
 export function setCurrentChatId(id) {
     currentChatId = id;
@@ -37,18 +36,31 @@ export function setIsLoading(loading) {
 }
 
 export function setSelectedFiles(files) {
+    // This function is intended to replace the entire array
     selectedFiles = files;
 }
+
 export function clearSelectedFiles() {
-    selectedFiles = [];
+    // Mutate the array in place
+    selectedFiles.length = 0;
 }
+
 export function addSelectedFile(file) {
-    // Remove existing first to avoid duplicates if re-attaching
+    // Remove existing file with the same ID first (handles updates or re-adding)
     selectedFiles = selectedFiles.filter(f => f.id !== file.id);
+    // Add the new file
     selectedFiles.push(file);
 }
+
 export function removeSelectedFileById(fileId) {
+     // Reassign the array after filtering
      selectedFiles = selectedFiles.filter(f => f.id !== fileId);
+}
+
+/** Removes the session file entry from the selectedFiles array. */
+export function removeSessionFileFromSelected() {
+    // Reassign the array after filtering out the session file
+    selectedFiles = selectedFiles.filter(f => f.type !== 'session');
 }
 
 

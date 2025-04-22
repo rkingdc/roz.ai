@@ -705,7 +705,9 @@ export function renderSelectedFiles() {
 export function renderSessionFileTag() {
     const sessionFile = state.sessionFile;
     // Filter out any old session file tags before rendering the new one (or none)
-    state.selectedFiles = state.selectedFiles.filter(f => f.type !== 'session');
+    // CORRECTED: Use the state function to remove the session file from the array
+    state.removeSessionFileFromSelected();
+
     if (sessionFile) {
         // Add the current session file to selectedFiles if it's not already there
         if (!state.selectedFiles.some(f => f.type === 'session')) {
@@ -753,6 +755,20 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
     return true;
 }
 
+/**
+ * Hides a modal window.
+ * @param {HTMLElement} modalElement - The modal element to hide.
+ */
+export function closeModal(modalElement) {
+    if (modalElement) {
+        modalElement.classList.remove('show');
+         // Check if any other modals are open before removing modal-open class
+        const anyModalOpen = document.querySelectorAll('.modal.show').length > 0;
+        if (!anyModalOpen) {
+             elements.bodyElement?.classList.remove('modal-open');
+        }
+    }
+}
 
 /**
  * Toggles the collapsed state of a sidebar.
