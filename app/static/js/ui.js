@@ -268,24 +268,26 @@ function createChatItem(chat) {
     if (!savedChatsList) return;
 
     const listItem = document.createElement('div');
-    // Removed flex, items-center, justify-between from listItem itself
+    // Use 'active' class for selection as per CORRECT HTML
     listItem.classList.add('list-item', 'chat-list-item', 'p-2', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
     listItem.dataset.chatId = chat.id;
 
     // Container for name and delete button (flex row)
+    // Use 'name-container' class as per CORRECT HTML
     const nameDeleteContainer = document.createElement('div');
-    nameDeleteContainer.classList.add('flex', 'items-center', 'justify-between', 'w-full');
+    nameDeleteContainer.classList.add('name-container'); // Use specific class
 
     const nameSpan = document.createElement('span');
-    // Default color is text-rz-sidebar-text (gold)
-    nameSpan.classList.add('filename', 'text-sm', 'text-rz-sidebar-text', 'truncate', 'flex-grow'); // Added truncate and flex-grow
+    // Use only 'filename' class as per CORRECT HTML
+    nameSpan.classList.add('filename'); // Use specific class
     nameSpan.textContent = chat.name || `Chat ${chat.id}`;
+    nameSpan.title = chat.name || `Chat ${chat.id}`; // Add title for tooltip
 
     // Add delete button
+    // Use only 'delete-btn' class as per CORRECT HTML
     const deleteButton = document.createElement('button');
-    // Changed text-red-500 to text-rz-sidebar-text for gold color consistency
-    deleteButton.classList.add('delete-btn', 'text-rz-sidebar-text', 'hover:text-red-700', 'ml-2', 'flex-shrink-0');
-    deleteButton.innerHTML = '<i class="fas fa-trash-alt text-xs"></i>';
+    deleteButton.classList.add('delete-btn'); // Use specific class
+    deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per CORRECT HTML
     deleteButton.title = `Delete "${chat.name || `Chat ${chat.id}`}"`;
     deleteButton.addEventListener('click', (event) => {
         event.stopPropagation(); // Prevent triggering the list item click
@@ -298,10 +300,11 @@ function createChatItem(chat) {
     nameDeleteContainer.appendChild(nameSpan);
     nameDeleteContainer.appendChild(deleteButton); // Append delete button
 
-    // Add timestamp span
-    const timestampSpan = document.createElement('span');
+    // Add timestamp div
+    // Use 'div' and specific classes as per CORRECT HTML
+    const timestampDiv = document.createElement('div');
     // Default color is text-rz-tab-background-text (greyish) based on provided HTML
-    timestampSpan.classList.add('timestamp', 'text-xs', 'text-rz-tab-background-text', 'mt-1'); // Added timestamp class and styling
+    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-tab-background-text'); // Use specific classes and mt-0.5
     try {
         const date = new Date(chat.last_updated_at);
         // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
@@ -317,15 +320,16 @@ function createChatItem(chat) {
         } else {
             formattedDate = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
         }
-        timestampSpan.textContent = formattedDate;
+        // Prepend "Last updated: " as per CORRECT HTML
+        timestampDiv.textContent = `Last updated: ${formattedDate}`;
     } catch (e) {
         console.error("Error formatting date:", chat.last_updated_at, e);
-        timestampSpan.textContent = 'Invalid Date';
+        timestampDiv.textContent = 'Last updated: Invalid Date';
     }
 
 
     listItem.appendChild(nameDeleteContainer); // Append the container
-    listItem.appendChild(timestampSpan); // Append the timestamp
+    listItem.appendChild(timestampDiv); // Append the timestamp div
 
     // Add click listener to load chat
     listItem.addEventListener('click', () => {
@@ -348,29 +352,31 @@ export function updateActiveChatListItem() {
 
     savedChatsList.querySelectorAll('.chat-list-item').forEach(item => {
         const chatId = parseInt(item.dataset.chatId);
-        const filenameSpan = item.querySelector('.filename'); // Find the filename span
-        const timestampSpan = item.querySelector('.timestamp'); // Find the timestamp span
+        // Find the timestamp div (it has text-xs class)
+        const timestampDiv = item.querySelector('.text-xs');
 
+        // Use 'active' class as per CORRECT HTML
         if (chatId === state.currentChatId) {
-            item.classList.add('active-selection');
+            item.classList.add('active'); // Use 'active'
+            item.classList.remove('active-selection'); // Remove old class
+
             // When active, timestamp should be gold (text-rz-sidebar-text)
-            if (timestampSpan) {
-                timestampSpan.classList.add('text-rz-sidebar-text');
-                timestampSpan.classList.remove('text-rz-tab-background-text');
+            if (timestampDiv) {
+                timestampDiv.classList.add('text-rz-sidebar-text');
+                timestampDiv.classList.remove('text-rz-tab-background-text');
             }
-            // Filename should remain gold (text-rz-sidebar-text) - no change needed here
+            // Filename color is handled by CSS rule .list-item.active .filename
         } else {
-            item.classList.remove('active-selection');
+            item.classList.remove('active'); // Use 'active'
+            item.classList.remove('active-selection'); // Remove old class
+
             // When inactive, timestamp should be greyish (text-rz-tab-background-text)
-            if (timestampSpan) {
-                timestampSpan.classList.remove('text-rz-sidebar-text');
-                timestampSpan.classList.add('text-rz-tab-background-text');
+            if (timestampDiv) {
+                timestampDiv.classList.remove('text-rz-sidebar-text');
+                timestampDiv.classList.add('text-rz-tab-background-text');
             }
-            // Filename should remain gold (text-rz-sidebar-text) - no change needed here
+            // Filename color is handled by CSS rule .filename
         }
-        // Ensure the active text color class is removed from spans if it was ever added
-        if (filenameSpan) filenameSpan.classList.remove('text-rz-sidebar-active-text');
-        if (timestampSpan) timestampSpan.classList.remove('text-rz-sidebar-active-text');
     });
 }
 
@@ -415,17 +421,26 @@ function createNoteItem(note) {
     if (!savedNotesList) return;
 
     const listItem = document.createElement('div');
-    listItem.classList.add('list-item', 'note-list-item', 'flex', 'items-center', 'justify-between', 'p-2', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
+    // Note items use 'active' class for selection as per provided HTML
+    listItem.classList.add('list-item', 'note-list-item', 'p-2', 'border-b', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
     listItem.dataset.noteId = note.id;
 
+    // Container for name and delete button (flex row)
+    // Use 'name-container' class as per provided HTML
+    const nameDeleteContainer = document.createElement('div');
+    nameDeleteContainer.classList.add('name-container'); // Use specific class
+
     const nameSpan = document.createElement('span');
-    nameSpan.classList.add('filename', 'text-sm', 'text-rz-sidebar-text', 'truncate', 'flex-grow'); // Added truncate and flex-grow
+    // Use only 'filename' class as per provided HTML
+    nameSpan.classList.add('filename'); // Use specific class
     nameSpan.textContent = note.name || `Note ${note.id}`;
+    nameSpan.title = note.name || `Note ${note.id}`; // Add title for tooltip
 
     // Add delete button
+    // Use only 'delete-btn' class as per provided HTML
     const deleteButton = document.createElement('button');
-    deleteButton.classList.add('delete-btn', 'text-red-500', 'hover:text-red-700', 'ml-2', 'flex-shrink-0'); // Added ml-2 and flex-shrink-0
-    deleteButton.innerHTML = '<i class="fas fa-trash-alt text-xs"></i>';
+    deleteButton.classList.add('delete-btn'); // Use specific class
+    deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per provided HTML
     deleteButton.title = `Delete "${note.name || `Note ${note.id}`}"`;
     deleteButton.addEventListener('click', (event) => {
         event.stopPropagation(); // Prevent triggering the list item click
@@ -435,8 +450,38 @@ function createNoteItem(note) {
         }).catch(error => console.error("Failed to import api for delete:", error));
     });
 
-    listItem.appendChild(nameSpan);
-    listItem.appendChild(deleteButton); // Append delete button
+    nameDeleteContainer.appendChild(nameSpan);
+    nameDeleteContainer.appendChild(deleteButton); // Append delete button
+
+    // Add timestamp div
+    // Use 'div' and specific classes as per provided HTML
+    const timestampDiv = document.createElement('div');
+    // Default color is text-rz-tab-background-text (greyish) based on provided HTML
+    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-tab-background-text'); // Use specific classes and mt-0.5
+    try {
+        const date = new Date(note.last_saved_at);
+        // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
+        const now = new Date();
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+
+        let formattedDate;
+        if (date.toDateString() === now.toDateString()) {
+            formattedDate = `Today, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+        } else if (date.toDateString() === yesterday.toDateString()) {
+            formattedDate = `Yesterday, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+        } else {
+            formattedDate = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        }
+        // Prepend "Last saved: " as per provided HTML
+        timestampDiv.textContent = `Last saved: ${formattedDate}`;
+    } catch (e) {
+        console.error("Error formatting date:", note.last_saved_at, e);
+        timestampDiv.textContent = 'Last saved: Invalid Date';
+    }
+
+    listItem.appendChild(nameDeleteContainer); // Append the container
+    listItem.appendChild(timestampDiv); // Append the timestamp div
 
     // Add click listener to load note
     listItem.addEventListener('click', () => {
@@ -459,10 +504,30 @@ export function updateActiveNoteListItem() {
 
     savedNotesList.querySelectorAll('.note-list-item').forEach(item => {
         const noteId = parseInt(item.dataset.noteId);
+        // Find the timestamp div (it has text-xs class)
+        const timestampDiv = item.querySelector('.text-xs');
+
+        // Use 'active' class as per provided HTML
         if (noteId === state.currentNoteId) {
-            item.classList.add('active-selection');
+            item.classList.add('active'); // Use 'active'
+            item.classList.remove('active-selection'); // Remove old class
+
+            // When active, timestamp should be gold (text-rz-sidebar-text)
+            if (timestampDiv) {
+                timestampDiv.classList.add('text-rz-sidebar-text');
+                timestampDiv.classList.remove('text-rz-tab-background-text');
+            }
+             // Filename color is handled by CSS rule .list-item.active .filename
         } else {
-            item.classList.remove('active-selection');
+            item.classList.remove('active'); // Use 'active'
+            item.classList.remove('active-selection'); // Remove old class
+
+            // When inactive, timestamp should be greyish (text-rz-tab-background-text)
+            if (timestampDiv) {
+                timestampDiv.classList.remove('text-rz-sidebar-text');
+                timestampDiv.classList.add('text-rz-tab-background-text');
+            }
+            // Filename color is handled by CSS rule .filename
         }
     });
 }
@@ -685,8 +750,8 @@ function handleModalFileCheckboxChange(e) {
         // Add a placeholder entry, type will be determined later when attach button clicked
         state.addSelectedFile({ id: fileId, filename: filename, type: 'pending' });
         listItem.classList.add('active-selection');
-        if (sidebarItem) sidebarItem.classList.add('active-selection'); // Sync sidebar styling
-        if (sidebarCheckbox) sidebarCheckbox.checked = true; // Sync sidebar checkbox
+        if (modalItem) modalItem.classList.add('active-selection'); // Sync modal styling
+        if (modalCheckbox) modalCheckbox.checked = true; // Sync modal checkbox
     } else {
         // Remove ALL entries for this file ID from selectedFiles
         state.removeSelectedFileById(fileId);
