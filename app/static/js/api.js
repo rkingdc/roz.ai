@@ -342,17 +342,21 @@ export async function attachSelectedFilesSummary() {
                 // fetchSummary calls loadUploadedFiles on success, which updates state.uploadedFiles
                 const updatedFile = state.uploadedFiles.find(f => f.id === fileId);
 
-                // Primary check: Did the reloaded file data indicate a summary now exists?
-                if (updatedFile && updatedFile.has_summary) {
+                // Check if summary generation was successful.
+                // fetchSummary updates state.summaryContent and reloads state.uploadedFiles.
+                const updatedFile = state.uploadedFiles.find(f => f.id === fileId);
+                const summaryLooksValid = !state.summaryContent.startsWith('[Error'); // Check if fetchSummary reported success
+
+                // Consider summary available if the reloaded data shows it OR if fetchSummary didn't report an error.
+                if ((updatedFile && updatedFile.has_summary) || summaryLooksValid) {
                     summaryAvailable = true; // Mark as available after successful generation
-                    setStatus(`Summary generated and verified for ${file.filename}.`);
+                    setStatus(`Summary generated and attached for ${file.filename}.`);
                 } else {
-                    // If the file data wasn't updated, generation likely failed.
-                    // Use the summaryContent state for the specific error message if available.
+                    // If both checks fail, generation likely failed.
                     const errorMsg = state.summaryContent.startsWith('[Error')
                         ? state.summaryContent // Use the specific error from fetchSummary/state
                         : `[Error: Failed to generate or verify summary for ${file.filename}]`; // Fallback error
-                    console.error(`Summary generation failed or verification failed for ${file.filename}: ${errorMsg}`);
+                    console.error(`Summary generation failed for ${file.filename}: ${errorMsg}`);
                     errors.push(`${file.filename}: ${errorMsg}`);
                     summaryAvailable = false; // Ensure it's marked as failed
                 }
