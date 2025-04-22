@@ -620,7 +620,7 @@ export function updateSelectedFileListItemStyling() {
         if (isNaN(fileId)) return;
 
         // Check against sidebarSelectedFiles (using the correct state variable)
-        const isSelected = state.sidebarSelectedFiles.some(f => f.id === fileId); // Read from state
+        const isSelected = state.sidebarSelectedFiles.some(sf => sf.id === fileId); // Read from state
 
         if (isSelected) {
             item.classList.add('active'); // Use 'active' class for selected state
@@ -975,81 +975,74 @@ export function setPluginSectionCollapsed(headerElement, contentElement, isColla
  * Updates the UI based on which plugins are enabled/disabled (reads from state).
  */
 export function updatePluginUI() {
+    // Add null checks for all elements accessed in this function
+    if (!elements.filePluginSection || !elements.fileUploadSessionLabel || !elements.selectedFilesContainer ||
+        !elements.calendarPluginSection || !elements.calendarToggleInputArea || !elements.webSearchToggleLabel ||
+        !elements.uploadedFilesList || !elements.manageFilesList || !elements.calendarStatus || !elements.calendarToggle ||
+        !elements.viewCalendarButton || !elements.webSearchToggle) {
+        // console.warn("Missing elements for updatePluginUI."); // Avoid excessive logs during early init
+        return;
+    }
+
     // File Plugin
-    if (elements.filePluginSection) { // Add null check
-        elements.filePluginSection.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
-    }
+    elements.filePluginSection.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
     // Hide file upload label and selected files container if plugin is disabled
-    if (elements.fileUploadSessionLabel) { // Add null check
-         elements.fileUploadSessionLabel.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
-    }
-     if (elements.selectedFilesContainer) { // Add null check
-         // Only hide if plugin is disabled AND there are no attached/session files
-         const hasFilesToDisplay = state.attachedFiles.length > 0 || state.sessionFile !== null; // Read from state
-         if (!state.isFilePluginEnabled && !hasFilesToDisplay) { // Read from state
+    elements.fileUploadSessionLabel.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
+     // Only hide if plugin is disabled AND there are no attached/session files
+     const hasFilesToDisplay = state.attachedFiles.length > 0 || state.sessionFile !== null; // Read from state
+     if (!state.isFilePluginEnabled && !hasFilesToDisplay) { // Read from state
              elements.selectedFilesContainer.classList.add('hidden');
-         }
-         // If plugin is enabled and there are files to display, ensure it's visible
-         if (state.isFilePluginEnabled && hasFilesToDisplay) { // Read from state
-              elements.selectedFilesContainer.classList.remove('hidden');
-         }
-         // If plugin is enabled but no files, hide it
-         if (state.isFilePluginEnabled && !hasFilesToDisplay) { // Read from state
-             elements.selectedFilesContainer.classList.add('hidden');
-         }
+     }
+     // If plugin is enabled and there are files to display, ensure it's visible
+     if (state.isFilePluginEnabled && hasFilesToDisplay) { // Read from state
+          elements.selectedFilesContainer.classList.remove('hidden');
+     }
+     // If plugin is enabled but no files, hide it
+     if (state.isFilePluginEnabled && !hasFilesToDisplay) { // Read from state
+         elements.selectedFilesContainer.classList.add('hidden');
      }
 
 
     // Calendar Plugin
-    if (elements.calendarPluginSection) { // Add null check
-        elements.calendarPluginSection.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
-    }
+    elements.calendarPluginSection.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
     // Hide calendar toggle input area if plugin is disabled
-    if (elements.calendarToggleInputArea) { // Add null check
-         elements.calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
-    }
+    elements.calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
 
 
     // Web Search Toggle (part of Chat input area)
-    if (elements.webSearchToggleLabel) { // Add null check
-        elements.webSearchToggleLabel.classList.toggle('hidden', !state.isWebSearchPluginEnabled); // Read from state
-    }
+    elements.webSearchToggleLabel.classList.toggle('hidden', !state.isWebSearchPluginEnabled); // Read from state
+
 
     // Re-render file lists if file plugin state changed
-    if (elements.uploadedFilesList && elements.manageFilesList) { // Add null checks
-        if (!state.isFilePluginEnabled) { // Read from state
-             elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
-             elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
-             // State clearing is handled by eventListeners.js reacting to toggle change
-             // renderAttachedAndSessionFiles(); // Called by renderUploadedFiles
-             // updateAttachButtonState(); // Called by renderUploadedFiles
-        } else {
-            // If plugin was just enabled, the file list will be rendered when loadUploadedFiles is called
-            // (triggered by eventListeners.js reacting to the toggle change).
-        }
+    if (!state.isFilePluginEnabled) { // Read from state
+         elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
+         elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
+         // State clearing is handled by eventListeners.js reacting to toggle change
+         // renderAttachedAndSessionFiles(); // Called by renderUploadedFiles
+         // updateAttachButtonState(); // Called by renderUploadedFiles
+    } else {
+        // If plugin was just enabled, the file list will be rendered when loadUploadedFiles is called
+        // (triggered by eventListeners.js reacting to the toggle change).
     }
 
     // Update calendar status if calendar plugin state changed
-    if (elements.calendarStatus) { // Add null check
-        if (!state.isCalendarPluginEnabled) { // Read from state
-            elements.calendarStatus.textContent = "Status: Plugin disabled";
-            // State clearing is handled by eventListeners.js reacting to toggle change
-            if(elements.calendarToggle) elements.calendarToggle.checked = false; // Add null check
-            if(elements.viewCalendarButton) elements.viewCalendarButton.classList.add('hidden'); // Add null check
-        } else {
-             // If plugin was just enabled, the status will be updated when loadCalendarEvents is called
-             // (triggered by eventListeners.js reacting to the toggle change).
-        }
+    if (!state.isCalendarPluginEnabled) { // Read from state
+        elements.calendarStatus.textContent = "Status: Plugin disabled";
+        // State clearing is handled by eventListeners.js reacting to toggle change
+        elements.calendarToggle.checked = false; // Add null check
+        elements.viewCalendarButton.classList.add('hidden'); // Add null check
+    } else {
+         // If plugin was just enabled, the status will be updated when loadCalendarEvents is called
+         // (triggered by eventListeners.js reacting to the toggle change).
     }
 
     // Update web search toggle state if plugin state changed
-    if (elements.webSearchToggle) { // Add null check
-         if (!state.isWebSearchPluginEnabled) { // Read from state
-             elements.webSearchToggle.checked = false; // Turn off toggle if plugin disabled
-         }
-         // The toggle's checked state is persisted/loaded in loadPersistedStates
-         // The actual checked state is read from state.isWebSearchEnabled by renderChatInputArea
-    }
+     if (!state.isWebSearchPluginEnabled) { // Read from state
+         elements.webSearchToggle.checked = false; // Turn off toggle if plugin disabled
+     }
+     // The toggle's checked state is persisted/loaded in loadPersistedStates
+     // The actual checked state is read from state.isWebSearchEnabled by renderChatInputArea
+
 
     // Render the chat input area elements based on plugin states
     renderChatInputArea();
@@ -1061,7 +1054,10 @@ export function updatePluginUI() {
 export function updateCalendarStatus() {
     const { calendarStatus, viewCalendarButton, calendarToggle } = elements;
     // Add null checks for individual elements
-    if (!calendarStatus || !viewCalendarButton || !calendarToggle) return;
+    if (!calendarStatus || !viewCalendarButton || !calendarToggle) {
+        // console.warn("Missing elements for updateCalendarStatus."); // Avoid excessive logs during early init
+        return;
+    }
 
     const context = state.calendarContext; // Read from state
     const isActive = state.isCalendarContextActive; // Read from state
@@ -1125,6 +1121,7 @@ export function renderChatInputArea() {
  * @param {'chat' | 'notes'} tab - The desired tab ('chat' or 'notes').
  */
 export function switchTab(tab) { // Made synchronous, state is already updated by event listener
+    console.log(`[DEBUG] switchTab called for tab: ${tab}`); // Add log here
     const {
         chatNavButton, notesNavButton, chatSection, notesSection,
         chatSidebarContent, notesSidebarContent, modelSelectorContainer,
@@ -1144,35 +1141,46 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
         return;
     }
 
-    // State is already updated by the event listener calling this function
-    // state.setCurrentTab(tab);
-    // localStorage.setItem(config.ACTIVE_TAB_KEY, tab);
+    console.log(`[DEBUG] switchTab: Toggling UI for tab: ${tab}`);
 
     // Update navigation buttons
     chatNavButton.classList.toggle('active', tab === 'chat');
     notesNavButton.classList.toggle('active', tab === 'notes');
+    console.log(`[DEBUG] switchTab: Nav buttons updated. Chat active: ${chatNavButton.classList.contains('active')}, Notes active: ${notesNavButton.classList.contains('active')}`);
+
 
     // Toggle main content sections
     chatSection.classList.toggle('hidden', tab !== 'chat');
     notesSection.classList.toggle('hidden', tab !== 'notes');
+    console.log(`[DEBUG] switchTab: Main sections updated. Chat hidden: ${chatSection.classList.contains('hidden')}, Notes hidden: ${notesSection.classList.contains('hidden')}`);
+
 
     // Toggle sidebar content sections
     chatSidebarContent.classList.toggle('hidden', tab !== 'chat');
     notesSidebarContent.classList.toggle('hidden', tab !== 'notes');
+    console.log(`[DEBUG] switchTab: Sidebar content updated. Chat hidden: ${chatSidebarContent.classList.contains('hidden')}, Notes hidden: ${notesSidebarContent.classList.contains('hidden')}`);
+
 
     // Toggle header elements (Model Selector vs Notes Mode)
     modelSelectorContainer.classList.toggle('hidden', tab !== 'chat');
     notesModeElements.classList.toggle('hidden', tab !== 'notes');
+    console.log(`[DEBUG] switchTab: Header elements updated. Model hidden: ${modelSelectorContainer.classList.contains('hidden')}, Notes mode hidden: ${notesModeElements.classList.contains('hidden')}`);
+
 
     // Toggle input area visibility (Chat needs it, Notes uses textarea directly)
     inputArea.classList.toggle('hidden', tab !== 'chat');
+    console.log(`[DEBUG] switchTab: Input area hidden: ${inputArea.classList.contains('hidden')}`);
+
 
     // Update current item display in sidebar header based on state
     renderCurrentChatDetails(); // Reads state.currentChatName, state.currentChatId, state.currentChatModel
     renderCurrentNoteDetails(); // Reads state.currentNoteName, state.currentNoteId
+    console.log(`[DEBUG] switchTab: Current item details rendered.`);
+
 
     // Ensure sidebar content visibility matches the active tab if sidebar is open
     if (!sidebar.classList.contains('collapsed')) {
+        console.log(`[DEBUG] switchTab: Sidebar is not collapsed, ensuring correct content is visible.`);
         if (tab === 'chat') {
             chatSidebarContent.classList.remove('hidden');
             notesSidebarContent.classList.add('hidden');
@@ -1180,18 +1188,24 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
             notesSidebarContent.classList.remove('hidden');
             chatSidebarContent.classList.add('hidden');
         }
+    } else {
+         console.log(`[DEBUG] switchTab: Sidebar is collapsed, content visibility not explicitly set.`);
     }
+
 
     // Render content specific to the new tab based on state
     if (tab === 'chat') {
+        console.log(`[DEBUG] switchTab: Rendering chat specific content.`);
         renderChatHistory(); // Reads state.chatHistory
         renderUploadedFiles(); // Reads state.uploadedFiles, state.sidebarSelectedFiles, state.attachedFiles, state.sessionFile
         updateCalendarStatus(); // Reads state.calendarContext, state.isCalendarContextActive, state.isCalendarPluginEnabled
         renderChatInputArea(); // Reads plugin states, web search state, calendar active state, file plugin state
     } else { // tab === 'notes'
+        console.log(`[DEBUG] switchTab: Rendering notes specific content.`);
         renderNoteContent(); // Reads state.noteContent, state.currentNoteId, state.isLoading
         setNoteMode(state.currentNoteMode); // Applies persisted/default mode from state
     }
+    console.log(`[DEBUG] switchTab finished.`);
 }
 
 /**
@@ -1388,6 +1402,9 @@ export function handleStateChange_currentTab() {
     // This handler might be redundant if switchTab is only called by eventListeners.js
     // reacting to the tab state change. Let's keep it simple and rely on eventListeners.js
     // calling switchTab directly for now.
+    // No, this handler *is* needed because state.notifyAll() will trigger it initially.
+    // Let's call switchTab from here.
+    switchTab(state.currentTab);
 }
 
 export function handleStateChange_currentNoteMode() {
