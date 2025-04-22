@@ -113,12 +113,16 @@ stop:
 	@rm -f /tmp/assistant_dev_db.sqlite # Hardcoded path from start-dev target
 
 # Target to start the application in development mode with a temporary file database using Flask's dev server
-start-dev: upgrade # Depends on upgrade now
+start-dev: install # Depends on install
 	@echo "Starting application in development mode with temporary file database using Flask's dev server..."
 	# Clean up previous temporary dev database file if it exists
 	@echo "Cleaning up temporary dev database file..."
 	@rm -f /tmp/assistant_dev_db.sqlite
-	# Migrations will create/update the temporary database file via 'make upgrade' dependency
+	# Now apply migrations to the clean database file
+	@echo "Applying database migrations to the temporary database..."
+	@DATABASE_NAME=/tmp/assistant_dev_db.sqlite TEST_DATABASE=TRUE IS_DEV_SERVER=TRUE $(PYTHON) -m flask --app $(RUN_FILE) db upgrade
+	@echo "Database migrations applied."
+	# Start Flask development server...
 	@echo "Starting Flask development server..."
 	# Start flask run with debug mode and set environment variables
 	@DATABASE_NAME=/tmp/assistant_dev_db.sqlite TEST_DATABASE=TRUE IS_DEV_SERVER=TRUE $(PYTHON) -m flask --app $(RUN_FILE) run --debug --port 5000
@@ -152,4 +156,3 @@ clean:
 	@find . -type f -name '*.pyc' -delete
 	@find . -type d -name '__pycache__' -delete
 	@echo "Clean complete."
-
