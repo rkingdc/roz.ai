@@ -442,12 +442,8 @@ function subscribeStateChangeListeners() {
     // Generic plugin enabled state change handler
     state.subscribe('pluginEnabled', ui.handleStateChange_pluginEnabled);
 
-    // Note: currentTab change is handled directly by the handleTabSwitchClick function
-    // calling ui.switchTab, as it needs to orchestrate loading data *before* rendering.
-    // A state notification for currentTab could be added, but ui.switchTab would need
-    // to be refactored to only handle rendering, and the data loading would need to
-    // happen elsewhere reacting to the state change. The current approach is simpler
-    // for tab switching which involves significant data loading.
+    // Subscribe the UI handler to the currentTab state change
+    state.subscribe('currentTab', ui.handleStateChange_currentTab);
 }
 
 
