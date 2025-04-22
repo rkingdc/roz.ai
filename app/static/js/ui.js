@@ -362,7 +362,7 @@ export function updateActiveChatListItem() {
 
             // When active, timestamp should be gold (text-rz-sidebar-text)
             if (timestampDiv) {
-                timestampDiv.classList.add('text-rz-sidebar-text');
+                timestampDiv.classList.add('text-rz-sidebar-text', 'active-timestamp');
                 timestampDiv.classList.remove('text-rz-tab-background-text');
             }
             // Filename color is handled by CSS rule .list-item .filename (inherits from parent)
@@ -372,7 +372,7 @@ export function updateActiveChatListItem() {
 
             // When inactive, timestamp should be greyish (text-rz-tab-background-text)
             if (timestampDiv) {
-                timestampDiv.classList.remove('text-rz-sidebar-text');
+                timestampDiv.classList.remove('text-rz-sidebar-text', 'active-timestamp');
                 timestampDiv.classList.add('text-rz-tab-background-text');
             }
             // Filename color is handled by CSS rule .list-item .filename (inherits from parent)
@@ -514,7 +514,7 @@ export function updateActiveNoteListItem() {
 
             // When active, timestamp should be gold (text-rz-sidebar-text)
             if (timestampDiv) {
-                timestampDiv.classList.add('text-rz-sidebar-text');
+                timestampDiv.classList.add('text-rz-sidebar-text', 'active-timestamp');
                 timestampDiv.classList.remove('text-rz-tab-background-text');
             }
              // Filename color is handled by CSS rule .list-item .filename (inherits from parent)
@@ -524,7 +524,7 @@ export function updateActiveNoteListItem() {
 
             // When inactive, timestamp should be greyish (text-rz-tab-background-text)
             if (timestampDiv) {
-                timestampDiv.classList.remove('text-rz-sidebar-text');
+                timestampDiv.classList.remove('text-rz-sidebar-text', 'active-timestamp');
                 timestampDiv.classList.add('text-rz-tab-background-text');
             }
             // Filename color is handled by CSS rule .list-item .filename (inherits from parent)

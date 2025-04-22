@@ -835,6 +835,11 @@
      font-family: monospace;
      font-size: 0.8rem;
 }
+/* Style for the timestamp div when active */
+.list-item.active .text-xs.active-timestamp {
+    color: var(--rz-sidebar-active-text); /* Active color for timestamp */
+}
+
 /* Status Bar Theming */
  #status-bar {
      background-color: var(--rz-status-bar-bg);
