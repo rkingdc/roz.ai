@@ -91,7 +91,16 @@
     </main>
 
     <aside id="plugins-sidebar">
-        <h2 class="text-xl font-semibold mb-4 whitespace-nowrap">Plugins</h2>
+        <!-- New container for header and settings button -->
+        <div class="flex items-center justify-between mb-4 whitespace-nowrap">
+            <h2 class="text-xl font-semibold">Plugins</h2>
+            <!-- Settings Button - Moved here and restyled -->
+            <button id="settings-btn" class="p-1 rounded text-rz-sidebar-text hover:bg-rz-sidebar-border" title="Settings">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+        <!-- End New container -->
+
         <div class="plugin-section flex flex-col" id="file-plugin-section">
             <div class="plugin-header flex-shrink-0" id="file-plugin-header">
                 <span><i class="fas fa-file-alt mr-2"></i> Files</span>
@@ -145,11 +154,6 @@
 
     <button id="plugins-toggle-btn" class="toggle-btn" title="Toggle Plugins">
         <i class="fas fa-chevron-right"></i>
-    </button>
-
-    <!-- New Settings Button - Positioned in top right -->
-    <button id="settings-btn" class="settings-btn fixed top-2 right-2 z-50" title="Settings">
-        <i class="fas fa-cog"></i>
     </button>
 
 
