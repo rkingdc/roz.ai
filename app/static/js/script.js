@@ -2724,16 +2724,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
                  if (currentNoteId !== null) {
                      console.log(`[DEBUG] Loading persisted note: ${currentNoteId}`);
-                     await loadNote(currentNoteId); // Load the persisted note
-                     console.log(`[DEBUG] loadNote(${currentNoteId}) completed.`);
+                     try {
+                         await loadNote(currentNoteId); // Load the persisted note
+                         console.log(`[DEBUG] loadNote(${currentNoteId}) completed.`);
+                     } catch (error) {
+                         console.warn(`[DEBUG] loadNote(${currentNoteId}) failed: ${error}. Starting new note.`);
+                         await startNewNote();
+                     }
                  } else {
                      console.log("[DEBUG] No persisted note found, loading most recent or creating new.");
                      const firstNoteElement = savedNotesList.querySelector('.list-item');
                      if (firstNoteElement) {
                          const mostRecentNoteId = parseInt(firstNoteElement.dataset.noteId);
                          console.log(`[DEBUG] Loading most recent note: ${mostRecentNoteId}`);
-                         await loadNote(mostRecentNoteId); // Load the most recent note
-                         console.log(`[DEBUG] loadNote(${mostRecentNoteId}) completed.`);
                      } else {
                          console.log("[DEBUG] No saved notes found, starting new note.");
                          await startNewNote(); // Create and load a new note
