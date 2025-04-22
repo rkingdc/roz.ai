@@ -42,8 +42,6 @@ def create_app(test_config=None):
     app.config.from_object('app.config.Config') # Load default config
     app.config.from_pyfile('config.py', silent=True) # Load instance config if exists
     # Load test config if passed in
-    else:
-        app.config.from_mapping(test_config)
 
     # --- Ensure instance folder exists ---
     try:
