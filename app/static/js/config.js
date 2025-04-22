@@ -42,7 +42,7 @@ markedRenderer.code = function(code, language) {
 
 markedRenderer.codespan = function(text) {
     let textString = typeof text === 'object' && text !== null && typeof text.text === 'string' ? text.text : String(text);
-    const escapedText = escapeHtml(textString);
+    const escapedText = escapeHtml(escapedText); // Corrected: Should use escapedText here
     return `<code class="bg-gray-200 px-1 rounded text-sm font-mono">${escapedText}</code>`;
 };
 

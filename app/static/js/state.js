@@ -16,6 +16,9 @@ export let isCalendarPluginEnabled = true;
 export let isWebSearchPluginEnabled = true;
 export let currentTab = 'chat';
 export let currentNoteMode = 'edit';
+export let savedChats = []; // Add state variable for saved chats list
+export let savedNotes = []; // Add state variable for saved notes list
+
 
 // Functions to update state (optional, alternative is direct modification via export let)
 // It's often cleaner to manage state changes via functions if logic is complex.
@@ -87,4 +90,13 @@ export function setCurrentTab(tab) {
 
 export function setCurrentNoteMode(mode) {
     currentNoteMode = mode;
+}
+
+// Add setter functions for saved lists
+export function setSavedChats(chats) {
+    savedChats = chats;
+}
+
+export function setSavedNotes(notes) {
+    savedNotes = notes;
 }

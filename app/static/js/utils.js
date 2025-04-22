@@ -23,7 +23,9 @@ export function escapeHtml(html) {
     return strHtml
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 // Note: The marked.js renderer configuration is moved to config.js
