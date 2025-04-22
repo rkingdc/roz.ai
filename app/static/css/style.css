@@ -172,8 +172,9 @@
      font-size: 0.75rem;
      line-height: 1rem;
 }
+/* Corrected: Use --rz-toolbar-text for gold color */
  .text-rz-sidebar-text {
-     color: var(--rz-toolbar-field-text);
+     color: var(--rz-toolbar-text);
 }
  .text-rz-tab-background-text {
     /* if not already defined*/
