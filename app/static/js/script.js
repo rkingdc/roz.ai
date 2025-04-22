@@ -713,7 +713,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const modalNameSpan = document.createElement('span');
                     modalNameSpan.textContent = file.filename;
-                    modalNameSpan.classList.add('filename', 'truncate', 'font-medium', 'text-gray-800'); // Added font-medium, text-gray-800
+                    modalNameSpan.classList.add('filename', 'truncate', 'font-medium'); // Added font-medium, text-gray-800
                     modalNameSpan.title = file.filename;
 
                     const modalTypeSpan = document.createElement('span');
