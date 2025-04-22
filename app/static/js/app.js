@@ -37,16 +37,16 @@ async function initializeApp() {
 
         // --- Load Core Data (Chat & Note Lists, then specific Chat/Note) ---
         // These API calls update the state.
-        await api.loadSavedChats(); // Updates state.savedChats, isLoading, statusMessage
+        await api.fetchSavedChats(); // Corrected function name based on api.js - Updates state.savedChats, isLoading, statusMessage
         // UI will react to state.savedChats change (renderSavedChats)
-        await api.loadSavedNotes(); // Updates state.savedNotes, isLoading, statusMessage
+        await api.fetchSavedNotes(); // Corrected function name based on api.js - Updates state.savedNotes, isLoading, statusMessage
         // UI will react to state.savedNotes change (renderSavedNotes)
 
         // Load data for the initial tab based on persisted ID or default
-        if (state.currentTab === 'chat') {
+        if (state.getActiveTab() === 'chat') { // Use getter
              await api.loadInitialChatData(); // Updates state (currentChatId, chatHistory, attachedFiles, uploadedFiles, etc.)
              // UI will react to these state changes (handleStateChange_currentChat, handleStateChange_uploadedFiles, etc.)
-        } else { // state.currentTab === 'notes'
+        } else { // state.getActiveTab() === 'notes' // Use getter
              await api.loadInitialNotesData(); // Updates state (currentNoteId, noteContent, uploadedFiles, etc.)
              // UI will react to these state changes (handleStateChange_currentNote, handleStateChange_uploadedFiles, etc.)
         }
@@ -73,15 +73,17 @@ async function initializeApp() {
 /** Loads persisted state values from localStorage into the state module */
 function loadPersistedStates() {
     // Load simple boolean/string states
-    state.setCalendarContextActive(localStorage.getItem('calendarContextActive') === 'true');
+    state.setIsCalendarContextActive(localStorage.getItem('calendarContextActive') === 'true');
     state.setStreamingEnabled(localStorage.getItem(config.STREAMING_ENABLED_KEY) === null ? true : localStorage.getItem(config.STREAMING_ENABLED_KEY) === 'true');
-    state.setFilePluginEnabled(localStorage.getItem(config.FILES_PLUGIN_ENABLED_KEY) === null ? true : localStorage.getItem(config.FILES_PLUGIN_ENABLED_KEY) === 'true');
-    state.setCalendarPluginEnabled(localStorage.getItem(config.CALENDAR_PLUGIN_ENABLED_KEY) === null ? true : localStorage.getItem(config.CALENDAR_PLUGIN_ENABLED_KEY) === 'true');
-    state.setWebSearchPluginEnabled(localStorage.getItem(config.WEB_SEARCH_PLUGIN_ENABLED_KEY) === null ? true : localStorage.getItem(config.WEB_SEARCH_PLUGIN_ENABLED_KEY) === 'true');
+    state.setIsFilePluginEnabled(localStorage.getItem(config.FILES_PLUGIN_ENABLED_KEY) === null ? true : localStorage.getItem(config.FILES_PLUGIN_ENABLED_KEY) === 'true');
+    // --- CHANGE DEFAULT FOR CALENDAR PLUGIN ---
+    state.setIsCalendarPluginEnabled(localStorage.getItem(config.CALENDAR_PLUGIN_ENABLED_KEY) === null ? false : localStorage.getItem(config.CALENDAR_PLUGIN_ENABLED_KEY) === 'true');
+    // ------------------------------------------
+    state.setIsWebSearchPluginEnabled(localStorage.getItem(config.WEB_SEARCH_PLUGIN_ENABLED_KEY) === null ? true : localStorage.getItem(config.WEB_SEARCH_PLUGIN_ENABLED_KEY) === 'true');
 
     // Load initial tab
     const storedTab = localStorage.getItem(config.ACTIVE_TAB_KEY);
-    state.setCurrentTab((storedTab === 'chat' || storedTab === 'notes') ? storedTab : 'chat');
+    state.setActiveTab((storedTab === 'chat' || storedTab === 'notes') ? storedTab : 'chat');
 
     // Load current IDs (will be used by loadInitialData)
     const persistedChatId = localStorage.getItem('currentChatId');
@@ -95,6 +97,48 @@ function loadPersistedStates() {
 
     // Load web search toggle state
     state.setWebSearchEnabled(localStorage.getItem('webSearchEnabled') === 'true'); // Assuming you persist this
+
+    // Load plugin collapsed states (UI concern, but loaded here)
+    // These setters are in ui.js, so we need to call them after elements are populated
+    // This loading will happen in initializeApp after populateElements
+    // state.setIsSidebarCollapsed(localStorage.getItem(config.SIDEBAR_COLLAPSED_KEY) === 'collapsed');
+    // state.setIsPluginsCollapsed(localStorage.getItem(config.PLUGINS_COLLAPSED_KEY) === 'collapsed');
+    // state.setIsFilePluginCollapsed(localStorage.getItem(config.FILE_PLUGIN_COLLAPSED_KEY) === 'collapsed'); // Assuming these exist
+    // state.setIsCalendarPluginCollapsed(localStorage.getItem(config.CALENDAR_PLUGIN_COLLAPSED_KEY) === 'collapsed'); // Assuming these exist
+    // state.setIsHistoryPluginCollapsed(localStorage.getItem(config.HISTORY_PLUGIN_COLLAPSED_KEY) === 'collapsed'); // Assuming these exist
+}
+
+// Helper function to load collapsed states after elements are populated
+function loadCollapsedStates() {
+    if (!elements.sidebar || !elements.sidebarToggleButton || !elements.pluginsSidebar || !elements.pluginsSidebarToggleButton ||
+        !elements.filePluginHeader || !elements.filePluginContent || !elements.calendarPluginHeader || !elements.calendarPluginContent ||
+        !elements.historyPluginHeader || !elements.historyPluginContent) { // Added history elements
+        console.warn("Missing elements for loading collapsed states.");
+        return;
+    }
+
+    // Load sidebar collapsed state
+    const sidebarCollapsed = localStorage.getItem(config.SIDEBAR_COLLAPSED_KEY) === 'collapsed';
+    ui.setSidebarCollapsed(elements.sidebar, elements.sidebarToggleButton, sidebarCollapsed, config.SIDEBAR_COLLAPSED_KEY, 'sidebar');
+    state.setIsSidebarCollapsed(sidebarCollapsed); // Update state
+
+    // Load plugins sidebar collapsed state
+    const pluginsCollapsed = localStorage.getItem(config.PLUGINS_COLLAPSED_KEY) === 'collapsed';
+    ui.setSidebarCollapsed(elements.pluginsSidebar, elements.pluginsSidebarToggleButton, pluginsCollapsed, config.PLUGINS_COLLAPSED_KEY, 'plugins');
+    state.setIsPluginsCollapsed(pluginsCollapsed); // Update state
+
+    // Load plugin section collapsed states
+    const filePluginCollapsed = localStorage.getItem(config.FILE_PLUGIN_COLLAPSED_KEY) === 'collapsed';
+    ui.setPluginSectionCollapsed(elements.filePluginHeader, elements.filePluginContent, filePluginCollapsed, config.FILE_PLUGIN_COLLAPSED_KEY);
+
+    const calendarPluginCollapsed = localStorage.getItem(config.CALENDAR_PLUGIN_COLLAPSED_KEY) === 'collapsed';
+    ui.setPluginSectionCollapsed(elements.calendarPluginHeader, elements.calendarPluginContent, calendarPluginCollapsed, config.CALENDAR_PLUGIN_COLLAPSED_KEY);
+
+    // Load history plugin collapsed state
+    const historyPluginCollapsed = localStorage.getItem(config.HISTORY_PLUGIN_COLLAPSED_KEY) === 'collapsed';
+    ui.setPluginSectionCollapsed(elements.historyPluginHeader, elements.historyPluginContent, historyPluginCollapsed, config.HISTORY_PLUGIN_COLLAPSED_KEY);
+
+    // Note: Web Search plugin section is not collapsible in the current HTML
 }
 
 
@@ -106,9 +150,14 @@ document.addEventListener('DOMContentLoaded', () => {
     populateElements();
     console.log("DOM elements populated.");
 
-    // 2. Set up all event listeners (which includes subscribing UI to state changes)
+    // 2. Load persisted UI states that depend on elements existing (collapsed states)
+    loadCollapsedStates();
+    console.log("Collapsed states loaded.");
+
+
+    // 3. Set up all event listeners (which includes subscribing UI to state changes)
     setupEventListeners();
 
-    // 3. Initialize the application state and load initial data
+    // 4. Initialize the application state and load initial data
     initializeApp();
 });
