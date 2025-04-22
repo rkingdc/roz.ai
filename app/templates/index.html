@@ -90,38 +90,40 @@
         <!-- Header - Removed roz.ai h1 -->
         <header class="bg-rz-header text-white p-4 flex justify-between items-center flex-wrap flex-shrink-0">
             <!-- Removed h1 "roz.ai" -->
-            <!-- Left container (Model Selector) -->
+            <!-- Left Area (empty for now) -->
             <div class="flex items-center">
-                 <div id="model-selector-container" class="flex items-center gap-2 mr-4">
+                <!-- Optional: Logo or Title here -->
+            </div>
+
+            <!-- Center Area (Model Selector OR Notes Mode Elements) -->
+            <div class="flex items-center justify-center flex-grow">
+                <!-- Model Selector (Visible on Chat Tab) -->
+                 <div id="model-selector-container" class="flex items-center gap-2">
                     <label for="model-selector" class="text-sm font-medium text-rz-header-text">Model:</label>
-                    <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line">
+                    <select id="model-selector" class="model-selector text-sm rounded-md bg-rz-toolbar-field text-rz-toolbar-field-text border border-rz-tab-line w-32">
                         {% for model in available_models %}
-                            <option value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
+                            <option class="bg-rz-toolbar-field" value="{{ model }}" {% if model == default_model %}selected{% endif %}>{{ model }}</option>
                         {% endfor %}
                     </select>
                 </div>
-            </div>
-            <!-- End Left container -->
 
-            <!-- Center container (Notes Mode Button Group) -->
-            <div class="flex items-center">
-                <div id="notes-mode-buttons" class="inline-flex rounded-md shadow-sm hidden" role="group">
-                    <button type="button" id="edit-note-btn" class="btn-group-left active">
-                      <i class="fas fa-edit mr-1"></i> Edit
-                    </button>
-                    <button type="button" id="view-note-btn" class="btn-group-right">
-                      <i class="fas fa-eye mr-1"></i> View
+                <!-- Notes Mode Buttons + Markdown Tips (Visible on Notes Tab) -->
+                <div id="notes-mode-elements" class="flex items-center hidden">
+                     <div id="notes-mode-buttons" class="inline-flex rounded-md shadow-sm" role="group">
+                        <button type="button" id="edit-note-btn" class="btn-group-left active">
+                          <i class="fas fa-edit mr-1"></i> Edit
+                        </button>
+                        <button type="button" id="view-note-btn" class="btn-group-right">
+                          <i class="fas fa-eye mr-1"></i> View
+                        </button>
+                    </div>
+                    <button id="markdown-tips-btn" class="ml-2 p-1 rounded text-rz-sidebar-text hover:bg-rz-toolbar-field" title="Markdown Tips">
+                        <i class="fas fa-info-circle"></i>
                     </button>
                 </div>
-                <!-- New Markdown Tips Button -->
-                <button id="markdown-tips-btn" class="ml-2 p-1 rounded text-rz-sidebar-text hover:bg-rz-toolbar-field" title="Markdown Tips">
-                    <i class="fas fa-info-circle"></i>
-                </button>
-                <!-- End New Markdown Tips Button -->
             </div>
-            <!-- End Center container -->
 
-            <!-- Right container (settings, plugins toggles) -->
+            <!-- Right Area (Settings, Plugins Toggle) -->
             <div class="flex items-center space-x-4">
                 <!-- Settings Button - Now in plugins sidebar header -->
                 <!-- <button id="settings-btn" class="p-1 rounded text-white hover:bg-gray-700" title="Settings">
@@ -438,5 +440,29 @@
 
                 <h4>Code</h4>
                 <p>Use backticks (`) for inline code and triple backticks (```) for code blocks. You can specify a language after the opening triple backticks for syntax highlighting.</p>
-                <pre><code class="language-markdown">This is `inline code`.
+                <pre><code class="language-javascript">
+// Example code block
+function greet(name) {
+  console.log("Hello, " + name);
+}
+</code></pre>
 
+                <h4>Links</h4>
+                <p>Create links using `[Link Text](url)`.</p>
+                <pre><code class="language-markdown">[Visit Google](https://www.google.com)</code></pre>
+
+                <h4>Blockquotes</h4>
+                <p>Use `>` for blockquotes.</p>
+                <pre><code class="language-markdown">> This is a blockquote.</code></pre>
+
+                <h4>Horizontal Rule</h4>
+                <p>Use three or more hyphens (`---`), asterisks (`***`), or underscores (`___`) on a line by themselves.</p>
+                <pre><code class="language-markdown">---</code></pre>
+
+                <p>Remember to leave a blank line before and after block-level elements like headers, lists, and code blocks for proper rendering.</p>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

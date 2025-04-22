@@ -240,6 +240,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const editNoteButton = document.getElementById('edit-note-btn');
     const viewNoteButton = document.getElementById('view-note-btn');
     const markdownTipsButton = document.getElementById('markdown-tips-btn'); // New: Markdown Tips button
+    const notesModeElements = document.getElementById('notes-mode-elements'); // New: Container for notes mode buttons and markdown tips button
+
 
     // New Markdown Tips Modal References
     const markdownTipsModal = document.getElementById('markdown-tips-modal');
@@ -277,7 +279,61 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log("[DEBUG] Marked.js options set globally."); // Added log
 
 
-    // --- Functions that access DOM elements (MUST be inside DOMContentLoaded or called from here) ---
+    // --- Utility Functions ---
+    // These functions don't access DOM elements directly on definition,
+    // so they can be outside DOMContentLoaded, but they might be called
+    // by code inside it.
+    function updateStatus(message, isError = false) {
+        // Access statusBar inside the function, assuming it's defined in the DOMContentLoaded scope
+        const statusBar = document.getElementById('status-bar');
+        if (!statusBar) {
+            console.error("Status bar element not found.");
+            return;
+        }
+        statusBar.textContent = `Status: ${message}`;
+        statusBar.className = `text-xs px-4 py-1 flex-shrink-0 ${isError ? 'text-red-600 bg-red-50 border-t border-red-200' : 'text-rz-status-bar-text bg-rz-status-bar-bg border-t border-rz-frame'}`;
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // setLoadingState needs to access many DOM elements, so it should be defined
+    // within or called from the DOMContentLoaded scope where those elements are referenced.
+    // Let's move its definition inside the listener.
+
+    // setSidebarCollapsed, toggleLeftSidebar, toggleRightSidebar,
+    // setPluginSectionCollapsed, toggleFilePlugin, toggleCalendarPlugin
+    // These access DOM elements and should be defined within DOMContentLoaded.
+
+    // addMessage, applyMarkdownToMessage
+    // These access chatbox and should be defined within DOMContentLoaded.
+
+    // All modal functions (show/close/handle) access modal elements and should be
+    // defined within DOMContentLoaded.
+
+    // loadUploadedFiles, handleFileUpload, addFileFromUrl, attachSelectedFiles,
+    // renderSelectedFiles, removeSelectedFile
+    // These access file/modal elements and should be defined within DOMContentLoaded.
+
+    // loadCalendarEvents, updateCalendarStatus, handleCalendarToggle, showCalendarModal
+    // These access calendar elements and should be defined within DOMContentLoaded.
+
+    // clearChatbox, loadSavedChats, startNewChat, loadChat, sendMessage,
+    // handleSaveChatName, handleDeleteChat, updateActiveChatListItem, handleModelChange
+    // These access chat/sidebar/input elements and should be defined within DOMContentLoaded.
+
+    // showSettingsModal, closeSettingsModal, handleStreamingToggle,
+    // handleFilesPluginToggle, handleCalendarPluginToggle, updatePluginUI
+    // These access settings/plugin elements and should be defined within DOMContentLoaded.
+
+    // initializeApp needs to access many elements and call many functions that do,
+    // so it should be defined within DOMContentLoaded.
+
 
     /** Deletes a file from the backend and updates the UI lists. */
     async function deleteFile(fileId) {
@@ -1006,9 +1062,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
          if (currentTab !== 'chat') {
+             updateStatus("Adding files from URL is only available in the Chat section.", true);
              urlStatus.textContent = "Adding files from URL is only available in the Chat section.";
              urlStatus.classList.add('text-red-500');
-             updateStatus("Adding files from URL is only available in the Chat section.", true);
              return;
          }
 
@@ -2200,8 +2256,7 @@ document.addEventListener('DOMContentLoaded', () => {
             notesSection.classList.add('hidden');
             document.getElementById('input-area').classList.remove('hidden'); // Show chat input area
             modelSelectorContainer.classList.remove('hidden'); // Show model selector
-            notesModeButtons.classList.add('hidden'); // Hide notes mode buttons
-            markdownTipsButton.classList.add('hidden'); // New: Hide markdown tips button
+            notesModeElements.classList.add('hidden'); // Hide notes mode elements container
 
             // Show chat sidebar content, hide notes sidebar content
             chatSidebarContent.classList.remove('hidden');
@@ -2242,8 +2297,7 @@ document.addEventListener('DOMContentLoaded', () => {
             notesSection.classList.remove('hidden');
             document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
             modelSelectorContainer.classList.add('hidden'); // Hide model selector
-            notesModeButtons.classList.remove('hidden'); // Show notes mode buttons
-            markdownTipsButton.classList.remove('hidden'); // New: Show markdown tips button
+            notesModeElements.classList.remove('hidden'); // Show notes mode elements container
 
             // Hide chat sidebar content, show notes sidebar content
             chatSidebarContent.classList.add('hidden');
@@ -2271,7 +2325,7 @@ document.addEventListener('DOMContentLoaded', () => {
                          console.log("[DEBUG] switchTab (notes): startNewNote completed after load failure.");
                      }
                  } else {
-                     console.log("[DEBUG] switchTab (notes): No currentNoteId, loading most recent or creating new.");
+                     console.log("[DEBUG] No currentNoteId, loading most recent or creating new.");
                      const firstNoteElement = savedNotesList.querySelector('.list-item');
                      if (firstNoteElement) {
                          const mostRecentNoteId = parseInt(firstNoteElement.dataset.noteId);
@@ -2920,8 +2974,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  notesNavButton.classList.remove('active');
                  document.getElementById('input-area').classList.remove('hidden');
                  modelSelectorContainer.classList.remove('hidden'); // Show model selector
-                 notesModeButtons.classList.add('hidden'); // Hide notes mode buttons
-                 markdownTipsButton.classList.add('hidden'); // New: Hide markdown tips button
+                 notesModeElements.classList.add('hidden'); // Hide notes mode elements container
                  chatSidebarContent.classList.remove('hidden'); // Show chat sidebar content
                  notesSidebarContent.classList.add('hidden'); // Hide notes sidebar content
                  sidebar.classList.remove('hidden'); // Ensure chat sidebar is visible
@@ -2968,8 +3021,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  notesNavButton.classList.add('active');
                  document.getElementById('input-area').classList.add('hidden'); // Hide chat input area
                  modelSelectorContainer.classList.add('hidden'); // Hide model selector
-                 notesModeButtons.classList.remove('hidden'); // Show notes mode buttons
-                 markdownTipsButton.classList.remove('hidden'); // New: Show markdown tips button
+                 notesModeElements.classList.remove('hidden'); // Show notes mode elements container
                  chatSidebarContent.classList.add('hidden'); // Hide chat sidebar content
                  notesSidebarContent.classList.remove('hidden'); // Show notes sidebar content
                  sidebar.classList.remove('hidden'); // Ensure chat sidebar is visible
