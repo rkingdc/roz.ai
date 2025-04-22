@@ -416,7 +416,13 @@
      transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
      white-space: nowrap;
      color: var(--rz-sidebar-text);
+ }
+
+
+ .list-item .text-xs {
+     color: var(--rz-toolbar-field-text) !important;
 }
+ 
  .list-item:hover {
      background-color: var(--rz-sidebar-hover-bg);
 }
