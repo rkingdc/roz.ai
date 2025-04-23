@@ -164,6 +164,8 @@ export function setupEventListeners() {
         document.addEventListener('selectionchange', () => {
             // Check if the message input is the active element when selection changes
             if (document.activeElement === elements.messageInput) {
+                // Log the button element reference *when selection changes*
+                console.log("[DEBUG] selectionchange (Chat): Checking chatCleanupButton ref:", elements.cleanupTranscriptButton);
                 updateCleanupState();
             } else {
                 // If selection changes outside the input, disable the button
@@ -188,6 +190,8 @@ export function setupEventListeners() {
         document.addEventListener('selectionchange', () => {
             // Check if the notes textarea is the active element when selection changes
             if (document.activeElement === elements.notesTextarea) {
+                 // Log the button element reference *when selection changes*
+                console.log("[DEBUG] selectionchange (Notes): Checking notesCleanupButton ref:", elements.cleanupTranscriptButtonNotes);
                 updateCleanupState();
             } else {
                 // If selection changes outside the textarea, disable the button
