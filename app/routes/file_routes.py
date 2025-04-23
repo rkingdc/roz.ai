@@ -34,68 +34,11 @@ def upload_file_route():
     errors = []
     max_size = current_app.config['MAX_FILE_SIZE_BYTES']
 
+    # Re-structure the loop to collect file objects added to session
+    files_added_to_session = []
+    request_errors = [] # Separate errors during request processing vs file processing
+
     try:
-        for file in request.files.getlist('file'): # Handle multiple files with same key 'file'
-            if file.filename == '':
-                # errors.append("Empty file part submitted.") # Ignore empty parts silently?
-                continue
-
-            if file and file_utils.allowed_file(file.filename):
-                filename = secure_filename(file.filename)
-                mimetype = file.mimetype
-
-                try:
-                    content_blob = file.read() # Read file content into bytes
-                    filesize = len(content_blob)
-
-                    # Check size after reading
-                    if filesize > max_size:
-                         errors.append(f"File '{filename}' ({filesize} bytes) exceeds size limit ({max_size // 1024 // 1024} MB).")
-                         continue # Skip this file
-
-                    # Save record and blob to DB - DO NOT COMMIT YET
-                    # save_file_record_to_db now returns the File object or None on add error
-                    file_obj = db.save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=False)
-
-                    if file_obj:
-                        # Add the file object to a temporary list to get its ID after commit
-                        # We can't get the ID reliably until after the commit
-                        # For now, just track that it was added to the session successfully
-                        # We'll retrieve details after the commit
-                        pass # File object is in the session now
-
-                    else:
-                        # save_file_record_to_db logs its own error on add failure
-                        errors.append(f"Failed to add file '{filename}' to database session.")
-
-                except Exception as e:
-                    errors.append(f"Error processing file '{filename}': {e}")
-                    current_app.logger.error(f"Error processing upload for '{filename}': {e}", exc_info=True)
-
-            elif file: # File submitted but extension not allowed
-                allowed_ext_str = ', '.join(current_app.config.get('ALLOWED_EXTENSIONS', []))
-                errors.append(f"File type not allowed for '{file.filename}'. Allowed: {allowed_ext_str}")
-
-        # --- Commit the transaction after processing all files ---
-        db.session.commit()
-        logger.info("Database session committed after file uploads.")
-
-        # --- Collect data for successfully uploaded files AFTER commit ---
-        # We need to query the database to get the IDs and other details
-        # of the files that were just committed.
-        # A simple way is to re-fetch the list, but that might be inefficient
-        # if there are many files. A better way is to query for files added
-        # within a recent time window or based on filenames processed in this request.
-        # For simplicity and to match the previous structure, let's just indicate success
-        # and rely on the frontend to reload the list.
-        # However, the frontend expects a list of uploaded_files_data.
-        # Let's refactor to collect the file objects added to the session
-        # and then get their IDs after commit.
-
-        # Re-structure the loop to collect file objects added to session
-        files_added_to_session = []
-        request_errors = [] # Separate errors during request processing vs file processing
-
         for file in request.files.getlist('file'):
              if file.filename == '':
                  continue
@@ -113,6 +56,7 @@ def upload_file_route():
                           continue
 
                      # save_file_record_to_db adds to session, returns File object or None
+                     # Pass commit=False to defer commit until after the loop
                      file_obj = db.save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=False)
 
                      if file_obj:
@@ -130,7 +74,8 @@ def upload_file_route():
                  request_errors.append(f"File type not allowed for '{file.filename}'. Allowed: {allowed_ext_str}")
 
         # --- Commit the transaction after processing all files ---
-        db.session.commit()
+        # Corrected: Access session via db.db.session
+        db.db.session.commit()
         logger.info(f"Database session committed after processing {len(files_added_to_session)} files.")
 
         # --- Collect data for successfully uploaded files AFTER commit ---
@@ -163,13 +108,15 @@ def upload_file_route():
              return jsonify({"error": "No valid files processed."}), 400
 
     except SQLAlchemyError as e:
-        db.session.rollback() # Rollback the entire transaction on DB error
+        # Corrected: Access session via db.db.session
+        db.db.session.rollback() # Rollback the entire transaction on DB error
         logger.error(f"Database error during file upload transaction: {e}", exc_info=True)
         errors.append(f"Database error during upload: {e}")
         return jsonify({"error": "; ".join(errors)}), 500
     except Exception as e:
         # Catch any other unexpected errors during the request processing
-        db.session.rollback() # Ensure rollback even on non-DB errors if session was modified
+        # Corrected: Access session via db.db.session
+        db.db.session.rollback() # Ensure rollback even on non-DB errors if session was modified
         logger.error(f"Unexpected error during file upload route processing: {e}", exc_info=True)
         errors.append(f"An unexpected error occurred: {e}")
         return jsonify({"error": "; ".join(errors)}), 500
@@ -242,7 +189,8 @@ def add_file_from_url_route():
 
     except Exception as e:
         # Ensure rollback in case of error before commit
-        db.session.rollback()
+        # Corrected: Access session via db.db.session
+        db.db.session.rollback()
         current_app.logger.error(f"Error adding file from URL '{url}': {e}", exc_info=True)
         return jsonify({"error": f"An unexpected error occurred while processing the URL: {e}"}), 500
 
