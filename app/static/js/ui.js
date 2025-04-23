@@ -43,6 +43,7 @@ export function updateLoadingState() {
     if (elements.messageInput) elements.messageInput.disabled = isLoading;
     if (elements.sendButton) elements.sendButton.disabled = isLoading;
     if (elements.newChatButton) elements.newChatButton.disabled = isLoading;
+    // Corrected: Use the correct element reference for the chat save button
     if (elements.saveChatNameButton) elements.saveChatNameButton.disabled = isLoading;
     if (elements.currentChatNameInput) elements.currentChatNameInput.disabled = isLoading;
     if (elements.newNoteButton) elements.newNoteButton.disabled = isLoading;

@@ -50,6 +50,9 @@ export let isSidebarCollapsed = false;
 export let isPluginsCollapsed = false;
 export let isNotesSidebarCollapsed = false; // Assuming a separate notes sidebar state
 
+// Note History State
+export let noteHistory = []; // History entries for the currently selected note
+
 
 // --- Observer Pattern ---
 // Map to store listeners for different state change events
@@ -142,6 +145,7 @@ export function notifyAll() {
     notify('isSidebarCollapsed', isSidebarCollapsed); // Notify collapsed states
     notify('isPluginsCollapsed', isPluginsCollapsed);
     notify('isNotesSidebarCollapsed', isNotesSidebarCollapsed);
+    notify('noteHistory', noteHistory); // Notify note history
 
 
     // Also notify combined states if listeners are subscribed to them
@@ -265,7 +269,7 @@ export function removeAttachedFileById(fileIdToRemove) {
 
 // --- Function for sessionFile (file attached for the current message) ---
 export function setSessionFile(file) {
-    if (sessionFile !== file) { // Check if the file object reference changed
+    if (sessionFile !== file) { // Simple reference check
         sessionFile = file;
         notify('sessionFile', sessionFile);
     }
@@ -457,8 +461,6 @@ export function setIsNotesSidebarCollapsed(isCollapsed) {
 }
 
 // --- Note History State ---
-export let noteHistory = []; // History entries for the currently selected note
-
 export function setNoteHistory(history) {
     noteHistory = history; // Assume history array is new or represents a change
     notify('noteHistory', noteHistory);

@@ -26,14 +26,15 @@ export const elements = {
     savedChatsList: null,
     newChatButton: null,
     currentChatNameInput: null,
-    saveChatNameButton: null,
+    // Corrected: Use a specific name for the chat save button reference
+    saveChatNameButton: null, // Reference for the chat name save button
     currentChatIdDisplay: null,
     chatSidebarContent: null, // Container for chat-specific sidebar items
     notesSidebarContent: null, // Container for note-specific sidebar items
     savedNotesList: null,
     newNoteButton: null,
     currentNoteNameInput: null,
-    saveNoteNameButton: null,
+    saveNoteNameButton: null, // Reference for the note name save button (matches HTML ID)
     currentNoteIdDisplay: null,
 
     // Plugins Sidebar Elements
@@ -124,7 +125,8 @@ export function populateElements() {
     elements.savedChatsList = document.getElementById('saved-chats-list');
     elements.newChatButton = document.getElementById('new-chat-btn');
     elements.currentChatNameInput = document.getElementById('current-chat-name');
-    elements.saveChatNameButton = document.getElementById('save-note-name-btn'); // Corrected ID
+    // Corrected: Assign the correct element to the chat save button reference
+    elements.saveChatNameButton = document.getElementById('save-chat-name-btn'); // Corrected ID to match HTML
     elements.currentChatIdDisplay = document.getElementById('current-chat-id-display');
     elements.statusBar = document.getElementById('status-bar');
     elements.sidebarToggleButton = document.getElementById('sidebar-toggle-btn');
@@ -189,7 +191,7 @@ export function populateElements() {
     elements.notesSidebarContent = document.getElementById('notes-sidebar-content');
     elements.newNoteButton = document.getElementById('new-note-btn');
     elements.currentNoteNameInput = document.getElementById('current-note-name');
-    elements.saveNoteNameButton = document.getElementById('save-note-name-btn');
+    elements.saveNoteNameButton = document.getElementById('save-note-name-btn'); // Corrected ID to match HTML
     elements.currentNoteIdDisplay = document.getElementById('current-note-id-display');
     elements.savedNotesList = document.getElementById('saved-notes-list');
     elements.modelSelectorContainer = document.getElementById('model-selector-container');

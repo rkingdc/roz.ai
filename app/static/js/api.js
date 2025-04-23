@@ -697,7 +697,17 @@ export async function sendMessage() {
 
 /** Saves the current chat's name by calling the backend and updates state. */
 export async function handleSaveChatName() {
-    if (state.isLoading || !state.currentChatId || state.currentTab !== 'chat') return;
+    if (state.isLoading || !state.currentChatId || state.currentTab !== 'chat') {
+        // Set status message if called when not appropriate
+        if (state.currentTab !== 'chat') {
+             setStatus("Cannot save chat name: Not on Chat tab.", true);
+        } else if (!state.currentChatId) {
+             setStatus("Cannot save chat name: No active chat.", true);
+        } else if (state.isLoading) {
+             setStatus("Cannot save chat name: Application is busy.", true);
+        }
+        return;
+    }
 
     // Read new name from DOM
     const newName = elements.currentChatNameInput?.value.trim() || 'New Chat';
@@ -931,7 +941,14 @@ export async function loadNote(noteId) {
 export async function saveNote() {
     console.log(`[DEBUG] saveNote called.`);
     if (state.isLoading || !state.currentNoteId || state.currentTab !== 'notes') {
-        setStatus("Cannot save: No active note, busy, or not on Notes tab.", true);
+        // Set status message if called when not appropriate
+        if (state.currentTab !== 'notes') {
+             setStatus("Cannot save note: Not on Notes tab.", true);
+        } else if (!state.currentNoteId) {
+             setStatus("Cannot save note: No active note.", true);
+        } else if (state.isLoading) {
+             setStatus("Cannot save note: Application is busy.", true);
+        }
         return;
     }
     setLoading(true, "Saving Note");
@@ -990,6 +1007,7 @@ export async function handleDeleteNote(noteId) { // Removed listItemElement para
         if (noteId == state.currentNoteId) {
             state.setCurrentNoteId(null); // Clear current note state
             localStorage.removeItem('currentNoteId');
+            state.setNoteContent(''); // Clear content for deleted note
             state.setNoteHistory([]); // Clear history for the deleted note
             // loadSavedNotes already re-rendered the list state
             const firstNote = state.savedNotes.length > 0 ? state.savedNotes[0] : null; // Get from updated state

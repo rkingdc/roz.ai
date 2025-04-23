@@ -21,6 +21,40 @@ export function setupEventListeners() {
     subscribeStateChangeListeners();
     console.log("UI subscribed to state changes.");
 
+    // --- Global Keyboard Shortcuts ---
+    document.addEventListener('keydown', async (event) => {
+        // Check for Ctrl+S or Cmd+S
+        if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+            event.preventDefault(); // Prevent the default browser save action
+
+            if (state.isLoading) {
+                state.setStatusMessage("Cannot save while busy.", true);
+                return;
+            }
+
+            if (state.currentTab === 'notes' && state.currentNoteId !== null) {
+                console.log("[DEBUG] Ctrl+S detected on Notes tab. Saving note...");
+                await api.saveNote(); // Save the current note
+            } else if (state.currentTab === 'chat' && state.currentChatId !== null) {
+                 console.log("[DEBUG] Ctrl+S detected on Chat tab. Saving chat name...");
+                 // Trigger the save chat name button click, which handles getting the name from the input
+                 elements.saveChatNameButton?.click(); // This button's ID is actually save-note-name-btn in the HTML, but it's used for chat name too.
+                                                       // Let's use the correct element reference from dom.js
+                 if (elements.saveChatNameButton) { // Use the correct element reference
+                     elements.saveChatNameButton.click();
+                 } else {
+                     console.error("Save chat name button element not found!");
+                     state.setStatusMessage("Error: Save button element missing.", true);
+                 }
+            } else {
+                console.log("[DEBUG] Ctrl+S detected, but no active chat or note to save.");
+                state.setStatusMessage("Nothing to save.", true);
+            }
+        }
+    });
+    console.log("Global keyboard listeners set up.");
+
+
     // --- Chat Input & Sending ---
     elements.sendButton?.addEventListener('click', async () => {
         await api.sendMessage(); // Updates state (chatHistory, isLoading, statusMessage, sessionFile)
@@ -329,12 +363,12 @@ export function setupEventListeners() {
         }
 
         // Save current state before switching (e.g., auto-save note)
-        if (state.currentTab === 'notes' && state.currentNoteId) {
-            // Use dynamic import for api
-            import('./api.js').then(api => {
-                 // await api.saveNote(); // Implement auto-save if needed
-            }).catch(error => console.error("Failed to import api for auto-save:", error));
-        }
+        // Auto-save note on tab switch is a potential feature, but not requested yet.
+        // If implemented, it would go here:
+        // if (state.currentTab === 'notes' && state.currentNoteId) {
+        //     console.log("[DEBUG] Auto-saving note before switching tabs...");
+        //     await api.saveNote(); // Implement auto-save if needed
+        // }
 
         state.setCurrentTab(tab); // Update state (notifies currentTab)
         localStorage.setItem(config.ACTIVE_TAB_KEY, tab); // Persist
