@@ -16,6 +16,7 @@ import re
 import base64
 from . import database
 from .plugins.web_search import perform_web_search
+
 from google.api_core.exceptions import (
     GoogleAPIError,
     DeadlineExceeded,
@@ -25,6 +26,11 @@ from google.api_core.exceptions import (
 )
 from pydantic_core import ValidationError
 import grpc
+
+import asyncio
+
+# Configure logging
+
 import logging
 
 # from functools import wraps # Remove this import
@@ -44,8 +50,10 @@ logger = logging.getLogger(__name__)
 
 
 # --- Summary Generation ---
+
 # Remove the decorator
 def generate_summary(file_id):
+
     """
     Generates a summary for a file using a designated multi-modal model via the client.
     Handles text directly and uses file upload API for other types.
@@ -313,6 +321,7 @@ def generate_summary(file_id):
                 )
 
 
+
 # --- Get Or Generate Summary ---
 # No decorator needed here as it calls generate_summary which now handles its own readiness
 def get_or_generate_summary(file_id):
@@ -333,6 +342,7 @@ def get_or_generate_summary(file_id):
         ):
             logger.info(f"Retrieved existing summary for file ID: {file_id}")
             return file_details["summary"]
+
         else:
             logger.info(f"Generating summary for file ID: {file_id}...")
             # Call the refactored function (which now handles its own readiness)
@@ -370,9 +380,11 @@ def get_or_generate_summary(file_id):
         return f"[Error retrieving or generating summary: {type(e).__name__}]"
 
 
+
 # --- Generate Search Query ---
 # Remove the decorator
 def generate_search_query(user_message: str, max_retries=1) -> str | None:
+
     """
     Uses the default LLM via client to generate a concise web search query.
     """
@@ -582,9 +594,11 @@ def _yield_streaming_error(error_msg: str):
     yield GenerateContentResponse(parts=[Part(text=error_msg)])
 
 
+
 # --- Chat Response Generation ---
 # This function is now DESIGNED to return EITHER a generator (if streaming) OR a string (if not streaming)
 def generate_chat_response(
+
     chat_id,
     user_message,
     attached_files=None,
@@ -1126,11 +1140,13 @@ def _prepare_chat_content(
                     mimetype = db_file_details["mimetype"]
                     content_blob = db_file_details["content"]
 
+
                     if attachment_type == "summary":
                         summary = get_or_generate_summary(file_id)
                         current_turn_parts.append(
                             Part(
                                 text=f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"
+
                             )
                         )
                     elif attachment_type == "full":
@@ -1299,7 +1315,6 @@ def _prepare_chat_content(
                         Part(
                             text=f"[System: Error processing session file '{filename}'.]"
                         )
-                    )
 
         # 4. Web Search
         if web_search_enabled:
@@ -1307,6 +1322,7 @@ def _prepare_chat_content(
             search_query = generate_search_query(user_message)
             if search_query:
                 search_results = perform_web_search(search_query)
+
                 if search_results:
                     results_text = "\n".join(search_results)
                     current_turn_parts.extend(
