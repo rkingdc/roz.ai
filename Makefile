@@ -114,8 +114,9 @@ stop:
 	@rm -f /tmp/assistant_dev_db.sqlite # Hardcoded path from start-dev target
 
 # Target to start the application in development mode with a temporary file database using Flask's dev server
-start-dev: install # Depends on install
+start-dev: install check-gcloud-auth # Depends on install and check-gcloud-auth now
 	@echo "Starting application in development mode with temporary file database using Flask's dev server..."
+	# Auth check is now done via dependency
 	# Clean up previous temporary dev database file if it exists
 	@echo "Cleaning up temporary dev database file..."
 	@rm -f /tmp/assistant_dev_db.sqlite
