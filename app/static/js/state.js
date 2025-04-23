@@ -507,7 +507,7 @@ export function setFinalTranscriptSegment(text) {
 }
 
 // --- NEW: Function to get the appropriate input element based on context ---
-function getInputElementForContext(context) {
+export function getInputElementForContext(context) { // Add export keyword
     if (context === 'chat') {
         return elements.messageInput;
     } else if (context === 'notes') {

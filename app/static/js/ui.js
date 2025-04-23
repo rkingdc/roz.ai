@@ -6,6 +6,7 @@
 
 import { elements } from './dom.js'; // Import elements from dom.js
 import * as state from './state.js'; // UI reads from state
+import { getInputElementForContext } from './state.js'; // Import the helper function
 import * as config from './config.js'; // Import config for keys
 import { escapeHtml, formatFileSize } from './utils.js'; // Import utility functions
 // No direct imports of api.js here to break the cycle.
