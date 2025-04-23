@@ -833,6 +833,11 @@ function subscribeStateChangeListeners() {
     // --- Subscribe UI to streaming transcript state change ---
     state.subscribe('streamingTranscript', ui.handleStateChange_streamingTranscript);
     // -------------------------------------------------------
+
+    // --- Subscribe UI to sidebar collapse state changes ---
+    state.subscribe('isSidebarCollapsed', ui.handleStateChange_isSidebarCollapsed);
+    state.subscribe('isPluginsCollapsed', ui.handleStateChange_isPluginsCollapsed);
+    // ----------------------------------------------------
 }
 
 

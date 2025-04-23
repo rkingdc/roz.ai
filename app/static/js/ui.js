@@ -902,39 +902,20 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
  * @param {'sidebar' | 'plugins'} type - The type of sidebar ('sidebar' or 'plugins').
  */
 export function setSidebarCollapsed(sidebarElement, toggleButton, isCollapsed, localStorageKey, type) {
-    if (!sidebarElement || !toggleButton) return;
+    // This function now ONLY updates localStorage and application state.
+    // The UI update (DOM manipulation) is handled by the state change handlers below.
+    if (!sidebarElement || !toggleButton) return; // Keep basic checks
 
-    if (isCollapsed) {
-        sidebarElement.classList.add('collapsed');
-        if (type === 'sidebar') {
-             const icon = toggleButton.querySelector('i');
-             if (icon) icon.classList.replace('fa-chevron-left', 'fa-chevron-right');
-             toggleButton.classList.add('collapsed');
-        } else if (type === 'plugins') {
-             const icon = toggleButton.querySelector('i');
-             if (icon) icon.classList.replace('fa-chevron-right', 'fa-chevron-left');
-             toggleButton.classList.add('collapsed');
-        }
-    } else {
-        sidebarElement.classList.remove('collapsed');
-         if (type === 'sidebar') {
-            const icon = toggleButton.querySelector('i');
-            if (icon) icon.classList.replace('fa-chevron-right', 'fa-chevron-left');
-            toggleButton.classList.remove('collapsed');
-         } else if (type === 'plugins') {
-            const icon = toggleButton.querySelector('i');
-            if (icon) icon.classList.replace('fa-chevron-left', 'fa-chevron-right');
-            toggleButton.classList.remove('collapsed');
-         }
-    }
     localStorage.setItem(localStorageKey, isCollapsed);
-    // Update state after updating DOM and localStorage
+
+    // Update state, which will trigger the corresponding handler to update the UI
     if (type === 'sidebar') {
         state.setIsSidebarCollapsed(isCollapsed);
     } else if (type === 'plugins') {
         state.setIsPluginsCollapsed(isCollapsed);
     }
 }
+
 
 /** Toggles the left sidebar (chat/notes list). */
 export function toggleLeftSidebar() {
@@ -1630,5 +1611,56 @@ export function renderStreamingTranscript() {
     }
 }
 // ---------------------------------------
+
+// --- NEW: State Change Handlers for Sidebar Collapse ---
+
+export function handleStateChange_isSidebarCollapsed() {
+    const isCollapsed = state.isSidebarCollapsed; // Read state
+    const sidebarElement = elements.sidebar;
+    const toggleButton = elements.sidebarToggleButton;
+    if (!sidebarElement || !toggleButton) return;
+
+    sidebarElement.classList.toggle('collapsed', isCollapsed);
+    toggleButton.classList.toggle('collapsed', isCollapsed);
+    const icon = toggleButton.querySelector('i');
+    if (icon) {
+        if (isCollapsed) {
+            // If collapsing, change left arrow to right arrow
+            icon.classList.remove('fa-chevron-left');
+            icon.classList.add('fa-chevron-right');
+        } else {
+            // If expanding, change right arrow to left arrow
+            icon.classList.remove('fa-chevron-right');
+            icon.classList.add('fa-chevron-left');
+        }
+    }
+    // Don't update localStorage or state here, just reflect the state in the UI
+}
+
+export function handleStateChange_isPluginsCollapsed() {
+    const isCollapsed = state.isPluginsCollapsed; // Read state
+    const sidebarElement = elements.pluginsSidebar;
+    const toggleButton = elements.pluginsToggleButton;
+    if (!sidebarElement || !toggleButton) return;
+
+    sidebarElement.classList.toggle('collapsed', isCollapsed);
+    toggleButton.classList.toggle('collapsed', isCollapsed);
+    const icon = toggleButton.querySelector('i');
+    if (icon) {
+        if (isCollapsed) {
+            // If collapsing, change right arrow to left arrow
+            icon.classList.remove('fa-chevron-right');
+            icon.classList.add('fa-chevron-left');
+        } else {
+            // If expanding, change left arrow to right arrow
+            icon.classList.remove('fa-chevron-left');
+            icon.classList.add('fa-chevron-right');
+        }
+    }
+    // Don't update localStorage or state here, just reflect the state in the UI
+}
+
+// -------------------------------------------------------
+
 
 // Add more handlers for other state changes as needed...
