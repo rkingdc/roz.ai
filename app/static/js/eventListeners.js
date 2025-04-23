@@ -8,6 +8,7 @@ import * as ui from './ui.js'; // Import ui to call rendering functions
 import * as api from './api.js'; // Import api to call backend functions
 import * as state from './state.js'; // Import state to update state directly for UI-only changes or read values
 import * as config from './config.js'; // Import config
+import * as voice from './voice.js'; // Import voice recording functions
 import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js'; // Import file size constants
 import { formatFileSize } from './utils.js';
 import { escapeHtml } from './utils.js'; // Need escapeHtml for session file loading
@@ -74,6 +75,16 @@ export function setupEventListeners() {
     elements.modelSelector?.addEventListener('change', async () => {
         await api.handleModelChange(); // Updates state (currentChatModel, isLoading, statusMessage)
         // UI updates are triggered by state notifications within api.handleModelChange
+    });
+    elements.micButton?.addEventListener('click', () => {
+        if (state.currentTab !== 'chat') return; // Only allow in chat
+
+        if (state.isRecording) {
+            voice.stopRecording(); // Will update state internally
+        } else {
+            voice.startRecording('chat'); // Will update state internally
+        }
+        // UI updates are triggered by state notifications (isRecording)
     });
 
     // --- Sidebar & Chat Management ---
@@ -512,6 +523,7 @@ function subscribeStateChangeListeners() {
     state.subscribe('savedChats', ui.handleStateChange_savedChats);
     state.subscribe('currentChat', ui.handleStateChange_currentChat); // Combined chat details
     state.subscribe('chatHistory', ui.handleStateChange_chatHistory);
+    state.subscribe('isRecording', ui.handleStateChange_isRecording); // Subscribe mic button UI to recording state
 
     state.subscribe('savedNotes', ui.handleStateChange_savedNotes);
     state.subscribe('currentNote', ui.handleStateChange_currentNote); // Combined note details

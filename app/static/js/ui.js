@@ -63,6 +63,7 @@ export function updateLoadingState() {
     if (elements.editNoteButton) elements.editNoteButton.disabled = isLoading;
     if (elements.viewNoteButton) elements.viewNoteButton.disabled = isLoading;
     if (elements.markdownTipsButton) elements.markdownTipsButton.disabled = isLoading;
+    if (elements.micButton) elements.micButton.disabled = isLoading; // Disable mic button when loading
 
 
     // Disable/enable list items for chats/notes/files
@@ -1418,6 +1419,7 @@ export function handleStateChange_isLoading() {
     // renderStatus(); // Called by handleStateChange_statusMessage
     // updateAttachButtonState(); // Called by updateLoadingState
     renderNoteContent(); // Loading state affects note textarea placeholder/disabled
+    renderMicButtonState(); // Loading state affects mic button disabled state
 }
 
 export function handleStateChange_statusMessage() {
@@ -1442,6 +1444,11 @@ export function handleStateChange_currentChat() { // Called when currentChatId, 
 
 export function handleStateChange_chatHistory() {
     renderChatHistory();
+}
+
+export function handleStateChange_isRecording() {
+    renderMicButtonState(); // Update mic button icon/style
+    updateLoadingState(); // Recording might affect other elements' loading state if needed
 }
 
 export function handleStateChange_savedNotes() {

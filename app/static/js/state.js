@@ -146,6 +146,8 @@ export function notifyAll() {
     notify('isPluginsCollapsed', isPluginsCollapsed);
     notify('isNotesSidebarCollapsed', isNotesSidebarCollapsed);
     notify('noteHistory', noteHistory); // Notify note history
+    notify('isRecording', isRecording); // Notify recording state
+    notify('recordingContext', recordingContext); // Notify recording context
 
 
     // Also notify combined states if listeners are subscribed to them
@@ -464,4 +466,14 @@ export function setIsNotesSidebarCollapsed(isCollapsed) {
 export function setNoteHistory(history) {
     noteHistory = history; // Assume history array is new or represents a change
     notify('noteHistory', noteHistory);
+}
+
+// --- Recording State Functions ---
+export function setIsRecording(recording, context = null) {
+    if (isRecording !== recording) {
+        isRecording = recording;
+        recordingContext = recording ? context : null; // Set context only when starting
+        notify('isRecording', isRecording);
+        notify('recordingContext', recordingContext); // Notify context change as well
+    }
 }

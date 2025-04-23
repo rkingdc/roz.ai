@@ -8,6 +8,7 @@ export const elements = {
     // Chat Elements
     chatbox: null,
     messageInput: null,
+    micButton: null, // Added mic button reference
     sendButton: null,
     modelSelector: null,
     modelSelectorContainer: null,
@@ -120,6 +121,7 @@ export function populateElements() {
     console.log("[DEBUG] populateElements called."); // Add logging
     elements.chatbox = document.getElementById('chatbox');
     elements.messageInput = document.getElementById('message-input');
+    elements.micButton = document.getElementById('mic-button'); // Populate mic button reference
     elements.sendButton = document.getElementById('send-button');
     elements.sidebar = document.getElementById('sidebar');
     elements.savedChatsList = document.getElementById('saved-chats-list');
