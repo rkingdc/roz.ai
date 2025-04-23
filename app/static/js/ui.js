@@ -1186,9 +1186,11 @@ export function updatePluginUI() {
     // Update elements within the history plugin section (only relevant when visible)
     if (showHistoryPlugin) { // Use the calculated visibility flag
         renderNoteHistory(); // Ensure history is rendered when switching to notes tab
+        updateTocVisibility(); // Show/hide TOC drawer based on tab
     } else {
         // Clear history list if tab is not notes
         if (elements.noteHistoryList) elements.noteHistoryList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Switch to Notes tab to view history.</p>`;
+        updateTocVisibility(); // Hide TOC drawer if not on notes tab
     }
 
     // Ensure plugins sidebar itself is hidden if no plugins are visible on the current tab
@@ -1598,6 +1600,14 @@ export function handleStateChange_currentNote() { // Called when currentNoteId, 
     renderNoteContent(); // Load content for the new note
 }
 
+// --- NEW: State Change Handler for Note Content (to update TOC) ---
+export function handleStateChange_noteContent() {
+    // This is called when the note content state changes (e.g., loading a note, typing in textarea)
+    renderNoteContent(); // Update textarea/preview
+    // TOC update is handled within renderNoteContent via debounced call
+}
+// -----------------------------------------------------------------
+
 export function handleStateChange_uploadedFiles() {
     renderUploadedFiles(); // Renders sidebar and modal lists
 }
@@ -1859,6 +1869,13 @@ export function setNotesTocCollapsedUI(isCollapsed) {
 }
 
 // --- End TOC Functions ---
+
+
+// --- NEW: State Change Handler for TOC Collapse State ---
+export function handleStateChange_isNotesTocCollapsed() {
+    setNotesTocCollapsedUI(state.isNotesTocCollapsed); // Update UI based on state
+}
+// ----------------------------------------------------
 
 
 // Add more handlers for other state changes as needed...

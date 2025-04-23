@@ -369,6 +369,61 @@ export function setupEventListeners() {
         });
     }
 
+    // --- NEW: Notes TOC Drawer Listeners ---
+    elements.notesTocHeader?.addEventListener('click', ui.toggleNotesTocDrawer); // Toggle on header click
+    elements.notesTocList?.addEventListener('click', (event) => {
+        const link = event.target.closest('.toc-link');
+        if (!link) return;
+
+        event.preventDefault(); // Prevent default anchor jump
+
+        const targetId = link.dataset.targetId;
+        if (!targetId) return;
+
+        // Find the target heading element within the notes preview area OR notes textarea
+        let targetElement = null;
+        if (state.currentNoteMode === 'view') {
+            targetElement = elements.notesPreview?.querySelector(`#${targetId}`);
+        } else { // 'edit' mode
+            // In edit mode, we need to find the corresponding line in the textarea
+            // This is tricky and less reliable than scrolling the rendered view.
+            // We'll try a basic text search for the heading content.
+            const headingText = link.textContent;
+            const textareaValue = elements.notesTextarea?.value || '';
+            const lines = textareaValue.split('\n');
+            // Find the line that starts with '#' characters followed by the heading text
+            const lineIndex = lines.findIndex(line => {
+                const trimmedLine = line.trim();
+                // Match lines like '# Heading', '## Heading', etc.
+                return trimmedLine.match(/^#+\s+/) && trimmedLine.substring(trimmedLine.indexOf(' ')+1).trim() === headingText.trim();
+            });
+
+            if (lineIndex !== -1 && elements.notesTextarea) {
+                // Estimate scroll position (very approximate)
+                const lineHeight = parseFloat(getComputedStyle(elements.notesTextarea).lineHeight) || 18; // Default line height
+                const scrollTop = lineIndex * lineHeight;
+                elements.notesTextarea.scrollTop = scrollTop;
+                // Optionally, try to set cursor position (might be jarring)
+                // const position = lines.slice(0, lineIndex).join('\n').length + (lineIndex > 0 ? 1 : 0);
+                // elements.notesTextarea.focus();
+                // elements.notesTextarea.setSelectionRange(position, position);
+                state.setStatusMessage(`Jumped to heading in editor (approximate).`);
+            } else {
+                 state.setStatusMessage("Could not find heading in editor.", true);
+            }
+            return; // Exit after handling edit mode
+        }
+
+
+        if (targetElement && state.currentNoteMode === 'view') {
+            // Scroll the preview container to the heading
+            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+            console.warn(`[DEBUG] TOC link clicked, but target heading #${targetId} not found or not in view mode.`);
+        }
+    });
+    // ---------------------------------------
+
     // --- Sidebar & Chat Management ---
     // Use the new tab button ID
     document.getElementById('sidebar-toggle-tab')?.addEventListener('click', ui.toggleLeftSidebar);
@@ -887,6 +942,10 @@ function subscribeStateChangeListeners() {
 
     // --- NEW: Subscribe UI to TOC drawer collapse state ---
     state.subscribe('isNotesTocCollapsed', ui.handleStateChange_isNotesTocCollapsed);
+    // ----------------------------------------------------
+
+    // --- NEW: Subscribe UI to TOC drawer collapse state ---
+    state.subscribe('isNotesTocCollapsed', handleStateChange_isNotesTocCollapsed);
     // ----------------------------------------------------
 }
 
