@@ -40,20 +40,25 @@ markedRenderer.code = function(code, language, isEscaped) {
 
     if (isDrawioXml) {
         // Prepare data for GraphViewer.processElements()
-        // Note: The instructions mention escaping JSON, but viewer-static expects raw XML in data-mxgraph.
-        // Let's follow the viewer-static documentation pattern: escape the XML directly for the attribute.
-        const escapedXmlData = escapeHtml(codeString); // Escape the raw XML string
+        // viewer.min.js expects the raw XML data in the attribute.
+        // WARNING: This assumes the XML doesn't contain characters that break HTML attributes (like quotes).
+        // If issues arise, we might need to escape quotes specifically or use a different embedding method.
+        const rawXmlData = codeString;
 
-        // Return the specific div structure
+        // Return the specific div structure with raw XML
         return `<div class="mxgraph my-4 border border-gray-300 rounded"
                      style="min-height: 150px; max-width: 100%;"
-                     data-mxgraph="${escapedXmlData}">
+                     data-mxgraph="${rawXmlData}">
                      <p class="text-center text-gray-500 p-4">Processing diagram...</p>
                 </div>`;
     } else {
         // Fallback for non-Draw.io code blocks: Basic escaping and pre/code tags.
-        // Stringify code just in case, then escape. Ignore language hints for simplicity.
-        const escapedCode = escapeHtml(String(code)); // Ensure string conversion before escaping
+        // Check if 'code' is actually a string before processing.
+        if (typeof code !== 'string') {
+            console.warn("[Marked Renderer] Received non-string code for fallback:", code);
+            codeString = JSON.stringify(code); // Attempt to stringify if not a string
+        }
+        const escapedCode = escapeHtml(codeString);
         return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapedCode}\n</code></pre>`;
     }
 };
