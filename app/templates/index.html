@@ -163,17 +163,18 @@
                         <!-- Label moved to input-controls div -->
                         <!-- <div id="session-file-display"></div> --> <!-- This div is no longer used -->
                     </div>
-                    <!-- Wrapper for textarea and mic button -->
+                    <!-- Wrapper for textarea and mic/cleanup button group -->
                     <div class="input-wrapper flex-grow relative">
                         <textarea id="message-input" rows="2" class="w-full p-2 rounded-lg focus:outline-none resize-none text-sm border border-gray-300" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
-                        <!-- Microphone Button (Moved Inside) -->
-                        <button id="mic-button" class="btn btn-secondary p-2 flex-shrink-0" title="Record Voice" style="height: 34px; width: 34px;"> {# Adjusted size slightly #}
-                            <i class="fas fa-microphone"></i>
-                        </button>
-                        <!-- NEW: Cleanup Transcript Button (Initially Hidden) -->
-                        <button id="cleanup-transcript-btn" class="btn btn-secondary p-2 flex-shrink-0 hidden" title="Clean Up Transcript" style="height: 34px; width: 34px;">
-                            <i class="fas fa-wand-magic-sparkles"></i> {# Example icon #}
-                        </button>
+                        <!-- Button Group for Mic and Cleanup -->
+                        <div class="inline-flex rounded-md shadow-sm absolute bottom-1 right-1" role="group">
+                            <button type="button" id="mic-button" class="btn-group-left" title="Record Voice">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                            <button type="button" id="cleanup-transcript-btn" class="btn-group-right" title="Clean Up Transcript" disabled>
+                                <i class="fas fa-wand-magic-sparkles"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="flex flex-col items-center self-end flex-shrink-0"> <!-- Container for Send button and checkbox -->
                         <!-- Web Search Toggle - Visibility controlled by plugin setting -->

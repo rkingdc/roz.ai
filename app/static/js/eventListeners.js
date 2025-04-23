@@ -83,6 +83,34 @@ export function setupEventListeners() {
         }
         // UI updates are triggered by state notifications (isRecording)
     });
+    elements.cleanupTranscriptButton?.addEventListener('click', () => {
+        if (state.isLoading || elements.cleanupTranscriptButton?.disabled) return;
+
+        const rawTranscript = elements.cleanupTranscriptButton?.dataset.rawTranscript;
+        if (!rawTranscript) {
+            state.setStatusMessage("No transcript data found for cleanup.", true);
+            return;
+        }
+
+        // Placeholder for cleanup logic
+        state.setStatusMessage("Cleanup requested...", false);
+        console.log("Cleanup button clicked. Raw transcript:", rawTranscript);
+        // TODO: Implement API call to backend for cleanup
+        // Example:
+        // try {
+        //     const cleanedTranscript = await api.cleanupTranscript(rawTranscript);
+        //     if (elements.messageInput) elements.messageInput.value = cleanedTranscript;
+        //     state.setStatusMessage("Transcript cleaned.", false);
+        // } catch (error) {
+        //     state.setStatusMessage(`Cleanup failed: ${error.message}`, true);
+        // } finally {
+        //     // Disable button again after cleanup? Or leave enabled?
+        //     if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = true;
+        // }
+        alert("Cleanup functionality not yet implemented."); // Temporary alert
+        if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = true; // Disable after click for now
+
+    });
 
     // --- Sidebar & Chat Management ---
     elements.sidebarToggleButton?.addEventListener('click', ui.toggleLeftSidebar); // UI-only toggle

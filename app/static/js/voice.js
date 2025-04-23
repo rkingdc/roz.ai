@@ -41,8 +41,12 @@ export async function startRecording(context) {
         return;
     }
 
-    // --- Check element reference at the very start ---
+    // --- Check element reference and ensure cleanup button is disabled ---
     const cleanupBtnRefAtStart = elements.cleanupTranscriptButton;
+    if (cleanupBtnRefAtStart) {
+        cleanupBtnRefAtStart.disabled = true; // Ensure disabled at start
+        cleanupBtnRefAtStart.removeAttribute('data-raw-transcript'); // Clear old transcript data
+    }
     // ---------------------------------------------
 
     // Clear previous streaming transcript state first
@@ -148,11 +152,13 @@ export async function startRecording(context) {
             // Reset mediaRecorder reference
             mediaRecorder = null;
 
-            // --- Show Cleanup Button ---
+            // --- Enable Cleanup Button ---
             const cleanupBtnRefAtStop = elements.cleanupTranscriptButton; // Get reference again
             if (recordingContextOnStop === 'chat' && cleanupBtnRefAtStop && finalTranscript) {
                 cleanupBtnRefAtStop.dataset.rawTranscript = finalTranscript; // Store raw transcript
-                cleanupBtnRefAtStop.classList.remove('hidden'); // Make button visible
+                cleanupBtnRefAtStop.disabled = false; // Enable button
+            } else if (cleanupBtnRefAtStop) {
+                 cleanupBtnRefAtStop.disabled = true; // Keep disabled if conditions not met
             }
             // -------------------------
         };
