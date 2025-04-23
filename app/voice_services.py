@@ -24,10 +24,6 @@ def transcribe_audio(audio_content: bytes, language_code: str = "en-US", sample_
     Returns:
         The transcribed text as a string, or None if transcription fails.
     """
-    if not current_app.config.get('GOOGLE_APPLICATION_CREDENTIALS'):
-        logger.error("GOOGLE_APPLICATION_CREDENTIALS environment variable not set. Cannot initialize SpeechClient.")
-        # Optionally check if the file path exists: os.path.exists(current_app.config['GOOGLE_APPLICATION_CREDENTIALS'])
-        return None
 
     try:
         # Instantiates a client. Relies on GOOGLE_APPLICATION_CREDENTIALS env var.
