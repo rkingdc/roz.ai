@@ -53,6 +53,10 @@ export let isNotesSidebarCollapsed = false; // Assuming a separate notes sidebar
 // Note History State
 export let noteHistory = []; // History entries for the currently selected note
 
+// Voice Recording State
+export let isRecording = false; // Whether audio is currently being recorded
+export let recordingContext = null; // Context associated with the current recording (e.g., 'chat', 'note')
+
 
 // --- Observer Pattern ---
 // Map to store listeners for different state change events
