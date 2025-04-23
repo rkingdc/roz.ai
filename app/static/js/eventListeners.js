@@ -83,7 +83,7 @@ export function setupEventListeners() {
         }
         // UI updates are triggered by state notifications (isRecording)
     });
-    elements.cleanupTranscriptButton?.addEventListener('click', () => {
+    elements.cleanupTranscriptButton?.addEventListener('click', async () => { // Add async here
         if (state.isLoading || elements.cleanupTranscriptButton?.disabled) return;
 
         const rawTranscript = elements.cleanupTranscriptButton?.dataset.rawTranscript;
