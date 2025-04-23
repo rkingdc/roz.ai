@@ -1026,10 +1026,21 @@ export function renderMicButtonState() {
         icon.classList.remove('fa-stop');
         icon.classList.add('fa-microphone');
     }
-    // Disable button if not on chat tab, if loading, or if socket isn't connected (when not recording)
-    // Allow enabling even if socket isn't connected yet, to allow user to initiate connection by clicking record
+
+    // Disable button if loading or not on the chat tab
     micButton.disabled = state.isLoading || state.currentTab !== 'chat';
-    // Add visual cue if socket is disconnected but button is enabled? Maybe later.
+
+    // Add visual cue and update tooltip if socket is disconnected but button is enabled
+    if (!isRecording && !state.isSocketConnected && !micButton.disabled) {
+        micButton.title = "Record Voice (Service Disconnected)";
+        // Add a class for styling (e.g., opacity-75). Define '.disconnected-cue' in your CSS.
+        micButton.classList.add('disconnected-cue');
+    } else if (!isRecording) {
+        // Ensure default title and remove cue class if connected or button is disabled
+        micButton.title = "Record Voice";
+        micButton.classList.remove('disconnected-cue');
+    }
+    // Tooltip for recording state is handled above
 }
 
 
