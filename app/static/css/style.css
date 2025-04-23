@@ -1068,6 +1068,9 @@
     display: inline-block; /* Ensure transform works */
     width: 1em; /* Ensure icon takes up space */
     text-align: center;
+    color: var(--rz-tab-background-text); /* Light gray color */
+    font-size: 0.8em; /* Make icon slightly smaller */
+    vertical-align: middle; /* Align icon better with text */
 }
 
 .collapsible-content {
@@ -1077,7 +1080,7 @@
     /* opacity: 1; */
     /* Add some padding/margin if needed */
      padding-left: 1.5em; /* Indent content slightly */
-     border-left: 2px solid var(--rz-tab-line); /* Add a visual indicator line */
+     /* border-left: 2px solid var(--rz-tab-line); /* REMOVED visual indicator line */
      margin-left: 0.5em; /* Space between icon and line */
      margin-top: 0.5em;
      margin-bottom: 1em;
@@ -1091,7 +1094,7 @@
     /* padding-bottom: 0; */
     /* margin-top: 0; */
     /* margin-bottom: 0; */
-     border-left: none; /* Hide border when collapsed */
+     /* border-left: none; /* REMOVED - No border to hide */
 }
 
 /* Rotate icon when collapsed */
