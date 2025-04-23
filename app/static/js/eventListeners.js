@@ -364,6 +364,9 @@ export function setupEventListeners() {
                 textarea.focus();
                 textarea.setSelectionRange(selectionStart, selectionStart + cleanedText.length);
 
+                // Trigger auto-resize after modifying content
+                ui.autoResizeTextarea(textarea);
+
                 // Status message is already set based on whether text changed.
 
                 // Optionally trigger auto-save or mark note as dirty
