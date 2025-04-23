@@ -49,10 +49,11 @@ export function setupEventListeners() {
                      console.error("Save chat name button element not found!");
                      state.setStatusMessage("Error: Save button element missing.", true);
                  }
-            } else {
-                console.log("[DEBUG] Ctrl+S detected, but no active chat or note to save.");
-                state.setStatusMessage("Nothing to save.", true);
             }
+            // else {
+                // console.log("[DEBUG] Ctrl+S detected, but no active chat or note to save.");
+                // state.setStatusMessage("Nothing to save.", true); // Avoid noisy status messages
+            // }
         }
     });
     console.log("Global keyboard listeners set up.");
@@ -243,7 +244,7 @@ export function setupEventListeners() {
     // -------------------------------------------------------
 
     elements.micButtonNotes?.addEventListener('click', () => {
-        console.log("[DEBUG] Notes Mic Button CLICKED!"); // Log mic click too
+        // console.log("[DEBUG] Notes Mic Button CLICKED!"); // Log mic click too
         if (state.currentTab !== 'notes') return; // Only allow in notes
 
         if (state.isRecording) {
