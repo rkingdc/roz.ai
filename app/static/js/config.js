@@ -52,11 +52,9 @@ markedRenderer.code = function(code, language, isEscaped) {
                 </div>`;
     } else {
         // Fallback to original renderer for other code blocks
-        // Ensure the original renderer also escapes HTML
-        const escapedCode = escapeHtml(codeString);
-        const langClass = language ? `language-${escapeHtml(language)}` : '';
-        return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code class="${langClass}">${escapedCode}\n</code></pre>`;
-        // return originalCodeRenderer(code, language, isEscaped); // Original fallback might not escape correctly
+        // Ensure we pass the string version of the code to the original renderer
+        // The original renderer should handle escaping appropriately.
+        return originalCodeRenderer(codeString, language, isEscaped);
     }
 };
 
