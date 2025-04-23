@@ -516,6 +516,7 @@ export function setupEventListeners() {
  * This function is called once during setupEventListeners.
  */
 function subscribeStateChangeListeners() {
+    console.log("[DEBUG] Subscribing state change listeners..."); // Add log at start
     // Subscribe UI functions to state changes they should react to
     state.subscribe('isLoading', ui.handleStateChange_isLoading);
     state.subscribe('statusMessage', ui.handleStateChange_statusMessage);
@@ -553,6 +554,11 @@ function subscribeStateChangeListeners() {
     // --- NEW: Subscribe UI to noteHistory state change ---
     state.subscribe('noteHistory', ui.handleStateChange_noteHistory); // Corrected handler name
     // ----------------------------------------------------
+
+    // --- Subscribe UI to streaming transcript state change ---
+    state.subscribe('streamingTranscript', ui.handleStateChange_streamingTranscript);
+    console.log("[DEBUG] Subscribed ui.handleStateChange_streamingTranscript to 'streamingTranscript'."); // Add specific log
+    // -------------------------------------------------------
 }
 
 
