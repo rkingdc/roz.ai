@@ -177,9 +177,11 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
             if (data && data.transcript !== undefined) {
                 if (data.is_final) {
                     console.log("Final transcript segment:", data.transcript);
-                    state.appendStreamingTranscript(data.transcript + ' ');
-                    state.setFinalTranscriptSegment(data.transcript);
+                    // Set the final transcript state directly, replacing any interim version
+                    state.setStreamingTranscript(data.transcript.trim()); // Trim whitespace
+                    state.setFinalTranscriptSegment(data.transcript.trim()); // Store the final segment if needed elsewhere
                 } else {
+                    // Update with interim results
                     state.setStreamingTranscript(data.transcript);
                 }
             }

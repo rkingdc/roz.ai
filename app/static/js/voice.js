@@ -112,13 +112,12 @@ export async function startRecording(context) {
             console.log(`[DEBUG] Final assembled transcript on stop: "${finalTranscript}"`);
 
             if (recordingContextOnStop === 'chat' && elements.messageInput) { // Use local variable
-                // The input should already contain the streaming transcript.
-                // We might just want to focus it.
+                // Explicitly set the final transcript in the input field
+                elements.messageInput.value = finalTranscript;
                 elements.messageInput.focus();
-                // Optionally, trigger LLM cleanup here if needed in the future
                 state.setStatusMessage("Recording stopped. Transcript added to input.");
             } else if (recordingContextOnStop === 'notes' && elements.notesTextarea) { // Use local variable
-                // Append to notes textarea (similar logic)
+                // Set the final transcript in the notes textarea
                 const currentVal = elements.notesTextarea.value;
                 // Replace the streaming placeholder with the final transcript
                 // This assumes the streaming updates were also directed to the notes textarea
