@@ -988,10 +988,7 @@ export async function handleDeleteNote(noteId) { // Removed listItemElement para
 /** Loads the history of a specific note from the backend and updates state. */
 export async function loadNoteHistory(noteId) {
     console.log(`[DEBUG] loadNoteHistory(${noteId}) called.`);
-    if (state.isLoading) {
-        console.log("[DEBUG] loadNoteHistory: App is busy, skipping history load.");
-        return; // Don't load history if app is busy
-    }
+    // REMOVED: if (state.isLoading) { ... } // History loading is part of note loading, shouldn't be blocked by it.
     // Note: Loading state is handled by the caller (loadNote or saveNote)
     // setStatus("Loading note history..."); // Status handled by caller
 
@@ -1002,11 +999,12 @@ export async function loadNoteHistory(noteId) {
              throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         const history = await response.json();
+        console.log('[DEBUG] loadNoteHistory: Fetched history data:', history); // Added logging
         state.setNoteHistory(history); // Update state (this notifies 'noteHistory')
         console.log(`[DEBUG] loadNoteHistory(${noteId}) finished successfully. Loaded ${history.length} entries.`);
         // Status handled by caller
     } catch (error) {
-        console.error(`Error loading note history for ${noteId}:`, error);
+        console.error(`[DEBUG] loadNoteHistory: Error fetching history for ${noteId}:`, error); // Added logging
         state.setNoteHistory([]); // Clear history on error
         // Status handled by caller
         throw error; // Re-throw for caller to handle if needed
