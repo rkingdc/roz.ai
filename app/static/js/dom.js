@@ -123,8 +123,12 @@ export function populateElements() {
     elements.chatbox = document.getElementById('chatbox');
     elements.messageInput = document.getElementById('message-input');
     elements.micButton = document.getElementById('mic-button');
-    elements.cleanupTranscriptButton = document.getElementById('cleanup-transcript-btn'); // Ensure this ID matches your HTML
-    console.log(`[DOM DEBUG] Populating elements.cleanupTranscriptButton:`, elements.cleanupTranscriptButton); // Add log
+    // --- Add more detailed logging for cleanupTranscriptButton ---
+    const cleanupBtnElement = document.getElementById('cleanup-transcript-btn');
+    console.log(`[DOM DEBUG] document.getElementById('cleanup-transcript-btn') returned:`, cleanupBtnElement);
+    elements.cleanupTranscriptButton = cleanupBtnElement; // Assign the found element (or null)
+    console.log(`[DOM DEBUG] elements.cleanupTranscriptButton after assignment:`, elements.cleanupTranscriptButton);
+    // ---------------------------------------------------------
     elements.sendButton = document.getElementById('send-button');
     elements.sidebar = document.getElementById('sidebar');
     elements.savedChatsList = document.getElementById('saved-chats-list');
