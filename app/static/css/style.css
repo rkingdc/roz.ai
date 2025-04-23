@@ -88,7 +88,7 @@
     padding-left: 0;
     padding-right: 0;
     border-right-width: 0;
-    /* overflow: hidden; */ /* REMOVED: This hides the tab when collapsed */
+    overflow: hidden; /* ADDED BACK: Hide content inside when collapsed */
 }
 /* --- End NEW Styles --- */
 /* Right Sidebar (Plugins) */
@@ -113,7 +113,7 @@
     padding-left: 0;
     padding-right: 0;
     border-left-width: 0;
-    /* overflow: hidden; */ /* REMOVED: This hides the tab when collapsed */
+    overflow: hidden; /* ADDED BACK: Hide content inside when collapsed */
 }
 /* --- End NEW Styles --- */
 
