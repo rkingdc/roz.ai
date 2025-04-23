@@ -1493,6 +1493,7 @@ export function handleStateChange_isSocketConnected() {
 
 // --- NEW: Handle Streaming Transcript Update ---
 export function handleStateChange_streamingTranscript() {
+    console.log("[UI DEBUG] handleStateChange_streamingTranscript triggered."); // Add log
     renderStreamingTranscript(); // Update the target input field
 }
 
@@ -1582,8 +1583,10 @@ export function handleStateChange_noteHistory() {
 export function renderStreamingTranscript() {
     const transcript = state.streamingTranscript; // Read from state
     const context = state.recordingContext; // Read context
+    console.log(`[UI DEBUG] renderStreamingTranscript called. Context: ${context}, Transcript: "${transcript}"`); // Add log
 
     if (context === 'chat' && elements.messageInput) {
+        console.log(`[UI DEBUG] Updating messageInput value to: "${transcript}"`); // Add log
         elements.messageInput.value = transcript; // Update chat input
         // Auto-scroll input if needed (usually not necessary for single line)
     } else if (context === 'notes' && elements.notesTextarea) {
