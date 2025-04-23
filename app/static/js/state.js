@@ -343,9 +343,12 @@ export function setWebSearchEnabled(enabled) {
 
 export function setCurrentTab(tab) {
     if (currentTab !== tab) {
+        const oldTab = currentTab; // Store old tab for logging
         currentTab = tab;
-        console.log(`[DEBUG] State: currentTab set to ${currentTab}`); // Add logging here
+        console.log(`[DEBUG] State: currentTab changed from ${oldTab} to ${currentTab}`); // Added logging here
         notify('currentTab', currentTab);
+    } else {
+         console.log(`[DEBUG] State: setCurrentTab called, but tab is already ${currentTab}. No change.`); // Added logging
     }
 }
 

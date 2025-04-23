@@ -322,7 +322,11 @@ export function setupEventListeners() {
 
     // New handler for tab button clicks
     async function handleTabSwitchClick(tab) {
-        if (state.currentTab === tab) return; // Already on this tab
+        console.log(`[DEBUG] handleTabSwitchClick called for tab: ${tab}`); // Added log
+        if (state.currentTab === tab) {
+            console.log(`[DEBUG] handleTabSwitchClick: Already on tab ${tab}, skipping.`); // Added log
+            return; // Already on this tab
+        }
 
         // Save current state before switching (e.g., auto-save note)
         if (state.currentTab === 'notes' && state.currentNoteId) {
@@ -475,7 +479,7 @@ function subscribeStateChangeListeners() {
     state.subscribe('pluginEnabled', ui.handleStateChange_pluginEnabled);
 
     // Subscribe the UI handler to the currentTab state change
-    state.subscribe('currentTab', ui.handleStateChange_currentTab);
+    state.subscribe('currentTab', ui.handleStateChange_currentTab); // Corrected event name
 
     // --- NEW: Subscribe UI to noteHistory state change ---
     state.subscribe('noteHistory', ui.handleStateChange_noteHistory); // Corrected handler name

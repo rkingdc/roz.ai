@@ -1004,6 +1004,8 @@ export function setPluginSectionCollapsed(headerElement, contentElement, isColla
  * Updates the UI based on which plugins are enabled/disabled (reads from state).
  */
 export function updatePluginUI() {
+    console.log(`[DEBUG] updatePluginUI called. Active Tab: ${state.currentTab}, Files Enabled: ${state.isFilePluginEnabled}, Calendar Enabled: ${state.isCalendarPluginEnabled}, Web Search Enabled: ${state.isWebSearchPluginEnabled}`); // Added log
+
     // Add null checks for all elements accessed in this function
     if (!elements.filePluginSection || !elements.fileUploadSessionLabel || !elements.selectedFilesContainer ||
         !elements.calendarPluginSection || !elements.calendarToggleInputArea || !elements.webSearchToggleLabel ||
@@ -1021,15 +1023,23 @@ export function updatePluginUI() {
 
     // Toggle visibility of entire plugin sections based on enabled state AND active tab
     // File plugin is only visible in Chat tab if enabled
-    elements.filePluginSection.classList.toggle('hidden', !isFileEnabled || activeTab !== 'chat');
+    const showFilesPlugin = isFileEnabled && activeTab === 'chat';
+    elements.filePluginSection.classList.toggle('hidden', !showFilesPlugin);
+    console.log(`[DEBUG] updatePluginUI: File Plugin hidden: ${elements.filePluginSection.classList.contains('hidden')} (Enabled: ${isFileEnabled}, Tab: ${activeTab})`); // Added log
+
     // Calendar plugin is only visible in Chat tab if enabled
-    elements.calendarPluginSection.classList.toggle('hidden', !isCalendarEnabled || activeTab !== 'chat');
+    const showCalendarPlugin = isCalendarEnabled && activeTab === 'chat';
+    elements.calendarPluginSection.classList.toggle('hidden', !showCalendarPlugin);
+    console.log(`[DEBUG] updatePluginUI: Calendar Plugin hidden: ${elements.calendarPluginSection.classList.contains('hidden')} (Enabled: ${isCalendarEnabled}, Tab: ${activeTab})`); // Added log
+
     // History plugin is only visible in Notes tab
-    elements.historyPluginSection.classList.toggle('hidden', activeTab !== 'notes');
+    const showHistoryPlugin = activeTab === 'notes';
+    elements.historyPluginSection.classList.toggle('hidden', !showHistoryPlugin);
+    console.log(`[DEBUG] updatePluginUI: History Plugin hidden: ${elements.historyPluginSection.classList.contains('hidden')} (Tab: ${activeTab})`); // Added log
 
 
     // Update elements within the file plugin section (only relevant when visible)
-    if (isFileEnabled && activeTab === 'chat') {
+    if (showFilesPlugin) { // Use the calculated visibility flag
         renderUploadedFiles(); // Ensure file list is rendered if plugin is enabled and tab is chat
     } else {
          // Clear file list if plugin is disabled or tab is not chat
@@ -1040,7 +1050,7 @@ export function updatePluginUI() {
     }
 
     // Update elements within the calendar plugin section (only relevant when visible)
-     if (isCalendarEnabled && activeTab === 'chat') {
+     if (showCalendarPlugin) { // Use the calculated visibility flag
         updateCalendarStatus(); // Ensure calendar status is updated if plugin is enabled and tab is chat
      } else {
          // Clear calendar status if plugin is disabled or tab is not chat
@@ -1053,7 +1063,7 @@ export function updatePluginUI() {
     // Its visibility is controlled by renderChatInputArea based on isWebSearchPluginEnabled.
 
     // Update elements within the history plugin section (only relevant when visible)
-    if (activeTab === 'notes') {
+    if (showHistoryPlugin) { // Use the calculated visibility flag
         renderNoteHistory(); // Ensure history is rendered when switching to notes tab
     } else {
         // Clear history list if tab is not notes
@@ -1062,9 +1072,11 @@ export function updatePluginUI() {
 
     // Ensure plugins sidebar itself is hidden if no plugins are visible on the current tab
     // Web Search plugin doesn't make the sidebar visible on its own now.
-    const anyPluginSectionVisible = (isFileEnabled || isCalendarEnabled) && activeTab === 'chat' || activeTab === 'notes'; // History plugin is always visible on notes tab
+    const anyPluginSectionVisible = showFilesPlugin || showCalendarPlugin || showHistoryPlugin; // Check if ANY section is visible
     if (elements.pluginsSidebar) elements.pluginsSidebar.classList.toggle('hidden', !anyPluginSectionVisible);
     if (elements.pluginsToggleButton) elements.pluginsToggleButton.classList.toggle('hidden', !anyPluginSectionVisible);
+    console.log(`[DEBUG] updatePluginUI: Plugins Sidebar hidden: ${elements.pluginsSidebar?.classList.contains('hidden')} (Any section visible: ${anyPluginSectionVisible})`); // Added log
+
 
     // Render the chat input area elements based on plugin states (includes web search toggle visibility)
     renderChatInputArea();
@@ -1482,7 +1494,7 @@ export function handleStateChange_pluginEnabled(pluginName) {
 }
 
 export function handleStateChange_currentTab() {
-    console.log(`[DEBUG] handleStateChange_currentTab called. State.currentTab is ${state.currentTab}`); // Add log
+    console.log(`[DEBUG] handleStateChange_currentTab called. State.currentTab is ${state.currentTab}`); // Added log
     // The switchTab function already handles rendering everything for the new tab
     // This handler might be redundant if switchTab is only called by eventListeners.js
     // reacting to the tab state change. Let's keep it simple and rely on eventListeners.js
