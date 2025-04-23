@@ -187,10 +187,11 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
                 } else {
                     // Only update with interim results if no final segment has been processed yet for this recording session
                     if (!state.finalTranscriptSegment) { // Check if finalTranscriptSegment is still empty/null
+                        console.log(`[API DEBUG] Received interim transcript: "${data.transcript}". Calling state.setStreamingTranscript.`); // Add log
                         state.setStreamingTranscript(data.transcript); // Update with interim result
                     } else {
                         // Optional: Log that an interim result was ignored after final
-                        // console.log("[DEBUG] Ignoring interim result after final segment received:", data.transcript);
+                         console.log(`[API DEBUG] Ignoring interim result after final segment received: "${data.transcript}"`); // Add log
                     }
                 }
             }
