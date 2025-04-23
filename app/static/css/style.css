@@ -690,7 +690,14 @@
 /* Ensure clicks pass through icons inside specific buttons */
 #cleanup-transcript-btn i,
 #cleanup-transcript-btn-notes i {
-    pointer-events: none;
+    pointer-events: none; /* Clicks pass through icon */
+}
+
+/* Ensure the buttons themselves accept pointer events when NOT disabled */
+#cleanup-transcript-btn:not(:disabled),
+#cleanup-transcript-btn-notes:not(:disabled) {
+    pointer-events: auto !important; /* Force pointer events */
+    cursor: pointer !important; /* Ensure cursor is pointer */
 }
 
 /* Button Group Styling */
