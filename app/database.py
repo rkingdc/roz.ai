@@ -390,25 +390,35 @@ def save_note_to_db(note_id, name, content):
 
         effective_name = name.strip() if name and name.strip() else f"Note {note_id}"
 
-        # Check if content or name has changed before saving history
-        content_changed = note.content != content
-        name_changed = note.name != effective_name
-
-        if content_changed or name_changed:
-            # Create a history entry *before* updating the note
-            history_entry = NoteHistory(
-                note_id=note.id,
-                name=note.name,      # Save the name *before* the update
-                content=note.content # Save the content *before* the update
-                # saved_at defaults to now()
-            )
-            db.session.add(history_entry)
-            logger.info(f"Created history entry for note ID {note_id} due to changes.")
+        # Store the current state *before* updating the note object
+        old_name = note.name
+        old_content = note.content
 
         # Update the note with new values
         note.name = effective_name
         note.content = content
         # last_saved_at is handled by onupdate in the model
+
+        # Check if content or name has changed *after* updating the note object
+        # This check compares the *old* state to the *new* state now stored in the note object
+        content_changed = old_content != note.content
+        name_changed = old_name != note.name
+
+        # Create a history entry *after* updating the note object,
+        # capturing the state *as it is about to be saved*
+        # Only create history if something actually changed
+        if content_changed or name_changed:
+            history_entry = NoteHistory(
+                note_id=note.id,
+                name=note.name,      # Save the name *after* the update
+                content=note.content # Save the content *after* the update
+                # saved_at defaults to now()
+            )
+            db.session.add(history_entry)
+            logger.info(f"Created history entry for note ID {note_id} capturing the new state.")
+        else:
+            logger.info(f"No changes detected for note ID {note_id}, skipping history entry creation.")
+
 
         logger.info(f"Attempting to save note content for ID: {note_id} (name: '{effective_name}')...")
         if _commit_session():
