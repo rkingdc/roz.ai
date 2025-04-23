@@ -217,9 +217,9 @@ def _google_request_generator(
     The first request sends the configuration.
     Putting None in the queue signals the end.
     """
-    # Send configuration first
-    yield speech.StreamingRecognizeRequest(streaming_config=streaming_config)
-    logger.debug("Sent streaming config to Google API.")
+    # The configuration is sent via the 'config' parameter in the streaming_recognize call.
+    # This generator should ONLY yield audio content.
+    # logger.debug("Starting Google request generator.") # Removed redundant log
 
     while True:
         chunk = audio_queue.get()
@@ -255,9 +255,10 @@ def _google_listen_print_loop(
         requests = _google_request_generator(audio_queue, streaming_config)
 
         # Call the Google API's streaming_recognize method
-        # The config is sent as the first item yielded by the 'requests' generator.
-        # Do NOT pass the config parameter here again.
+        # Pass the streaming_config object directly as the 'config' argument.
+        # The 'requests' generator will yield only the audio chunks.
         responses = client.streaming_recognize(
+            config=streaming_config, # Pass the config object here
             requests=requests,
             timeout=STREAM_LIMIT_SECONDS + 10
         )  # Add buffer to timeout
