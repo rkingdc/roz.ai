@@ -23,7 +23,6 @@ function isMimeTypeSupported() {
         console.error(`[ERROR] Required MIME type ${MIME_TYPE} not supported by this browser.`);
         return false;
     }
-    console.log(`[DEBUG] Using MIME type: ${MIME_TYPE}`);
     return true;
 }
 
