@@ -919,14 +919,18 @@ export function setSidebarCollapsed(sidebarElement, toggleButton, isCollapsed, l
 
 /** Toggles the left sidebar (chat/notes list). */
 export function toggleLeftSidebar() {
-    if (!elements.sidebar || !elements.sidebarToggleButton) return; // Add null check
-    setSidebarCollapsed(elements.sidebar, elements.sidebarToggleButton, !elements.sidebar.classList.contains('collapsed'), config.SIDEBAR_COLLAPSED_KEY, 'sidebar');
+    const sidebarElement = document.getElementById('sidebar');
+    const toggleButton = document.getElementById('sidebar-toggle-tab'); // Use new ID
+    if (!sidebarElement || !toggleButton) return;
+    setSidebarCollapsed(sidebarElement, toggleButton, !sidebarElement.classList.contains('collapsed'), config.SIDEBAR_COLLAPSED_KEY, 'sidebar');
 }
 
 /** Toggles the right sidebar (plugins). */
 export function toggleRightSidebar() {
-    if (!elements.pluginsSidebar || !elements.pluginsToggleButton) return; // Add null check
-    setSidebarCollapsed(elements.pluginsSidebar, elements.pluginsToggleButton, !elements.pluginsSidebar.classList.contains('collapsed'), config.PLUGINS_COLLAPSED_KEY, 'plugins');
+    const sidebarElement = document.getElementById('plugins-sidebar');
+    const toggleButton = document.getElementById('plugins-toggle-tab'); // Use new ID
+    if (!sidebarElement || !toggleButton) return;
+    setSidebarCollapsed(sidebarElement, toggleButton, !sidebarElement.classList.contains('collapsed'), config.PLUGINS_COLLAPSED_KEY, 'plugins');
 }
 
 /** Toggles the File Plugin section. */
@@ -1616,46 +1620,36 @@ export function renderStreamingTranscript() {
 
 export function handleStateChange_isSidebarCollapsed() {
     const isCollapsed = state.isSidebarCollapsed; // Read state
-    const sidebarElement = elements.sidebar;
-    const toggleButton = elements.sidebarToggleButton;
+    const sidebarElement = document.getElementById('sidebar');
+    const toggleButton = document.getElementById('sidebar-toggle-tab'); // Use new ID
     if (!sidebarElement || !toggleButton) return;
 
     sidebarElement.classList.toggle('collapsed', isCollapsed);
-    toggleButton.classList.toggle('collapsed', isCollapsed);
+    // The button itself doesn't need the 'collapsed' class for positioning anymore
+    // toggleButton.classList.toggle('collapsed', isCollapsed);
     const icon = toggleButton.querySelector('i');
     if (icon) {
-        if (isCollapsed) {
-            // If collapsing, change left arrow to right arrow
-            icon.classList.remove('fa-chevron-left');
-            icon.classList.add('fa-chevron-right');
-        } else {
-            // If expanding, change right arrow to left arrow
-            icon.classList.remove('fa-chevron-right');
-            icon.classList.add('fa-chevron-left');
-        }
+        // Left sidebar tab: Shows '<' when expanded, '>' when collapsed
+        icon.classList.toggle('fa-chevron-left', !isCollapsed);
+        icon.classList.toggle('fa-chevron-right', isCollapsed);
     }
     // Don't update localStorage or state here, just reflect the state in the UI
 }
 
 export function handleStateChange_isPluginsCollapsed() {
     const isCollapsed = state.isPluginsCollapsed; // Read state
-    const sidebarElement = elements.pluginsSidebar;
-    const toggleButton = elements.pluginsToggleButton;
+    const sidebarElement = document.getElementById('plugins-sidebar');
+    const toggleButton = document.getElementById('plugins-toggle-tab'); // Use new ID
     if (!sidebarElement || !toggleButton) return;
 
     sidebarElement.classList.toggle('collapsed', isCollapsed);
-    toggleButton.classList.toggle('collapsed', isCollapsed);
+    // The button itself doesn't need the 'collapsed' class for positioning anymore
+    // toggleButton.classList.toggle('collapsed', isCollapsed);
     const icon = toggleButton.querySelector('i');
     if (icon) {
-        if (isCollapsed) {
-            // If collapsing, change right arrow to left arrow
-            icon.classList.remove('fa-chevron-right');
-            icon.classList.add('fa-chevron-left');
-        } else {
-            // If expanding, change left arrow to right arrow
-            icon.classList.remove('fa-chevron-left');
-            icon.classList.add('fa-chevron-right');
-        }
+        // Right sidebar tab: Shows '>' when expanded, '<' when collapsed
+        icon.classList.toggle('fa-chevron-right', !isCollapsed);
+        icon.classList.toggle('fa-chevron-left', isCollapsed);
     }
     // Don't update localStorage or state here, just reflect the state in the UI
 }

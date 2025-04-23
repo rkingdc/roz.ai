@@ -370,7 +370,8 @@ export function setupEventListeners() {
     }
 
     // --- Sidebar & Chat Management ---
-    elements.sidebarToggleButton?.addEventListener('click', ui.toggleLeftSidebar); // UI-only toggle
+    // Use the new tab button ID
+    document.getElementById('sidebar-toggle-tab')?.addEventListener('click', ui.toggleLeftSidebar);
     elements.newChatButton?.addEventListener('click', async () => {
         await api.startNewChat(); // Updates state (currentChatId, savedChats, chatHistory, isLoading, statusMessage, etc.)
         // UI updates are triggered by state notifications within api.startNewChat
@@ -423,7 +424,8 @@ export function setupEventListeners() {
 
 
     // --- Plugins Sidebar & Sections ---
-    elements.pluginsToggleButton?.addEventListener('click', ui.toggleRightSidebar); // UI-only toggle
+    // Use the new tab button ID
+    document.getElementById('plugins-toggle-tab')?.addEventListener('click', ui.toggleRightSidebar);
     elements.filePluginHeader?.addEventListener('click', ui.toggleFilePlugin); // UI-only toggle
     elements.calendarPluginHeader?.addEventListener('click', ui.toggleCalendarPlugin); // UI-only toggle
     // Add listener for history plugin header if it's collapsible

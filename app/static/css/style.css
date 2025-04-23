@@ -68,6 +68,7 @@
 }
 /* Left Sidebar (Chats) */
  #sidebar {
+     position: relative; /* Needed for absolute positioning of the tab */
      width: 320px;
      background-color: var(--rz-sidebar-bg);
      border-right: 1px solid var(--rz-sidebar-border);
@@ -78,15 +79,13 @@
      flex-shrink: 0;
      transition: width 0.3s ease-in-out, padding 0.3s ease-in-out, border 0.3s ease-in-out;
      overflow-x: hidden;
+     /* Ensure content doesn't overlap the tab */
+     /* padding-top: 40px; */ /* Adjust if tab overlaps content */
 }
- body.sidebar-collapsed #sidebar {
-     width: 0;
-     padding-left: 0;
-     padding-right: 0;
-     border-right-width: 0;
-}
+/* --- REMOVED body.sidebar-collapsed rule --- */
 /* Right Sidebar (Plugins) */
  #plugins-sidebar {
+     position: relative; /* Needed for absolute positioning of the tab */
      width: 300px;
      background-color: var(--rz-sidebar-bg);
      border-left: 1px solid var(--rz-sidebar-border);
@@ -97,13 +96,60 @@
      flex-shrink: 0;
      transition: width 0.3s ease-in-out, padding 0.3s ease-in-out, border 0.3s ease-in-out;
      overflow-x: hidden;
+     /* Ensure content doesn't overlap the tab */
+     /* padding-top: 40px; */ /* Adjust if tab overlaps content */
 }
- body.plugins-collapsed #plugins-sidebar {
-     width: 0;
-     padding-left: 0;
-     padding-right: 0;
-     border-left-width: 0;
+/* --- REMOVED body.plugins-collapsed rule --- */
+
+/* --- NEW Sidebar Toggle Tab Styles --- */
+.sidebar-toggle-tab {
+    position: absolute;
+    top: 10px; /* Position from the top */
+    width: 24px; /* Width of the tab */
+    height: 40px; /* Height of the tab */
+    background-color: var(--rz-toolbar-opaque); /* Use toolbar color */
+    color: var(--rz-toolbar-field-text); /* Use toolbar text color */
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 50; /* Ensure it's above sidebar content */
+    transition: background-color 0.2s, left 0.3s ease-in-out, right 0.3s ease-in-out;
+    font-size: 0.8rem; /* Smaller icon */
 }
+
+.sidebar-toggle-tab.left-tab {
+    right: -24px; /* Stick out to the right */
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+}
+
+.sidebar-toggle-tab.right-tab {
+    left: -24px; /* Stick out to the left */
+    border-top-left-radius: 5px;
+    border-bottom-left-radius: 5px;
+}
+
+.sidebar-toggle-tab:hover {
+    background-color: var(--rz-toolbar-text); /* Gold on hover */
+    color: var(--rz-toolbar-field); /* Maroon text on hover */
+}
+
+/* Styles when sidebar is collapsed */
+#sidebar.collapsed .sidebar-toggle-tab.left-tab {
+    right: auto; /* Remove right positioning */
+    left: 5px; /* Position from the left edge of the collapsed sidebar */
+    border-radius: 5px; /* Adjust border radius */
+}
+
+#plugins-sidebar.collapsed .sidebar-toggle-tab.right-tab {
+    left: auto; /* Remove left positioning */
+    right: 5px; /* Position from the right edge of the collapsed sidebar */
+    border-radius: 5px; /* Adjust border radius */
+}
+/* --- End Sidebar Toggle Tab Styles --- */
+
 /* Main Content Area */
  #main-content {
      flex-grow: 1;

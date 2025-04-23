@@ -20,11 +20,15 @@
       <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
       <script src="{{ url_for('static', filename='js/app.js') }}" type="module" defer></script>    <!-- Link to your external JavaScript file -->
 
-    <button id="sidebar-toggle-btn" class="toggle-btn" title="Toggle Chat List">
-        <i class="fas fa-chevron-left"></i>
-    </button>
+    <!-- REMOVED old sidebar toggle button -->
 
-    <aside id="sidebar">
+    <aside id="sidebar" class="relative"> <!-- Added position: relative -->
+        <!-- NEW Sidebar Toggle Tab -->
+        <button id="sidebar-toggle-tab" class="sidebar-toggle-tab left-tab" title="Toggle Sidebar">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <!-- End NEW Sidebar Toggle Tab -->
+
         <!-- Moved button group here -->
         <div class="flex items-center justify-between mb-4 whitespace-nowrap">
              <h2 class="text-xl font-semibold">roz.ai</h2>
@@ -323,11 +327,14 @@
         </div>
         <!-- End NEW History Plugin Section -->
 
+        <!-- NEW Plugins Toggle Tab -->
+        <button id="plugins-toggle-tab" class="sidebar-toggle-tab right-tab" title="Toggle Plugins Sidebar">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+        <!-- End NEW Plugins Toggle Tab -->
     </aside>
 
-    <button id="plugins-toggle-btn" class="toggle-btn" title="Toggle Plugins">
-        <i class="fas fa-chevron-right"></i>
-    </button>
+    <!-- REMOVED old plugins toggle button -->
 
 
     <!-- New Manage Files Modal -->
