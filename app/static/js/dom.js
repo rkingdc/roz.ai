@@ -24,7 +24,7 @@ export const elements = {
 
     // Sidebar Elements
     sidebar: null,
-    sidebarToggleButton: null,
+    sidebarToggleTab: null, // Renamed from sidebarToggleButton
     savedChatsList: null,
     newChatButton: null,
     currentChatNameInput: null,
@@ -41,7 +41,7 @@ export const elements = {
 
     // Plugins Sidebar Elements
     pluginsSidebar: null,
-    pluginsToggleButton: null,
+    pluginsToggleTab: null, // Renamed from pluginsToggleButton
     filePluginSection: null,
     filePluginHeader: null,
     filePluginContent: null,
@@ -138,9 +138,9 @@ export function populateElements() {
     elements.saveChatNameButton = document.getElementById('save-chat-name-btn'); // Corrected ID to match HTML
     elements.currentChatIdDisplay = document.getElementById('current-chat-id-display');
     elements.statusBar = document.getElementById('status-bar');
-    elements.sidebarToggleButton = document.getElementById('sidebar-toggle-btn');
+    elements.sidebarToggleTab = document.getElementById('sidebar-toggle-tab'); // Use new ID
     elements.pluginsSidebar = document.getElementById('plugins-sidebar');
-    elements.pluginsToggleButton = document.getElementById('plugins-toggle-btn');
+    elements.pluginsToggleTab = document.getElementById('plugins-toggle-tab'); // Use new ID
     elements.uploadedFilesList = document.getElementById('uploaded-files-list');
     elements.selectedFilesContainer = document.getElementById('selected-files-container');
     elements.bodyElement = document.body;

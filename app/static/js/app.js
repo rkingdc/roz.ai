@@ -117,7 +117,8 @@ function loadPersistedStates() {
 
 // Helper function to load collapsed states after elements are populated
 function loadCollapsedStates() {
-    if (!elements.sidebar || !elements.sidebarToggleButton || !elements.pluginsSidebar || !elements.pluginsToggleButton ||
+    // Use the new element references for the toggle tabs
+    if (!elements.sidebar || !elements.sidebarToggleTab || !elements.pluginsSidebar || !elements.pluginsToggleTab ||
         !elements.filePluginHeader || !elements.filePluginContent || !elements.calendarPluginHeader || !elements.calendarPluginContent ||
         !elements.historyPluginHeader || !elements.historyPluginContent) { // Added history elements
         console.warn("Missing elements for loading collapsed states.");
@@ -125,13 +126,15 @@ function loadCollapsedStates() {
     }
 
     // Load sidebar collapsed state
-    const sidebarCollapsed = localStorage.getItem(config.SIDEBAR_COLLAPSED_KEY) === 'collapsed';
-    ui.setSidebarCollapsed(elements.sidebar, elements.sidebarToggleButton, sidebarCollapsed, config.SIDEBAR_COLLAPSED_KEY, 'sidebar');
+    const sidebarCollapsed = localStorage.getItem(config.SIDEBAR_COLLAPSED_KEY) === 'true'; // Check for 'true' string
+    // Use the new element reference: elements.sidebarToggleTab
+    ui.setSidebarCollapsed(elements.sidebar, elements.sidebarToggleTab, sidebarCollapsed, config.SIDEBAR_COLLAPSED_KEY, 'sidebar');
     // state.setIsSidebarCollapsed is now called inside ui.setSidebarCollapsed
 
     // Load plugins sidebar collapsed state
-    const pluginsCollapsed = localStorage.getItem(config.PLUGINS_COLLAPSED_KEY) === 'collapsed';
-    ui.setSidebarCollapsed(elements.pluginsSidebar, elements.pluginsToggleButton, pluginsCollapsed, config.PLUGINS_COLLAPSED_KEY, 'plugins');
+    const pluginsCollapsed = localStorage.getItem(config.PLUGINS_COLLAPSED_KEY) === 'true'; // Check for 'true' string
+    // Use the new element reference: elements.pluginsToggleTab
+    ui.setSidebarCollapsed(elements.pluginsSidebar, elements.pluginsToggleTab, pluginsCollapsed, config.PLUGINS_COLLAPSED_KEY, 'plugins');
     // state.setIsPluginsCollapsed is now called inside ui.setSidebarCollapsed
 
     // Load plugin section collapsed states

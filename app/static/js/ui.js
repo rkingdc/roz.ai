@@ -1049,7 +1049,7 @@ export function updatePluginUI() {
         !elements.calendarPluginSection || !elements.calendarToggleInputArea || !elements.webSearchToggleLabel ||
         !elements.uploadedFilesList || !elements.manageFilesList || !elements.calendarStatus || !elements.calendarToggle ||
         !elements.viewCalendarButton || !elements.webSearchToggle || !elements.historyPluginSection || !elements.noteHistoryList ||
-        !elements.pluginsSidebar || !elements.pluginsToggleButton) {
+        !elements.pluginsSidebar || !elements.pluginsToggleTab) { // Use the new reference name
         console.warn("Missing core plugin elements for updatePluginUI.");
         return;
     }
@@ -1109,7 +1109,7 @@ export function updatePluginUI() {
     // Web Search plugin doesn't make the sidebar visible on its own now.
     const anyPluginSectionVisible = showFilesPlugin || showCalendarPlugin || showHistoryPlugin; // Check if ANY section is visible
     if (elements.pluginsSidebar) elements.pluginsSidebar.classList.toggle('hidden', !anyPluginSectionVisible);
-    if (elements.pluginsToggleButton) elements.pluginsToggleButton.classList.toggle('hidden', !anyPluginSectionVisible);
+    if (elements.pluginsToggleTab) elements.pluginsToggleTab.classList.toggle('hidden', !anyPluginSectionVisible); // Use the new reference name
 
 
     // Render the chat input area elements based on plugin states (includes web search toggle visibility)
@@ -1203,7 +1203,7 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
         !chatSidebarContent || !notesSidebarContent || !modelSelectorContainer ||
         !notesModeElements || !messageInput || !notesTextarea || !notesPreview ||
         !currentChatNameInput || !currentNoteNameInput || !currentChatIdDisplay ||
-        !currentNoteIdDisplay || !inputArea || !sidebar || !sidebarToggleButton) {
+        !currentNoteIdDisplay || !inputArea || !sidebar || !elements.sidebarToggleTab) { // Use the new reference name
         console.error("Missing elements for tab switching.");
         // Status update handled by event listener or caller
         return;
