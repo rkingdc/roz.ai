@@ -47,9 +47,14 @@ def transcribe_audio(audio_content: bytes, language_code: str = "en-US", sample_
             # enable_automatic_punctuation=True, # Optional: Add punctuation
         )
 
-        logger.info(f"Sending audio to Google Speech-to-Text API (Language: {language_code}, Encoding: WEBM_OPUS, Channels: 2)")
-        response = client.recognize(config=config, audio=audio)
-        logger.info("Received response from Google Speech-to-Text API")
+        logger.info(f"Sending audio to Google Speech-to-Text Long Running API (Language: {language_code}, Encoding: WEBM_OPUS, Channels: 2)")
+        # Use long_running_recognize for potentially longer audio files
+        operation = client.long_running_recognize(config=config, audio=audio)
+
+        logger.info("Waiting for long-running transcription operation to complete...")
+        # Set a timeout (e.g., 300 seconds = 5 minutes) to avoid hanging indefinitely
+        response = operation.result(timeout=300)
+        logger.info("Long-running transcription operation finished.")
 
         # Process the response
         if response.results:
