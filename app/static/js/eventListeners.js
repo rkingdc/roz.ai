@@ -154,6 +154,7 @@ export function setupEventListeners() {
             ui.updateChatCleanupButtonState();
         }
     });
+    } // <-- Add missing closing brace for 'if (chatCleanupButton)'
 
     // --- Chat Input Listeners for Cleanup Button State ---
     if (elements.messageInput) {
