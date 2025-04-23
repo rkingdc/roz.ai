@@ -117,6 +117,7 @@ export function setupEventListeners() {
             const newFullText = textBefore + cleanedText + textAfter;
 
             // Update the input field directly
+            console.log("[DEBUG] Chat Cleanup: Replacing text in input field.");
             inputField.value = newFullText;
 
             // Restore selection around the newly inserted text (optional but good UX)
@@ -233,9 +234,11 @@ export function setupEventListeners() {
             const newFullText = textBefore + cleanedText + textAfter;
 
             // Update the textarea directly
+            console.log("[DEBUG] Notes Cleanup: Replacing text in textarea.");
             textarea.value = newFullText;
 
-            // Update the application state
+            // Update the application state AFTER updating the DOM value
+            console.log("[DEBUG] Notes Cleanup: Updating state.noteContent.");
             state.setNoteContent(newFullText);
 
             // Check if the text actually changed
@@ -249,7 +252,7 @@ export function setupEventListeners() {
             textarea.focus();
             textarea.setSelectionRange(selectionStart, selectionStart + cleanedText.length);
 
-            state.setStatusMessage("Selected text cleaned.");
+            // Status message is already set based on whether text changed.
 
             // Optionally trigger auto-save or mark note as dirty
             // await api.saveNote(); // Or just let the user save manually

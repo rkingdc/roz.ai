@@ -32,6 +32,7 @@ function isMimeTypeSupported() {
  * @param {'chat' | 'notes'} context - Where the transcription should go.
  */
 export async function startRecording(context) {
+    console.log(`[DEBUG] startRecording called with context: ${context}`); // Log context
     if (state.isRecording) {
         console.warn("[WARN] Already recording.");
         return;
@@ -67,7 +68,9 @@ export async function startRecording(context) {
         state.setStatusMessage("Connecting to transcription service...");
         // connectTranscriptionSocket now handles reusing/creating the connection
         // and returns a promise that resolves when the backend stream is ready.
+        console.log(`[DEBUG] Connecting transcription socket for context: ${context}`);
         await api.connectTranscriptionSocket('en-US', 'WEBM_OPUS'); // Use appropriate lang code and format
+        console.log(`[DEBUG] Transcription socket connected/ready for context: ${context}`);
         // If we reach here, the connection is established and backend confirmed readiness.
         // Status is now "Recording... Speak now." (set by api.js handler)
 
@@ -121,6 +124,7 @@ export async function startRecording(context) {
 
             // --- Read context BEFORE resetting state ---
             const recordingContextOnStop = state.recordingContext;
+            console.log(`[DEBUG] mediaRecorder.onstop: Context is "${recordingContextOnStop}"`); // Log context in onstop
             // -----------------------------------------
 
             // Append the final transcript segment (if any) to the input field
