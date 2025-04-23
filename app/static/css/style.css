@@ -448,6 +448,12 @@
      background-color: var(--rz-input-text-bg);
      border: 1px solid var(--rz-input-border);
      color: var(--rz-input-text);
+    /* --- NEW: Auto-resize styles --- */
+    min-height: 42px; /* Approx height for 2 rows + padding */
+    max-height: 33vh; /* Max height ~1/3 of viewport */
+    overflow-y: auto; /* Show scrollbar when max-height is reached */
+    resize: none; /* Ensure no manual resize handle */
+    /* ----------------------------- */
 }
  #message-input::placeholder {
      color: var(--rz-tab-background-text);
