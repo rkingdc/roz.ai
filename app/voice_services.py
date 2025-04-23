@@ -272,8 +272,11 @@ def _google_listen_print_loop(
         requests = _google_request_generator(audio_queue, streaming_config)
 
         # Call the Google API's streaming_recognize method
+        # Pass both the streaming_config and the request generator
         responses = client.streaming_recognize(
-            requests=requests, timeout=STREAM_LIMIT_SECONDS + 10
+            config=streaming_config, # Pass the config object here
+            requests=requests,
+            timeout=STREAM_LIMIT_SECONDS + 10
         )  # Add buffer to timeout
 
         # Process responses from Google
