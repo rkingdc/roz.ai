@@ -70,6 +70,16 @@ export function setupEventListeners() {
             await elements.sendButton?.click(); // Trigger send button click
         }
     });
+   // --- NEW: Auto-resize textarea ---
+   elements.messageInput?.addEventListener('input', () => {
+       const textarea = elements.messageInput;
+       if (!textarea) return;
+       // Reset height to auto to get correct scrollHeight
+       textarea.style.height = 'auto';
+       // Set height to scrollHeight (CSS max-height will limit it)
+       textarea.style.height = `${textarea.scrollHeight}px`;
+   });
+   // ---------------------------------
     elements.modelSelector?.addEventListener('change', async () => {
         await api.handleModelChange(); // Updates state (currentChatModel, isLoading, statusMessage)
         // UI updates are triggered by state notifications within api.handleModelChange
