@@ -1284,6 +1284,7 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
     // This ensures plugin sections and related UI elements are shown/hidden correctly
     // based on the newly active tab and plugin enabled states.
     updatePluginUI();
+    updateNotesCleanupButtonState(); // Update button state when switching tabs
     // ----------------------------------------------------
 
 }
@@ -1454,6 +1455,7 @@ export function handleStateChange_isLoading() {
     // updateAttachButtonState(); // Called by updateLoadingState
     renderNoteContent(); // Loading state affects note textarea placeholder/disabled
     renderMicButtonState(); // Loading/recording state affects mic button disabled state
+    updateNotesCleanupButtonState(); // Loading state affects button enabled state
 }
 
 export function handleStateChange_statusMessage() {
@@ -1576,6 +1578,18 @@ export function handleStateChange_noteHistory() {
     renderNoteHistory(); // Re-render the history list when history state changes
 }
 // -------------------------------------------------
+
+/**
+ * Updates the enabled/disabled state of the Notes "Cleanup" button
+ * based on whether text is selected in the notes textarea.
+ */
+export function updateNotesCleanupButtonState() {
+    if (!elements.notesTextarea || !elements.cleanupTranscriptButtonNotes) return;
+
+    const hasSelection = elements.notesTextarea.selectionStart !== elements.notesTextarea.selectionEnd;
+    // Only enable if on the Notes tab, not loading, and text is selected
+    elements.cleanupTranscriptButtonNotes.disabled = !(state.currentTab === 'notes' && !state.isLoading && hasSelection);
+}
 
 // --- UPDATED: Render Streaming Transcript ---
 /**

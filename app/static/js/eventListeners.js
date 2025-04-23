@@ -127,37 +127,61 @@ export function setupEventListeners() {
         // UI updates are triggered by state notifications (isRecording)
     });
     elements.cleanupTranscriptButtonNotes?.addEventListener('click', async () => {
-        if (state.isLoading || elements.cleanupTranscriptButtonNotes?.disabled) return;
+        // Button should already be disabled if no selection, but double-check
+        if (state.isLoading || elements.cleanupTranscriptButtonNotes?.disabled || !elements.notesTextarea) return;
 
-        const rawTranscript = elements.cleanupTranscriptButtonNotes?.dataset.rawTranscript;
-        if (!rawTranscript) {
-            state.setStatusMessage("No transcript data found for cleanup.", true);
+        const textarea = elements.notesTextarea;
+        const selectionStart = textarea.selectionStart;
+        const selectionEnd = textarea.selectionEnd;
+        const originalFullText = textarea.value; // Get text *before* API call
+        const selectedText = originalFullText.substring(selectionStart, selectionEnd);
+
+        if (!selectedText) {
+            state.setStatusMessage("No text selected to clean.", true);
+            // Ensure button is disabled if somehow clicked without selection
+            if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = true;
             return;
         }
 
-        // Disable button immediately
-        if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = true;
-        const originalText = elements.notesTextarea?.value || ''; // Store original text
+        // Disable button during processing (handled by global isLoading state via ui.updateNotesCleanupButtonState)
+        // state.setIsLoading(true); // api.cleanupTranscript handles this
 
         try {
-            // Call the API function
-            const cleanedTranscript = await api.cleanupTranscript(rawTranscript);
+            // Call the existing API function with the selected text
+            const cleanedText = await api.cleanupTranscript(selectedText);
 
-            // Update the notes textarea ONLY if cleanup was successful
-            if (elements.notesTextarea) {
-                elements.notesTextarea.value = cleanedTranscript;
-                // Also update the state to match the cleaned content
-                state.setNoteContent(cleanedTranscript);
-            }
-            // Status is set by api.cleanupTranscript on success/failure
+            // Get the potentially updated text *after* API call returns
+            const currentFullText = textarea.value;
+
+            // --- Smart Replacement (Basic) ---
+            // Replace based on original indices. Assumes text outside selection didn't change drastically.
+            const textBefore = currentFullText.substring(0, selectionStart);
+            const textAfter = currentFullText.substring(selectionEnd);
+            const newFullText = textBefore + cleanedText + textAfter;
+
+            // Update the textarea directly
+            textarea.value = newFullText;
+
+            // Update the application state
+            state.setNoteContent(newFullText);
+
+            // Restore selection around the newly inserted text (optional but good UX)
+            textarea.focus();
+            textarea.setSelectionRange(selectionStart, selectionStart + cleanedText.length);
+
+            state.setStatusMessage("Selected text cleaned.");
+
+            // Optionally trigger auto-save or mark note as dirty
+            // await api.saveNote(); // Or just let the user save manually
 
         } catch (error) {
-            // Error status is already set by api.cleanupTranscript
-            // Restore original text if cleanup failed
-            if (elements.notesTextarea) {
-                elements.notesTextarea.value = originalText;
-            }
-            // Button remains disabled
+            // Error status is set by api.cleanupTranscript
+            console.error("Error cleaning selected text:", error);
+            // Optionally display a more specific error to the user if needed
+        } finally {
+            // Loading state is handled by api.cleanupTranscript
+            // Re-evaluate button state after operation (selection might have changed)
+            ui.updateNotesCleanupButtonState();
         }
     });
 
