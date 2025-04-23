@@ -54,7 +54,8 @@ markedRenderer.code = function(code, language, isEscaped) {
         // Fallback to original renderer for other code blocks
         // Ensure we pass the string version of the code to the original renderer
         // The original renderer should handle escaping appropriately.
-        return originalCodeRenderer(codeString, language, isEscaped);
+        // Call with only code and language, as isEscaped seems problematic.
+        return originalCodeRenderer(codeString, language);
     }
 };
 

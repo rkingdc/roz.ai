@@ -10,8 +10,7 @@ import * as state from './state.js'; // Import state to update state directly fo
 import * as config from './config.js'; // Import config
 import * as voice from './voice.js'; // Import voice recording functions
 import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js'; // Import file size constants
-import { formatFileSize } from './utils.js';
-import { escapeHtml } from './utils.js'; // Need escapeHtml for session file loading
+import { formatFileSize, debounce, escapeHtml } from './utils.js'; // Import debounce and escapeHtml
 
 /**
  * Sets up all event listeners for the application.
