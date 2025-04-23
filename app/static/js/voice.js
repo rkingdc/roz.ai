@@ -152,6 +152,17 @@ export async function startRecording(context) {
 
             // Reset mediaRecorder reference
             mediaRecorder = null;
+
+            // --- Show Cleanup Button ---
+            console.log(`[DEBUG] Checking conditions to show cleanup button: context=${recordingContextOnStop}, buttonExists=${!!elements.cleanupTranscriptButton}, transcriptNotEmpty=${!!finalTranscript}`); // Add log
+            if (recordingContextOnStop === 'chat' && elements.cleanupTranscriptButton && finalTranscript) {
+                console.log("[DEBUG] Conditions met. Showing cleanup button and setting dataset."); // Add log
+                elements.cleanupTranscriptButton.dataset.rawTranscript = finalTranscript; // Store raw transcript
+                elements.cleanupTranscriptButton.classList.remove('hidden'); // Make button visible
+            } else {
+                console.log("[DEBUG] Conditions NOT met. Cleanup button remains hidden."); // Add log
+            }
+            // -------------------------
         };
 
         mediaRecorder.onerror = (event) => {
