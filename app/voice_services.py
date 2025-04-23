@@ -33,17 +33,18 @@ def transcribe_audio(audio_content: bytes, language_code: str = "en-US", sample_
         audio = speech.RecognitionAudio(content=audio_content)
 
         # Prepare the configuration object
-        # TODO: Determine the best Encoding based on frontend capture (LINEAR16, WEBM_OPUS, etc.)
-        # For now, assuming LINEAR16 (like WAV). Frontend must match this.
+        # The frontend sends audio/webm which typically uses Opus codec.
+        # For WEBM_OPUS, the sample rate is usually included in the header,
+        # so we don't need to specify sample_rate_hertz explicitly.
         config = speech.RecognitionConfig(
-            encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16, # Adjust if frontend sends Opus/WebM etc.
-            sample_rate_hertz=sample_rate_hertz, # Must match frontend recording sample rate
+            encoding=speech.RecognitionConfig.AudioEncoding.WEBM_OPUS,
+            # sample_rate_hertz is omitted; API will detect from WebM header
             language_code=language_code,
             # model="telephony", # Optional: Specify model for better accuracy in some cases
             # enable_automatic_punctuation=True, # Optional: Add punctuation
         )
 
-        logger.info(f"Sending audio to Google Speech-to-Text API (Language: {language_code}, Sample Rate: {sample_rate_hertz})")
+        logger.info(f"Sending audio to Google Speech-to-Text API (Language: {language_code}, Encoding: WEBM_OPUS)")
         response = client.recognize(config=config, audio=audio)
         logger.info("Received response from Google Speech-to-Text API")
 
@@ -58,7 +59,7 @@ def transcribe_audio(audio_content: bytes, language_code: str = "en-US", sample_
             return "" # Return empty string for no results vs None for error
 
     except InvalidArgument as e:
-         logger.error(f"Google Speech API Invalid Argument: {e}. Check audio encoding/sample rate match.", exc_info=True)
+         logger.error(f"Google Speech API Invalid Argument: {e}. Ensure audio encoding matches the file format.", exc_info=True)
          # You might want to inspect e.details() or specific error codes
          return None
     except GoogleAPICallError as e:
