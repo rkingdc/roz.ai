@@ -154,14 +154,15 @@
 
 /* Styles when sidebar is collapsed */
 #sidebar.collapsed .sidebar-toggle-tab.left-tab {
-    right: auto; /* Remove right positioning */
-    left: 5px; /* Position from the left edge of the collapsed sidebar */
-    border-radius: 5px; /* Adjust border radius */
+    /* right: auto; REMOVE - Not needed if using left */
+    left: 0; /* Position from the left edge of the viewport */
+    border-radius: 0 5px 5px 0; /* Adjust border radius for edge */
+    z-index: 51; /* Ensure it's above potential overlapping elements */
 }
 
 #plugins-sidebar.collapsed .sidebar-toggle-tab.right-tab {
-    left: auto; /* Remove left positioning */
-    right: 5px; /* Position from the right edge of the collapsed sidebar */
+    /* left: auto; REMOVE - Not needed if using right */
+    right: 0; /* Position from the right edge of the viewport */
     border-radius: 5px; /* Adjust border radius */
 }
 /* --- End Sidebar Toggle Tab Styles --- */
