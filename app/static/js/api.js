@@ -1342,7 +1342,6 @@ export async function loadNoteHistory(noteId) {
              throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         const history = await response.json();
-        console.log('[DEBUG] loadNoteHistory: Fetched history data:', history); // Added logging
 
         // --- Frontend Workaround: Update the name of the most recent history entry ---
         // This assumes the backend returns history sorted by saved_at DESC
@@ -1356,10 +1355,8 @@ export async function loadNoteHistory(noteId) {
         // -----------------------------------------------------------------------------
 
         state.setNoteHistory(history); // Update state (this notifies 'noteHistory')
-        console.log(`[DEBUG] loadNoteHistory(${noteId}) finished successfully. Loaded ${history.length} entries.`);
         // Status handled by caller
     } catch (error) {
-        console.error(`[DEBUG] loadNoteHistory: Error fetching history for ${noteId}:`, error); // Added logging
         state.setNoteHistory([]); // Clear history on error
         // Status handled by caller
         throw error; // Re-throw for caller to handle if needed
