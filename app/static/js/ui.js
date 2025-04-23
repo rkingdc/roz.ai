@@ -1426,7 +1426,7 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
                 } else {
                      console.warn("[DEBUG] GraphViewer or GraphViewer.processElements not available in setNoteMode.");
                 }
-             }, 0); // Delay ensures library is loaded and DOM updated
+             }, 100); // Increased delay to 100ms
              // -------------------------------------------------------------
         } else {
              notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
@@ -1471,7 +1471,7 @@ export function updateNotesPreview() {
                } else {
                    console.warn("[DEBUG] GraphViewer or GraphViewer.processElements not available in updateNotesPreview.");
                }
-            }, 0);
+            }, 100); // Increased delay to 100ms
             // -------------------------------------------------------------
         } else {
             notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
