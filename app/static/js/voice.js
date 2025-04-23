@@ -43,8 +43,9 @@ export async function startRecording(context) {
         return;
     }
 
-    // --- Add log here to check element reference ---
-    console.log(`[DEBUG] Value of elements.cleanupTranscriptButton at start of startRecording:`, elements.cleanupTranscriptButton);
+    // --- Check element reference at the very start ---
+    const cleanupBtnRefAtStart = elements.cleanupTranscriptButton;
+    console.log(`[DEBUG] elements.cleanupTranscriptButton at start of startRecording:`, cleanupBtnRefAtStart);
     // ---------------------------------------------
 
     // Clear previous streaming transcript state first
@@ -158,11 +159,12 @@ export async function startRecording(context) {
             mediaRecorder = null;
 
             // --- Show Cleanup Button ---
-            console.log(`[DEBUG] Value of elements.cleanupTranscriptButton inside onstop:`, elements.cleanupTranscriptButton); // Log the element reference itself
-            console.log(`[DEBUG] Checking conditions to show cleanup button: context=${recordingContextOnStop}, buttonExists=${!!elements.cleanupTranscriptButton}, transcriptNotEmpty=${!!finalTranscript}`); // Add log
-            if (recordingContextOnStop === 'chat' && elements.cleanupTranscriptButton && finalTranscript) {
+            const cleanupBtnRefAtStop = elements.cleanupTranscriptButton; // Get reference again
+            console.log(`[DEBUG] elements.cleanupTranscriptButton inside onstop:`, cleanupBtnRefAtStop); // Log the element reference itself
+            console.log(`[DEBUG] Checking conditions to show cleanup button: context=${recordingContextOnStop}, buttonExists=${!!cleanupBtnRefAtStop}, transcriptNotEmpty=${!!finalTranscript}`); // Add log
+            if (recordingContextOnStop === 'chat' && cleanupBtnRefAtStop && finalTranscript) {
                 console.log("[DEBUG] Conditions met. Showing cleanup button and setting dataset."); // Add log
-                elements.cleanupTranscriptButton.dataset.rawTranscript = finalTranscript; // Store raw transcript
+                cleanupBtnRefAtStop.dataset.rawTranscript = finalTranscript; // Store raw transcript
                 elements.cleanupTranscriptButton.classList.remove('hidden'); // Make button visible
             } else {
                 console.log("[DEBUG] Conditions NOT met. Cleanup button remains hidden."); // Add log
