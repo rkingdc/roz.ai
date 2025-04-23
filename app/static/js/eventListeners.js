@@ -85,77 +85,7 @@ export function setupEventListeners() {
         // UI updates are triggered by state notifications (isRecording)
     });
 
-    // --- Chat Cleanup Button Listener ---
-    const chatCleanupButton = elements.cleanupTranscriptButton;
-    if (chatCleanupButton) {
-        console.log("[DEBUG] Attaching listener to Chat Cleanup Button:", chatCleanupButton);
-        chatCleanupButton.addEventListener('click', async () => {
-            // Log button state *immediately* on click attempt
-            console.log(`[DEBUG] Chat Cleanup Button CLICKED! Disabled: ${chatCleanupButton.disabled}`);
-            // Button should already be disabled if no selection, but double-check
-            if (state.isLoading || chatCleanupButton.disabled || !elements.messageInput) { // Check the variable directly
-                 console.log(`[DEBUG] Chat Cleanup: Click ignored (isLoading: ${state.isLoading}, isDisabled: ${chatCleanupButton.disabled}, hasInput: ${!!elements.messageInput}).`);
-                 return;
-            }
-
-        const inputField = elements.messageInput;
-        const selectionStart = inputField.selectionStart;
-        const selectionEnd = inputField.selectionEnd;
-        const originalFullText = inputField.value; // Get text *before* API call
-        const selectedText = originalFullText.substring(selectionStart, selectionEnd);
-
-        if (!selectedText) {
-            state.setStatusMessage("No text selected to clean.", true);
-            // Ensure button is disabled if somehow clicked without selection
-            if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = true;
-            return;
-        }
-
-        // Disable button during processing (handled by global isLoading state via ui.updateChatCleanupButtonState)
-        // state.setIsLoading(true); // api.cleanupTranscript handles this
-
-        console.log(`[DEBUG] Chat Cleanup: Selected text: "${selectedText}"`);
-        try {
-            // Call the existing API function with the selected text
-            const cleanedText = await api.cleanupTranscript(selectedText);
-            console.log(`[DEBUG] Chat Cleanup: Received cleaned text: "${cleanedText}"`);
-
-            // Get the potentially updated text *after* API call returns
-            const currentFullText = inputField.value;
-
-            // --- Smart Replacement (Basic) ---
-            // Replace based on original indices. Assumes text outside selection didn't change drastically.
-            const textBefore = currentFullText.substring(0, selectionStart);
-            const textAfter = currentFullText.substring(selectionEnd);
-            const newFullText = textBefore + cleanedText + textAfter;
-            console.log(`[DEBUG] Chat Cleanup: Replacing with new full text: "${newFullText}"`);
-
-            // Update the input field directly
-            console.log("[DEBUG] Chat Cleanup: Replacing text in input field.");
-            inputField.value = newFullText;
-
-            // Restore selection around the newly inserted text (optional but good UX)
-            inputField.focus();
-            inputField.setSelectionRange(selectionStart, selectionStart + cleanedText.length);
-
-            // Check if the text actually changed
-            if (cleanedText === selectedText) {
-                state.setStatusMessage("Cleanup did not change the selected text.");
-            } else {
-                state.setStatusMessage("Selected text cleaned.");
-            }
-
-        } catch (error) {
-            // Error status is set by api.cleanupTranscript
-            console.error("Error cleaning selected text:", error);
-            // Optionally display a more specific error to the user if needed
-        } finally {
-            // Loading state is handled by api.cleanupTranscript
-            // Re-evaluate button state after operation (selection might have changed)
-            ui.updateChatCleanupButtonState();
-        }
-    });
-    } // <-- Add missing closing brace for 'if (chatCleanupButton)'
+    // --- Chat Cleanup Button Listener (REMOVED - Using Delegation Below) ---
 
     // --- Chat Input Listeners for Cleanup Button State ---
     if (elements.messageInput) {
@@ -221,85 +151,7 @@ export function setupEventListeners() {
         // UI updates are triggered by state notifications (isRecording)
     });
 
-    // --- Notes Cleanup Button Listener ---
-    const notesCleanupButton = elements.cleanupTranscriptButtonNotes;
-    if (notesCleanupButton) {
-        console.log("[DEBUG] Attaching listener to Notes Cleanup Button:", notesCleanupButton);
-        notesCleanupButton.addEventListener('click', async () => {
-             // Log button state *immediately* on click attempt
-            console.log(`[DEBUG] Notes Cleanup Button CLICKED! Disabled: ${notesCleanupButton.disabled}`);
-            // Button should already be disabled if no selection, but double-check
-            if (state.isLoading || notesCleanupButton.disabled || !elements.notesTextarea) { // Check the variable directly
-                 console.log(`[DEBUG] Notes Cleanup: Click ignored (isLoading: ${state.isLoading}, isDisabled: ${notesCleanupButton.disabled}, hasTextarea: ${!!elements.notesTextarea}).`);
-                 return;
-            }
-
-        const textarea = elements.notesTextarea;
-        const selectionStart = textarea.selectionStart;
-        const selectionEnd = textarea.selectionEnd;
-        const originalFullText = textarea.value; // Get text *before* API call
-        const selectedText = originalFullText.substring(selectionStart, selectionEnd);
-
-        if (!selectedText) {
-            state.setStatusMessage("No text selected to clean.", true);
-            // Ensure button is disabled if somehow clicked without selection
-            if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = true;
-            return;
-        }
-
-        // Disable button during processing (handled by global isLoading state via ui.updateNotesCleanupButtonState)
-        // state.setIsLoading(true); // api.cleanupTranscript handles this
-
-        console.log(`[DEBUG] Notes Cleanup: Selected text: "${selectedText}"`);
-        try {
-            // Call the existing API function with the selected text
-            const cleanedText = await api.cleanupTranscript(selectedText);
-            console.log(`[DEBUG] Notes Cleanup: Received cleaned text: "${cleanedText}"`);
-
-            // Get the potentially updated text *after* API call returns
-            const currentFullText = textarea.value;
-
-            // --- Smart Replacement (Basic) ---
-            // Replace based on original indices. Assumes text outside selection didn't change drastically.
-            const textBefore = currentFullText.substring(0, selectionStart);
-            const textAfter = currentFullText.substring(selectionEnd);
-            const newFullText = textBefore + cleanedText + textAfter;
-            console.log(`[DEBUG] Notes Cleanup: Replacing with new full text: "${newFullText}"`);
-
-            // Update the textarea directly
-            console.log("[DEBUG] Notes Cleanup: Replacing text in textarea.");
-            textarea.value = newFullText;
-
-            // Update the application state AFTER updating the DOM value
-            console.log("[DEBUG] Notes Cleanup: Updating state.noteContent.");
-            state.setNoteContent(newFullText);
-
-            // Check if the text actually changed
-            if (cleanedText === selectedText) {
-                state.setStatusMessage("Cleanup did not change the selected text.");
-            } else {
-                state.setStatusMessage("Selected text cleaned.");
-            }
-
-            // Restore selection around the newly inserted text (optional but good UX)
-            textarea.focus();
-            textarea.setSelectionRange(selectionStart, selectionStart + cleanedText.length);
-
-            // Status message is already set based on whether text changed.
-
-            // Optionally trigger auto-save or mark note as dirty
-            // await api.saveNote(); // Or just let the user save manually
-
-        } catch (error) {
-            // Error status is set by api.cleanupTranscript
-            console.error("Error cleaning selected text:", error);
-            // Optionally display a more specific error to the user if needed
-        } finally {
-            // Loading state is handled by api.cleanupTranscript
-            // Re-evaluate button state after operation (selection might have changed)
-            ui.updateNotesCleanupButtonState();
-        }
-    });
+    // --- Notes Cleanup Button Listener (REMOVED - Using Delegation Below) ---
 
     // --- Sidebar & Chat Management ---
     elements.sidebarToggleButton?.addEventListener('click', ui.toggleLeftSidebar); // UI-only toggle
@@ -712,8 +564,83 @@ export function setupEventListeners() {
     });
     // -----------------------------------------------------------------
 
+    // --- Delegated Click Listener for Cleanup Buttons ---
+    document.body.addEventListener('click', async (event) => {
+        const chatCleanupBtn = event.target.closest('#cleanup-transcript-btn');
+        const notesCleanupBtn = event.target.closest('#cleanup-transcript-btn-notes');
+
+        if (chatCleanupBtn) {
+            console.log(`[DEBUG] Delegated Chat Cleanup Button CLICKED! Disabled: ${chatCleanupBtn.disabled}`);
+            if (state.isLoading || chatCleanupBtn.disabled || !elements.messageInput) {
+                 console.log(`[DEBUG] Delegated Chat Cleanup: Click ignored (isLoading: ${state.isLoading}, isDisabled: ${chatCleanupBtn.disabled}, hasInput: ${!!elements.messageInput}).`);
+                 return;
+            }
+
+            const inputField = elements.messageInput;
+            const selectionStart = inputField.selectionStart;
+            const selectionEnd = inputField.selectionEnd;
+            const selectedText = inputField.value.substring(selectionStart, selectionEnd);
+
+            if (!selectedText) {
+                state.setStatusMessage("No text selected to clean.", true);
+                return;
+            }
+
+            console.log(`[DEBUG] Delegated Chat Cleanup: Selected text: "${selectedText}"`);
+            try {
+                const cleanedText = await api.cleanupTranscript(selectedText);
+                console.log(`[DEBUG] Delegated Chat Cleanup: Received cleaned text: "${cleanedText}"`);
+                const currentFullText = inputField.value;
+                const textBefore = currentFullText.substring(0, selectionStart);
+                const textAfter = currentFullText.substring(selectionEnd);
+                const newFullText = textBefore + cleanedText + textAfter;
+                console.log(`[DEBUG] Delegated Chat Cleanup: Replacing with new full text: "${newFullText}"`);
+                inputField.value = newFullText;
+                inputField.focus();
+                inputField.setSelectionRange(selectionStart, selectionStart + cleanedText.length);
+                if (cleanedText === selectedText) { state.setStatusMessage("Cleanup did not change the selected text."); } else { state.setStatusMessage("Selected text cleaned."); }
+            } catch (error) { console.error("Error cleaning selected text (Chat):", error); }
+            finally { ui.updateChatCleanupButtonState(); }
+
+        } else if (notesCleanupBtn) {
+            console.log(`[DEBUG] Delegated Notes Cleanup Button CLICKED! Disabled: ${notesCleanupBtn.disabled}`);
+            if (state.isLoading || notesCleanupBtn.disabled || !elements.notesTextarea) {
+                 console.log(`[DEBUG] Delegated Notes Cleanup: Click ignored (isLoading: ${state.isLoading}, isDisabled: ${notesCleanupBtn.disabled}, hasTextarea: ${!!elements.notesTextarea}).`);
+                 return;
+            }
+
+            const textarea = elements.notesTextarea;
+            const selectionStart = textarea.selectionStart;
+            const selectionEnd = textarea.selectionEnd;
+            const selectedText = textarea.value.substring(selectionStart, selectionEnd);
+
+            if (!selectedText) {
+                state.setStatusMessage("No text selected to clean.", true);
+                return;
+            }
+
+            console.log(`[DEBUG] Delegated Notes Cleanup: Selected text: "${selectedText}"`);
+            try {
+                const cleanedText = await api.cleanupTranscript(selectedText);
+                console.log(`[DEBUG] Delegated Notes Cleanup: Received cleaned text: "${cleanedText}"`);
+                const currentFullText = textarea.value;
+                const textBefore = currentFullText.substring(0, selectionStart);
+                const textAfter = currentFullText.substring(selectionEnd);
+                const newFullText = textBefore + cleanedText + textAfter;
+                console.log(`[DEBUG] Delegated Notes Cleanup: Replacing with new full text: "${newFullText}"`);
+                textarea.value = newFullText;
+                state.setNoteContent(newFullText); // Update state for notes
+                textarea.focus();
+                textarea.setSelectionRange(selectionStart, selectionStart + cleanedText.length);
+                 if (cleanedText === selectedText) { state.setStatusMessage("Cleanup did not change the selected text."); } else { state.setStatusMessage("Selected text cleaned."); }
+            } catch (error) { console.error("Error cleaning selected text (Notes):", error); }
+            finally { ui.updateNotesCleanupButtonState(); }
+        }
+    });
+    // ----------------------------------------------------
+
     console.log("[DEBUG] setupEventListeners finished."); // Log completion
-    } // <-- Add potentially spurious closing brace here based on error message
+    // } // <-- REMOVE the potentially spurious closing brace added previously
 }
 
 
