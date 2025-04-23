@@ -430,11 +430,11 @@
 }
 .input-wrapper #mic-button.recording {
     background-color: #dc2626; /* Keep Red background when recording */
-    color: white;
-    border-color: #b91c1c;
+    color: white; /* White icon when recording */
+    border-color: #b91c1c; /* Darker red border */
 }
 .input-wrapper #mic-button.recording:hover:not(:disabled) {
-    background-color: #b91c1c;
+    background-color: #b91c1c; /* Darker red on hover when recording */
 }
 .input-wrapper #mic-button i {
     font-size: 0.9rem; /* Adjust icon size if needed */
