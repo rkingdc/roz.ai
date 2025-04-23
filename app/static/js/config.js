@@ -46,15 +46,17 @@ markedRenderer.code = function(code, language, isEscaped) {
 
     if (isDrawioXml) {
         // Prepare data for GraphViewer.processElements()
-        // viewer.min.js expects the raw XML data in the attribute.
-        // WARNING: This assumes the XML doesn't contain characters that break HTML attributes (like quotes).
-        // If issues arise, we might need to escape quotes specifically or use a different embedding method.
-        const rawXmlData = codeString;
+        // Create a JSON object containing the raw XML string.
+        const graphData = { xml: codeString };
+        // Stringify the JSON object.
+        const jsonGraphData = JSON.stringify(graphData);
+        // Escape the resulting JSON string to make it safe for the HTML attribute.
+        const escapedJsonData = escapeHtml(jsonGraphData);
 
-        // Return the specific div structure with raw XML
+        // Return the specific div structure with the escaped JSON string in data-mxgraph
         return `<div class="mxgraph my-4 border border-gray-300 rounded"
                      style="min-height: 150px; max-width: 100%;"
-                     data-mxgraph="${rawXmlData}">
+                     data-mxgraph="${escapedJsonData}">
                      <p class="text-center text-gray-500 p-4">Processing diagram...</p>
                 </div>`;
     } else {
