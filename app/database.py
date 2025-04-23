@@ -201,7 +201,8 @@ def get_chat_history_from_db(chat_id, limit=100):
         return []
 
 # Files
-def save_file_record_to_db(filename, content_blob, mimetype, filesize):
+# Added optional commit parameter
+def save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=True):
     """Saves file metadata and content blob using the File model."""
     new_file = File(
         filename=filename,
@@ -212,15 +213,22 @@ def save_file_record_to_db(filename, content_blob, mimetype, filesize):
     )
     try:
         db.session.add(new_file)
-        logger.info(f"Attempting to save file record for '{filename}'...")
-        if _commit_session():
-            logger.info(f"Successfully saved file record & BLOB: ID {new_file.id}, Name '{filename}', Type '{mimetype}', Size {filesize}")
-            return new_file.id
+        logger.info(f"Added file record for '{filename}' to session.")
+        if commit:
+            logger.info(f"Attempting to commit file record for '{filename}'...")
+            if _commit_session():
+                logger.info(f"Successfully saved file record & BLOB: ID {new_file.id}, Name '{filename}', Type '{mimetype}', Size {filesize}")
+                return new_file.id
+            else:
+                # _commit_session handles rollback and logging
+                return None # Commit failed
         else:
-            return None # Commit failed
+            # Return ID (will be None until committed) and indicate no commit happened
+            logger.info(f"File record for '{filename}' added to session, commit deferred.")
+            return new_file.id # ID is None until commit
     except SQLAlchemyError as e:
-        logger.error(f"Database error saving file record/BLOB for '{filename}': {e}", exc_info=True)
-        db.session.rollback()
+        logger.error(f"Database error adding file record/BLOB for '{filename}' to session: {e}", exc_info=True)
+        db.session.rollback() # Rollback the add operation if it failed
         return None
 
 def get_uploaded_files_from_db():
