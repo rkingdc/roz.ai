@@ -1234,15 +1234,22 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
     if (tab === 'chat') {
         console.log(`[DEBUG] ui.switchTab: Rendering chat specific content.`);
         renderChatHistory(); // Reads state.chatHistory
-        renderUploadedFiles(); // Reads state.uploadedFiles, state.sidebarSelectedFiles, state.attachedFiles, state.sessionFile
-        updateCalendarStatus(); // Reads state.calendarContext, state.isCalendarContextActive, state.isCalendarPluginEnabled
-        renderChatInputArea(); // Reads plugin states, web search state, calendar active state, file plugin state
+        // renderUploadedFiles(); // Called by updatePluginUI
+        // updateCalendarStatus(); // Called by updatePluginUI
+        // renderChatInputArea(); // Called by updatePluginUI
     } else { // tab === 'notes'
         console.log(`[DEBUG] ui.switchTab: Rendering notes specific content.`);
         renderNoteContent(); // Reads state.noteContent, state.currentNoteId, state.isLoading
         setNoteMode(state.currentNoteMode); // Applies persisted/default mode from state
-        renderNoteHistory(); // Reads state.noteHistory, state.currentNoteId
+        // renderNoteHistory(); // Called by updatePluginUI
     }
+
+    // --- FIX: Call updatePluginUI after switching tabs ---
+    // This ensures plugin sections and related UI elements are shown/hidden correctly
+    // based on the newly active tab and plugin enabled states.
+    updatePluginUI();
+    // ----------------------------------------------------
+
     console.log(`[DEBUG] ui.switchTab finished.`);
 }
 
