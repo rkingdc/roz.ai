@@ -1003,6 +1003,35 @@ export function setPluginSectionCollapsed(headerElement, contentElement, isColla
 
 
 /**
+ * Updates the microphone button icon and style based on recording state.
+ */
+export function renderMicButtonState() {
+    const { micButton } = elements;
+    if (!micButton) return;
+
+    const isRecording = state.isRecording; // Read from state
+
+    // Find the icon element within the button
+    const icon = micButton.querySelector('i');
+    if (!icon) return;
+
+    if (isRecording) {
+        micButton.title = "Stop Recording";
+        micButton.classList.add('recording'); // Add class for potential styling (e.g., red background)
+        icon.classList.remove('fa-microphone');
+        icon.classList.add('fa-stop');
+    } else {
+        micButton.title = "Record Voice";
+        micButton.classList.remove('recording');
+        icon.classList.remove('fa-stop');
+        icon.classList.add('fa-microphone');
+    }
+    // Disable button if not on chat tab (handled by event listener logic, but good safety check)
+    micButton.disabled = state.isLoading || state.currentTab !== 'chat';
+}
+
+
+/**
  * Updates the UI based on which plugins are enabled/disabled (reads from state).
  */
 export function updatePluginUI() {

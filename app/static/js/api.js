@@ -25,6 +25,66 @@ function setStatus(message, isError = false) {
 }
 
 
+// --- Voice Transcription API ---
+
+/**
+ * Sends audio blob to the backend for transcription.
+ * @param {Blob} audioBlob - The audio data blob.
+ * @returns {Promise<string|null>} The transcribed text or null on error.
+ */
+export async function transcribeAudioApi(audioBlob) {
+    if (state.isLoading) {
+        setStatus("Cannot transcribe: Application is busy.", true);
+        return null;
+    }
+    if (!audioBlob || audioBlob.size === 0) {
+        setStatus("Cannot transcribe: No audio data.", true);
+        return null;
+    }
+
+    setLoading(true, "Transcribing Audio..."); // Use setLoading helper
+
+    const formData = new FormData();
+    // Use a consistent filename, the backend doesn't rely on it but it's good practice
+    const filename = `recording.${audioBlob.type.split('/')[1].split(';')[0]}`; // e.g., recording.wav or recording.webm
+    formData.append('audio_file', audioBlob, filename);
+    // Optional: Send sample rate if needed by backend, though it's hardcoded for now
+    // formData.append('sampleRate', TARGET_SAMPLE_RATE); // TARGET_SAMPLE_RATE needs to be accessible here or passed
+
+    try {
+        const response = await fetch('/api/voice/transcribe', {
+            method: 'POST',
+            body: formData
+            // No 'Content-Type' header needed for FormData, browser sets it with boundary
+        });
+
+        const data = await response.json(); // Try to parse JSON regardless of status code
+
+        if (!response.ok) {
+            // Use error from JSON if available, otherwise use status text
+            throw new Error(data.error || `HTTP error ${response.status} - ${response.statusText}`);
+        }
+
+        // Check if transcript exists in the response
+        if (data && data.transcript !== undefined) {
+            setStatus("Transcription successful."); // Update status via state
+            return data.transcript; // Return the text
+        } else {
+            // This case should ideally not happen if backend returns correctly
+            console.warn("[WARN] Transcription API response OK, but no transcript found in data:", data);
+            throw new Error("Received empty or invalid transcription response.");
+        }
+
+    } catch (error) {
+        console.error('Error during transcription API call:', error);
+        setStatus(`Transcription Error: ${error.message}`, true); // Update status via state
+        return null; // Indicate failure
+    } finally {
+        setLoading(false); // Use setLoading helper
+    }
+}
+
+
 // --- File API ---
 
 /** Deletes a file from the backend and updates the state. */
