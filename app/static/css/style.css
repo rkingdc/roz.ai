@@ -399,6 +399,45 @@
      box-shadow: 0 0 0 2px var(--rz-input-focus-ring);
      border-color: var(--rz-input-focus-ring);
 }
+/* New styles for input wrapper and mic button positioning */
+.input-wrapper {
+    position: relative; /* Container for absolute positioning */
+    display: flex; /* Ensure it takes up space like the textarea */
+}
+.input-wrapper #message-input {
+    padding-right: 45px; /* Add padding to prevent text overlap */
+    width: 100%; /* Ensure textarea fills the wrapper */
+}
+.input-wrapper #mic-button {
+    position: absolute;
+    right: 8px; /* Adjust as needed */
+    bottom: 8px; /* Adjust as needed */
+    z-index: 10; /* Ensure it's above the textarea */
+    /* Use theme colors */
+    background-color: var(--rz-frame);
+    color: var(--rz-button-secondary-text);
+    border: 1px solid var(--rz-button-secondary-bg);
+    border-radius: 50%; /* Make it circular */
+    padding: 0; /* Remove default button padding */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.input-wrapper #mic-button:hover:not(:disabled) {
+    background-color: var(--rz-button-secondary-hover-bg);
+}
+.input-wrapper #mic-button.recording {
+    background-color: #dc2626; /* Example: Red background when recording */
+    color: white;
+    border-color: #b91c1c;
+}
+.input-wrapper #mic-button.recording:hover:not(:disabled) {
+    background-color: #b91c1c;
+}
+.input-wrapper #mic-button i {
+    font-size: 0.9rem; /* Adjust icon size if needed */
+    margin: 0; /* Remove any default margins */
+}
 /* Selected Files Display Area */
  #selected-files-container {
      display: flex;

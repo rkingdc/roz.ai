@@ -159,23 +159,27 @@
                         <i class="fas fa-paperclip"></i>
                     </label>
                    <div id="file-upload-session-container" class="hidden">
-        <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf">
-        <!-- Label moved to input-controls div -->
-        <!-- <div id="session-file-display"></div> --> <!-- This div is no longer used -->
-    </div>
-                    <textarea id="message-input" rows="2" class="flex-grow p-2 rounded-lg focus:outline-none resize-none text-sm border border-gray-300" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
-                    <div class="flex flex-col items-center self-end flex-shrink-0"> <!-- Container for button and checkbox -->
+                        <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf">
+                        <!-- Label moved to input-controls div -->
+                        <!-- <div id="session-file-display"></div> --> <!-- This div is no longer used -->
+                    </div>
+                    <!-- Wrapper for textarea and mic button -->
+                    <div class="input-wrapper flex-grow relative">
+                        <textarea id="message-input" rows="2" class="w-full p-2 rounded-lg focus:outline-none resize-none text-sm border border-gray-300" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
+                        <!-- Microphone Button (Moved Inside) -->
+                        <button id="mic-button" class="btn btn-secondary p-2 flex-shrink-0" title="Record Voice" style="height: 34px; width: 34px;"> {# Adjusted size slightly #}
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                    </div>
+                    <div class="flex flex-col items-center self-end flex-shrink-0"> <!-- Container for Send button and checkbox -->
                         <!-- Web Search Toggle - Visibility controlled by plugin setting -->
                         <label class="toggle-switch text-xs mb-1" id="web-search-toggle-label" title="Include web search results in the AI's context">
                             <input type="checkbox" id="web-search-toggle">
                             <span class="toggle-slider"></span>
                             Web Search
                         </label>
-                        <!-- Microphone Button -->
-                        <button id="mic-button" class="btn btn-secondary p-2 flex-shrink-0" title="Record Voice" style="height: 42px; width: 42px;">
-                            <i class="fas fa-microphone"></i>
-                        </button>
                         <!-- Send Button -->
+                        {# Mic button moved inside input-wrapper #}
                         <button id="send-button" class="btn btn-primary flex-grow" style="height: 42px;">
                             <i class="fas fa-paper-plane"></i> Send
                         </button>
