@@ -101,7 +101,6 @@ export async function startRecording(context) {
                 await api.stopAudioStream(); // This now returns a promise
 
             } catch (error) {
-                 console.error("[ERROR] Error waiting for transcription completion:", error);
                  // Set error status even if waiting failed, but still try to process transcript
                  state.setStatusMessage(`Error finalizing transcription: ${error.message}`, true);
             }
