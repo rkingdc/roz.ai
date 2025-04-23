@@ -183,10 +183,15 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
                     // Append with a space if the current transcript isn't empty
                     const updatedTranscript = currentTranscript ? `${currentTranscript} ${newFinalSegment}` : newFinalSegment;
                     state.setStreamingTranscript(updatedTranscript); // Update state with appended transcript
-                    state.setFinalTranscriptSegment(newFinalSegment); // Store just the *last* final segment if needed elsewhere
+                    state.setFinalTranscriptSegment(newFinalSegment); // Mark that a final segment arrived and store the last one
                 } else {
-                    // Update with interim results (replace previous interim)
-                    state.setStreamingTranscript(data.transcript);
+                    // Only update with interim results if no final segment has been processed yet for this recording session
+                    if (!state.finalTranscriptSegment) { // Check if finalTranscriptSegment is still empty/null
+                        state.setStreamingTranscript(data.transcript); // Update with interim result
+                    } else {
+                        // Optional: Log that an interim result was ignored after final
+                        // console.log("[DEBUG] Ignoring interim result after final segment received:", data.transcript);
+                    }
                 }
             }
         });
