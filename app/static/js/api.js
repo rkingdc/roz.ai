@@ -112,6 +112,11 @@ export async function handleFileUpload(event) {
         return;
     }
 
+    // --- FIX: Disable input and label during upload ---
+    if (elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = true;
+    if (elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.add('disabled');
+    // -------------------------------------------------
+
     setLoading(true, "Uploading");
     const formData = new FormData();
     let fileCount = 0;
@@ -126,6 +131,10 @@ export async function handleFileUpload(event) {
 
     if (fileCount === 0) {
         setLoading(false);
+        // --- FIX: Re-enable input and label ---
+        if(elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = false;
+        if(elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.remove('disabled');
+        // -------------------------------------
         if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = '';
         setStatus("No valid files selected for upload.", true);
         return;
@@ -153,7 +162,11 @@ export async function handleFileUpload(event) {
         setStatus(`Error uploading files: ${error.message}`, true);
     } finally {
         setLoading(false);
-        if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = ''; // Reset input
+        // --- FIX: Re-enable input and label and reset value ---
+        if(elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = false;
+        if(elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.remove('disabled');
+        if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = ''; // Reset input value
+        // -----------------------------------------------------
         // Closing modal should be handled by event listener or UI logic reacting to state
     }
 }
@@ -468,11 +481,21 @@ export async function loadSavedChats() {
 
 /** Starts a new chat session by calling the backend and updates state. */
 export async function startNewChat() {
+    console.log(`[DEBUG] startNewChat called.`);
+    if (state.isLoading) return;
     setLoading(true, "Creating Chat");
+    // Clear current chat state immediately
+    state.setCurrentChatId(null);
+    state.setCurrentChatName(''); // Assuming setCurrentChatName in state.js
+    state.setCurrentChatModel(''); // Assuming setCurrentChatModel in state.js
+    state.setChatHistory([]); // Clear history for the new empty chat
+    resetChatContext(); // Clear chat-specific context states
+
     try {
         const response = await fetch('/api/chat', { method: 'POST' });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const newChat = await response.json();
+        console.log(`[DEBUG] startNewChat: Received new chat ID ${newChat.id}. Loading it...`);
 
         // Load the new chat (this updates state.currentChatId, loads history, resets context)
         await loadChat(newChat.id);
@@ -481,13 +504,13 @@ export async function startNewChat() {
         await loadSavedChats();
 
         setStatus(`New chat created (ID: ${newChat.id}).`);
-
+        console.log(`[DEBUG] startNewChat: Successfully created and loaded chat ${newChat.id}.`);
     } catch (error) {
         console.error('Error starting new chat:', error);
         // Add system message via state? Or let UI react to status?
         // For now, just update status
         setStatus("Error creating new chat.", true);
-        // Don't re-throw, allow UI to remain usable if possible
+        // state is already reset above
     } finally {
         setLoading(false);
     }
@@ -615,7 +638,7 @@ export async function sendMessage() {
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            throw new Error(data.error || `HTTP error! status: ${response.status}`);
         }
 
         if (state.isStreamingEnabled && response.headers.get('Content-Type')?.includes('text/plain')) {
@@ -1055,18 +1078,6 @@ export async function loadInitialChatData() {
     }
 
 
-    // If a valid persisted chat ID was found (or if chatToLoadId is now null after clearing stale ID)
-    if (chatToLoadId !== null) {
-        console.log(`[DEBUG] loadInitialChatData: Attempting to load chat ID ${chatToLoadId}.`);
-        try {
-            await loadChat(chatToLoadId); // Attempt to load the persisted chat (updates state)
-        } catch (error) {
-            console.warn(`[DEBUG] loadInitialChatData: loadChat(${chatToLoadId}) failed: ${error}. Falling back.`);
-            // Error handling in loadChat already clears state and localStorage
-            // chatToLoadId is effectively null now, fallback logic will trigger
-        }
-    }
-
     // If no valid persisted chat or loading failed, load most recent or start new
     if (state.currentChatId === null) { // Check state.currentChatId after attempts
         console.log("[DEBUG] loadInitialChatData: No valid currentChatId after attempts, loading most recent or creating new.");
@@ -1110,18 +1121,6 @@ export async function loadInitialNotesData() {
          noteToLoadId = null; // Ensure fallback logic triggers
     }
 
-
-    // If a valid persisted note ID was found (or if noteToLoadId is now null after clearing stale ID)
-    if (noteToLoadId !== null) {
-        console.log(`[DEBUG] loadInitialNotesData: Attempting to load note ID ${noteToLoadId}.`);
-        try {
-            await loadNote(noteToLoadId); // Attempt to load persisted note (updates state)
-        } catch (error) {
-            console.warn(`[DEBUG] loadInitialNotesData: loadNote(${noteToLoadId}) failed: ${error}. Starting new note.`);
-            // Error handling in loadNote already clears state and localStorage
-            // noteToLoadId is effectively null now, fallback logic will trigger
-        }
-    }
 
     // If no valid persisted note or loading failed, load most recent or start new
     if (state.currentNoteId === null) { // Check state.currentNoteId after attempts
