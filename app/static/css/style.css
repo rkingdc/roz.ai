@@ -1052,3 +1052,53 @@
 #notes-textarea {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
+
+/* --- Collapsible Heading Styles --- */
+.collapsible-heading {
+    cursor: pointer;
+    /* Optional: Add some hover effect */
+    /* transition: background-color 0.2s; */
+}
+/* .collapsible-heading:hover {
+    background-color: rgba(0, 0, 0, 0.05); /* Subtle hover */
+/* } */
+
+.collapsible-toggle {
+    transition: transform 0.2s ease-in-out;
+    display: inline-block; /* Ensure transform works */
+    width: 1em; /* Ensure icon takes up space */
+    text-align: center;
+}
+
+.collapsible-content {
+    /* transition: max-height 0.3s ease-out, opacity 0.3s ease-out; */
+    overflow: hidden;
+    /* max-height: 10000px; /* Set a large max-height for transition */
+    /* opacity: 1; */
+    /* Add some padding/margin if needed */
+     padding-left: 1.5em; /* Indent content slightly */
+     border-left: 2px solid var(--rz-tab-line); /* Add a visual indicator line */
+     margin-left: 0.5em; /* Space between icon and line */
+     margin-top: 0.5em;
+     margin-bottom: 1em;
+}
+
+.collapsible-content.collapsed {
+    display: none;
+    /* max-height: 0; */
+    /* opacity: 0; */
+    /* padding-top: 0; */
+    /* padding-bottom: 0; */
+    /* margin-top: 0; */
+    /* margin-bottom: 0; */
+     border-left: none; /* Hide border when collapsed */
+}
+
+/* Rotate icon when collapsed */
+/* This is handled by toggling fa-chevron-down/fa-chevron-right in JS now */
+/*
+.collapsible-heading .collapsible-toggle.collapsed {
+    transform: rotate(-90deg);
+}
+*/
+/* --- End Collapsible Heading Styles --- */

@@ -784,8 +784,36 @@ export function setupEventListeners() {
 
     // --- Delegated Click Listener for Cleanup Buttons (REMOVED) ---
 
+
+    // --- Delegated Click Listener for Collapsible Headings ---
+    function handleCollapsibleClick(event) {
+        const heading = event.target.closest('.collapsible-heading');
+        if (!heading) return;
+
+        const targetId = heading.dataset.target;
+        const content = targetId ? document.querySelector(targetId) : null;
+        const icon = heading.querySelector('.collapsible-toggle');
+
+        if (content) {
+            const isCollapsed = content.classList.toggle('collapsed');
+            // Toggle icon direction
+            if (icon) {
+                icon.classList.toggle('fa-chevron-down', !isCollapsed);
+                icon.classList.toggle('fa-chevron-right', isCollapsed); // Point right when collapsed
+            }
+            // Optional: Store state in localStorage/sessionStorage if persistence is needed
+        }
+    }
+
+    // Add listener to chatbox
+    elements.chatbox?.addEventListener('click', handleCollapsibleClick);
+
+    // Add listener to notes preview area
+    elements.notesPreview?.addEventListener('click', handleCollapsibleClick);
+    // ---------------------------------------------------------
+
+
     // console.log("[DEBUG] setupEventListeners finished."); // Log completion
-    // } // <-- REMOVE the potentially spurious closing brace added previously
 }
 
 
