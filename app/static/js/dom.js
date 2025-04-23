@@ -123,7 +123,7 @@ export function populateElements() {
     elements.chatbox = document.getElementById('chatbox');
     elements.messageInput = document.getElementById('message-input');
     elements.micButton = document.getElementById('mic-button');
-    elements.cleanupTranscriptButton = document.getElementById('cleanup-transcript-btn'); // Populate cleanup button reference
+    elements.cleanupTranscriptButton = document.getElementById('cleanup-transcript-btn'); // Ensure this ID matches your HTML
     console.log(`[DOM DEBUG] Populating elements.cleanupTranscriptButton:`, elements.cleanupTranscriptButton); // Add log
     elements.sendButton = document.getElementById('send-button');
     elements.sidebar = document.getElementById('sidebar');
