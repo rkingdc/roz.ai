@@ -263,9 +263,21 @@ export function stopAudioStream() {
         // --- Promise state management ---
         let promiseResolved = false;
         let promiseRejected = false;
+        let timeoutId = null; // Declare timeoutId here
 
+        // Define removeListeners helper first
+        const removeListeners = () => {
+            if (socket) {
+                socket.off('transcription_complete', handleComplete);
+                socket.off('transcription_error', handleError);
+                socket.off('disconnect', handleDisconnect);
+            }
+        };
+
+        // Define resolveOnce and rejectOnce with clearTimeout built-in
         const resolveOnce = (message = "Transcription complete.") => {
             if (!promiseResolved && !promiseRejected) {
+                clearTimeout(timeoutId); // Clear timeout on resolve
                 promiseResolved = true;
                 removeListeners();
                 console.log(`[DEBUG] stopAudioStream Promise resolved: ${message}`);
@@ -274,6 +286,7 @@ export function stopAudioStream() {
         };
         const rejectOnce = (error) => {
              if (!promiseResolved && !promiseRejected) {
+                clearTimeout(timeoutId); // Clear timeout on reject
                 promiseRejected = true;
                 removeListeners();
                 console.error(`[DEBUG] stopAudioStream Promise rejected:`, error);
@@ -281,7 +294,7 @@ export function stopAudioStream() {
             }
         };
 
-        // --- Temporary listeners for this stop request ---
+        // --- Temporary listeners for this stop request (using the functions defined above) ---
         const handleComplete = (data) => {
             console.log("Backend confirmed transcription complete:", data.message);
             resolveOnce(data.message);
@@ -314,23 +327,12 @@ export function stopAudioStream() {
 
         // Optional: Add a timeout in case the backend never sends 'transcription_complete'
         const timeoutDuration = 10000; // 10 seconds
-        const timeoutId = setTimeout(() => {
+        // Assign to the timeoutId declared earlier
+        timeoutId = setTimeout(() => {
              rejectOnce(new Error(`Timeout waiting for transcription completion after ${timeoutDuration}ms`));
         }, timeoutDuration);
 
-        // Ensure timeout is cleared if promise resolves/rejects normally
-        // Modify the original functions to include clearTimeout
-        const originalResolveOnce = resolveOnce;
-        resolveOnce = (message) => {
-            clearTimeout(timeoutId);
-            originalResolveOnce(message); // Call the original function
-        };
-
-        const originalRejectOnce = rejectOnce;
-        rejectOnce = (error) => {
-            clearTimeout(timeoutId);
-            originalRejectOnce(error); // Call the original function
-        };
+        // No need to modify resolveOnce/rejectOnce here, clearTimeout is already included
 
     }); // End of promise constructor
 }
