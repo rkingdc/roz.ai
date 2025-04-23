@@ -43,6 +43,10 @@ export async function startRecording(context) {
         return;
     }
 
+    // --- Add log here to check element reference ---
+    console.log(`[DEBUG] Value of elements.cleanupTranscriptButton at start of startRecording:`, elements.cleanupTranscriptButton);
+    // ---------------------------------------------
+
     // Clear previous streaming transcript state first
     state.setStreamingTranscript("");
     state.setFinalTranscriptSegment("");
