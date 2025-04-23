@@ -17,9 +17,11 @@ logger = logging.getLogger(__name__) # Use the standard logger name
 @socketio.on('connect')
 def handle_connect():
     """Handles new client connections."""
-    logger.info(f"WebSocket client connected: {request.sid}")
-    # Optionally join a room specific to the user/session if needed later
-    # join_room(request.sid)
+    sid = request.sid
+    logger.info(f"WebSocket client connected: {sid}")
+    # Join a room specific to the session ID so we can emit directly to this client
+    join_room(sid)
+    logger.info(f"Client {sid} joined its room.")
 
 
 @socketio.on('disconnect')
@@ -28,10 +30,12 @@ def handle_disconnect():
     sid = request.sid
     logger.info(f"WebSocket client disconnected: {sid}")
     # Signal the end of the stream if the client disconnects abruptly
-    # The listener thread in voice_services will handle queue cleanup
+    # The listener thread in voice_services will handle queue cleanup.
     logger.info(f"Signaling end of stream due to disconnect for SID: {sid}")
     signal_end_of_stream(sid)
-    # Optionally leave rooms if joined
+    # Leave the room associated with the session
+    leave_room(sid)
+    logger.info(f"Client {sid} left its room.")
 
 
 @socketio.on('start_transcription')
@@ -61,12 +65,13 @@ def handle_start_transcription(data):
         )
         # Note: audio_queue is managed within voice_services now, we don't store it here.
         logger.info(f"Transcription stream setup initiated for client: {sid}")
-        # Send confirmation back to client
-        emit('transcription_started', {'message': 'Streaming transcription ready.'})
+        # Send confirmation back to the specific client
+        emit('transcription_started', {'message': 'Streaming transcription ready.'}, room=sid)
 
     except Exception as e:
         logger.error(f"Error starting transcription stream for {sid}: {e}", exc_info=True)
-        emit('transcription_error', {'error': f'Failed to start transcription: {e}'})
+        # Send error back to the specific client
+        emit('transcription_error', {'error': f'Failed to start transcription: {e}'}, room=sid)
 
 
 @socketio.on('audio_chunk')

@@ -43,31 +43,26 @@ export async function startRecording(context) {
         return;
     }
 
-    // --- Connect WebSocket ---
-    try {
-        // Connect WebSocket *before* getting user media
-        api.connectTranscriptionSocket('en-US', 'WEBM_OPUS'); // Use appropriate lang code and format
-        // Status updates handled within connectTranscriptionSocket
-    } catch (error) {
-        console.error("Failed to initiate WebSocket connection:", error);
-        state.setStatusMessage("Failed to connect to transcription service.", true);
-        return; // Don't proceed if connection fails
-    }
-    // Wait briefly for connection? Or rely on 'transcription_started' event?
-    // Let's proceed and assume the backend handles buffering if needed.
-
-    // Clear previous streaming transcript state
+    // Clear previous streaming transcript state first
     state.setStreamingTranscript("");
     state.setFinalTranscriptSegment("");
 
     try {
-        // Request microphone access
+        // --- Connect WebSocket and wait for backend readiness FIRST ---
+        // This ensures the connection exists and the backend stream is initialized.
+        state.setStatusMessage("Connecting to transcription service...");
+        // connectTranscriptionSocket now handles reusing/creating the connection
+        // and returns a promise that resolves when the backend stream is ready.
+        await api.connectTranscriptionSocket('en-US', 'WEBM_OPUS'); // Use appropriate lang code and format
+        // If we reach here, the connection is established and backend confirmed readiness.
+        // Status is now "Recording... Speak now." (set by api.js handler)
+
+        // --- Request microphone access AFTER successful connection ---
         state.setStatusMessage("Requesting microphone access...");
-        // Request microphone access - sampleRate constraint might not be respected for Opus/WebM
         audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         console.log("[DEBUG] Microphone access granted.");
 
-        // Log actual track settings (sample rate might be fixed for Opus, e.g., 48000Hz)
+        // Log actual track settings
         const audioTracks = audioStream.getAudioTracks();
         if (audioTracks.length > 0) {
             const settings = audioTracks[0].getSettings();
@@ -76,10 +71,18 @@ export async function startRecording(context) {
         }
 
         // --- Initialize MediaRecorder ---
+        // Check if recording was stopped while waiting for mic access (unlikely but possible)
+        // Note: isRecording state is NOT set yet. We check if mediaRecorder exists.
+        if (mediaRecorder) {
+             console.warn("[WARN] MediaRecorder already exists? Aborting startRecording.");
+             return;
+        }
+
         mediaRecorder = new MediaRecorder(audioStream, { mimeType: MIME_TYPE });
 
         mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0 && state.isSocketConnected) {
+            // Send chunk only if recorder is running and socket is connected
+            if (event.data.size > 0 && state.isSocketConnected && mediaRecorder?.state === 'recording') {
                 // console.log(`[DEBUG] Sending audio chunk, size: ${event.data.size}`); // Verbose
                 // Send chunk immediately via WebSocket
                 api.sendAudioChunk(event.data);
@@ -134,49 +137,68 @@ export async function startRecording(context) {
             // Disconnect WebSocket
             api.disconnectTranscriptionSocket();
             // Reset recording state
+            // --- Read context BEFORE resetting state ---
+            const recordingContextOnStop = state.recordingContext;
+            // -----------------------------------------
+
+            // Reset recording state *before* potentially adding transcript to input/notes
+            // This prevents race conditions if stopRecording is called again quickly.
             state.setIsRecording(false); // This will trigger UI update for button
+
+            // Append the final transcript segment (if any) to the input field
+            // The streaming transcript state already updates the input field in real-time via ui.js
+            // We just need to ensure the final state is reflected.
+            const finalTranscript = state.streamingTranscript.trim(); // Get the full assembled transcript
+            console.log(`[DEBUG] Final assembled transcript on stop: "${finalTranscript}"`);
+
+            if (recordingContextOnStop === 'chat' && elements.messageInput) { // Use local variable
+                // The input should already contain the streaming transcript.
+                // We might just want to focus it.
+                elements.messageInput.focus();
+                // Optionally, trigger LLM cleanup here if needed in the future
+                state.setStatusMessage("Recording stopped. Transcript added to input.");
+            } else if (recordingContextOnStop === 'notes' && elements.notesTextarea) { // Use local variable
+                // Append to notes textarea (similar logic)
+                const currentVal = elements.notesTextarea.value;
+                // Replace the streaming placeholder with the final transcript
+                // This assumes the streaming updates were also directed to the notes textarea
+                elements.notesTextarea.value = finalTranscript; // Replace content
+                state.setNoteContent(finalTranscript); // Update state
+                elements.notesTextarea.focus();
+                state.setStatusMessage("Recording stopped. Transcript added to note.");
+            } else {
+                 console.warn(`[WARN] Recording context "${recordingContextOnStop}" not handled on stop.`); // Use local variable
+                 state.setStatusMessage("Recording stopped.", true);
+            }
+
+
+            // Clean up audio stream tracks
+            stopMediaStreamTracks();
+            // Disconnect WebSocket - Let api.js handle this if necessary, or keep connection open?
+            // For now, let's keep the connection open unless an error occurs.
+            // api.disconnectTranscriptionSocket();
+            // Reset mediaRecorder reference
+            mediaRecorder = null;
         };
 
         mediaRecorder.onerror = (event) => {
             console.error("[ERROR] MediaRecorder error:", event.error);
             state.setStatusMessage(`Recording error: ${event.error.message}`, true);
             stopMediaStreamTracks(); // Clean up stream tracks
-            api.disconnectTranscriptionSocket(); // Disconnect socket on error
+            api.disconnectTranscriptionSocket(); // Disconnect socket on media recorder error
             state.setIsRecording(false); // Reset state
+            mediaRecorder = null; // Clear reference
         };
 
-        // Start recording with a timeslice to get chunks periodically
+        // --- Start recording ---
+        // Set recording state *just before* starting
+        state.setIsRecording(true, context); // Update state (notifies isRecording)
         mediaRecorder.start(TIMESLICE_MS);
         console.log(`[DEBUG] MediaRecorder started with timeslice ${TIMESLICE_MS}ms.`);
-        state.setIsRecording(true, context); // Update state (notifies isRecording)
-        // Status message updated by 'transcription_started' event from backend
-        // --- Wait for backend confirmation before starting recorder ---
-        // We need a way to know when the 'transcription_started' event is received.
-        // Let's modify connectTranscriptionSocket to return a promise that resolves on 'transcription_started'.
-
-        // Connect WebSocket and wait for backend readiness
-        const backendReadyPromise = api.connectTranscriptionSocket('en-US', 'WEBM_OPUS'); // Use appropriate lang code and format
-
-        // Set recording state and context *before* awaiting backend confirmation
-        state.setIsRecording(true, context); // Update state (notifies isRecording)
-
-        // Wait for the promise to resolve (or reject on error)
-        await backendReadyPromise; // This pauses execution until the backend confirms
-
-        // If we reach here, the backend is ready. Now start the recorder.
-        // Check if recording was stopped while waiting (e.g., due to error)
-        if (!state.isRecording || !mediaRecorder) {
-             console.warn("[WARN] Recording stopped before MediaRecorder could start (likely due to connection error).");
-             // Cleanup might have already happened in error handler, but ensure tracks are stopped
-             stopMediaStreamTracks();
-             return; // Exit startRecording
-        }
-        mediaRecorder.start(TIMESLICE_MS);
-        console.log(`[DEBUG] MediaRecorder started with timeslice ${TIMESLICE_MS}ms after backend confirmation.`);
-        // Status message is already set to "Recording... Speak now." by the 'transcription_started' handler in api.js
+        // Status message is already "Recording... Speak now." from api.js
 
     } catch (error) {
-        // Handle errors from connectTranscriptionSocket promise or getUserMedia/MediaRecorder setup
+        // Handle errors from connectTranscriptionSocket promise or getUserMedia
         console.error("[ERROR] Error during recording setup:", error);
         if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
             state.setStatusMessage("Microphone access denied. Please allow access in browser settings.", true);
@@ -188,6 +210,7 @@ export async function startRecording(context) {
         stopMediaStreamTracks(); // Clean up if stream was partially acquired
         api.disconnectTranscriptionSocket(); // Disconnect socket if start failed
         state.setIsRecording(false); // Ensure state is reset
+        mediaRecorder = null; // Ensure recorder reference is cleared
     }
 }
 
@@ -206,13 +229,16 @@ export function stopRecording() {
         state.setStatusMessage("Stopping recording...");
         mediaRecorder.stop(); // This will trigger the 'onstop' event handler
         console.log("[DEBUG] Requesting MediaRecorder stop.");
-        // State isRecording will be set to false in onstop handler AFTER processing & disconnect
+        // State isRecording will be set to false in onstop handler AFTER processing
+        // We no longer disconnect the socket in the onstop handler by default.
     } else {
         console.warn(`[WARN] MediaRecorder state is not 'recording': ${mediaRecorder.state}`);
         // If somehow stopped but state wasn't updated, force cleanup
         stopMediaStreamTracks();
-        api.disconnectTranscriptionSocket();
+        // Don't disconnect socket here either, keep it open if possible
+        // api.disconnectTranscriptionSocket();
         state.setIsRecording(false);
+        mediaRecorder = null; // Ensure reference is cleared
     }
 }
 
