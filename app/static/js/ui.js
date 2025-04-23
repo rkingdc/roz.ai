@@ -1625,11 +1625,11 @@ export function handleStateChange_isSidebarCollapsed() {
     if (!sidebarElement || !toggleButton) return;
 
     sidebarElement.classList.toggle('collapsed', isCollapsed);
-    // The button itself doesn't need the 'collapsed' class for positioning anymore
-    // toggleButton.classList.toggle('collapsed', isCollapsed);
+    toggleButton.classList.toggle('collapsed', isCollapsed); // Add/remove collapsed class on the tab itself
+
     const icon = toggleButton.querySelector('i');
     if (icon) {
-        // Left sidebar tab: Shows '<' when expanded, '>' when collapsed
+        // Left sidebar tab: Shows '<' when expanded (tab not collapsed), '>' when collapsed (tab is collapsed)
         icon.classList.toggle('fa-chevron-left', !isCollapsed);
         icon.classList.toggle('fa-chevron-right', isCollapsed);
     }
@@ -1643,11 +1643,11 @@ export function handleStateChange_isPluginsCollapsed() {
     if (!sidebarElement || !toggleButton) return;
 
     sidebarElement.classList.toggle('collapsed', isCollapsed);
-    // The button itself doesn't need the 'collapsed' class for positioning anymore
-    // toggleButton.classList.toggle('collapsed', isCollapsed);
+    toggleButton.classList.toggle('collapsed', isCollapsed); // Add/remove collapsed class on the tab itself
+
     const icon = toggleButton.querySelector('i');
     if (icon) {
-        // Right sidebar tab: Shows '>' when expanded, '<' when collapsed
+        // Right sidebar tab: Shows '>' when expanded (tab not collapsed), '<' when collapsed (tab is collapsed)
         icon.classList.toggle('fa-chevron-right', !isCollapsed);
         icon.classList.toggle('fa-chevron-left', isCollapsed);
     }

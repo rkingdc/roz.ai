@@ -22,13 +22,12 @@
 
     <!-- REMOVED old sidebar toggle button -->
 
-    <aside id="sidebar" class="relative"> <!-- Added position: relative -->
-        <!-- NEW Sidebar Toggle Tab -->
-        <button id="sidebar-toggle-tab" class="sidebar-toggle-tab left-tab" title="Toggle Sidebar">
-            <i class="fas fa-chevron-left"></i>
-        </button>
-        <!-- End NEW Sidebar Toggle Tab -->
+    <!-- MOVED Sidebar Toggle Tab OUTSIDE aside -->
+    <button id="sidebar-toggle-tab" class="sidebar-toggle-tab left-tab" title="Toggle Sidebar">
+        <i class="fas fa-chevron-left"></i>
+    </button>
 
+    <aside id="sidebar"> <!-- REMOVED position: relative -->
         <!-- Moved button group here -->
         <div class="flex items-center justify-between mb-4 whitespace-nowrap">
              <h2 class="text-xl font-semibold">roz.ai</h2>
@@ -327,12 +326,12 @@
         </div>
         <!-- End NEW History Plugin Section -->
 
-        <!-- NEW Plugins Toggle Tab -->
-        <button id="plugins-toggle-tab" class="sidebar-toggle-tab right-tab" title="Toggle Plugins Sidebar">
-            <i class="fas fa-chevron-right"></i>
-        </button>
-        <!-- End NEW Plugins Toggle Tab -->
-    </aside>
+    </aside> <!-- Plugins Toggle Tab is now OUTSIDE -->
+
+    <!-- MOVED Plugins Toggle Tab OUTSIDE aside -->
+    <button id="plugins-toggle-tab" class="sidebar-toggle-tab right-tab" title="Toggle Plugins Sidebar">
+        <i class="fas fa-chevron-right"></i>
+    </button>
 
     <!-- REMOVED old plugins toggle button -->
 

@@ -68,7 +68,7 @@
 }
 /* Left Sidebar (Chats) */
  #sidebar {
-     position: relative; /* Needed for absolute positioning of the tab */
+     /* REMOVED position: relative; */
      width: 320px;
      background-color: var(--rz-sidebar-bg);
      border-right: 1px solid var(--rz-sidebar-border);
@@ -93,7 +93,7 @@
 /* --- End NEW Styles --- */
 /* Right Sidebar (Plugins) */
  #plugins-sidebar {
-     position: relative; /* Needed for absolute positioning of the tab */
+     /* REMOVED position: relative; */
      width: 300px;
      background-color: var(--rz-sidebar-bg);
      border-left: 1px solid var(--rz-sidebar-border);
@@ -119,7 +119,7 @@
 
 /* --- NEW Sidebar Toggle Tab Styles --- */
 .sidebar-toggle-tab {
-    position: absolute;
+    position: fixed; /* Use fixed positioning */
     top: 10px; /* Position from the top */
     width: 24px; /* Width of the tab */
     height: 40px; /* Height of the tab */
@@ -130,21 +130,21 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    z-index: 50; /* Ensure it's above sidebar content */
+    z-index: 100; /* Increase z-index */
     transition: background-color 0.2s, left 0.3s ease-in-out, right 0.3s ease-in-out;
     font-size: 0.8rem; /* Smaller icon */
 }
 
 .sidebar-toggle-tab.left-tab {
-    right: -24px; /* Stick out to the right */
-    border-top-right-radius: 5px;
-    border-bottom-right-radius: 5px;
+    left: 320px; /* Position relative to expanded sidebar width */
+    right: auto; /* Ensure right is not set */
+    border-radius: 0 5px 5px 0; /* Rounded corners on the right */
 }
 
 .sidebar-toggle-tab.right-tab {
-    left: -24px; /* Stick out to the left */
-    border-top-left-radius: 5px;
-    border-bottom-left-radius: 5px;
+    right: 300px; /* Position relative to expanded sidebar width */
+    left: auto; /* Ensure left is not set */
+    border-radius: 5px 0 0 5px; /* Rounded corners on the left */
 }
 
 .sidebar-toggle-tab:hover {
@@ -152,20 +152,13 @@
     color: var(--rz-toolbar-field); /* Maroon text on hover */
 }
 
-/* Styles when sidebar is collapsed */
-#sidebar.collapsed .sidebar-toggle-tab.left-tab {
-    /* Position the tab so it sticks out from the left edge */
-    left: 0; /* Align the *left* edge of the tab with the viewport edge */
-    /* We keep the original border-radius for the right side */
-    border-radius: 0 5px 5px 0;
-    z-index: 51; /* Ensure it's above potential overlapping elements */
+/* Styles when the TAB ITSELF is collapsed */
+.sidebar-toggle-tab.left-tab.collapsed {
+    left: 0; /* Move tab to the left edge */
 }
 
-#plugins-sidebar.collapsed .sidebar-toggle-tab.right-tab {
-    /* Position the tab so it sticks out from the right edge */
-    right: 0; /* Align the *right* edge of the tab with the viewport edge */
-    /* We keep the original border-radius for the left side */
-    border-radius: 5px 0 0 5px; /* Corrected border-radius */
+.sidebar-toggle-tab.right-tab.collapsed {
+    right: 0; /* Move tab to the right edge */
 }
 /* --- End Sidebar Toggle Tab Styles --- */
 
