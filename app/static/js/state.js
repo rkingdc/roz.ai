@@ -84,20 +84,27 @@ export function subscribe(eventType, listener) {
  * @param {*} [data] - Optional data to pass to the listeners.
  */
 function notify(eventType, data) {
+    // --- DETAILED NOTIFY LOGGING ---
+    console.log(`[STATE NOTIFY DEBUG] Attempting to notify event: "${eventType}"`);
     if (!notificationsEnabled) {
-        // console.log(`[DEBUG] Notifications disabled, skipping event: ${eventType}`);
+        console.log(`[STATE NOTIFY DEBUG] Notifications disabled, skipping event: "${eventType}"`);
         return;
     }
-    // console.log(`[DEBUG] Notifying event: ${eventType}`); // Add logging here
     if (listeners.has(eventType)) {
-        listeners.get(eventType).forEach(listener => {
+        const eventListeners = listeners.get(eventType);
+        console.log(`[STATE NOTIFY DEBUG] Found ${eventListeners.length} listener(s) for event: "${eventType}"`);
+        eventListeners.forEach((listener, index) => {
+            console.log(`[STATE NOTIFY DEBUG] Calling listener ${index + 1} for event: "${eventType}"`);
             try {
                 listener(data); // Pass data if provided
             } catch (error) {
-                console.error(`Error in listener for event "${eventType}":`, error);
+                console.error(`Error in listener for event "${eventType}" (Listener ${index + 1}):`, error);
             }
         });
+    } else {
+        console.log(`[STATE NOTIFY DEBUG] No listeners found for event: "${eventType}"`);
     }
+    // --- END DETAILED NOTIFY LOGGING ---
 }
 
 /**
