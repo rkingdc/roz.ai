@@ -1403,18 +1403,17 @@ def clean_up_transcript(raw_transcript: str) -> str:
         else raw_model_name
     )
 
-    prompt = f"""Clean the following text, removing punctuation and filler words to improve readability. Filler words include "um," "uh," "er," "like," "so," "you know," and "I mean," as well as conversational tags such as "right?", "okay?", and interjections such as "well," and "oh." Remove repetitions and incomplete sentences at the end. Remove any leading or trailing whitespace and newlines. Retain the original sentence structure.
+    prompt = f"""You are a skilled Markdown editor.  Take the following transcribed speech and convert it into a well-formatted Markdown document.
 
-**Example:**
+*   Identify key topics and create appropriate headings (using `#`, `##`, `###`, etc.).  Use bold or italic formatting for emphasis when appropriate.
+*   Extract key points and represent them as bullet points (`*` or `-`).
+*   Recognize numbered lists or iterative steps and format them as numbered lists (`1.`, `2.`, `3.`).
+*   Retain the original order of the content as much as possible. Minor rephrasing for clarity is acceptable, but avoid significant changes to the content or meaning.
+*   Remove filler words and conversational elements like "um," "uh," "okay," "you know," and repeated phrases, but only where doing so improves readability.
+*   Output *only* the Markdown text.
 
-**Input:**
-"Um, so, like, I went to the store, uh, and, um, I bought, like, milk, you know? Right?"
-
-**Output:**
-"I went to the store and I bought milk."
-
-**Now clean the following text. Return only the cleaned text:**
-
+Here is the transcribed speech:
+    
 {raw_transcript}
 """
 
