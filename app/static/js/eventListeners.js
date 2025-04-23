@@ -74,6 +74,7 @@ export function setupEventListeners() {
         // UI updates are triggered by state notifications within api.handleModelChange
     });
     elements.micButton?.addEventListener('click', () => {
+        console.log("[DEBUG] Chat Mic Button CLICKED!"); // Log mic click too
         if (state.currentTab !== 'chat') return; // Only allow in chat
 
         if (state.isRecording) {
@@ -194,6 +195,7 @@ export function setupEventListeners() {
     // -------------------------------------------------------
 
     elements.micButtonNotes?.addEventListener('click', () => {
+        console.log("[DEBUG] Notes Mic Button CLICKED!"); // Log mic click too
         if (state.currentTab !== 'notes') return; // Only allow in notes
 
         if (state.isRecording) {
@@ -685,6 +687,7 @@ export function setupEventListeners() {
     });
     // -----------------------------------------------------------------
 
+    console.log("[DEBUG] setupEventListeners finished."); // Log completion
 }
 
 
