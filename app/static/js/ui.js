@@ -34,67 +34,67 @@ function makeHeadingsCollapsible(htmlString) {
 
     const nodes = Array.from(wrapperDiv.childNodes);
     const resultFragment = document.createDocumentFragment();
-    let currentSection = null;
-    let currentContentDiv = null;
-    let currentLevel = 0;
+    const sectionStack = []; // Stack to keep track of [level, contentDiv]
 
     nodes.forEach(node => {
-        // Check if it's an H1-H6 element
         const isHeading = node.nodeName && node.nodeName.match(/^H[1-6]$/);
         const level = isHeading ? parseInt(node.nodeName.substring(1), 10) : 0;
 
-        // If it's a heading, handle the transition from the previous section (if any)
         if (isHeading) {
-            // Append the previous section before starting a new one,
-            // regardless of level in this flat structure approach.
-            if (currentSection) {
-                resultFragment.appendChild(currentSection); // Append the completed section
-                currentSection = null; // Reset for the new section
-                currentContentDiv = null;
-                // currentLevel will be reset below when the new section starts
+            // Pop sections from stack with level >= current level
+            while (sectionStack.length > 0 && sectionStack[sectionStack.length - 1][0] >= level) {
+                sectionStack.pop();
             }
 
-            // Now, create the new section for the current heading
-            currentLevel = level;
-            currentSection = document.createElement('div');
-            currentSection.classList.add('collapsible-section', `level-${level}`); // Add level class
+            // Create the new section elements
+            const sectionDiv = document.createElement('div');
+            sectionDiv.classList.add('collapsible-section', `level-${level}`);
 
-            // Modify the heading element itself
-            const headingElement = node.cloneNode(true); // Clone the heading
+            const headingElement = node.cloneNode(true); // Clone the original heading
             headingElement.classList.add('collapsible-heading');
-            headingElement.style.cursor = 'pointer'; // Add pointer cursor directly
-            headingElement.dataset.level = level; // Store level
+            headingElement.style.cursor = 'pointer';
+            headingElement.dataset.level = level;
 
-            // Add toggle icon
             const toggleIcon = document.createElement('i');
-            // Use chevron-down by default (expanded)
-            toggleIcon.classList.add('fas', 'fa-chevron-down', 'collapsible-toggle', 'mr-2', 'transition-transform', 'duration-200', 'inline-block'); // Added transition and display
-            headingElement.insertBefore(toggleIcon, headingElement.firstChild); // Prepend icon
+            toggleIcon.classList.add('fas', 'fa-chevron-down', 'collapsible-toggle', 'mr-2', 'transition-transform', 'duration-200', 'inline-block');
+            headingElement.insertBefore(toggleIcon, headingElement.firstChild);
 
-            // Create content div
-            currentContentDiv = document.createElement('div');
-            currentContentDiv.classList.add('collapsible-content');
-            // Generate unique IDs (optional but good practice for accessibility/targeting)
+            const contentDiv = document.createElement('div');
+            contentDiv.classList.add('collapsible-content');
             const sectionId = `collapse-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-            currentContentDiv.id = sectionId;
-            headingElement.dataset.target = `#${sectionId}`; // Link heading to content div
+            contentDiv.id = sectionId;
+            headingElement.dataset.target = `#${sectionId}`;
 
-            currentSection.appendChild(headingElement); // Add modified heading to section
-            currentSection.appendChild(currentContentDiv); // Add content div to section
+            sectionDiv.appendChild(headingElement);
+            sectionDiv.appendChild(contentDiv);
 
-        } else if (currentContentDiv) {
-            // If we are inside a section, append the node to the current content div
-            currentContentDiv.appendChild(node.cloneNode(true)); // Clone node
+            // Append the new section to the correct parent
+            if (sectionStack.length > 0) {
+                // Append to the content div of the parent section on the stack
+                const parentContentDiv = sectionStack[sectionStack.length - 1][1];
+                parentContentDiv.appendChild(sectionDiv);
+            } else {
+                // Append to the root fragment if it's a top-level heading
+                resultFragment.appendChild(sectionDiv);
+            }
+
+            // Push the new section's level and contentDiv onto the stack
+            sectionStack.push([level, contentDiv]);
+
         } else {
-            // If not inside a section (e.g., content before the first heading), append directly
-            resultFragment.appendChild(node.cloneNode(true));
+            // Append non-heading nodes
+            if (sectionStack.length > 0) {
+                // Append to the content div of the current section on the stack
+                const currentContentDiv = sectionStack[sectionStack.length - 1][1];
+                currentContentDiv.appendChild(node.cloneNode(true));
+            } else {
+                // Append directly to the fragment if before the first heading
+                resultFragment.appendChild(node.cloneNode(true));
+            }
         }
     });
 
-    // Append the last section if it exists
-    if (currentSection) {
-        resultFragment.appendChild(currentSection);
-    }
+    // No need to append last section explicitly, stack handling does this
 
     return resultFragment;
 }
