@@ -26,15 +26,45 @@ export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 // Marked.js Renderer Configuration (can be done in app.js or ui.js)
 // Import escapeHtml from utils.js
-// import { escapeHtml } from './utils.js'; // No longer needed here
+import { escapeHtml } from './utils.js'; // Make sure escapeHtml is available
 
-// REMOVED Custom Renderer Definition from config.js
-// The custom renderer is now defined and used directly in ui.js
+// Create a custom renderer
+export const markedRenderer = new marked.Renderer();
+const originalCodeRenderer = markedRenderer.code.bind(markedRenderer);
+
+markedRenderer.code = function(code, language, isEscaped) {
+    let codeString = String(code); // Ensure it's a string
+
+    // Check for Draw.io XML signature
+    const isDrawioXml = /<(diagram|mxGraphModel)(\s|>)/.test(codeString);
+
+    if (isDrawioXml) {
+        // Prepare data for GraphViewer.processElements()
+        // Note: The instructions mention escaping JSON, but viewer-static expects raw XML in data-mxgraph.
+        // Let's follow the viewer-static documentation pattern: escape the XML directly for the attribute.
+        const escapedXmlData = escapeHtml(codeString); // Escape the raw XML string
+
+        // Return the specific div structure
+        return `<div class="mxgraph my-4 border border-gray-300 rounded"
+                     style="min-height: 150px; max-width: 100%;"
+                     data-mxgraph="${escapedXmlData}">
+                     <p class="text-center text-gray-500 p-4">Processing diagram...</p>
+                </div>`;
+    } else {
+        // Fallback to original renderer for other code blocks
+        // Ensure the original renderer also escapes HTML
+        const escapedCode = escapeHtml(codeString);
+        const langClass = language ? `language-${escapeHtml(language)}` : '';
+        return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code class="${langClass}">${escapedCode}\n</code></pre>`;
+        // return originalCodeRenderer(code, language, isEscaped); // Original fallback might not escape correctly
+    }
+};
 
 // Marked.js Options (to be used with marked.setOptions)
-// We don't set a default renderer here anymore.
-// The custom renderer is passed directly in ui.js where marked.parse is called.
+// We pass the renderer directly in ui.js now, so this isn't strictly needed,
+// but keep basic options.
 export const markedOptions = {
+    // renderer: markedRenderer, // Renderer is applied in ui.js
     breaks: true,
     gfm: true // Ensure GitHub Flavored Markdown is enabled
 };

@@ -11,48 +11,12 @@ import { originalNoteTextBeforeRecording } from './voice.js'; // Import original
 import * as config from './config.js'; // Import config for keys
 import { escapeHtml, formatFileSize } from './utils.js'; // Import utility functions
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js'; // Import marked for lexer
+import { markedRenderer } from './config.js'; // Import the custom renderer from config.js
 // No direct imports of api.js here to break the cycle.
 // Event listeners will import api functions dynamically when needed.
 
-// --- Custom Marked Renderer for Draw.io ---
-const customMarkedRenderer = new marked.Renderer();
-const originalCodeRenderer = customMarkedRenderer.code.bind(customMarkedRenderer); // Keep original for fallback
-
-customMarkedRenderer.code = function(code, language, isEscaped) {
-  language = (language || '').toLowerCase(); // Ensure language is lowercase
-  if (language === 'drawio') {
-    // Output the div structure expected by viewer-static.min.js
-    // Escape the raw XML content before putting it into the data attribute.
-    const escapedXml = escapeHtml(code);
-    // Use class="mxgraph" and data-mxgraph attribute.
-    return `<div class="mxgraph my-4 border border-gray-300 p-2 rounded" style="max-width:100%;border:1px solid transparent;" data-mxgraph="${escapedXml}"></div>`;
-  }
-  // Fallback to original renderer for other languages
-  return originalCodeRenderer(code, language, isEscaped);
-};
-// -----------------------------------------
-
-// --- Draw.io Rendering Function ---
-/**
- * Processes elements with the 'mxgraph' class to render Draw.io diagrams.
- */
-function renderDrawioDiagrams() {
-    // Ensure GraphViewer library is loaded (it should be from index.html)
-    if (typeof GraphViewer === 'undefined') {
-        console.warn("GraphViewer library not found. Cannot render Draw.io diagrams.");
-        return;
-    }
-
-    try {
-        // console.log("[DEBUG] Calling GraphViewer.processElements()"); // Optional debug log
-        GraphViewer.processElements(); // Automatically finds and renders divs with class="mxgraph"
-    } catch (e) {
-        console.error("Error processing Draw.io diagrams:", e);
-        // Optionally display a generic error message somewhere if needed
-        // state.setStatusMessage("Error rendering one or more diagrams.", true);
-    }
-}
-// ------------------------------------
+// --- REMOVED Old Custom Marked Renderer ---
+// --- REMOVED Old renderDrawioDiagrams function ---
 
 // Debounce function
 function debounce(func, wait) {
@@ -1443,15 +1407,27 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
         // Render markdown and make headings collapsible in the preview area
         notesPreview.innerHTML = ''; // Clear previous content
         if (typeof marked !== 'undefined') {
-             // Use the custom renderer
-             const rawHtml = marked.parse(state.noteContent || '', { renderer: customMarkedRenderer });
+             // Use the custom renderer from config.js
+             const rawHtml = marked.parse(state.noteContent || '', { renderer: markedRenderer });
              const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
              notesPreview.appendChild(collapsibleFragment); // Append the processed fragment
              // Apply prose styles to the container if desired
              notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
-             // --- Render Draw.io diagrams AFTER adding HTML ---
-             renderDrawioDiagrams(); // Call the simplified function
-             // -----------------------------------------------
+             // --- Process Draw.io diagrams AFTER adding HTML and with delay ---
+             setTimeout(() => {
+                if (typeof GraphViewer !== 'undefined' && typeof GraphViewer.processElements === 'function') {
+                     console.log("[DEBUG] Calling GraphViewer.processElements() in setNoteMode..."); // Keep optional debug log
+                     try {
+                         GraphViewer.processElements(); // Automatically finds and renders .mxgraph elements
+                     } catch (e) {
+                          console.error("Error in GraphViewer.processElements():", e);
+                     }
+                     console.log("[DEBUG] GraphViewer.processElements() finished in setNoteMode."); // Keep optional debug log
+                } else {
+                     console.warn("[DEBUG] GraphViewer or GraphViewer.processElements not available in setNoteMode.");
+                }
+             }, 0); // Delay ensures library is loaded and DOM updated
+             // -------------------------------------------------------------
         } else {
              notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
         }
@@ -1476,15 +1452,27 @@ export function updateNotesPreview() {
     if (state.currentNoteMode === 'view') { // Read from state
         notesPreview.innerHTML = ''; // Clear previous content
         if (typeof marked !== 'undefined') {
-            // Use the custom renderer
-            const rawHtml = marked.parse(state.noteContent || '', { renderer: customMarkedRenderer });
+            // Use the custom renderer from config.js
+            const rawHtml = marked.parse(state.noteContent || '', { renderer: markedRenderer });
             const collapsibleFragment = makeHeadingsCollapsible(rawHtml); // Keep collapsible headings
             notesPreview.appendChild(collapsibleFragment);
             // Apply prose styles
             notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
-            // --- Render Draw.io diagrams AFTER adding HTML ---
-            renderDrawioDiagrams(); // Call the simplified function
-            // -----------------------------------------------
+            // --- Process Draw.io diagrams AFTER adding HTML and with delay ---
+            setTimeout(() => {
+               if (typeof GraphViewer !== 'undefined' && typeof GraphViewer.processElements === 'function') {
+                    console.log("[DEBUG] Calling GraphViewer.processElements() in updateNotesPreview..."); // Keep optional debug log
+                    try {
+                        GraphViewer.processElements();
+                    } catch (e) {
+                         console.error("Error in GraphViewer.processElements() during updateNotesPreview:", e);
+                    }
+                    console.log("[DEBUG] GraphViewer.processElements() finished in updateNotesPreview."); // Keep optional debug log
+               } else {
+                   console.warn("[DEBUG] GraphViewer or GraphViewer.processElements not available in updateNotesPreview.");
+               }
+            }, 0);
+            // -------------------------------------------------------------
         } else {
             notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
         }
