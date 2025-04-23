@@ -1455,7 +1455,8 @@ export function handleStateChange_isLoading() {
     // updateAttachButtonState(); // Called by updateLoadingState
     renderNoteContent(); // Loading state affects note textarea placeholder/disabled
     renderMicButtonState(); // Loading/recording state affects mic button disabled state
-    updateNotesCleanupButtonState(); // Loading state affects button enabled state
+    updateNotesCleanupButtonState(); // Loading state affects notes button enabled state
+    updateChatCleanupButtonState(); // Loading state affects chat button enabled state
 }
 
 export function handleStateChange_statusMessage() {
@@ -1590,6 +1591,19 @@ export function updateNotesCleanupButtonState() {
     // Only enable if on the Notes tab, not loading, and text is selected
     elements.cleanupTranscriptButtonNotes.disabled = !(state.currentTab === 'notes' && !state.isLoading && hasSelection);
 }
+
+/**
+ * Updates the enabled/disabled state of the Chat "Cleanup" button
+ * based on whether text is selected in the message input field.
+ */
+export function updateChatCleanupButtonState() {
+    if (!elements.messageInput || !elements.cleanupTranscriptButton) return;
+
+    const hasSelection = elements.messageInput.selectionStart !== elements.messageInput.selectionEnd;
+    // Only enable if on the Chat tab, not loading, and text is selected
+    elements.cleanupTranscriptButton.disabled = !(state.currentTab === 'chat' && !state.isLoading && hasSelection);
+}
+
 
 // --- UPDATED: Render Streaming Transcript ---
 /**

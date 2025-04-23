@@ -83,39 +83,87 @@ export function setupEventListeners() {
         }
         // UI updates are triggered by state notifications (isRecording)
     });
-    elements.cleanupTranscriptButton?.addEventListener('click', async () => { // Add async here
-        if (state.isLoading || elements.cleanupTranscriptButton?.disabled) return;
+    elements.cleanupTranscriptButton?.addEventListener('click', async () => {
+        // Button should already be disabled if no selection, but double-check
+        if (state.isLoading || elements.cleanupTranscriptButton?.disabled || !elements.messageInput) return;
 
-        const rawTranscript = elements.cleanupTranscriptButton?.dataset.rawTranscript;
-        if (!rawTranscript) {
-            state.setStatusMessage("No transcript data found for cleanup.", true);
+        const inputField = elements.messageInput;
+        const selectionStart = inputField.selectionStart;
+        const selectionEnd = inputField.selectionEnd;
+        const originalFullText = inputField.value; // Get text *before* API call
+        const selectedText = originalFullText.substring(selectionStart, selectionEnd);
+
+        if (!selectedText) {
+            state.setStatusMessage("No text selected to clean.", true);
+            // Ensure button is disabled if somehow clicked without selection
+            if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = true;
             return;
         }
 
-        // Disable button immediately
-        if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = true;
-        const originalText = elements.messageInput?.value || ''; // Store original text in case of error
+        // Disable button during processing (handled by global isLoading state via ui.updateChatCleanupButtonState)
+        // state.setIsLoading(true); // api.cleanupTranscript handles this
 
         try {
-            // Call the new API function
-            const cleanedTranscript = await api.cleanupTranscript(rawTranscript);
+            // Call the existing API function with the selected text
+            const cleanedText = await api.cleanupTranscript(selectedText);
 
-            // Update the input field ONLY if cleanup was successful
-            if (elements.messageInput) {
-                elements.messageInput.value = cleanedTranscript;
+            // Get the potentially updated text *after* API call returns
+            const currentFullText = inputField.value;
+
+            // --- Smart Replacement (Basic) ---
+            // Replace based on original indices. Assumes text outside selection didn't change drastically.
+            const textBefore = currentFullText.substring(0, selectionStart);
+            const textAfter = currentFullText.substring(selectionEnd);
+            const newFullText = textBefore + cleanedText + textAfter;
+
+            // Update the input field directly
+            inputField.value = newFullText;
+
+            // Restore selection around the newly inserted text (optional but good UX)
+            inputField.focus();
+            inputField.setSelectionRange(selectionStart, selectionStart + cleanedText.length);
+
+            // Check if the text actually changed
+            if (cleanedText === selectedText) {
+                state.setStatusMessage("Cleanup did not change the selected text.");
+            } else {
+                state.setStatusMessage("Selected text cleaned.");
             }
-            // Status is set by api.cleanupTranscript on success/failure
 
         } catch (error) {
-            // Error status is already set by api.cleanupTranscript
-            // Restore original text if cleanup failed
-            if (elements.messageInput) {
-                elements.messageInput.value = originalText;
-            }
-            // Button remains disabled due to the immediate disable above
+            // Error status is set by api.cleanupTranscript
+            console.error("Error cleaning selected text:", error);
+            // Optionally display a more specific error to the user if needed
+        } finally {
+            // Loading state is handled by api.cleanupTranscript
+            // Re-evaluate button state after operation (selection might have changed)
+            ui.updateChatCleanupButtonState();
         }
-        // No finally block needed here, button is disabled at the start or on error
     });
+
+    // --- Chat Input Listeners for Cleanup Button State ---
+    if (elements.messageInput) {
+        const updateCleanupState = () => ui.updateChatCleanupButtonState(); // Alias for brevity
+        // Update button state when selection changes within the document
+        document.addEventListener('selectionchange', () => {
+            // Check if the message input is the active element when selection changes
+            if (document.activeElement === elements.messageInput) {
+                updateCleanupState();
+            } else {
+                // If selection changes outside the input, disable the button
+                if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = true;
+            }
+        });
+        // Also update when typing or clicking within the input might clear selection
+        elements.messageInput.addEventListener('input', updateCleanupState);
+        elements.messageInput.addEventListener('click', updateCleanupState); // Handle clicks that might clear selection
+        elements.messageInput.addEventListener('focus', updateCleanupState); // Update on focus
+        elements.messageInput.addEventListener('blur', () => { // Disable when focus leaves
+             if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = true;
+        });
+    }
+    // -------------------------------------------------------
+
 
     // --- Notes Textarea Listeners for Cleanup Button State ---
     if (elements.notesTextarea) {
@@ -189,6 +237,13 @@ export function setupEventListeners() {
 
             // Update the application state
             state.setNoteContent(newFullText);
+
+            // Check if the text actually changed
+            if (cleanedText === selectedText) {
+                state.setStatusMessage("Cleanup did not change the selected text.");
+            } else {
+                state.setStatusMessage("Selected text cleaned.");
+            }
 
             // Restore selection around the newly inserted text (optional but good UX)
             textarea.focus();
