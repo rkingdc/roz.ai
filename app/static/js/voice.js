@@ -7,7 +7,7 @@ import { elements } from './dom.js';
 let mediaRecorder = null;
 // let audioChunks = []; // No longer needed to store chunks locally for blob creation
 let audioStream = null; // Store the stream to stop tracks later
-let originalNoteTextBeforeRecording = null; // Store original notes text
+export let originalNoteTextBeforeRecording = null; // Store original notes text - EXPORTED
 
 // --- Configuration ---
 // Google Speech-to-Text streaming API works well with LINEAR16 or Opus in WebM/Ogg.
