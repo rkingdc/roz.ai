@@ -431,10 +431,27 @@ export function setupEventListeners() {
         const historyId = parseInt(listItem.dataset.historyId);
         if (isNaN(historyId)) return;
 
-        // TODO: Implement logic to load/view a specific history entry
-        // This will likely involve a new API endpoint and UI modal/display area
-        console.log(`[DEBUG] History item clicked: ID=${historyId}. Loading history version not yet implemented.`);
-        state.setStatusMessage(`Loading history version ${historyId} not yet implemented.`, true); // Update state
+        console.log(`[DEBUG] History item clicked: ID=${historyId}. Attempting to load history version.`);
+
+        // Find the history entry in the state
+        const historyEntry = state.noteHistory.find(entry => entry.id === historyId);
+
+        if (historyEntry) {
+            console.log(`[DEBUG] Found history entry ${historyId}. Loading content and name.`);
+            // Update the state with the history entry's content and name
+            state.setNoteContent(historyEntry.content); // Notifies noteContent, currentNote
+            state.setCurrentNoteName(historyEntry.name); // Notifies currentNoteName, currentNote
+
+            // Switch to edit mode so the user can modify the loaded history version
+            state.setCurrentNoteMode('edit'); // Notifies currentNoteMode
+
+            state.setStatusMessage(`Loaded history version ${historyId}.`); // Update state
+            // UI updates are triggered by state notifications
+        } else {
+            console.warn(`[DEBUG] History entry with ID ${historyId} not found in state.noteHistory.`);
+            state.setStatusMessage(`Error: History version ${historyId} not found.`, true); // Update state
+            // UI update is triggered by statusMessage notification
+        }
     });
     // -----------------------------------------------------------------
 

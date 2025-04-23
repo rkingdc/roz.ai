@@ -358,7 +358,7 @@ export async function attachSelectedFilesSummary() {
                         : `[Error: Failed to generate or verify summary for ${file.filename}]`; // Fallback error
                     console.error(`Summary generation failed for ${file.filename}: ${errorMsg}`);
                     errors.push(`${file.filename}: ${specificError}`); // Use specificError
-                    summaryAvailable = false; // Ensure it's marked as failed
+                    summaryAvailable = false; // Ensure it's not attached if generation failed
                 }
             } catch (error) { // This catch block handles errors *within the try block above*
                 // This catch block handles errors *within the try block above*,
@@ -988,7 +988,6 @@ export async function handleDeleteNote(noteId) { // Removed listItemElement para
 /** Loads the history of a specific note from the backend and updates state. */
 export async function loadNoteHistory(noteId) {
     console.log(`[DEBUG] loadNoteHistory(${noteId}) called.`);
-    // REMOVED: if (state.isLoading) { ... } // History loading is part of note loading, shouldn't be blocked by it.
     // Note: Loading state is handled by the caller (loadNote or saveNote)
     // setStatus("Loading note history..."); // Status handled by caller
 
@@ -1000,6 +999,18 @@ export async function loadNoteHistory(noteId) {
         }
         const history = await response.json();
         console.log('[DEBUG] loadNoteHistory: Fetched history data:', history); // Added logging
+
+        // --- Frontend Workaround: Update the name of the most recent history entry ---
+        // This assumes the backend returns history sorted by saved_at DESC
+        // REMOVED: This workaround is no longer needed as the backend is fixed
+        // if (history && history.length > 0) {
+        //     const currentNote = state.savedNotes.find(note => note.id === noteId);
+        //     const currentNoteName = currentNote ? (currentNote.name || `Note ${noteId}`) : (state.currentNoteName || `Note ${noteId}`);
+        //     history[0] = { ...history[0], name: currentNoteName };
+        //     console.log('[DEBUG] loadNoteHistory: Applied frontend workaround to update name of most recent history entry:', history[0]);
+        // }
+        // -----------------------------------------------------------------------------
+
         state.setNoteHistory(history); // Update state (this notifies 'noteHistory')
         console.log(`[DEBUG] loadNoteHistory(${noteId}) finished successfully. Loaded ${history.length} entries.`);
         // Status handled by caller

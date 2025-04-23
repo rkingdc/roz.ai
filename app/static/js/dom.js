@@ -123,7 +123,7 @@ export function populateElements() {
     elements.savedChatsList = document.getElementById('saved-chats-list');
     elements.newChatButton = document.getElementById('new-chat-btn');
     elements.currentChatNameInput = document.getElementById('current-chat-name');
-    elements.saveChatNameButton = document.getElementById('save-chat-name-btn');
+    elements.saveChatNameButton = document.getElementById('save-note-name-btn'); // Corrected ID
     elements.currentChatIdDisplay = document.getElementById('current-chat-id-display');
     elements.statusBar = document.getElementById('status-bar');
     elements.sidebarToggleButton = document.getElementById('sidebar-toggle-btn');
