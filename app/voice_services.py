@@ -168,8 +168,10 @@ def transcribe_stream(language_code: str = "en-US", encoding: str = "WEBM_OPUS")
         recognition_config = speech.RecognitionConfig(
             encoding=speech.RecognitionConfig.AudioEncoding[encoding],
             language_code=language_code,
-            # sample_rate_hertz and audio_channel_count are omitted for WEBM_OPUS
-            # Add them here if using LINEAR16 based on parameters
+            # Explicitly set sample rate for WEBM_OPUS streaming, as auto-detection seems unreliable here.
+            # Browsers typically record WebM Opus at 48000 Hz.
+            sample_rate_hertz=48000,
+            # audio_channel_count is still omitted for WEBM_OPUS, API should detect this.
             enable_automatic_punctuation=True,  # Enable punctuation
             # Use enhanced model if available and configured
             # use_enhanced=True,
