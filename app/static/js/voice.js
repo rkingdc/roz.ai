@@ -134,49 +134,13 @@ export async function startRecording(context) {
 
             // Clean up audio stream tracks
             stopMediaStreamTracks();
-            // Disconnect WebSocket
-            api.disconnectTranscriptionSocket();
-            // Reset recording state
-            // --- Read context BEFORE resetting state ---
-            const recordingContextOnStop = state.recordingContext;
-            // -----------------------------------------
-
-            // Reset recording state *before* potentially adding transcript to input/notes
-            // This prevents race conditions if stopRecording is called again quickly.
-            state.setIsRecording(false); // This will trigger UI update for button
-
-            // Append the final transcript segment (if any) to the input field
-            // The streaming transcript state already updates the input field in real-time via ui.js
-            // We just need to ensure the final state is reflected.
-            const finalTranscript = state.streamingTranscript.trim(); // Get the full assembled transcript
-            console.log(`[DEBUG] Final assembled transcript on stop: "${finalTranscript}"`);
-
-            if (recordingContextOnStop === 'chat' && elements.messageInput) { // Use local variable
-                // The input should already contain the streaming transcript.
-                // We might just want to focus it.
-                elements.messageInput.focus();
-                // Optionally, trigger LLM cleanup here if needed in the future
-                state.setStatusMessage("Recording stopped. Transcript added to input.");
-            } else if (recordingContextOnStop === 'notes' && elements.notesTextarea) { // Use local variable
-                // Append to notes textarea (similar logic)
-                const currentVal = elements.notesTextarea.value;
-                // Replace the streaming placeholder with the final transcript
-                // This assumes the streaming updates were also directed to the notes textarea
-                elements.notesTextarea.value = finalTranscript; // Replace content
-                state.setNoteContent(finalTranscript); // Update state
-                elements.notesTextarea.focus();
-                state.setStatusMessage("Recording stopped. Transcript added to note.");
-            } else {
-                 console.warn(`[WARN] Recording context "${recordingContextOnStop}" not handled on stop.`); // Use local variable
-                 state.setStatusMessage("Recording stopped.", true);
-            }
-
-
-            // Clean up audio stream tracks
-            stopMediaStreamTracks();
             // Disconnect WebSocket - Let api.js handle this if necessary, or keep connection open?
             // For now, let's keep the connection open unless an error occurs.
             // api.disconnectTranscriptionSocket();
+
+            // Reset recording state *after* processing transcript and context
+            state.setIsRecording(false); // This will trigger UI update for button
+
             // Reset mediaRecorder reference
             mediaRecorder = null;
         };
