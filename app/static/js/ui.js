@@ -223,8 +223,8 @@ function addMessageToDom(role, content, isError = false) {
              const rawHtml = marked.parse(content);
              const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
              messageElement.appendChild(collapsibleFragment); // Append the processed fragment
-             // Add prose styles if needed, but be careful not to conflict with collapsible structure
-             // messageElement.classList.add('prose', 'prose-sm', 'max-w-none');
+             // Apply prose styles to the container if desired, but be mindful of conflicts
+             // messageElement.classList.add('prose', 'prose-sm', 'max-w-none'); // Apply prose styles if needed
          } else {
              messageElement.textContent = content; // Fallback
          }
