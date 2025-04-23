@@ -154,6 +154,7 @@ export async function startRecording(context) {
             mediaRecorder = null;
 
             // --- Show Cleanup Button ---
+            console.log(`[DEBUG] Value of elements.cleanupTranscriptButton inside onstop:`, elements.cleanupTranscriptButton); // Log the element reference itself
             console.log(`[DEBUG] Checking conditions to show cleanup button: context=${recordingContextOnStop}, buttonExists=${!!elements.cleanupTranscriptButton}, transcriptNotEmpty=${!!finalTranscript}`); // Add log
             if (recordingContextOnStop === 'chat' && elements.cleanupTranscriptButton && finalTranscript) {
                 console.log("[DEBUG] Conditions met. Showing cleanup button and setting dataset."); // Add log
