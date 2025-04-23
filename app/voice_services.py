@@ -13,25 +13,8 @@ import queue  # For passing audio chunks between threads
 
 # Import the new cleanup function
 from app.ai_services import clean_up_transcript
-logger = logging.getLogger(__name__)
-# Import socket emission functions (assuming sockets.py is created)
-try:
-    from app.sockets import (
-        emit_transcript_update,
-        emit_transcription_error_from_service,
-    )
-except ImportError:
-    # Handle case where sockets.py might not exist yet or circular import issues during setup
-    logger.warning(
-        "Could not import socket emission functions. Streaming transcription updates will not be sent."
-    )
-
-    def emit_transcript_update(sid, transcript, is_final):
-        pass
-
-    def emit_transcription_error_from_service(sid, error_message):
-        pass
-
+# Import the socketio instance directly from the app package
+from app import socketio
 
 logger = logging.getLogger(__name__)
 
@@ -298,10 +281,12 @@ def _google_listen_print_loop(
             # Display interim results, but don't store them permanently yet
             if not result.is_final:
                 # logger.debug(f"SID {sid} - Interim transcript: {transcript}")
-                emit_transcript_update(sid, transcript, is_final=False)
+                # Use socketio.emit directly
+                socketio.emit('transcript_update', {'transcript': transcript, 'is_final': False}, room=sid)
             else:
                 logger.info(f"SID {sid} - Final transcript: {transcript}")
-                emit_transcript_update(sid, transcript, is_final=True)
+                # Use socketio.emit directly
+                socketio.emit('transcript_update', {'transcript': transcript, 'is_final': True}, room=sid)
                 # Here you could potentially trigger the LLM cleanup if desired,
                 # but it would happen *after* this final segment is received.
                 # For now, we just send the final raw segment.
@@ -312,22 +297,21 @@ def _google_listen_print_loop(
     except OutOfRange as e:
         # Stream limit reached
         logger.warning(f"Google API stream limit likely reached for SID {sid}: {e}")
-        emit_transcription_error_from_service(
-            sid, "Transcription stream duration limit reached."
-        )
+        # Use socketio.emit directly
+        socketio.emit('transcription_error', {'error': "Transcription stream duration limit reached."}, room=sid)
     except GoogleAPICallError as e:
         logger.error(
             f"Google API call error during streaming for SID {sid}: {e}", exc_info=True
         )
-        emit_transcription_error_from_service(sid, f"Google API Error: {e}")
+        # Use socketio.emit directly
+        socketio.emit('transcription_error', {'error': f"Google API Error: {e}"}, room=sid)
     except Exception as e:
         logger.error(
             f"Unexpected error in Google listener loop for SID {sid}: {e}",
             exc_info=True,
         )
-        emit_transcription_error_from_service(
-            sid, f"Unexpected Transcription Error: {e}"
-        )
+        # Use socketio.emit directly
+        socketio.emit('transcription_error', {'error': f"Unexpected Transcription Error: {e}"}, room=sid)
     finally:
         # Clean up the audio queue associated with this SID
         with _queue_lock:

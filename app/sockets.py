@@ -97,17 +97,5 @@ def handle_stop_transcription():
     # We can send a confirmation that the stop signal was received.
     emit('transcription_stop_acknowledged', {'message': 'Stop signal received.'})
 
-
-# Note: Functions to emit results (emit_transcript_update, emit_transcription_error_from_service)
-# are defined here but called directly from the background thread in voice_services.py
-# using the imported `socketio` instance.
-
-def emit_transcript_update(sid, transcript, is_final):
-    """Emits transcript updates to a specific client."""
-    # logger.debug(f"Emitting transcript update to {sid}: Final={is_final}, Text='{transcript[:30]}...'")
-    socketio.emit('transcript_update', {'transcript': transcript, 'is_final': is_final}, room=sid)
-
-def emit_transcription_error_from_service(sid, error_message):
-    """Emits transcription errors originating from the service."""
-    logger.error(f"Emitting transcription error to {sid}: {error_message}")
-    socketio.emit('transcription_error', {'error': error_message}, room=sid)
+# Note: Functions to emit results are now called directly from the background thread
+# in voice_services.py using the imported `socketio` instance.
