@@ -90,10 +90,11 @@ export function setupEventListeners() {
     if (chatCleanupButton) {
         console.log("[DEBUG] Attaching listener to Chat Cleanup Button:", chatCleanupButton);
         chatCleanupButton.addEventListener('click', async () => {
-            console.log("[DEBUG] Chat Cleanup Button CLICKED!"); // Log click
+            // Log button state *immediately* on click attempt
+            console.log(`[DEBUG] Chat Cleanup Button CLICKED! Disabled: ${chatCleanupButton.disabled}`);
             // Button should already be disabled if no selection, but double-check
-            if (state.isLoading || elements.cleanupTranscriptButton?.disabled || !elements.messageInput) {
-                 console.log("[DEBUG] Chat Cleanup: Click ignored (loading, disabled, or no input).");
+            if (state.isLoading || chatCleanupButton.disabled || !elements.messageInput) { // Check the variable directly
+                 console.log(`[DEBUG] Chat Cleanup: Click ignored (isLoading: ${state.isLoading}, isDisabled: ${chatCleanupButton.disabled}, hasInput: ${!!elements.messageInput}).`);
                  return;
             }
 
@@ -221,10 +222,11 @@ export function setupEventListeners() {
     if (notesCleanupButton) {
         console.log("[DEBUG] Attaching listener to Notes Cleanup Button:", notesCleanupButton);
         notesCleanupButton.addEventListener('click', async () => {
-            console.log("[DEBUG] Notes Cleanup Button CLICKED!"); // Log click
+             // Log button state *immediately* on click attempt
+            console.log(`[DEBUG] Notes Cleanup Button CLICKED! Disabled: ${notesCleanupButton.disabled}`);
             // Button should already be disabled if no selection, but double-check
-            if (state.isLoading || elements.cleanupTranscriptButtonNotes?.disabled || !elements.notesTextarea) {
-                 console.log("[DEBUG] Notes Cleanup: Click ignored (loading, disabled, or no textarea).");
+            if (state.isLoading || notesCleanupButton.disabled || !elements.notesTextarea) { // Check the variable directly
+                 console.log(`[DEBUG] Notes Cleanup: Click ignored (isLoading: ${state.isLoading}, isDisabled: ${notesCleanupButton.disabled}, hasTextarea: ${!!elements.notesTextarea}).`);
                  return;
             }
 
