@@ -1373,9 +1373,9 @@ export async function loadNoteHistory(noteId) {
  * @returns {Promise<string>} A promise that resolves with the cleaned transcript or rejects on error.
  */
 export async function cleanupTranscript(rawTranscript) {
-    console.log("[DEBUG] cleanupTranscript API called with:", rawTranscript); // Log input
+    // console.log("[DEBUG] cleanupTranscript API called with:", rawTranscript); // Log input
     if (state.isLoading) {
-        console.warn("[WARN] cleanupTranscript called while loading.");
+        // console.warn("[WARN] cleanupTranscript called while loading.");
         throw new Error("Application is busy."); // Throw error if already loading
     }
     setLoading(true, "Cleaning Transcript");
@@ -1387,9 +1387,9 @@ export async function cleanupTranscript(rawTranscript) {
             body: JSON.stringify({ transcript: rawTranscript })
         });
 
-        console.log("[DEBUG] cleanupTranscript API response status:", response.status);
+        // console.log("[DEBUG] cleanupTranscript API response status:", response.status);
         const responseText = await response.text(); // Get raw text first for logging
-        console.log("[DEBUG] cleanupTranscript API raw response body:", responseText);
+        // console.log("[DEBUG] cleanupTranscript API raw response body:", responseText);
 
         let data;
         try {
@@ -1406,7 +1406,7 @@ export async function cleanupTranscript(rawTranscript) {
         }
 
         const cleanedTranscript = data.cleaned_transcript;
-        console.log("[DEBUG] cleanupTranscript API success. Cleaned text:", cleanedTranscript);
+        // console.log("[DEBUG] cleanupTranscript API success. Cleaned text:", cleanedTranscript);
 
         setStatus("Transcript cleaned."); // Set status on success
         return cleanedTranscript; // Return the cleaned text

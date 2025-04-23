@@ -74,7 +74,7 @@ export function setupEventListeners() {
         // UI updates are triggered by state notifications within api.handleModelChange
     });
     elements.micButton?.addEventListener('click', () => {
-        console.log("[DEBUG] Chat Mic Button CLICKED!"); // Log mic click too
+        // console.log("[DEBUG] Chat Mic Button CLICKED!"); // Log mic click too
         if (state.currentTab !== 'chat') return; // Only allow in chat
 
         if (state.isRecording) {
@@ -88,7 +88,7 @@ export function setupEventListeners() {
     // --- Chat Cleanup Button Listener ---
     const chatCleanupButton = elements.cleanupTranscriptButton;
     if (chatCleanupButton) {
-        console.log("[DEBUG] Attaching mousedown/click listeners to Chat Cleanup Button:", chatCleanupButton);
+        // console.log("[DEBUG] Attaching mousedown/click listeners to Chat Cleanup Button:", chatCleanupButton);
 
         // Capture selection on mousedown
         chatCleanupButton.addEventListener('mousedown', (event) => {
@@ -104,7 +104,7 @@ export function setupEventListeners() {
                 chatCleanupButton.dataset.selectedTextForCleanup = selectedText;
                 chatCleanupButton.dataset.selectionStart = selectionStart;
                 chatCleanupButton.dataset.selectionEnd = selectionEnd;
-                console.log(`[DEBUG] Chat mousedown: Stored selected text: "${selectedText}"`);
+                // console.log(`[DEBUG] Chat mousedown: Stored selected text: "${selectedText}"`);
             } else {
                 // Clear stored data if no selection on mousedown
                 delete chatCleanupButton.dataset.selectedTextForCleanup;
@@ -115,7 +115,7 @@ export function setupEventListeners() {
 
         chatCleanupButton.addEventListener('click', async () => {
             // Log button state *immediately* on click attempt
-            console.log(`[DEBUG] Chat Cleanup Button CLICKED! Disabled: ${chatCleanupButton.disabled}`);
+            // console.log(`[DEBUG] Chat Cleanup Button CLICKED! Disabled: ${chatCleanupButton.disabled}`);
 
             // Read selection details stored during mousedown
             const selectedText = chatCleanupButton.dataset.selectedTextForCleanup;
@@ -129,13 +129,13 @@ export function setupEventListeners() {
 
             // Check button state and if we actually captured text
             if (state.isLoading || chatCleanupButton.disabled || !elements.messageInput) { // Check the variable directly
-                 console.log(`[DEBUG] Chat Cleanup: Click ignored (isLoading: ${state.isLoading}, isDisabled: ${chatCleanupButton.disabled}, hasInput: ${!!elements.messageInput}).`);
+                 // console.log(`[DEBUG] Chat Cleanup: Click ignored (isLoading: ${state.isLoading}, isDisabled: ${chatCleanupButton.disabled}, hasInput: ${!!elements.messageInput}).`);
                  return;
             }
 
             // Use the selectedText captured during mousedown
             if (!selectedText || isNaN(selectionStart) || isNaN(selectionEnd)) {
-                console.log("[DEBUG] Chat Cleanup: Click ignored (no text selected or indices missing from mousedown).");
+                // console.log("[DEBUG] Chat Cleanup: Click ignored (no text selected or indices missing from mousedown).");
                 state.setStatusMessage("No text selected to clean.", true);
                 // Ensure button is disabled if somehow clicked without selection
                 if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = true;
@@ -145,13 +145,13 @@ export function setupEventListeners() {
             // Disable button during processing (handled by global isLoading state via ui.updateChatCleanupButtonState)
             // state.setIsLoading(true); // api.cleanupTranscript handles this
 
-            console.log(`[DEBUG] Chat Cleanup: Selected text: "${selectedText}"`);
+            // console.log(`[DEBUG] Chat Cleanup: Selected text: "${selectedText}"`);
             const inputField = elements.messageInput; // Get reference again
-            console.log(`[DEBUG] Chat Cleanup: Selected text from mousedown: "${selectedText}"`);
+            // console.log(`[DEBUG] Chat Cleanup: Selected text from mousedown: "${selectedText}"`);
             try {
                 // Call the existing API function with the selected text
                 const cleanedText = await api.cleanupTranscript(selectedText);
-                console.log(`[DEBUG] Chat Cleanup: Received cleaned text: "${cleanedText}"`);
+                // console.log(`[DEBUG] Chat Cleanup: Received cleaned text: "${cleanedText}"`);
 
                 // Get the potentially updated text *after* API call returns
                 const currentFullText = inputField.value;
@@ -161,10 +161,10 @@ export function setupEventListeners() {
                 const textBefore = currentFullText.substring(0, selectionStart);
                 const textAfter = currentFullText.substring(selectionEnd);
                 const newFullText = textBefore + cleanedText + textAfter;
-                console.log(`[DEBUG] Chat Cleanup: Replacing with new full text: "${newFullText}"`);
+                // console.log(`[DEBUG] Chat Cleanup: Replacing with new full text: "${newFullText}"`);
 
                 // Update the input field directly
-                console.log("[DEBUG] Chat Cleanup: Replacing text in input field.");
+                // console.log("[DEBUG] Chat Cleanup: Replacing text in input field.");
                 inputField.value = newFullText;
 
                 // Restore selection around the newly inserted text (optional but good UX)
@@ -198,7 +198,7 @@ export function setupEventListeners() {
             // Check if the message input is the active element when selection changes
             if (document.activeElement === elements.messageInput) {
                 // Log the button element reference *when selection changes*
-                console.log("[DEBUG] selectionchange (Chat): Checking chatCleanupButton ref:", elements.cleanupTranscriptButton);
+                // console.log("[DEBUG] selectionchange (Chat): Checking chatCleanupButton ref:", elements.cleanupTranscriptButton);
                 updateCleanupState();
             } else {
                 // If selection changes outside the input, disable the button
@@ -224,7 +224,7 @@ export function setupEventListeners() {
             // Check if the notes textarea is the active element when selection changes
             if (document.activeElement === elements.notesTextarea) {
                  // Log the button element reference *when selection changes*
-                console.log("[DEBUG] selectionchange (Notes): Checking notesCleanupButton ref:", elements.cleanupTranscriptButtonNotes);
+                // console.log("[DEBUG] selectionchange (Notes): Checking notesCleanupButton ref:", elements.cleanupTranscriptButtonNotes);
                 updateCleanupState();
             } else {
                 // If selection changes outside the textarea, disable the button
@@ -257,7 +257,7 @@ export function setupEventListeners() {
     // --- Notes Cleanup Button Listener ---
     const notesCleanupButton = elements.cleanupTranscriptButtonNotes;
     if (notesCleanupButton) {
-        console.log("[DEBUG] Attaching mousedown/click listeners to Notes Cleanup Button:", notesCleanupButton);
+        // console.log("[DEBUG] Attaching mousedown/click listeners to Notes Cleanup Button:", notesCleanupButton);
 
         // Capture selection on mousedown
         notesCleanupButton.addEventListener('mousedown', (event) => {
@@ -273,7 +273,7 @@ export function setupEventListeners() {
                 notesCleanupButton.dataset.selectedTextForCleanup = selectedText;
                 notesCleanupButton.dataset.selectionStart = selectionStart;
                 notesCleanupButton.dataset.selectionEnd = selectionEnd;
-                console.log(`[DEBUG] Notes mousedown: Stored selected text: "${selectedText}"`);
+                // console.log(`[DEBUG] Notes mousedown: Stored selected text: "${selectedText}"`);
             } else {
                 // Clear stored data if no selection on mousedown
                 delete notesCleanupButton.dataset.selectedTextForCleanup;
@@ -284,7 +284,7 @@ export function setupEventListeners() {
 
         notesCleanupButton.addEventListener('click', async () => {
              // Log button state *immediately* on click attempt
-            console.log(`[DEBUG] Notes Cleanup Button CLICKED! Disabled: ${notesCleanupButton.disabled}`);
+            // console.log(`[DEBUG] Notes Cleanup Button CLICKED! Disabled: ${notesCleanupButton.disabled}`);
 
             // Read selection details stored during mousedown
             const selectedText = notesCleanupButton.dataset.selectedTextForCleanup;
@@ -298,13 +298,13 @@ export function setupEventListeners() {
 
             // Check button state and if we actually captured text
             if (state.isLoading || notesCleanupButton.disabled || !elements.notesTextarea) { // Check the variable directly
-                 console.log(`[DEBUG] Notes Cleanup: Click ignored (isLoading: ${state.isLoading}, isDisabled: ${notesCleanupButton.disabled}, hasTextarea: ${!!elements.notesTextarea}).`);
+                 // console.log(`[DEBUG] Notes Cleanup: Click ignored (isLoading: ${state.isLoading}, isDisabled: ${notesCleanupButton.disabled}, hasTextarea: ${!!elements.notesTextarea}).`);
                  return;
             }
 
             // Use the selectedText captured during mousedown
             if (!selectedText || isNaN(selectionStart) || isNaN(selectionEnd)) {
-                console.log("[DEBUG] Notes Cleanup: Click ignored (no text selected or indices missing from mousedown).");
+                // console.log("[DEBUG] Notes Cleanup: Click ignored (no text selected or indices missing from mousedown).");
                 state.setStatusMessage("No text selected to clean.", true);
                 // Ensure button is disabled if somehow clicked without selection
                 if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = true;
@@ -314,13 +314,13 @@ export function setupEventListeners() {
             // Disable button during processing (handled by global isLoading state via ui.updateNotesCleanupButtonState)
             // state.setIsLoading(true); // api.cleanupTranscript handles this
 
-            console.log(`[DEBUG] Notes Cleanup: Selected text: "${selectedText}"`);
+            // console.log(`[DEBUG] Notes Cleanup: Selected text: "${selectedText}"`);
             const textarea = elements.notesTextarea; // Get reference again
-            console.log(`[DEBUG] Notes Cleanup: Selected text from mousedown: "${selectedText}"`);
+            // console.log(`[DEBUG] Notes Cleanup: Selected text from mousedown: "${selectedText}"`);
             try {
                 // Call the existing API function with the selected text
                 const cleanedText = await api.cleanupTranscript(selectedText);
-                console.log(`[DEBUG] Notes Cleanup: Received cleaned text: "${cleanedText}"`);
+                // console.log(`[DEBUG] Notes Cleanup: Received cleaned text: "${cleanedText}"`);
 
                 // Get the potentially updated text *after* API call returns
                 const currentFullText = textarea.value;
@@ -330,14 +330,14 @@ export function setupEventListeners() {
                 const textBefore = currentFullText.substring(0, selectionStart);
                 const textAfter = currentFullText.substring(selectionEnd);
                 const newFullText = textBefore + cleanedText + textAfter;
-                console.log(`[DEBUG] Notes Cleanup: Replacing with new full text: "${newFullText}"`);
+                // console.log(`[DEBUG] Notes Cleanup: Replacing with new full text: "${newFullText}"`);
 
                 // Update the textarea directly
-                console.log("[DEBUG] Notes Cleanup: Replacing text in textarea.");
+                // console.log("[DEBUG] Notes Cleanup: Replacing text in textarea.");
                 textarea.value = newFullText;
 
                 // Update the application state AFTER updating the DOM value
-                console.log("[DEBUG] Notes Cleanup: Updating state.noteContent.");
+                // console.log("[DEBUG] Notes Cleanup: Updating state.noteContent.");
                 state.setNoteContent(newFullText); // Update state for notes
 
                 // Check if the text actually changed
