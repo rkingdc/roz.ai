@@ -34,58 +34,41 @@ function makeHeadingsCollapsible(htmlString) {
 
     const nodes = Array.from(wrapperDiv.childNodes);
     const resultFragment = document.createDocumentFragment();
-    const sectionStack = []; // Stack to keep track of [level, contentDiv]
+    let currentContentDiv = null; // Keep track of the content div for the current heading
 
     nodes.forEach(node => {
         const isHeading = node.nodeName && node.nodeName.match(/^H[1-6]$/);
-        const level = isHeading ? parseInt(node.nodeName.substring(1), 10) : 0;
 
         if (isHeading) {
-            // Pop sections from stack with level >= current level
-            while (sectionStack.length > 0 && sectionStack[sectionStack.length - 1][0] >= level) {
-                sectionStack.pop();
-            }
-
-            // Create the new section elements
-            const sectionDiv = document.createElement('div');
-            sectionDiv.classList.add('collapsible-section', `level-${level}`);
-
+            // Create the heading element
             const headingElement = node.cloneNode(true); // Clone the original heading
             headingElement.classList.add('collapsible-heading');
             headingElement.style.cursor = 'pointer';
-            headingElement.dataset.level = level;
+            // Optionally keep level data if needed elsewhere, but not for styling indentation
+            // headingElement.dataset.level = parseInt(node.nodeName.substring(1), 10);
 
             const toggleIcon = document.createElement('i');
             toggleIcon.classList.add('fas', 'fa-chevron-down', 'collapsible-toggle', 'mr-2', 'transition-transform', 'duration-200', 'inline-block');
             headingElement.insertBefore(toggleIcon, headingElement.firstChild);
 
+            // Create the content div for this heading
             const contentDiv = document.createElement('div');
-            contentDiv.classList.add('collapsible-content');
+            contentDiv.classList.add('collapsible-content'); // Keep this class for collapse functionality
             const sectionId = `collapse-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
             contentDiv.id = sectionId;
-            headingElement.dataset.target = `#${sectionId}`;
+            headingElement.dataset.target = `#${sectionId}`; // Link heading to content div
 
-            sectionDiv.appendChild(headingElement);
-            sectionDiv.appendChild(contentDiv);
+            // Append heading and content div directly to the fragment (flat structure)
+            resultFragment.appendChild(headingElement);
+            resultFragment.appendChild(contentDiv);
 
-            // Append the new section to the correct parent
-            if (sectionStack.length > 0) {
-                // Append to the content div of the parent section on the stack
-                const parentContentDiv = sectionStack[sectionStack.length - 1][1];
-                parentContentDiv.appendChild(sectionDiv);
-            } else {
-                // Append to the root fragment if it's a top-level heading
-                resultFragment.appendChild(sectionDiv);
-            }
-
-            // Push the new section's level and contentDiv onto the stack
-            sectionStack.push([level, contentDiv]);
+            // Set this new content div as the target for subsequent non-heading nodes
+            currentContentDiv = contentDiv;
 
         } else {
             // Append non-heading nodes
-            if (sectionStack.length > 0) {
-                // Append to the content div of the current section on the stack
-                const currentContentDiv = sectionStack[sectionStack.length - 1][1];
+            if (currentContentDiv) {
+                // Append to the content div of the most recent heading
                 currentContentDiv.appendChild(node.cloneNode(true));
             } else {
                 // Append directly to the fragment if before the first heading
@@ -93,8 +76,6 @@ function makeHeadingsCollapsible(htmlString) {
             }
         }
     });
-
-    // No need to append last section explicitly, stack handling does this
 
     return resultFragment;
 }
