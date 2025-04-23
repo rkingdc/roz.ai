@@ -18,6 +18,36 @@ import { markedRenderer } from './config.js'; // Import the custom renderer from
 // --- REMOVED Old Custom Marked Renderer ---
 // --- REMOVED Old renderDrawioDiagrams function ---
 
+/**
+ * Waits for GraphViewer to be available and then processes diagrams.
+ * Polls for a limited number of attempts.
+ * @param {number} [maxAttempts=10] - Maximum number of times to check.
+ * @param {number} [delay=100] - Delay between checks in milliseconds.
+ */
+function waitForGraphViewerAndProcess(maxAttempts = 10, delay = 100) {
+    let attempts = 0;
+
+    function checkAndProcess() {
+        attempts++;
+        if (typeof GraphViewer !== 'undefined' && typeof GraphViewer.processElements === 'function') {
+            console.log(`[DEBUG] GraphViewer found after ${attempts} attempt(s). Calling processElements().`);
+            try {
+                GraphViewer.processElements();
+            } catch (e) {
+                console.error("Error in GraphViewer.processElements():", e);
+            }
+        } else if (attempts < maxAttempts) {
+            // console.log(`[DEBUG] GraphViewer not ready, attempt ${attempts}. Retrying in ${delay}ms...`);
+            setTimeout(checkAndProcess, delay);
+        } else {
+            console.warn(`[WARN] GraphViewer did not become available after ${maxAttempts} attempts.`);
+        }
+    }
+
+    checkAndProcess(); // Start the check
+}
+
+
 // Debounce function
 function debounce(func, wait) {
     let timeout;
@@ -1413,21 +1443,9 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
              notesPreview.appendChild(collapsibleFragment); // Append the processed fragment
              // Apply prose styles to the container if desired
              notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
-             // --- Process Draw.io diagrams AFTER adding HTML and with delay ---
-             setTimeout(() => {
-                if (typeof GraphViewer !== 'undefined' && typeof GraphViewer.processElements === 'function') {
-                     console.log("[DEBUG] Calling GraphViewer.processElements() in setNoteMode..."); // Keep optional debug log
-                     try {
-                         GraphViewer.processElements(); // Automatically finds and renders .mxgraph elements
-                     } catch (e) {
-                          console.error("Error in GraphViewer.processElements():", e);
-                     }
-                     console.log("[DEBUG] GraphViewer.processElements() finished in setNoteMode."); // Keep optional debug log
-                } else {
-                     console.warn("[DEBUG] GraphViewer or GraphViewer.processElements not available in setNoteMode.");
-                }
-             }, 100); // Increased delay to 100ms
-             // -------------------------------------------------------------
+             // --- Process Draw.io diagrams AFTER adding HTML using the robust checker ---
+             waitForGraphViewerAndProcess();
+             // -------------------------------------------------------------------------
         } else {
              notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
         }
@@ -1458,21 +1476,9 @@ export function updateNotesPreview() {
             notesPreview.appendChild(collapsibleFragment);
             // Apply prose styles
             notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
-            // --- Process Draw.io diagrams AFTER adding HTML and with delay ---
-            setTimeout(() => {
-               if (typeof GraphViewer !== 'undefined' && typeof GraphViewer.processElements === 'function') {
-                    console.log("[DEBUG] Calling GraphViewer.processElements() in updateNotesPreview..."); // Keep optional debug log
-                    try {
-                        GraphViewer.processElements();
-                    } catch (e) {
-                         console.error("Error in GraphViewer.processElements() during updateNotesPreview:", e);
-                    }
-                    console.log("[DEBUG] GraphViewer.processElements() finished in updateNotesPreview."); // Keep optional debug log
-               } else {
-                   console.warn("[DEBUG] GraphViewer or GraphViewer.processElements not available in updateNotesPreview.");
-               }
-            }, 100); // Increased delay to 100ms
-            // -------------------------------------------------------------
+            // --- Process Draw.io diagrams AFTER adding HTML using the robust checker ---
+            waitForGraphViewerAndProcess();
+            // -------------------------------------------------------------------------
         } else {
             notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
         }
