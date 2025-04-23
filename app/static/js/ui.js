@@ -43,16 +43,18 @@ function makeHeadingsCollapsible(htmlString) {
         const isHeading = node.nodeName && node.nodeName.match(/^H[1-6]$/);
         const level = isHeading ? parseInt(node.nodeName.substring(1), 10) : 0;
 
-        // If this is a heading of the same or higher level (lower number), close the previous section
-        if (isHeading && currentSection && level <= currentLevel) {
-            resultFragment.appendChild(currentSection);
-            currentSection = null;
-            currentContentDiv = null;
-            currentLevel = 0;
-        }
-
-        // If it's a heading, start a new section
+        // If it's a heading, handle the transition from the previous section (if any)
         if (isHeading) {
+            // Append the previous section before starting a new one,
+            // regardless of level in this flat structure approach.
+            if (currentSection) {
+                resultFragment.appendChild(currentSection); // Append the completed section
+                currentSection = null; // Reset for the new section
+                currentContentDiv = null;
+                // currentLevel will be reset below when the new section starts
+            }
+
+            // Now, create the new section for the current heading
             currentLevel = level;
             currentSection = document.createElement('div');
             currentSection.classList.add('collapsible-section', `level-${level}`); // Add level class
