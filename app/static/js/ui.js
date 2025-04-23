@@ -7,6 +7,7 @@
 import { elements } from './dom.js'; // Import elements from dom.js
 import * as state from './state.js'; // UI reads from state
 import { getInputElementForContext } from './state.js'; // Import the helper function
+import { originalNoteTextBeforeRecording } from './voice.js'; // Import original text holder
 import * as config from './config.js'; // Import config for keys
 import { escapeHtml, formatFileSize } from './utils.js'; // Import utility functions
 // No direct imports of api.js here to break the cycle.
@@ -1021,7 +1022,7 @@ export function renderMicButtonState() {
     if (!targetButton) return; // No button to update for the current tab
 
     // Find the icon element within the target button
-    const icon = micButton.querySelector('i');
+    const icon = targetButton.querySelector('i'); // Use targetButton here
     if (!icon) return;
 
     if (isRecording) {
@@ -1587,7 +1588,13 @@ export function renderStreamingTranscript() {
     const targetElement = getInputElementForContext(context);
 
     if (targetElement) {
-        targetElement.value = transcript; // Update the correct input/textarea
+        if (context === 'notes' && originalNoteTextBeforeRecording !== null) {
+            // Append to original text for notes
+            targetElement.value = originalNoteTextBeforeRecording + (originalNoteTextBeforeRecording ? "\n\n" : "") + transcript; // Add newline separator
+        } else {
+            // Overwrite for chat or if original notes text wasn't stored
+            targetElement.value = transcript;
+        }
         // Optional: Auto-scroll if needed, especially for textarea
         // if (targetElement.scrollHeight > targetElement.clientHeight) {
         //     targetElement.scrollTop = targetElement.scrollHeight;

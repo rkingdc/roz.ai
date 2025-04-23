@@ -53,6 +53,13 @@ export async function startRecording(context) {
     state.setStreamingTranscript("");
     state.setFinalTranscriptSegment("");
 
+    // Store original text if recording into notes
+    if (context === 'notes' && elements.notesTextarea) {
+        originalNoteTextBeforeRecording = elements.notesTextarea.value;
+    } else {
+        originalNoteTextBeforeRecording = null; // Clear if not recording notes
+    }
+
     try {
         // --- Connect WebSocket and wait for backend readiness FIRST ---
         // This ensures the connection exists and the backend stream is initialized.
@@ -126,14 +133,13 @@ export async function startRecording(context) {
                 elements.messageInput.focus();
                 state.setStatusMessage("Recording stopped. Transcript added to input.");
             } else if (recordingContextOnStop === 'notes' && elements.notesTextarea) { // Use local variable
-                // Set the final transcript in the notes textarea
-                const currentVal = elements.notesTextarea.value;
-                // Replace the streaming placeholder with the final transcript
-                // This assumes the streaming updates were also directed to the notes textarea
-                elements.notesTextarea.value = finalTranscript; // Replace content
-                state.setNoteContent(finalTranscript); // Update state
+                // Combine original text with the final transcript
+                const combinedText = originalNoteTextBeforeRecording + (originalNoteTextBeforeRecording ? "\n\n" : "") + finalTranscript;
+                elements.notesTextarea.value = combinedText; // Set combined text in textarea
+                state.setNoteContent(combinedText); // Update state with combined text
                 elements.notesTextarea.focus();
                 state.setStatusMessage("Recording stopped. Transcript added to note.");
+                originalNoteTextBeforeRecording = null; // Clear the stored original text
             } else {
                  console.warn(`[WARN] Recording context "${recordingContextOnStop}" not handled on stop.`); // Use local variable
                  state.setStatusMessage("Recording stopped.", true);
