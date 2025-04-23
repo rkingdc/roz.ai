@@ -112,6 +112,11 @@ export async function handleFileUpload(event) {
         return;
     }
 
+    // --- FIX: Reset the input value immediately after getting files ---
+    // This prevents the 'change' event from potentially re-firing when the value is cleared later.
+    if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = '';
+    // -----------------------------------------------------------------
+
     // --- FIX: Disable input and label during upload ---
     if (elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = true;
     if (elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.add('disabled');
@@ -135,7 +140,7 @@ export async function handleFileUpload(event) {
         if(elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = false;
         if(elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.remove('disabled');
         // -------------------------------------
-        if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = '';
+        // Input value is already reset
         setStatus("No valid files selected for upload.", true);
         return;
     }
@@ -162,10 +167,10 @@ export async function handleFileUpload(event) {
         setStatus(`Error uploading files: ${error.message}`, true);
     } finally {
         setLoading(false);
-        // --- FIX: Re-enable input and label and reset value ---
+        // --- FIX: Re-enable input and label ---
         if(elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = false;
         if(elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.remove('disabled');
-        if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = ''; // Reset input value
+        // Input value is already reset
         // -----------------------------------------------------
         // Closing modal should be handled by event listener or UI logic reacting to state
     }
