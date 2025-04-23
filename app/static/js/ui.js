@@ -1195,7 +1195,7 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
         chatSidebarContent, notesSidebarContent, modelSelectorContainer,
         notesModeElements, messageInput, notesTextarea, notesPreview,
         currentChatNameInput, currentNoteNameInput, currentChatIdDisplay,
-        currentNoteIdDisplay, inputArea, sidebar, sidebarToggleButton
+        currentNoteIdDisplay, inputArea, sidebar, sidebarToggleTab // Use the new reference name
     } = elements;
 
     // Add null checks for individual elements
