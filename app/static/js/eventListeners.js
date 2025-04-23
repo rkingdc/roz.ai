@@ -481,8 +481,9 @@ export function setupEventListeners() {
             state.setNoteContent(historyEntry.content); // Notifies noteContent, currentNote
             state.setCurrentNoteName(historyEntry.name); // Notifies currentNoteName, currentNote
 
-            // Switch to edit mode so the user can modify the loaded history version
-            state.setCurrentNoteMode('edit'); // Notifies currentNoteMode
+            // --- REMOVED: Do NOT change the note mode when loading history ---
+            // state.setCurrentNoteMode('edit'); // Notifies currentNoteMode
+            // -----------------------------------------------------------------
 
             state.setStatusMessage(`Loaded history version ${historyId}.`); // Update state
             // UI updates are triggered by state notifications
