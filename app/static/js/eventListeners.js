@@ -56,7 +56,7 @@ export function setupEventListeners() {
             // }
         }
     });
-    console.log("Global keyboard listeners set up.");
+    // console.log("Global keyboard listeners set up.");
 
 
     // --- Chat Input & Sending ---
@@ -782,7 +782,7 @@ export function setupEventListeners() {
 
     // --- Delegated Click Listener for Cleanup Buttons (REMOVED) ---
 
-    console.log("[DEBUG] setupEventListeners finished."); // Log completion
+    // console.log("[DEBUG] setupEventListeners finished."); // Log completion
     // } // <-- REMOVE the potentially spurious closing brace added previously
 }
 
