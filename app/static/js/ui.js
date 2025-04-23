@@ -14,6 +14,77 @@ import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js'; 
 // No direct imports of api.js here to break the cycle.
 // Event listeners will import api functions dynamically when needed.
 
+// --- Custom Marked Renderer for Draw.io ---
+const customMarkedRenderer = new marked.Renderer();
+const originalCodeRenderer = customMarkedRenderer.code.bind(customMarkedRenderer); // Keep original for fallback
+
+customMarkedRenderer.code = function(code, language, isEscaped) {
+  language = (language || '').toLowerCase(); // Ensure language is lowercase
+  if (language === 'drawio') {
+    // Don't escape the XML content for the data attribute initially,
+    // but escape it when setting the attribute value for safety.
+    const escapedXml = escapeHtml(code);
+    // Output a placeholder div that the GraphViewer will target
+    return `<div class="drawio-diagram my-4 border border-gray-300 p-2 rounded" data-diagram-xml="${escapedXml}">Loading diagram...</div>`;
+  }
+  // Fallback to original renderer for other languages
+  return originalCodeRenderer(code, language, isEscaped);
+};
+// -----------------------------------------
+
+// --- Draw.io Rendering Function ---
+/**
+ * Finds placeholder divs and renders Draw.io diagrams using GraphViewer.
+ * @param {HTMLElement} containerElement - The element containing the rendered markdown.
+ */
+function renderDrawioDiagrams(containerElement) {
+    // Ensure GraphViewer library is loaded (it should be from index.html)
+    if (!containerElement || typeof GraphViewer === 'undefined') {
+        if (typeof GraphViewer === 'undefined') console.warn("GraphViewer library not found.");
+        return;
+    }
+
+    const diagrams = containerElement.querySelectorAll('.drawio-diagram');
+    diagrams.forEach(div => {
+        const xmlData = div.dataset.diagramXml;
+        if (xmlData) {
+            try {
+                // Decode the HTML entities back to XML string
+                // Use a temporary element to decode HTML entities safely
+                const tempEl = document.createElement('textarea');
+                tempEl.innerHTML = xmlData; // Browser decodes entities here
+                const decodedXml = tempEl.value;
+
+                // Clear the "Loading..." message
+                div.innerHTML = '';
+                div.style.cursor = 'default'; // Remove loading cursor if any
+
+                // Create a new GraphViewer instance for each diagram
+                // Ensure the container div itself is used for rendering
+                new GraphViewer(div, null, {
+                    xml: decodedXml,
+                    // Configuration options for the viewer
+                    lightbox: false, // Disable lightbox effect
+                    toolbar: null, // Hide toolbar
+                    resize: true, // Allow resizing if needed
+                    border: 0, // No border from the viewer itself
+                    responsive: true,
+                    // background: 'transparent' // Optional: Set background if needed
+                    'toolbar-nohide': true, // Keep toolbar visible if shown (though we hide it)
+                    'toolbar-position': 'top',
+                    // Add more config as needed: https://github.com/jgraph/drawio/blob/dev/src/main/webapp/js/viewer.min.js
+                });
+            } catch (e) {
+                console.error("Error rendering Draw.io diagram:", e);
+                div.innerHTML = '<p class="text-red-500 text-xs">Error rendering diagram.</p>';
+            }
+        } else {
+             div.innerHTML = '<p class="text-yellow-500 text-xs">Diagram data not found.</p>';
+        }
+    });
+}
+// ------------------------------------
+
 // Debounce function
 function debounce(func, wait) {
     let timeout;
@@ -1403,13 +1474,17 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
         // Render markdown and make headings collapsible in the preview area
         notesPreview.innerHTML = ''; // Clear previous content
         if (typeof marked !== 'undefined') {
-             const rawHtml = marked.parse(state.noteContent); // Read from state
+             // Use the custom renderer
+             const rawHtml = marked.parse(state.noteContent || '', { renderer: customMarkedRenderer });
              const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
              notesPreview.appendChild(collapsibleFragment); // Append the processed fragment
              // Apply prose styles to the container if desired
              notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
+             // --- Render Draw.io diagrams AFTER adding HTML ---
+             renderDrawioDiagrams(notesPreview);
+             // -----------------------------------------------
         } else {
-             notesPreview.textContent = state.noteContent; // Read from state (fallback)
+             notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
         }
     }
 }
@@ -1430,10 +1505,19 @@ export function updateNotesPreview() {
     // assuming the event listener updates state.noteContent on textarea input.
 
     if (state.currentNoteMode === 'view') { // Read from state
+        notesPreview.innerHTML = ''; // Clear previous content
         if (typeof marked !== 'undefined') {
-             notesPreview.innerHTML = marked.parse(state.noteContent); // Read from state
+            // Use the custom renderer
+            const rawHtml = marked.parse(state.noteContent || '', { renderer: customMarkedRenderer });
+            const collapsibleFragment = makeHeadingsCollapsible(rawHtml); // Keep collapsible headings
+            notesPreview.appendChild(collapsibleFragment);
+            // Apply prose styles
+            notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
+            // --- Render Draw.io diagrams AFTER adding HTML ---
+            renderDrawioDiagrams(notesPreview);
+            // -----------------------------------------------
         } else {
-             notesPreview.textContent = state.noteContent; // Read from state
+            notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
         }
     }
     // If in edit mode, the textarea is visible.
