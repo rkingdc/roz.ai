@@ -33,9 +33,15 @@ export const markedRenderer = new marked.Renderer();
 const originalCodeRenderer = markedRenderer.code.bind(markedRenderer);
 
 markedRenderer.code = function(code, language, isEscaped) {
-    let codeString = String(code); // Ensure it's a string
+    // Extract the actual code text, handling potential object input from marked
+    let codeString = '';
+    if (typeof code === 'object' && code !== null && typeof code.text === 'string') {
+        codeString = code.text; // Use the text property if available
+    } else {
+        codeString = String(code); // Fallback to string conversion
+    }
 
-    // Check for Draw.io XML signature
+    // Check for Draw.io XML signature using the extracted string
     const isDrawioXml = /<(diagram|mxGraphModel)(\s|>)/.test(codeString);
 
     if (isDrawioXml) {
@@ -52,13 +58,8 @@ markedRenderer.code = function(code, language, isEscaped) {
                      <p class="text-center text-gray-500 p-4">Processing diagram...</p>
                 </div>`;
     } else {
-        // Fallback for non-Draw.io code blocks: Basic escaping and pre/code tags.
-        // Check if 'code' is actually a string before processing.
-        if (typeof code !== 'string') {
-            console.warn("[Marked Renderer] Received non-string code for fallback:", code);
-            codeString = JSON.stringify(code); // Attempt to stringify if not a string
-        }
-        const escapedCode = escapeHtml(codeString);
+        // Fallback for non-Draw.io code blocks: Use the extracted codeString.
+        const escapedCode = escapeHtml(codeString); // Escape the extracted string
         return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapedCode}\n</code></pre>`;
     }
 };
