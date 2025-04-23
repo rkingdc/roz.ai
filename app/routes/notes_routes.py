@@ -125,3 +125,30 @@ def delete_note(note_id):
     except Exception as e:
         logger.error(f"An unexpected error occurred while deleting note {note_id}: {e}", exc_info=True)
         return jsonify({"error": "An unexpected error occurred"}), 500
+
+# --- NEW: API endpoint to retrieve note history by ID ---
+@bp.route('/notes/<int:note_id>/history', methods=['GET'])
+def get_note_history(note_id):
+    """API endpoint to retrieve the history of a specific note by ID."""
+    logger.info(f"Received GET request for /api/notes/{note_id}/history")
+    try:
+        # First, check if the note itself exists
+        note_exists = database.get_note_from_db(note_id) is not None
+        if not note_exists:
+            logger.warning(f"Note with ID {note_id} not found when requesting history.")
+            return jsonify({"error": "Note not found"}), 404
+
+        # If the note exists, fetch its history
+        history_list = database.get_note_history_from_db(note_id)
+        if history_list is None:
+            # If get_note_history_from_db returns None, it indicates a database error
+            logger.error(f"Failed to retrieve note history from database for ID {note_id}.")
+            return jsonify({"error": "Failed to retrieve note history"}), 500
+
+        logger.info(f"Successfully retrieved {len(history_list)} history entries for note ID: {note_id}.")
+        return jsonify(history_list)
+
+    except Exception as e:
+        logger.error(f"An unexpected error occurred while getting note history for {note_id}: {e}", exc_info=True)
+        return jsonify({"error": "An unexpected error occurred"}), 500
+# -------------------------------------------------------
