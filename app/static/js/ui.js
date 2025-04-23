@@ -1726,6 +1726,9 @@ export function renderStreamingTranscript() {
         // if (targetElement.scrollHeight > targetElement.clientHeight) {
         //     targetElement.scrollTop = targetElement.scrollHeight;
         // }
+        // --- NEW: Trigger auto-resize after updating value ---
+        autoResizeTextarea(targetElement);
+        // -----------------------------------------------------
     }
 }
 // ---------------------------------------
@@ -1881,6 +1884,21 @@ export function handleStateChange_isNotesTocCollapsed() {
     setNotesTocCollapsedUI(state.isNotesTocCollapsed); // Update UI based on state
 }
 // ----------------------------------------------------
+
+
+// --- NEW: Reusable Textarea Auto-Resize Function ---
+/**
+ * Adjusts the height of a textarea based on its content.
+ * @param {HTMLTextAreaElement} textareaElement - The textarea to resize.
+ */
+export function autoResizeTextarea(textareaElement) {
+    if (!textareaElement) return;
+    // Temporarily reset height to get accurate scrollHeight
+    textareaElement.style.height = 'auto';
+    // Set height to scrollHeight, respecting CSS max-height
+    textareaElement.style.height = `${textareaElement.scrollHeight}px`;
+}
+// --------------------------------------------------
 
 
 // Add more handlers for other state changes as needed...
