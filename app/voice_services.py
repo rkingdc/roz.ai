@@ -107,3 +107,208 @@ def transcribe_audio(audio_content: bytes, language_code: str = "en-US", sample_
     except Exception as e:
         logger.error(f"An unexpected error occurred during transcription: {e}", exc_info=True)
         return None
+
+
+# --- Streaming Transcription ---
+
+# Google API constraints
+STREAM_LIMIT_SECONDS = 290 # ~5 minutes, slightly less than Google's limit
+
+def transcribe_stream(language_code: str = "en-US", encoding: str = "WEBM_OPUS"):
+    """
+    Sets up and manages a streaming transcription request with Google Cloud Speech-to-Text.
+
+    This function is designed to be called when a WebSocket client connects and requests
+    to start transcription. It sets up the Google API stream and starts a background
+    thread to listen for transcript responses. It provides a mechanism (queue) for the
+    WebSocket handler to send audio chunks.
+
+    Args:
+        language_code: Language code for transcription.
+        encoding: Audio encoding ('WEBM_OPUS', 'LINEAR16', etc.).
+        # sample_rate: Sample rate (required for LINEAR16, not for WEBM_OPUS).
+        # audio_channel_count: Channel count (required for LINEAR16, not for WEBM_OPUS).
+
+    Returns:
+        A tuple: (audio_queue, streaming_config)
+        - audio_queue: A queue.Queue object where audio chunks should be put.
+                       Putting None into the queue signals the end of the stream.
+        - streaming_config: The RecognitionConfig used for the stream.
+
+    Raises:
+        Exception: If setup fails.
+    """
+    from flask import request # Import request here to get SID within the context of the socket event
+    sid = request.sid # Get the session ID of the client initiating the stream
+
+    logger.info(f"Setting up transcription stream for SID: {sid}, Lang: {language_code}, Enc: {encoding}")
+
+    try:
+        # Get Google client (consider caching if performance is critical)
+        # Using 'g' might be tricky with background threads, create client directly for now
+        client = speech.SpeechClient()
+
+        # Configure recognition settings
+        recognition_config = speech.RecognitionConfig(
+            encoding=speech.RecognitionConfig.AudioEncoding[encoding],
+            language_code=language_code,
+            # sample_rate_hertz and audio_channel_count are omitted for WEBM_OPUS
+            # Add them here if using LINEAR16 based on parameters
+            enable_automatic_punctuation=True, # Enable punctuation
+            # Use enhanced model if available and configured
+            # use_enhanced=True,
+            # model='telephony', # Or other specialized models
+        )
+        streaming_config = speech.StreamingRecognitionConfig(
+            config=recognition_config,
+            interim_results=True # Get interim results for real-time feedback
+        )
+
+        # Create a thread-safe queue for this client's audio chunks
+        audio_queue = queue.Queue()
+        with _queue_lock:
+            audio_queues[sid] = audio_queue
+        logger.info(f"Audio queue created for SID: {sid}")
+
+        # Start the background thread that will handle Google API interaction
+        listener_thread = threading.Thread(
+            target=_google_listen_print_loop,
+            args=(client, streaming_config, audio_queue, sid),
+            daemon=True # Daemonize thread so it exits when main process exits
+        )
+        listener_thread.start()
+        logger.info(f"Transcription listener thread started for SID: {sid}")
+
+        # Return the queue and config (caller uses the queue to send audio)
+        return audio_queue, streaming_config
+
+    except Exception as e:
+        logger.error(f"Failed to setup transcription stream for SID {sid}: {e}", exc_info=True)
+        # Clean up queue if partially created
+        with _queue_lock:
+            if sid in audio_queues:
+                del audio_queues[sid]
+        raise # Re-raise exception to be caught by the socket handler
+
+
+def _google_request_generator(audio_queue: queue.Queue, streaming_config: speech.StreamingRecognitionConfig):
+    """
+    A generator that yields audio chunks from the queue to the Google API.
+    The first request sends the configuration.
+    Putting None in the queue signals the end.
+    """
+    # Send configuration first
+    yield speech.StreamingRecognizeRequest(streaming_config=streaming_config)
+    logger.debug("Sent streaming config to Google API.")
+
+    while True:
+        chunk = audio_queue.get()
+        if chunk is None:
+            logger.info("Received None (end signal) in audio queue. Stopping request generator.")
+            break # End of stream signaled
+
+        # logger.debug(f"Sending audio chunk size {len(chunk)} to Google API.") # Very verbose
+        yield speech.StreamingRecognizeRequest(audio_content=chunk)
+
+        # Signal task completion (important for queue management)
+        audio_queue.task_done()
+
+    logger.debug("Google request generator finished.")
+
+
+def _google_listen_print_loop(client: speech.SpeechClient, streaming_config: speech.StreamingRecognitionConfig, audio_queue: queue.Queue, sid: str):
+    """
+    Listens to the Google API response stream in a background thread,
+    processes results, and emits them via SocketIO.
+    """
+    logger.info(f"Google listener loop started for SID: {sid}")
+    responses = None
+    try:
+        # Create the request generator using the queue
+        requests = _google_request_generator(audio_queue, streaming_config)
+
+        # Call the Google API's streaming_recognize method
+        responses = client.streaming_recognize(requests=requests, timeout=STREAM_LIMIT_SECONDS + 10) # Add buffer to timeout
+
+        # Process responses from Google
+        for response in responses:
+            if not response.results:
+                # logger.debug("Received empty response from Google.")
+                continue
+
+            # The results list is consecutive. For streaming, we only care about
+            # the first result being considered, since alternatives are less likely
+            # to change rapidly.
+            result = response.results[0]
+            if not result.alternatives:
+                # logger.debug("Received response with no alternatives.")
+                continue
+
+            transcript = result.alternatives[0].transcript
+
+            # Display interim results, but don't store them permanently yet
+            if not result.is_final:
+                # logger.debug(f"SID {sid} - Interim transcript: {transcript}")
+                emit_transcript_update(sid, transcript, is_final=False)
+            else:
+                logger.info(f"SID {sid} - Final transcript: {transcript}")
+                emit_transcript_update(sid, transcript, is_final=True)
+                # Here you could potentially trigger the LLM cleanup if desired,
+                # but it would happen *after* this final segment is received.
+                # For now, we just send the final raw segment.
+
+                # If the stream limit was reached by Google, the is_final flag might be true
+                # Check for specific error types if needed (though OutOfRange is caught below)
+
+    except OutOfRange as e:
+        # Stream limit reached
+        logger.warning(f"Google API stream limit likely reached for SID {sid}: {e}")
+        emit_transcription_error_from_service(sid, "Transcription stream duration limit reached.")
+    except GoogleAPICallError as e:
+        logger.error(f"Google API call error during streaming for SID {sid}: {e}", exc_info=True)
+        emit_transcription_error_from_service(sid, f"Google API Error: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error in Google listener loop for SID {sid}: {e}", exc_info=True)
+        emit_transcription_error_from_service(sid, f"Unexpected Transcription Error: {e}")
+    finally:
+        # Clean up the audio queue associated with this SID
+        with _queue_lock:
+            if sid in audio_queues:
+                # Ensure the queue is empty and generator is signaled if needed
+                try:
+                    while not audio_queue.empty():
+                        audio_queue.get_nowait()
+                        audio_queue.task_done()
+                    # Signal generator to stop if it hasn't already
+                    audio_queue.put(None)
+                except queue.Empty:
+                    pass # Queue already empty
+                except Exception as q_err:
+                    logger.error(f"Error cleaning up queue for SID {sid}: {q_err}")
+                # Remove the queue
+                del audio_queues[sid]
+                logger.info(f"Cleaned up audio queue for SID: {sid}")
+        logger.info(f"Google listener loop finished for SID: {sid}")
+
+
+def send_audio_chunk_to_queue(sid: str, chunk: bytes):
+    """Puts an audio chunk onto the appropriate client's queue."""
+    with _queue_lock:
+        if sid in audio_queues:
+            # logger.debug(f"Putting audio chunk size {len(chunk)} into queue for SID {sid}") # Verbose
+            audio_queues[sid].put(chunk)
+            return True
+        else:
+            logger.warning(f"Attempted to send chunk to non-existent queue for SID: {sid}")
+            return False
+
+def signal_end_of_stream(sid: str):
+    """Signals the end of audio by putting None into the queue."""
+    with _queue_lock:
+        if sid in audio_queues:
+            logger.info(f"Signaling end of audio stream for SID: {sid}")
+            audio_queues[sid].put(None)
+            return True
+        else:
+            logger.warning(f"Attempted to signal end for non-existent queue for SID: {sid}")
+            return False

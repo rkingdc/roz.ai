@@ -42,12 +42,13 @@ def handle_transcribe():
             # --- Old logic ---
             # if transcript is not None:
             #     logger.info(f"Transcription successful for {file.filename}")
-                return jsonify({"transcript": transcript}), 200
-            else:
-                logger.error(f"Transcription failed for {file.filename}")
-                return jsonify({"error": "Transcription failed"}), 500 # Internal Server Error or specific code
+            #     return jsonify({"transcript": transcript}), 200
+            # else:
+            #     logger.error(f"Transcription failed for {file.filename}")
+            #     return jsonify({"error": "Transcription failed"}), 500 # Internal Server Error or specific code
+            # --- End Old logic ---
 
-        except Exception as e:
+        except Exception as e: # Keep general error handling for file reading issues etc.
             logger.error(f"Error processing audio file {file.filename}: {e}", exc_info=True)
             return jsonify({"error": "Error processing audio file"}), 500
     else:
