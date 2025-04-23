@@ -152,13 +152,19 @@ export async function startRecording(context) {
             // Reset mediaRecorder reference
             mediaRecorder = null;
 
-            // --- Enable Cleanup Button ---
-            const cleanupBtnRefAtStop = elements.cleanupTranscriptButton; // Get reference again
-            if (recordingContextOnStop === 'chat' && cleanupBtnRefAtStop && finalTranscript) {
-                cleanupBtnRefAtStop.dataset.rawTranscript = finalTranscript; // Store raw transcript
-                cleanupBtnRefAtStop.disabled = false; // Enable button
-            } else if (cleanupBtnRefAtStop) {
-                 cleanupBtnRefAtStop.disabled = true; // Keep disabled if conditions not met
+            // --- Enable Correct Cleanup Button ---
+            let cleanupBtnToEnable = null;
+            if (recordingContextOnStop === 'chat') {
+                cleanupBtnToEnable = elements.cleanupTranscriptButton;
+            } else if (recordingContextOnStop === 'notes') {
+                cleanupBtnToEnable = elements.cleanupTranscriptButtonNotes;
+            }
+
+            if (cleanupBtnToEnable && finalTranscript) {
+                cleanupBtnToEnable.dataset.rawTranscript = finalTranscript; // Store raw transcript
+                cleanupBtnToEnable.disabled = false; // Enable the specific button
+            } else if (cleanupBtnToEnable) {
+                 cleanupBtnToEnable.disabled = true; // Keep disabled if conditions not met
             }
             // -------------------------
         };

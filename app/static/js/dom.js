@@ -75,6 +75,9 @@ export const elements = {
     viewNoteButton: null,
     markdownTipsButton: null,
     notesModeElements: null, // Container for notes mode buttons and markdown tips button
+    notesMicButtonGroup: null, // Container for notes mic/cleanup buttons
+    micButtonNotes: null, // Mic button specifically for notes
+    cleanupTranscriptButtonNotes: null, // Cleanup button specifically for notes
 
     // Modal Elements
     summaryModal: null,
@@ -213,6 +216,9 @@ export function populateElements() {
     elements.historyPluginHeader = document.getElementById('history-plugin-header');
     elements.historyPluginContent = document.getElementById('history-plugin-content');
     elements.noteHistoryList = document.getElementById('note-history-list');
+    elements.notesMicButtonGroup = document.getElementById('notes-mic-button-group');
+    elements.micButtonNotes = document.getElementById('mic-button-notes');
+    elements.cleanupTranscriptButtonNotes = document.getElementById('cleanup-transcript-btn-notes');
 
 
     // Basic check

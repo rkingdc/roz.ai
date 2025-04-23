@@ -995,42 +995,58 @@ export function setPluginSectionCollapsed(headerElement, contentElement, isColla
 
 
 /**
- * Updates the microphone button icon and style based on recording state.
+ * Updates the microphone button icons and styles based on recording state and active tab.
  */
 export function renderMicButtonState() {
-    const { micButton } = elements;
-    if (!micButton) return;
-
+    const { micButton, micButtonNotes } = elements; // Get both buttons
     const isRecording = state.isRecording; // Read from state
+    const activeTab = state.currentTab; // Read active tab
 
-    // Find the icon element within the button
+    // Determine which button to update based on the active tab
+    const targetButton = activeTab === 'chat' ? micButton : (activeTab === 'notes' ? micButtonNotes : null);
+    const otherButton = activeTab === 'chat' ? micButtonNotes : (activeTab === 'notes' ? micButton : null);
+
+    // Disable the button on the inactive tab
+    if (otherButton) {
+        otherButton.disabled = true;
+        // Reset icon on inactive button
+        const otherIcon = otherButton.querySelector('i');
+        if (otherIcon) {
+             otherIcon.classList.remove('fa-stop', 'recording');
+             otherIcon.classList.add('fa-microphone');
+        }
+    }
+
+    if (!targetButton) return; // No button to update for the current tab
+
+    // Find the icon element within the target button
     const icon = micButton.querySelector('i');
     if (!icon) return;
 
     if (isRecording) {
-        micButton.title = "Stop Recording";
-        micButton.classList.add('recording'); // Add class for potential styling (e.g., red background)
+        targetButton.title = "Stop Recording";
+        targetButton.classList.add('recording'); // Add class for potential styling (e.g., red background)
         icon.classList.remove('fa-microphone');
         icon.classList.add('fa-stop');
     } else {
-        micButton.title = "Record Voice";
-        micButton.classList.remove('recording');
+        targetButton.title = activeTab === 'chat' ? "Record Voice" : "Record Voice into Note";
+        targetButton.classList.remove('recording');
         icon.classList.remove('fa-stop');
         icon.classList.add('fa-microphone');
     }
 
-    // Disable button if loading or not on the chat tab
-    micButton.disabled = state.isLoading || state.currentTab !== 'chat';
+    // Disable button if loading
+    targetButton.disabled = state.isLoading;
 
     // Add visual cue and update tooltip if socket is disconnected but button is enabled
-    if (!isRecording && !state.isSocketConnected && !micButton.disabled) {
-        micButton.title = "Record Voice (Service Disconnected)";
+    if (!isRecording && !state.isSocketConnected && !targetButton.disabled) {
+        targetButton.title += " (Service Disconnected)";
         // Add a class for styling (e.g., opacity-75). Define '.disconnected-cue' in your CSS.
-        micButton.classList.add('disconnected-cue');
+        targetButton.classList.add('disconnected-cue');
     } else if (!isRecording) {
         // Ensure default title and remove cue class if connected or button is disabled
-        micButton.title = "Record Voice";
-        micButton.classList.remove('disconnected-cue');
+        // Title is set above based on recording state and tab
+        targetButton.classList.remove('disconnected-cue');
     }
     // Tooltip for recording state is handled above
 }
@@ -1275,9 +1291,9 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
  * @param {'edit' | 'view'} mode - The desired mode.
  */
 export function setNoteMode(mode) { // Made synchronous, state is already updated by event listener
-    const { notesTextarea, notesPreview, editNoteButton, viewNoteButton } = elements;
+    const { notesTextarea, notesPreview, editNoteButton, viewNoteButton, notesMicButtonGroup } = elements; // Added notesMicButtonGroup
     // Add null checks for individual elements
-    if (!notesTextarea || !notesPreview || !editNoteButton || !viewNoteButton) {
+    if (!notesTextarea || !notesPreview || !editNoteButton || !viewNoteButton || !notesMicButtonGroup) { // Added notesMicButtonGroup check
         console.error("Missing elements for note mode switching.");
         return;
     }
@@ -1291,6 +1307,7 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
         notesPreview.classList.add('hidden');
         editNoteButton.classList.add('active');
         viewNoteButton.classList.remove('active');
+        notesMicButtonGroup.classList.remove('hidden'); // Show mic buttons in edit mode
         // Ensure preview is updated if switching back to edit after viewing
         if (typeof marked !== 'undefined') {
              notesPreview.innerHTML = marked.parse(notesTextarea.value); // Read from DOM for immediate preview update
@@ -1300,6 +1317,7 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
     } else { // state.currentNoteMode === 'view'
         notesTextarea.classList.add('hidden');
         notesPreview.classList.remove('hidden');
+        notesMicButtonGroup.classList.add('hidden'); // Hide mic buttons in view mode
         editNoteButton.classList.remove('active');
         viewNoteButton.classList.add('active');
         // Render markdown in the preview area
@@ -1557,24 +1575,22 @@ export function handleStateChange_noteHistory() {
 }
 // -------------------------------------------------
 
-// --- NEW: Render Streaming Transcript ---
+// --- UPDATED: Render Streaming Transcript ---
 /**
- * Updates the appropriate input field with the current streaming transcript.
+ * Updates the appropriate input field with the current streaming transcript based on context.
  */
 export function renderStreamingTranscript() {
     const transcript = state.streamingTranscript; // Read from state
     const context = state.recordingContext; // Read context
-    // console.log(`[UI DEBUG] renderStreamingTranscript called. Context: ${context}, Transcript: "${transcript}"`); // Reduce noise
 
-    if (context === 'chat' && elements.messageInput) {
-        elements.messageInput.value = transcript; // Update chat input
-        // Auto-scroll input if needed (usually not necessary for single line)
-    } else if (context === 'notes' && elements.notesTextarea) {
-        // Decide if we want to update notes textarea in real-time
-        // This might be disruptive if the user is also typing.
-        // For now, let's only update the chat input during streaming.
-        // The final transcript will be placed in notesTextarea on stop.
-        // elements.notesTextarea.value = transcript; // Update notes textarea
+    const targetElement = getInputElementForContext(context);
+
+    if (targetElement) {
+        targetElement.value = transcript; // Update the correct input/textarea
+        // Optional: Auto-scroll if needed, especially for textarea
+        // if (targetElement.scrollHeight > targetElement.clientHeight) {
+        //     targetElement.scrollTop = targetElement.scrollHeight;
+        // }
     }
 }
 // ---------------------------------------

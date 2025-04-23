@@ -505,3 +505,13 @@ export function setFinalTranscriptSegment(text) {
     finalTranscriptSegment = text;
     notify('finalTranscriptSegment', finalTranscriptSegment);
 }
+
+// --- NEW: Function to get the appropriate input element based on context ---
+function getInputElementForContext(context) {
+    if (context === 'chat') {
+        return elements.messageInput;
+    } else if (context === 'notes') {
+        return elements.notesTextarea;
+    }
+    return null;
+}

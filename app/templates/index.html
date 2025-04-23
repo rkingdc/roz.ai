@@ -210,11 +210,19 @@
             <!-- Removed the inner flex container that created side-by-side layout -->
             <!-- Removed labels for Markdown Input and Preview -->
 
-            <!-- Textarea for Markdown Input -->
-            <!-- Added flex-grow and overflow-auto to make textarea fill its container and scroll -->
-            <!-- Added note-mode-element class for JS toggling -->
-            {# Removed focus:ring-blue-500 focus:border-blue-500 #}
-            <textarea id="notes-textarea" class="note-mode-element flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
+            <!-- Textarea for Markdown Input - Added relative positioning -->
+            <div class="note-mode-element flex-grow w-full relative"> {# Wrap textarea to position buttons #}
+                <textarea id="notes-textarea" class="h-full w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
+                <!-- NEW: Button Group for Notes Mic and Cleanup (Initially Hidden) -->
+                <div id="notes-mic-button-group" class="inline-flex items-center absolute bottom-2 right-2 hidden" role="group">
+                    <button type="button" id="mic-button-notes" class="btn btn-secondary p-2" title="Record Voice into Note" style="height: 34px; width: 34px;">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button type="button" id="cleanup-transcript-btn-notes" class="btn btn-secondary p-2 ml-1" title="Clean Up Note Transcript" disabled style="height: 34px; width: 34px;">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                    </button>
+                </div>
+            </div>
 
             <!-- Preview Area -->
             <!-- Added flex-grow and overflow-y-auto to make preview fill its container and scroll -->

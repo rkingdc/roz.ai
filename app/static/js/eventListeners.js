@@ -116,6 +116,50 @@ export function setupEventListeners() {
         }
         // No finally block needed here, button is disabled at the start or on error
     });
+    elements.micButtonNotes?.addEventListener('click', () => {
+        if (state.currentTab !== 'notes') return; // Only allow in notes
+
+        if (state.isRecording) {
+            voice.stopRecording(); // Will update state internally
+        } else {
+            voice.startRecording('notes'); // Will update state internally
+        }
+        // UI updates are triggered by state notifications (isRecording)
+    });
+    elements.cleanupTranscriptButtonNotes?.addEventListener('click', async () => {
+        if (state.isLoading || elements.cleanupTranscriptButtonNotes?.disabled) return;
+
+        const rawTranscript = elements.cleanupTranscriptButtonNotes?.dataset.rawTranscript;
+        if (!rawTranscript) {
+            state.setStatusMessage("No transcript data found for cleanup.", true);
+            return;
+        }
+
+        // Disable button immediately
+        if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = true;
+        const originalText = elements.notesTextarea?.value || ''; // Store original text
+
+        try {
+            // Call the API function
+            const cleanedTranscript = await api.cleanupTranscript(rawTranscript);
+
+            // Update the notes textarea ONLY if cleanup was successful
+            if (elements.notesTextarea) {
+                elements.notesTextarea.value = cleanedTranscript;
+                // Also update the state to match the cleaned content
+                state.setNoteContent(cleanedTranscript);
+            }
+            // Status is set by api.cleanupTranscript on success/failure
+
+        } catch (error) {
+            // Error status is already set by api.cleanupTranscript
+            // Restore original text if cleanup failed
+            if (elements.notesTextarea) {
+                elements.notesTextarea.value = originalText;
+            }
+            // Button remains disabled
+        }
+    });
 
     // --- Sidebar & Chat Management ---
     elements.sidebarToggleButton?.addEventListener('click', ui.toggleLeftSidebar); // UI-only toggle
