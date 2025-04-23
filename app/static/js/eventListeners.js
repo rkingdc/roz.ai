@@ -944,9 +944,6 @@ function subscribeStateChangeListeners() {
     state.subscribe('isNotesTocCollapsed', ui.handleStateChange_isNotesTocCollapsed);
     // ----------------------------------------------------
 
-    // --- NEW: Subscribe UI to TOC drawer collapse state ---
-    state.subscribe('isNotesTocCollapsed', ui.handleStateChange_isNotesTocCollapsed); // Corrected: Use ui. prefix
-    // ----------------------------------------------------
 }
 
 
