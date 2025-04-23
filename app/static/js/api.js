@@ -125,6 +125,8 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
         socket.on('transcription_stop_acknowledged', (data) => {
             console.log("Backend acknowledged stop signal:", data.message);
         });
+    }); //End of promise constructor
+}
     
 /**
  * Sends an audio chunk over the WebSocket.
