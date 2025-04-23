@@ -707,6 +707,7 @@ export function setupEventListeners() {
     // -----------------------------------------------------------------
 
     console.log("[DEBUG] setupEventListeners finished."); // Log completion
+    } // <-- Add potentially spurious closing brace here based on error message
 }
 
 
