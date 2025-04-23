@@ -51,6 +51,7 @@ export let noteContent = '';
 export let isSidebarCollapsed = false;
 export let isPluginsCollapsed = false;
 export let isNotesSidebarCollapsed = false; // Assuming a separate notes sidebar state
+export let isNotesTocCollapsed = true; // TOC drawer state, default collapsed
 
 // Note History State
 export let noteHistory = []; // History entries for the currently selected note
@@ -147,12 +148,13 @@ export function notifyAll() {
     notify('chatHistory', chatHistory);
     notify('noteContent', noteContent);
     notify('currentNoteName', currentNoteName);
-    notify('isSidebarCollapsed', isSidebarCollapsed); // Notify collapsed states
+    notify('isSidebarCollapsed', isSidebarCollapsed);
     notify('isPluginsCollapsed', isPluginsCollapsed);
     notify('isNotesSidebarCollapsed', isNotesSidebarCollapsed);
-    notify('noteHistory', noteHistory); // Notify note history
-    notify('isRecording', isRecording); // Notify recording state
-    notify('recordingContext', recordingContext); // Notify recording context
+    notify('isNotesTocCollapsed', isNotesTocCollapsed); // Notify TOC drawer state
+    notify('noteHistory', noteHistory);
+    notify('isRecording', isRecording);
+    notify('recordingContext', recordingContext);
     notify('isSocketConnected', isSocketConnected); // Notify socket status
     notify('streamingTranscript', streamingTranscript); // Notify streaming transcript
     notify('finalTranscriptSegment', finalTranscriptSegment); // Notify final segment
@@ -463,6 +465,14 @@ export function setIsNotesSidebarCollapsed(isCollapsed) {
     if (isNotesSidebarCollapsed !== isCollapsed) {
         isNotesSidebarCollapsed = isCollapsed;
         notify('isNotesSidebarCollapsed', isNotesSidebarCollapsed);
+    }
+}
+
+// --- Notes TOC Drawer State ---
+export function setIsNotesTocCollapsed(isCollapsed) {
+    if (isNotesTocCollapsed !== isCollapsed) {
+        isNotesTocCollapsed = isCollapsed;
+        notify('isNotesTocCollapsed', isNotesTocCollapsed);
     }
 }
 

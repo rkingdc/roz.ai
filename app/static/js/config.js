@@ -14,6 +14,7 @@ export const CURRENT_NOTE_ID_KEY = 'currentNoteId';
 export const CURRENT_NOTE_MODE_KEY = 'currentNoteMode';
 // --- NEW KEY ---
 export const HISTORY_PLUGIN_COLLAPSED_KEY = 'historyPluginCollapsed';
+export const NOTES_TOC_COLLAPSED_KEY = 'notesTocCollapsed';
 // ---------------
 
 // File Settings

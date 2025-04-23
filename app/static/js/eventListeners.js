@@ -782,8 +782,6 @@ export function setupEventListeners() {
     });
     // -----------------------------------------------------------------
 
-    // --- Delegated Click Listener for Cleanup Buttons (REMOVED) ---
-
 
     // --- Delegated Click Listener for Collapsible Headings ---
     function handleCollapsibleClick(event) {
@@ -811,6 +809,24 @@ export function setupEventListeners() {
     // Add listener to notes preview area
     elements.notesPreview?.addEventListener('click', handleCollapsibleClick);
     // ---------------------------------------------------------
+
+
+    // --- Update TOC on Note Textarea Input ---
+    if (elements.notesTextarea) {
+        // Debounce the TOC update function from ui.js
+        const debouncedTocUpdate = debounce(() => {
+            if (state.currentTab === 'notes') {
+                ui.generateAndRenderToc(); // Call the UI function to update TOC
+            }
+        }, 300); // Use the same debounce delay as in ui.js
+
+        elements.notesTextarea.addEventListener('input', () => {
+            // Update state first (already handled by existing listener)
+            // Then trigger the debounced TOC update
+            debouncedTocUpdate();
+        });
+    }
+    // -----------------------------------------
 
 
     // console.log("[DEBUG] setupEventListeners finished."); // Log completion
@@ -867,6 +883,10 @@ function subscribeStateChangeListeners() {
     // --- Subscribe UI to sidebar collapse state changes ---
     state.subscribe('isSidebarCollapsed', ui.handleStateChange_isSidebarCollapsed);
     state.subscribe('isPluginsCollapsed', ui.handleStateChange_isPluginsCollapsed);
+    // ----------------------------------------------------
+
+    // --- NEW: Subscribe UI to TOC drawer collapse state ---
+    state.subscribe('isNotesTocCollapsed', ui.handleStateChange_isNotesTocCollapsed);
     // ----------------------------------------------------
 }
 

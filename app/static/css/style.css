@@ -1105,3 +1105,98 @@
 }
 */
 /* --- End Collapsible Heading Styles --- */
+
+
+/* --- Notes TOC Drawer Styles --- */
+.notes-toc-drawer {
+    margin-top: 1rem; /* Space above the drawer */
+    border: 1px solid var(--rz-sidebar-border);
+    border-radius: 0.5rem;
+    background-color: var(--rz-sidebar-bg);
+    overflow: hidden; /* Important for collapse transition */
+    flex-shrink: 0; /* Prevent shrinking */
+}
+
+.toc-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    background-color: var(--rz-frame);
+    border-bottom: 1px solid var(--rz-sidebar-border);
+    color: var(--rz-sidebar-text);
+    font-weight: 500;
+    cursor: pointer;
+    border-top-left-radius: 0.5rem; /* Match container */
+    border-top-right-radius: 0.5rem; /* Match container */
+}
+
+.toc-toggle-button {
+    background: none;
+    border: none;
+    color: var(--rz-sidebar-text);
+    cursor: pointer;
+    padding: 0.25rem;
+    line-height: 1;
+}
+
+.toc-toggle-icon {
+    transition: transform 0.2s ease-in-out;
+}
+
+.toc-drawer-header.collapsed .toc-toggle-icon {
+    transform: rotate(180deg); /* Point down when collapsed */
+}
+
+.toc-drawer-content {
+    padding: 0.5rem;
+    max-height: 200px; /* Adjust as needed */
+    overflow-y: auto;
+    transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding 0.3s ease-out;
+    opacity: 1;
+    color: var(--rz-sidebar-text);
+}
+
+/* Styles for scrollbar within TOC */
+.toc-drawer-content::-webkit-scrollbar { width: 5px; height: 5px; }
+.toc-drawer-content::-webkit-scrollbar-track { background: var(--rz-frame); border-radius: 10px; }
+.toc-drawer-content::-webkit-scrollbar-thumb { background: var(--rz-tab-line); border-radius: 10px; }
+.toc-drawer-content::-webkit-scrollbar-thumb:hover { background: var(--rz-toolbar-text); }
+
+
+.toc-drawer-content.collapsed {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+    border-top: none; /* If header border is conditional */
+}
+
+.toc-item {
+    display: block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    margin-bottom: 0.1rem;
+    font-size: 0.8rem;
+    color: var(--rz-sidebar-text);
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.toc-item:hover {
+    background-color: var(--rz-sidebar-hover-bg);
+    color: var(--rz-toolbar-field-text); /* Adjust hover text color if needed */
+}
+
+/* Indentation for different levels */
+.toc-level-1 { padding-left: 0.5rem; }
+.toc-level-2 { padding-left: 1.25rem; }
+.toc-level-3 { padding-left: 2rem; }
+.toc-level-4 { padding-left: 2.75rem; }
+.toc-level-5 { padding-left: 3.5rem; }
+.toc-level-6 { padding-left: 4.25rem; }
+/* --- End Notes TOC Drawer Styles --- */

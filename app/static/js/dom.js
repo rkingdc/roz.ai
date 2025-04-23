@@ -75,9 +75,13 @@ export const elements = {
     viewNoteButton: null,
     markdownTipsButton: null,
     notesModeElements: null, // Container for notes mode buttons and markdown tips button
-    notesMicButtonGroup: null, // Container for notes mic/cleanup buttons
-    micButtonNotes: null, // Mic button specifically for notes
-    cleanupTranscriptButtonNotes: null, // Cleanup button specifically for notes
+    notesMicButtonGroup: null,
+    micButtonNotes: null,
+    cleanupTranscriptButtonNotes: null,
+    notesTocDrawer: null, // TOC Drawer elements
+    notesTocHeader: null,
+    notesTocToggle: null,
+    notesTocList: null,
 
     // Modal Elements
     summaryModal: null,
@@ -219,6 +223,10 @@ export function populateElements() {
     elements.notesMicButtonGroup = document.getElementById('notes-mic-button-group');
     elements.micButtonNotes = document.getElementById('mic-button-notes');
     elements.cleanupTranscriptButtonNotes = document.getElementById('cleanup-transcript-btn-notes');
+    elements.notesTocDrawer = document.getElementById('notes-toc-drawer'); // TOC Drawer elements
+    elements.notesTocHeader = document.getElementById('notes-toc-header');
+    elements.notesTocToggle = document.getElementById('notes-toc-toggle');
+    elements.notesTocList = document.getElementById('notes-toc-list');
 
 
     // Basic check
