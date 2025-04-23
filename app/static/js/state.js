@@ -56,6 +56,9 @@ export let noteHistory = []; // History entries for the currently selected note
 // Voice Recording State
 export let isRecording = false; // Whether audio is currently being recorded
 export let recordingContext = null; // Context associated with the current recording (e.g., 'chat', 'note')
+export let isSocketConnected = false; // WebSocket connection status for transcription
+export let streamingTranscript = ""; // Holds the current real-time transcript
+export let finalTranscriptSegment = ""; // Holds the last final transcript segment received
 
 
 // --- Observer Pattern ---
@@ -152,6 +155,9 @@ export function notifyAll() {
     notify('noteHistory', noteHistory); // Notify note history
     notify('isRecording', isRecording); // Notify recording state
     notify('recordingContext', recordingContext); // Notify recording context
+    notify('isSocketConnected', isSocketConnected); // Notify socket status
+    notify('streamingTranscript', streamingTranscript); // Notify streaming transcript
+    notify('finalTranscriptSegment', finalTranscriptSegment); // Notify final segment
 
 
     // Also notify combined states if listeners are subscribed to them
@@ -480,4 +486,30 @@ export function setIsRecording(recording, context = null) {
         notify('isRecording', isRecording);
         notify('recordingContext', recordingContext); // Notify context change as well
     }
+}
+
+export function setIsSocketConnected(connected) {
+    if (isSocketConnected !== connected) {
+        isSocketConnected = connected;
+        notify('isSocketConnected', isSocketConnected);
+    }
+}
+
+export function setStreamingTranscript(transcript) {
+    if (streamingTranscript !== transcript) {
+        streamingTranscript = transcript;
+        notify('streamingTranscript', streamingTranscript);
+    }
+}
+
+// Function to append to the streaming transcript (useful for interim results)
+export function appendStreamingTranscript(text) {
+    streamingTranscript += text;
+    notify('streamingTranscript', streamingTranscript);
+}
+
+// Function to store the last final segment
+export function setFinalTranscriptSegment(text) {
+    finalTranscriptSegment = text;
+    notify('finalTranscriptSegment', finalTranscriptSegment);
 }

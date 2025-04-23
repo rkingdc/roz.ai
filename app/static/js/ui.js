@@ -1026,8 +1026,10 @@ export function renderMicButtonState() {
         icon.classList.remove('fa-stop');
         icon.classList.add('fa-microphone');
     }
-    // Disable button if not on chat tab (handled by event listener logic, but good safety check)
+    // Disable button if not on chat tab, if loading, or if socket isn't connected (when not recording)
+    // Allow enabling even if socket isn't connected yet, to allow user to initiate connection by clicking record
     micButton.disabled = state.isLoading || state.currentTab !== 'chat';
+    // Add visual cue if socket is disconnected but button is enabled? Maybe later.
 }
 
 
@@ -1448,7 +1450,7 @@ export function handleStateChange_isLoading() {
     // renderStatus(); // Called by handleStateChange_statusMessage
     // updateAttachButtonState(); // Called by updateLoadingState
     renderNoteContent(); // Loading state affects note textarea placeholder/disabled
-    renderMicButtonState(); // Loading state affects mic button disabled state
+    renderMicButtonState(); // Loading/recording state affects mic button disabled state
 }
 
 export function handleStateChange_statusMessage() {
@@ -1477,7 +1479,21 @@ export function handleStateChange_chatHistory() {
 
 export function handleStateChange_isRecording() {
     renderMicButtonState(); // Update mic button icon/style
-    updateLoadingState(); // Recording might affect other elements' loading state if needed
+    // Recording state itself doesn't trigger global loading state
+    // updateLoadingState();
+    // Connect/disconnect logic is handled by the event listener triggering start/stop recording
+}
+
+// --- NEW: Handle WebSocket Connection Status Change ---
+export function handleStateChange_isSocketConnected() {
+    renderMicButtonState(); // Update mic button (e.g., disable if not connected)
+    // Update status bar? Maybe not, status message handles connection status.
+    console.log(`[UI] WebSocket connection state changed: ${state.isSocketConnected}`);
+}
+
+// --- NEW: Handle Streaming Transcript Update ---
+export function handleStateChange_streamingTranscript() {
+    renderStreamingTranscript(); // Update the target input field
 }
 
 export function handleStateChange_savedNotes() {
@@ -1558,5 +1574,26 @@ export function handleStateChange_noteHistory() {
     renderNoteHistory(); // Re-render the history list when history state changes
 }
 // -------------------------------------------------
+
+// --- NEW: Render Streaming Transcript ---
+/**
+ * Updates the appropriate input field with the current streaming transcript.
+ */
+export function renderStreamingTranscript() {
+    const transcript = state.streamingTranscript; // Read from state
+    const context = state.recordingContext; // Read context
+
+    if (context === 'chat' && elements.messageInput) {
+        elements.messageInput.value = transcript; // Update chat input
+        // Auto-scroll input if needed (usually not necessary for single line)
+    } else if (context === 'notes' && elements.notesTextarea) {
+        // Decide if we want to update notes textarea in real-time
+        // This might be disruptive if the user is also typing.
+        // For now, let's only update the chat input during streaming.
+        // The final transcript will be placed in notesTextarea on stop.
+        // elements.notesTextarea.value = transcript; // Update notes textarea
+    }
+}
+// ---------------------------------------
 
 // Add more handlers for other state changes as needed...

@@ -1,38 +1,30 @@
 // Handles microphone access, audio recording, and interaction with the transcription API.
 
 import * as state from './state.js';
-import * as api from './api.js'; // To call the transcription API
+import * as api from './api.js'; // To manage WebSocket connection and send chunks
 import { elements } from './dom.js';
 
 let mediaRecorder = null;
-let audioChunks = [];
+// let audioChunks = []; // No longer needed to store chunks locally for blob creation
 let audioStream = null; // Store the stream to stop tracks later
 
 // --- Configuration ---
-// Match the sample rate expected by the backend (app/voice_services.py)
-const TARGET_SAMPLE_RATE = 16000;
-// Define the desired MIME type. 'audio/wav' is widely supported and expected by the backend (LINEAR16).
-// Browsers might record in webm/opus by default, requiring backend adjustment or frontend conversion.
-// Let's try 'audio/wav' first. If it fails, we might need 'audio/webm;codecs=opus' and backend changes.
-const PREFERRED_MIME_TYPE = 'audio/wav';
-const FALLBACK_MIME_TYPE = 'audio/webm;codecs=opus'; // If WAV fails
+// Google Speech-to-Text streaming API works well with LINEAR16 or Opus in WebM/Ogg.
+// Since we fixed the backend for WEBM_OPUS, let's stick with that.
+const MIME_TYPE = 'audio/webm;codecs=opus';
+const TIMESLICE_MS = 500; // Send audio chunks every 500ms
 
 /**
- * Checks if the preferred MIME type is supported for recording.
- * @returns {string} The supported MIME type (preferred or fallback).
+ * Checks if the required MIME type is supported.
+ * @returns {boolean} True if supported, false otherwise.
  */
-function getSupportedMimeType() {
-    if (MediaRecorder.isTypeSupported(PREFERRED_MIME_TYPE)) {
-        console.log(`[DEBUG] Using preferred MIME type: ${PREFERRED_MIME_TYPE}`);
-        return PREFERRED_MIME_TYPE;
-    } else if (MediaRecorder.isTypeSupported(FALLBACK_MIME_TYPE)) {
-        console.warn(`[WARN] Preferred MIME type ${PREFERRED_MIME_TYPE} not supported. Using fallback: ${FALLBACK_MIME_TYPE}. Backend might need adjustment.`);
-        // TODO: If using fallback, update backend encoding in voice_services.py
-        return FALLBACK_MIME_TYPE;
-    } else {
-        console.error("[ERROR] Neither WAV nor WebM/Opus recording is supported by this browser.");
-        return null; // Indicate no supported type found
+function isMimeTypeSupported() {
+    if (!MediaRecorder.isTypeSupported(MIME_TYPE)) {
+        console.error(`[ERROR] Required MIME type ${MIME_TYPE} not supported by this browser.`);
+        return false;
     }
+    console.log(`[DEBUG] Using MIME type: ${MIME_TYPE}`);
+    return true;
 }
 
 /**
@@ -46,114 +38,115 @@ export async function startRecording(context) {
         return;
     }
 
-    const supportedMimeType = getSupportedMimeType();
-    if (!supportedMimeType) {
-        state.setStatusMessage("Audio recording format not supported by this browser.", true);
+    if (!isMimeTypeSupported()) {
+        state.setStatusMessage(`Audio format (${MIME_TYPE}) not supported by this browser.`, true);
         return;
     }
+
+    // --- Connect WebSocket ---
+    try {
+        // Connect WebSocket *before* getting user media
+        api.connectTranscriptionSocket('en-US', 'WEBM_OPUS'); // Use appropriate lang code and format
+        // Status updates handled within connectTranscriptionSocket
+    } catch (error) {
+        console.error("Failed to initiate WebSocket connection:", error);
+        state.setStatusMessage("Failed to connect to transcription service.", true);
+        return; // Don't proceed if connection fails
+    }
+    // Wait briefly for connection? Or rely on 'transcription_started' event?
+    // Let's proceed and assume the backend handles buffering if needed.
+
+    // Clear previous streaming transcript state
+    state.setStreamingTranscript("");
+    state.setFinalTranscriptSegment("");
 
     try {
         // Request microphone access
         state.setStatusMessage("Requesting microphone access...");
-        audioStream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                // Attempt to request the target sample rate if the browser supports constraints
-                sampleRate: TARGET_SAMPLE_RATE,
-                // Other constraints might be useful, e.g., channelCount: 1
-            }
-        });
+        // Request microphone access - sampleRate constraint might not be respected for Opus/WebM
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         console.log("[DEBUG] Microphone access granted.");
 
-        // Check the actual sample rate of the track
+        // Log actual track settings (sample rate might be fixed for Opus, e.g., 48000Hz)
         const audioTracks = audioStream.getAudioTracks();
         if (audioTracks.length > 0) {
             const settings = audioTracks[0].getSettings();
-            console.log("[DEBUG] Audio track settings:", settings);
-            if (settings.sampleRate && settings.sampleRate !== TARGET_SAMPLE_RATE) {
-                console.warn(`[WARN] Actual sample rate ${settings.sampleRate} differs from target ${TARGET_SAMPLE_RATE}. Transcription quality may be affected.`);
-                // Backend might handle resampling, but it's good to be aware.
-            }
+            console.log("[DEBUG] Actual audio track settings:", settings);
+            // Backend handles Opus correctly regardless of sample rate specified here
         }
 
         // --- Initialize MediaRecorder ---
-        // Use the determined supported MIME type
-        mediaRecorder = new MediaRecorder(audioStream, { mimeType: supportedMimeType });
-        audioChunks = []; // Reset chunks
+        mediaRecorder = new MediaRecorder(audioStream, { mimeType: MIME_TYPE });
 
         mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-                audioChunks.push(event.data);
-                console.log(`[DEBUG] Audio chunk received, size: ${event.data.size}`);
+            if (event.data.size > 0 && state.isSocketConnected) {
+                // console.log(`[DEBUG] Sending audio chunk, size: ${event.data.size}`); // Verbose
+                // Send chunk immediately via WebSocket
+                api.sendAudioChunk(event.data);
+            } else if (!state.isSocketConnected) {
+                 console.warn("[WARN] Received audio data but WebSocket is not connected. Stopping recording.");
+                 stopRecording(); // Stop recording if socket disconnects unexpectedly
+                 state.setStatusMessage("Transcription service disconnected during recording.", true);
             }
         };
 
-        mediaRecorder.onstop = async () => {
+        mediaRecorder.onstop = () => {
             console.log("[DEBUG] MediaRecorder stopped.");
-            state.setStatusMessage("Processing transcription..."); // Update status before API call
+            // Signal end of audio stream to backend via WebSocket
+            api.stopAudioStream();
 
-            // Combine chunks into a single Blob
-            const audioBlob = new Blob(audioChunks, { type: supportedMimeType });
-            console.log(`[DEBUG] Audio Blob created, size: ${audioBlob.size}, type: ${audioBlob.type}`);
+            // The final transcript is assembled via 'transcript_update' events.
+            // We might want to perform final actions here, like focusing the input.
 
-            // --- Send to Backend ---
-            try {
-                // Call the API function (to be created in api.js)
-                const transcript = await api.transcribeAudioApi(audioBlob); // Pass the blob
+            // Append the final transcript segment (if any) to the input field
+            // The streaming transcript state already updates the input field in real-time via ui.js
+            // We just need to ensure the final state is reflected.
+            const finalTranscript = state.streamingTranscript.trim(); // Get the full assembled transcript
+            console.log(`[DEBUG] Final assembled transcript on stop: "${finalTranscript}"`);
 
-                if (transcript !== null && transcript !== undefined) { // Check for null or undefined explicitly
-                    console.log(`[DEBUG] Transcription received: "${transcript.substring(0, 50)}..."`);
-                    // Insert transcript into the correct input based on context
-                    if (state.recordingContext === 'chat' && elements.messageInput) {
-                        // Append to existing content, adding a space if needed
-                        const currentVal = elements.messageInput.value;
-                        elements.messageInput.value = currentVal + (currentVal.length > 0 ? ' ' : '') + transcript;
-                        elements.messageInput.focus(); // Keep focus on input
-                        state.setStatusMessage("Transcription added to chat input.");
-                    } else if (state.recordingContext === 'notes' && elements.notesTextarea) {
-                        // Append to existing content, adding a space if needed
-                        const currentVal = elements.notesTextarea.value;
-                        elements.notesTextarea.value = currentVal + (currentVal.length > 0 ? ' ' : '') + transcript;
-                        // Also update the state for notes
-                        state.setNoteContent(elements.notesTextarea.value);
-                        elements.notesTextarea.focus(); // Keep focus on textarea
-                        state.setStatusMessage("Transcription added to note.");
-                    } else {
-                        console.warn(`[WARN] Recording context "${state.recordingContext}" not handled or element missing.`);
-                        state.setStatusMessage("Transcription received but could not be placed.", true);
-                    }
-                } else if (transcript === "") { // Handle empty string response (no speech detected)
-                     console.log("[DEBUG] Transcription returned empty string (no speech detected?).");
-                     state.setStatusMessage("No speech detected in the recording.", true);
-                }
-                else {
-                    // Transcription failed (api.transcribeAudioApi should have set status)
-                    console.error("[ERROR] Transcription failed (transcript is null/undefined).");
-                    // Status message should be set by the API function on error
-                }
-            } catch (error) {
-                // Error during API call handled by api.transcribeAudioApi
-                console.error("[ERROR] Error during transcription API call:", error);
-                // Status message should be set by the API function
-            } finally {
-                // Clean up stream tracks regardless of API success/failure
-                stopAudioStream();
-                // Reset recording state AFTER API call finishes
-                state.setIsRecording(false); // This will trigger UI update for button
+            if (state.recordingContext === 'chat' && elements.messageInput) {
+                // The input should already contain the streaming transcript.
+                // We might just want to focus it.
+                elements.messageInput.focus();
+                // Optionally, trigger LLM cleanup here if needed in the future
+                state.setStatusMessage("Recording stopped. Transcript added to input.");
+            } else if (state.recordingContext === 'notes' && elements.notesTextarea) {
+                // Append to notes textarea (similar logic)
+                const currentVal = elements.notesTextarea.value;
+                // Replace the streaming placeholder with the final transcript
+                // This assumes the streaming updates were also directed to the notes textarea
+                elements.notesTextarea.value = finalTranscript; // Replace content
+                state.setNoteContent(finalTranscript); // Update state
+                elements.notesTextarea.focus();
+                state.setStatusMessage("Recording stopped. Transcript added to note.");
+            } else {
+                 console.warn(`[WARN] Recording context "${state.recordingContext}" not handled on stop.`);
+                 state.setStatusMessage("Recording stopped.", true);
             }
+
+
+            // Clean up audio stream tracks
+            stopMediaStreamTracks();
+            // Disconnect WebSocket
+            api.disconnectTranscriptionSocket();
+            // Reset recording state
+            state.setIsRecording(false); // This will trigger UI update for button
         };
 
         mediaRecorder.onerror = (event) => {
             console.error("[ERROR] MediaRecorder error:", event.error);
             state.setStatusMessage(`Recording error: ${event.error.message}`, true);
-            stopAudioStream(); // Clean up stream
+            stopMediaStreamTracks(); // Clean up stream tracks
+            api.disconnectTranscriptionSocket(); // Disconnect socket on error
             state.setIsRecording(false); // Reset state
         };
 
-        // Start recording
-        mediaRecorder.start();
-        console.log("[DEBUG] MediaRecorder started.");
+        // Start recording with a timeslice to get chunks periodically
+        mediaRecorder.start(TIMESLICE_MS);
+        console.log(`[DEBUG] MediaRecorder started with timeslice ${TIMESLICE_MS}ms.`);
         state.setIsRecording(true, context); // Update state (notifies isRecording)
-        state.setStatusMessage("Recording... Click stop to finish.");
+        // Status message updated by 'transcription_started' event from backend
+        state.setStatusMessage("Waiting for transcription service...");
 
     } catch (error) {
         console.error("[ERROR] Error accessing microphone or starting recorder:", error);
@@ -164,7 +157,8 @@ export async function startRecording(context) {
         } else {
             state.setStatusMessage(`Error starting recording: ${error.message}`, true);
         }
-        stopAudioStream(); // Clean up if stream was partially acquired
+        stopMediaStreamTracks(); // Clean up if stream was partially acquired
+        api.disconnectTranscriptionSocket(); // Disconnect socket if start failed
         state.setIsRecording(false); // Ensure state is reset
     }
 }
@@ -180,26 +174,28 @@ export function stopRecording() {
     }
 
     if (mediaRecorder.state === "recording") {
+        // Status message will be updated in onstop handler
+        state.setStatusMessage("Stopping recording...");
         mediaRecorder.stop(); // This will trigger the 'onstop' event handler
         console.log("[DEBUG] Requesting MediaRecorder stop.");
-        // Status message will be updated in onstop handler
-        // State isRecording will be set to false in onstop handler AFTER processing
+        // State isRecording will be set to false in onstop handler AFTER processing & disconnect
     } else {
         console.warn(`[WARN] MediaRecorder state is not 'recording': ${mediaRecorder.state}`);
         // If somehow stopped but state wasn't updated, force cleanup
-        stopAudioStream();
+        stopMediaStreamTracks();
+        api.disconnectTranscriptionSocket();
         state.setIsRecording(false);
     }
 }
 
 /**
- * Stops the audio stream tracks to release the microphone.
+ * Stops the audio stream tracks (part of MediaStream) to release the microphone.
  */
-function stopAudioStream() {
+function stopMediaStreamTracks() {
     if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
-        console.log("[DEBUG] Audio stream tracks stopped.");
+        console.log("[DEBUG] MediaStream audio tracks stopped.");
         audioStream = null; // Clear the stream reference
     }
-    mediaRecorder = null; // Clear recorder reference
+    // mediaRecorder reference is cleared in onstop or onerror
 }

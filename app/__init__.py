@@ -1,10 +1,12 @@
 # app/__init__.py
 import os
+import os
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy # Import SQLAlchemy
-from flask_migrate import Migrate     # Import Migrate
-from sqlalchemy import MetaData       # Import MetaData for naming convention
-import google.generativeai as genai # Keep if needed elsewhere
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from sqlalchemy import MetaData
+import google.generativeai as genai
+from flask_socketio import SocketIO # Import SocketIO
 
 # Configure logging FIRST, at the application entry point
 import logging
@@ -27,6 +29,9 @@ metadata = MetaData(naming_convention={
 # Initialize extensions (outside the factory)
 db = SQLAlchemy(metadata=metadata)
 migrate = Migrate()
+# Initialize SocketIO (async_mode=None will try eventlet, then gevent, then Flask dev server)
+# Consider specifying async_mode='eventlet' or 'gevent' for production
+socketio = SocketIO()
 
 
 def create_app(test_config=None):
@@ -57,6 +62,7 @@ def create_app(test_config=None):
     # --- Initialize Extensions with App ---
     db.init_app(app)
     migrate.init_app(app, db)
+    socketio.init_app(app) # Initialize SocketIO with the app
 
     # --- Import Models ---
     # Import models AFTER db is initialized and associated with the app
@@ -108,6 +114,9 @@ def create_app(test_config=None):
         logger.error(f"Error registering voice blueprint: {e}")
     # ---------------------------------
 
+    # --- Import SocketIO events ---
+    # Import after app and socketio are created to avoid circular imports
+    from . import sockets # noqa
 
     # Health Check Route
     @app.route('/health')

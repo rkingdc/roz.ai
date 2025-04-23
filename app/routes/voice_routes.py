@@ -32,11 +32,16 @@ def handle_transcribe():
             # For now, using defaults from voice_services
             # sample_rate = int(request.form.get('sampleRate', 16000)) # Example if sent from frontend
 
-            # Call the transcription service
-            transcript = transcribe_audio(audio_content) # Add params if needed
+            # Call the transcription service (OLD METHOD - Now handled by WebSockets)
+            # transcript = transcribe_audio(audio_content) # Add params if needed
+            # logger.info(f"Received audio file for non-streaming transcription (DEPRECATED): {file.filename}")
+            # For now, return an error or a message indicating streaming should be used.
+            logger.warning(f"Received request on deprecated HTTP endpoint for {file.filename}. Use WebSocket for streaming.")
+            return jsonify({"error": "This endpoint is deprecated. Use WebSocket for streaming transcription."}), 405 # Method Not Allowed
 
-            if transcript is not None:
-                logger.info(f"Transcription successful for {file.filename}")
+            # --- Old logic ---
+            # if transcript is not None:
+            #     logger.info(f"Transcription successful for {file.filename}")
                 return jsonify({"transcript": transcript}), 200
             else:
                 logger.error(f"Transcription failed for {file.filename}")

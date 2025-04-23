@@ -5,11 +5,16 @@
 
 import { elements } from './dom.js'; // Still need elements to read input values sometimes
 import * as state from './state.js'; // API updates the state
-import { escapeHtml, formatFileSize } from './utils.js'; // Still need utilities
-import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js'; // Still need config
+import { escapeHtml, formatFileSize } from './utils.js';
+import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js';
+// Import Socket.IO client library (assuming it's loaded via script tag or bundler)
+// If using a script tag, it attaches to `window.io`
+// const io = window.io; // Uncomment if using script tag
+
+// --- Socket.IO Instance ---
+let socket = null; // Holds the socket connection
 
 // --- Helper to update loading and status state ---
-// API functions will use these state setters instead of calling ui.updateStatus/setLoadingState directly
 function setLoading(isLoading, message = "Busy...") {
     state.setIsLoading(isLoading);
     if (isLoading) {
@@ -25,67 +30,154 @@ function setStatus(message, isError = false) {
 }
 
 
-// --- Voice Transcription API ---
+// --- Voice Transcription API (WebSocket) ---
 
 /**
- * Sends audio blob to the backend for transcription.
- * @param {Blob} audioBlob - The audio data blob.
- * @returns {Promise<string|null>} The transcribed text or null on error.
+ * Connects to the WebSocket server for transcription.
+ * @param {string} languageCode - e.g., 'en-US'
+ * @param {string} audioFormat - e.g., 'WEBM_OPUS' (must match frontend recording)
  */
-export async function transcribeAudioApi(audioBlob) {
-    if (state.isLoading) {
-        setStatus("Cannot transcribe: Application is busy.", true);
-        return null;
-    }
-    if (!audioBlob || audioBlob.size === 0) {
-        setStatus("Cannot transcribe: No audio data.", true);
-        return null;
+export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat = 'WEBM_OPUS') {
+    if (socket && socket.connected) {
+        console.warn("WebSocket already connected.");
+        return;
     }
 
-    setLoading(true, "Transcribing Audio..."); // Use setLoading helper
+    // Ensure Socket.IO client library is loaded
+    if (typeof io === 'undefined') {
+        console.error("Socket.IO client library not found. Make sure it's included.");
+        setStatus("Error: Missing Socket.IO library.", true);
+        return;
+    }
 
-    const formData = new FormData();
-    // Use a consistent filename, the backend doesn't rely on it but it's good practice
-    const filename = `recording.${audioBlob.type.split('/')[1].split(';')[0]}`; // e.g., recording.wav or recording.webm
-    formData.append('audio_file', audioBlob, filename);
-    // Optional: Send sample rate if needed by backend, though it's hardcoded for now
-    // formData.append('sampleRate', TARGET_SAMPLE_RATE); // TARGET_SAMPLE_RATE needs to be accessible here or passed
+    setStatus("Connecting to transcription service...");
+    state.setIsSocketConnected(false); // Update state
 
-    try {
-        const response = await fetch('/api/voice/transcribe', {
-            method: 'POST',
-            body: formData
-            // No 'Content-Type' header needed for FormData, browser sets it with boundary
-        });
+    // Connect to the Socket.IO server (adjust URL if needed)
+    // Use the default namespace or specify one if used on the backend
+    socket = io(); // Connects to the server that serves the page
 
-        const data = await response.json(); // Try to parse JSON regardless of status code
+    socket.on('connect', () => {
+        console.log("WebSocket connected successfully:", socket.id);
+        setStatus("Transcription service connected. Ready to record.");
+        state.setIsSocketConnected(true); // Update state
 
-        if (!response.ok) {
-            // Use error from JSON if available, otherwise use status text
-            throw new Error(data.error || `HTTP error ${response.status} - ${response.statusText}`);
+        // Tell the backend to start preparing for this client's stream
+        socket.emit('start_transcription', { languageCode, audioFormat });
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error("WebSocket connection error:", error);
+        setStatus(`Transcription connection failed: ${error.message}`, true);
+        state.setIsSocketConnected(false); // Update state
+        socket = null; // Clear socket reference on failure
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log("WebSocket disconnected:", reason);
+        // Only show idle status if disconnect wasn't due to an error handled elsewhere
+        if (!state.isErrorStatus) {
+            setStatus("Transcription service disconnected.");
         }
+        state.setIsSocketConnected(false); // Update state
+        state.setStreamingTranscript(""); // Clear transcript on disconnect
+        socket = null; // Clear socket reference
+    });
 
-        // Check if transcript exists in the response
+    // --- Listen for transcript updates from backend ---
+    socket.on('transcript_update', (data) => {
+        // console.debug("Received transcript_update:", data); // Verbose
         if (data && data.transcript !== undefined) {
-            setStatus("Transcription successful."); // Update status via state
-            return data.transcript; // Return the text
-        } else {
-            // This case should ideally not happen if backend returns correctly
-            console.warn("[WARN] Transcription API response OK, but no transcript found in data:", data);
-            throw new Error("Received empty or invalid transcription response.");
+            if (data.is_final) {
+                console.log("Final transcript segment:", data.transcript);
+                // Append the final segment to the state
+                // We might want to replace the entire streamingTranscript with the final one,
+                // or append it depending on desired UI behavior. Let's append for now.
+                state.appendStreamingTranscript(data.transcript + ' '); // Add space after final segment
+                state.setFinalTranscriptSegment(data.transcript); // Store the last final segment separately if needed
+            } else {
+                // Update the streaming transcript state with the interim result
+                // Replace the entire content with the latest interim for smoother updates
+                state.setStreamingTranscript(data.transcript);
+            }
         }
+    });
 
-    } catch (error) {
-        console.error('Error during transcription API call:', error);
-        setStatus(`Transcription Error: ${error.message}`, true); // Update status via state
-        return null; // Indicate failure
-    } finally {
-        setLoading(false); // Use setLoading helper
+    // --- Listen for errors from backend during transcription ---
+    socket.on('transcription_error', (data) => {
+        console.error("Transcription error from backend:", data.error);
+        setStatus(`Transcription Error: ${data.error}`, true);
+        // Optionally disconnect or handle error further
+        disconnectTranscriptionSocket(); // Disconnect on error
+    });
+
+     // --- Listen for confirmation that backend is ready ---
+    socket.on('transcription_started', (data) => {
+        console.log("Backend confirmed transcription started:", data.message);
+        // Now the frontend knows it can start sending audio chunks
+        setStatus("Recording... Speak now."); // Update status
+    });
+
+    // --- Listen for confirmation that backend finished ---
+    socket.on('transcription_finished', (data) => {
+        console.log("Backend confirmed transcription finished:", data.message);
+        // Final transcript should have already been received via 'transcript_update'
+        //setStatus("Transcription finished."); // Status updated by stopRecording flow
+    });
+
+    // --- Listen for stop acknowledgement ---
+    socket.on('transcription_stop_acknowledged', (data) => {
+        console.log("Backend acknowledged stop signal:", data.message);
+        // This confirms the backend received the stop request.
+        // The actual disconnect and state reset happens in the stopRecording flow.
+    });
+}
+
+/**
+ * Sends an audio chunk over the WebSocket.
+ * @param {Blob | ArrayBuffer | Buffer} chunk - The audio data chunk.
+ */
+export function sendAudioChunk(chunk) {
+    if (socket && socket.connected) {
+        // console.debug(`Sending audio chunk, size: ${chunk.size || chunk.byteLength}`); // Verbose
+        socket.emit('audio_chunk', chunk);
+    } else {
+        console.warn("Cannot send audio chunk: WebSocket not connected.");
+        // Handle error - maybe try reconnecting or notify user
+        setStatus("Error: Transcription service disconnected. Cannot send audio.", true);
+    }
+}
+
+/**
+ * Signals the backend that audio streaming is finished.
+ */
+export function stopAudioStream() {
+     if (socket && socket.connected) {
+        console.log("Signaling end of audio stream to backend.");
+        socket.emit('stop_transcription');
+        // The backend might send a final 'transcription_finished' event
+        // We don't disconnect immediately here, let the stopRecording flow handle it.
+    } else {
+        console.warn("Cannot signal stop: WebSocket not connected.");
+    }
+}
+
+/**
+ * Disconnects the WebSocket.
+ */
+export function disconnectTranscriptionSocket() {
+    if (socket) {
+        console.log("Disconnecting WebSocket.");
+        socket.disconnect();
+        socket = null; // Clear reference
+        state.setIsSocketConnected(false); // Update state
+        // Clear transcript state as well? Depends on desired behavior.
+        // state.setStreamingTranscript("");
     }
 }
 
 
-// --- File API ---
+// --- File API --- (Keep existing file API functions)
 
 /** Deletes a file from the backend and updates the state. */
 export async function deleteFile(fileId) {

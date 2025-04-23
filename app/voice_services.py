@@ -1,12 +1,29 @@
 import logging
 from google.cloud import speech
-from google.api_core.exceptions import GoogleAPICallError, NotFound, InvalidArgument
+from google.api_core.exceptions import GoogleAPICallError, NotFound, InvalidArgument, OutOfRange
 import os
-from flask import current_app
+from flask import current_app, g # Import g for potential context caching if needed
+import threading
+import queue # For passing audio chunks between threads
+
 # Import the new cleanup function
 from app.ai_services import clean_up_transcript
+# Import socket emission functions (assuming sockets.py is created)
+try:
+    from app.sockets import emit_transcript_update, emit_transcription_error_from_service
+except ImportError:
+    # Handle case where sockets.py might not exist yet or circular import issues during setup
+    logger.warning("Could not import socket emission functions. Streaming transcription updates will not be sent.")
+    def emit_transcript_update(sid, transcript, is_final): pass
+    def emit_transcription_error_from_service(sid, error_message): pass
+
 
 logger = logging.getLogger(__name__)
+
+# --- Thread-safe storage for audio queues ---
+# Key: session ID (sid), Value: queue.Queue
+audio_queues = {}
+_queue_lock = threading.Lock()
 
 # Ensure credentials are set (the library often picks up the env var automatically)
 # You might need to explicitly point to the credentials file if the env var isn't set
