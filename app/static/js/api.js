@@ -307,14 +307,6 @@ export function stopAudioStream() {
             console.warn(`WebSocket disconnected while waiting for transcription completion: ${reason}`);
             rejectOnce(new Error(`WebSocket disconnected: ${reason}`));
         };
-
-        const removeListeners = () => {
-            if (socket) {
-                socket.off('transcription_complete', handleComplete);
-                socket.off('transcription_error', handleError);
-                socket.off('disconnect', handleDisconnect);
-            }
-        };
         // -------------------------------------------------
 
         // Add listeners specifically for this stop request
