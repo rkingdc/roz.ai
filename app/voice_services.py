@@ -40,13 +40,14 @@ def transcribe_audio(audio_content: bytes, language_code: str = "en-US", sample_
             encoding=speech.RecognitionConfig.AudioEncoding.WEBM_OPUS,
             # sample_rate_hertz is omitted; API will detect from WebM header
             language_code=language_code,
-            # audio_channel_count is also omitted for WEBM_OPUS; API should detect from header.
-            # enable_separate_recognition_per_channel=True, # Removed as it didn't resolve channel mismatch
+            # Explicitly set channel count based on error message (WebM header indicates 2)
+            audio_channel_count=2,
+            # enable_separate_recognition_per_channel=True, # Keep removed for now, add back if needed after fixing channel count
             # model="telephony", # Optional: Specify model for better accuracy in some cases
             # enable_automatic_punctuation=True, # Optional: Add punctuation
         )
 
-        logger.info(f"Sending audio to Google Speech-to-Text API (Language: {language_code}, Encoding: WEBM_OPUS)")
+        logger.info(f"Sending audio to Google Speech-to-Text API (Language: {language_code}, Encoding: WEBM_OPUS, Channels: 2)")
         response = client.recognize(config=config, audio=audio)
         logger.info("Received response from Google Speech-to-Text API")
 
