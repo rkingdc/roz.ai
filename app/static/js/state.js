@@ -84,27 +84,19 @@ export function subscribe(eventType, listener) {
  * @param {*} [data] - Optional data to pass to the listeners.
  */
 function notify(eventType, data) {
-    // --- DETAILED NOTIFY LOGGING ---
-    console.log(`[STATE NOTIFY DEBUG] Attempting to notify event: "${eventType}"`);
     if (!notificationsEnabled) {
-        console.log(`[STATE NOTIFY DEBUG] Notifications disabled, skipping event: "${eventType}"`);
         return;
     }
     if (listeners.has(eventType)) {
         const eventListeners = listeners.get(eventType);
-        console.log(`[STATE NOTIFY DEBUG] Found ${eventListeners.length} listener(s) for event: "${eventType}"`);
         eventListeners.forEach((listener, index) => {
-            console.log(`[STATE NOTIFY DEBUG] Calling listener ${index + 1} for event: "${eventType}"`);
             try {
                 listener(data); // Pass data if provided
             } catch (error) {
                 console.error(`Error in listener for event "${eventType}" (Listener ${index + 1}):`, error);
             }
         });
-    } else {
-        console.log(`[STATE NOTIFY DEBUG] No listeners found for event: "${eventType}"`);
     }
-    // --- END DETAILED NOTIFY LOGGING ---
 }
 
 /**
@@ -112,7 +104,6 @@ function notify(eventType, data) {
  */
 export function disableNotifications() {
     notificationsEnabled = false;
-    console.log("[DEBUG] State notifications disabled."); // Add logging
 }
 
 /**
@@ -120,7 +111,6 @@ export function disableNotifications() {
  */
 export function enableNotifications() {
     notificationsEnabled = true;
-    console.log("[DEBUG] State notifications enabled."); // Add logging
 }
 
 /**
@@ -128,7 +118,6 @@ export function enableNotifications() {
  * Useful for initial render after loading state.
  */
 export function notifyAll() {
-    console.log("[DEBUG] Notifying all state changes."); // Add logging
     // Explicitly notify for each state property that UI might depend on
     notify('currentChatId', currentChatId);
     notify('currentNoteId', currentNoteId);
@@ -366,12 +355,8 @@ export function setWebSearchEnabled(enabled) {
 
 export function setCurrentTab(tab) {
     if (currentTab !== tab) {
-        const oldTab = currentTab; // Store old tab for logging
         currentTab = tab;
-        console.log(`[DEBUG] State: currentTab changed from ${oldTab} to ${currentTab}`); // Added logging here
         notify('currentTab', currentTab);
-    } else {
-         console.log(`[DEBUG] State: setCurrentTab called, but tab is already ${currentTab}. No change.`); // Added logging
     }
 }
 

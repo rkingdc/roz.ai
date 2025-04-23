@@ -20,7 +20,6 @@ import { escapeHtml } from './utils.js'; // Need escapeHtml for session file loa
 export function setupEventListeners() {
     // --- Subscribe UI Renderers to State Changes ---
     subscribeStateChangeListeners();
-    console.log("UI subscribed to state changes.");
 
     // --- Global Keyboard Shortcuts ---
     document.addEventListener('keydown', async (event) => {
@@ -34,13 +33,11 @@ export function setupEventListeners() {
             }
 
             if (state.currentTab === 'notes' && state.currentNoteId !== null) {
-                console.log("[DEBUG] Ctrl+S detected on Notes tab. Saving note...");
                 await api.saveNote(); // Save the current note
                 // --- NEW: Return focus to notes textarea after save ---
                 elements.notesTextarea?.focus();
                 // ----------------------------------------------------
             } else if (state.currentTab === 'chat' && state.currentChatId !== null) {
-                 console.log("[DEBUG] Ctrl+S detected on Chat tab. Saving chat name...");
                  // Trigger the save chat name button click, which handles getting the name from the input
                  // Use the correct element reference from dom.js
                  if (elements.saveChatNameButton) {
@@ -189,17 +186,14 @@ export function setupEventListeners() {
         const hasSummaryDataset = itemDiv.dataset.hasSummary; // Get raw dataset value
         // Convert to boolean, accepting 'true' or '1' as true
         const hasSummary = hasSummaryDataset === 'true' || hasSummaryDataset === '1';
-        console.log(`[DEBUG] Sidebar file clicked: ID=${fileId}, Name=${filename}, Dataset hasSummary=${hasSummaryDataset}, Parsed hasSummary=${hasSummary}`); // Log values
         if (isNaN(fileId) || !filename) return;
 
         const isCurrentlySelected = state.sidebarSelectedFiles.some(f => f.id === fileId);
 
         if (isCurrentlySelected) {
-            console.log(`[DEBUG] Removing file ${fileId} from sidebar selection.`);
             state.removeSidebarSelectedFileById(fileId); // Update state (notifies sidebarSelectedFiles)
         } else {
             const fileToAdd = { id: fileId, filename: filename, has_summary: hasSummary };
-            console.log(`[DEBUG] Adding file to sidebar selection:`, fileToAdd);
             state.addSidebarSelectedFile(fileToAdd); // Update state (notifies sidebarSelectedFiles)
         }
         // UI updates are triggered by sidebarSelectedFiles notification
@@ -372,9 +366,7 @@ export function setupEventListeners() {
 
     // New handler for tab button clicks
     async function handleTabSwitchClick(tab) {
-        console.log(`[DEBUG] handleTabSwitchClick called for tab: ${tab}`); // Added log
         if (state.currentTab === tab) {
-            console.log(`[DEBUG] handleTabSwitchClick: Already on tab ${tab}, skipping.`); // Added log
             return; // Already on this tab
         }
 
@@ -481,13 +473,10 @@ export function setupEventListeners() {
         const historyId = parseInt(listItem.dataset.historyId);
         if (isNaN(historyId)) return;
 
-        console.log(`[DEBUG] History item clicked: ID=${historyId}. Attempting to load history version.`);
-
         // Find the history entry in the state
         const historyEntry = state.noteHistory.find(entry => entry.id === historyId);
 
         if (historyEntry) {
-            console.log(`[DEBUG] Found history entry ${historyId}. Loading content and name.`);
             // Update the state with the history entry's content and name
             state.setNoteContent(historyEntry.content); // Notifies noteContent, currentNote
             state.setCurrentNoteName(historyEntry.name); // Notifies currentNoteName, currentNote
@@ -506,8 +495,6 @@ export function setupEventListeners() {
     });
     // -----------------------------------------------------------------
 
-
-    console.log("Event listeners set up.");
 }
 
 
@@ -516,7 +503,6 @@ export function setupEventListeners() {
  * This function is called once during setupEventListeners.
  */
 function subscribeStateChangeListeners() {
-    console.log("[DEBUG] Subscribing state change listeners..."); // Add log at start
     // Subscribe UI functions to state changes they should react to
     state.subscribe('isLoading', ui.handleStateChange_isLoading);
     state.subscribe('statusMessage', ui.handleStateChange_statusMessage);
@@ -557,7 +543,6 @@ function subscribeStateChangeListeners() {
 
     // --- Subscribe UI to streaming transcript state change ---
     state.subscribe('streamingTranscript', ui.handleStateChange_streamingTranscript);
-    console.log("[DEBUG] Subscribed ui.handleStateChange_streamingTranscript to 'streamingTranscript'."); // Add specific log
     // -------------------------------------------------------
 }
 

@@ -860,7 +860,6 @@ export function renderAttachedAndSessionFiles() {
  * @returns {boolean} True if the modal was shown, false otherwise.
  */
 export function showModal(modalElement, requiredPlugin = null, requiredTab = null) {
-    console.log(`[DEBUG] showModal called for element:`, modalElement, `Required Plugin: ${requiredPlugin}`, `Required Tab: ${requiredTab}`);
 
     if (!modalElement) {
         console.error("Modal element not found.");
@@ -874,25 +873,18 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
         if (requiredPlugin === 'calendar' && state.isCalendarPluginEnabled) pluginEnabled = true;
         // Add checks for other plugins here
         if (!pluginEnabled) {
-            console.log(`[DEBUG] showModal: Required plugin "${requiredPlugin}" not enabled.`);
             // Status update handled by event listener or caller
             return false;
         }
-         console.log(`[DEBUG] showModal: Required plugin "${requiredPlugin}" is enabled.`);
     }
 
     // Check if required tab is active (Read from state)
     if (requiredTab && state.currentTab !== requiredTab) {
-         console.log(`[DEBUG] showModal: Required tab "${requiredTab}" not active. Current tab: ${state.currentTab}`);
          // Status update handled by event listener or caller
          return false;
     }
-     if (requiredTab) {
-         console.log(`[DEBUG] showModal: Required tab "${requiredTab}" is active.`);
-     }
 
 
-    console.log(`[DEBUG] showModal: Checks passed. Adding 'show' class to modal.`);
     modalElement.classList.add('show');
     if (elements.bodyElement) elements.bodyElement.classList.add('modal-open'); // Add null check
     return true;
@@ -1048,7 +1040,6 @@ export function renderMicButtonState() {
  * Updates the UI based on which plugins are enabled/disabled (reads from state).
  */
 export function updatePluginUI() {
-    console.log(`[DEBUG] updatePluginUI called. Active Tab: ${state.currentTab}, Files Enabled: ${state.isFilePluginEnabled}, Calendar Enabled: ${state.isCalendarPluginEnabled}, Web Search Enabled: ${state.isWebSearchPluginEnabled}`); // Added log
 
     // Add null checks for all elements accessed in this function
     if (!elements.filePluginSection || !elements.fileUploadSessionLabel || !elements.selectedFilesContainer ||
@@ -1069,17 +1060,14 @@ export function updatePluginUI() {
     // File plugin is only visible in Chat tab if enabled
     const showFilesPlugin = isFileEnabled && activeTab === 'chat';
     elements.filePluginSection.classList.toggle('hidden', !showFilesPlugin);
-    console.log(`[DEBUG] updatePluginUI: File Plugin hidden: ${elements.filePluginSection.classList.contains('hidden')} (Enabled: ${isFileEnabled}, Tab: ${activeTab})`); // Added log
 
     // Calendar plugin is only visible in Chat tab if enabled
     const showCalendarPlugin = isCalendarEnabled && activeTab === 'chat';
     elements.calendarPluginSection.classList.toggle('hidden', !showCalendarPlugin);
-    console.log(`[DEBUG] updatePluginUI: Calendar Plugin hidden: ${elements.calendarPluginSection.classList.contains('hidden')} (Enabled: ${isCalendarEnabled}, Tab: ${activeTab})`); // Added log
 
     // History plugin is only visible in Notes tab
     const showHistoryPlugin = activeTab === 'notes';
     elements.historyPluginSection.classList.toggle('hidden', !showHistoryPlugin);
-    console.log(`[DEBUG] updatePluginUI: History Plugin hidden: ${elements.historyPluginSection.classList.contains('hidden')} (Tab: ${activeTab})`); // Added log
 
 
     // Update elements within the file plugin section (only relevant when visible)
@@ -1119,7 +1107,6 @@ export function updatePluginUI() {
     const anyPluginSectionVisible = showFilesPlugin || showCalendarPlugin || showHistoryPlugin; // Check if ANY section is visible
     if (elements.pluginsSidebar) elements.pluginsSidebar.classList.toggle('hidden', !anyPluginSectionVisible);
     if (elements.pluginsToggleButton) elements.pluginsToggleButton.classList.toggle('hidden', !anyPluginSectionVisible);
-    console.log(`[DEBUG] updatePluginUI: Plugins Sidebar hidden: ${elements.pluginsSidebar?.classList.contains('hidden')} (Any section visible: ${anyPluginSectionVisible})`); // Added log
 
 
     // Render the chat input area elements based on plugin states (includes web search toggle visibility)
@@ -1200,7 +1187,6 @@ export function renderChatInputArea() {
  * @param {'chat' | 'notes'} tab - The desired tab ('chat' or 'notes').
  */
 export function switchTab(tab) { // Made synchronous, state is already updated by event listener
-    console.log(`[DEBUG] ui.switchTab called for tab: ${tab}`); // Add log here
     const {
         chatNavButton, notesNavButton, chatSection, notesSection,
         chatSidebarContent, notesSidebarContent, modelSelectorContainer,
@@ -1220,63 +1206,51 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
         return;
     }
 
-    console.log(`[DEBUG] ui.switchTab: Toggling UI for tab: ${tab}`);
-
     // Update navigation buttons
     chatNavButton.classList.toggle('active', tab === 'chat');
     notesNavButton.classList.toggle('active', tab === 'notes');
-    console.log(`[DEBUG] ui.switchTab: Nav buttons updated. Chat active: ${chatNavButton.classList.contains('active')}, Notes active: ${notesNavButton.classList.contains('active')}`);
 
 
     // Toggle main content sections
     if (chatSection) {
         chatSection.classList.toggle('hidden', tab !== 'chat');
-        console.log(`[DEBUG] ui.switchTab: chatSection hidden: ${chatSection.classList.contains('hidden')}, classList: ${chatSection.classList}`); // Add classList log
     }
     if (notesSection) {
         notesSection.classList.toggle('hidden', tab !== 'notes');
-        console.log(`[DEBUG] ui.switchTab: notesSection hidden: ${notesSection.classList.contains('hidden')}, classList: ${notesSection.classList}`); // Add classList log
     }
 
 
     // Toggle sidebar content sections
     if (chatSidebarContent) {
         chatSidebarContent.classList.toggle('hidden', tab !== 'chat');
-        console.log(`[DEBUG] ui.switchTab: chatSidebarContent hidden: ${chatSidebarContent.classList.contains('hidden')}, classList: ${chatSidebarContent.classList}`); // Add classList log
     }
     if (notesSidebarContent) {
         notesSidebarContent.classList.toggle('hidden', tab !== 'notes');
-        console.log(`[DEBUG] ui.switchTab: notesSidebarContent hidden: ${notesSidebarContent.classList.contains('hidden')}, classList: ${notesSidebarContent.classList}`); // Add classList log
     }
 
 
     // Toggle header elements (Model Selector vs Notes Mode)
     if (modelSelectorContainer) {
         modelSelectorContainer.classList.toggle('hidden', tab === 'notes'); // Model selector only on chat tab
-        console.log(`[DEBUG] ui.switchTab: modelSelectorContainer hidden: ${modelSelectorContainer.classList.contains('hidden')}`);
     }
     if (notesModeElements) {
         notesModeElements.classList.toggle('hidden', tab === 'chat'); // Notes mode elements only on notes tab
-        console.log(`[DEBUG] ui.switchTab: notesModeElements hidden: ${notesModeElements.classList.contains('hidden')}`);
     }
 
 
     // Toggle input area visibility (Chat needs it, Notes uses textarea directly)
     if (inputArea) {
         inputArea.classList.toggle('hidden', tab !== 'chat');
-        console.log(`[DEBUG] ui.switchTab: inputArea hidden: ${inputArea.classList.contains('hidden')}`);
     }
 
 
     // Update current item display in sidebar header based on state
     renderCurrentChatDetails(); // Reads state.currentChatName, state.currentChatId, state.currentChatModel
     renderCurrentNoteDetails(); // Reads state.currentNoteName, state.currentNoteId
-    console.log(`[DEBUG] ui.switchTab: Current item details rendered.`);
 
 
     // Render content specific to the new tab based on state
     if (tab === 'chat') {
-        console.log(`[DEBUG] ui.switchTab: Rendering chat specific content.`);
         renderChatHistory(); // Reads state.chatHistory
         // renderUploadedFiles(); // Called by updatePluginUI
         // updateCalendarStatus(); // Called by updatePluginUI
@@ -1294,7 +1268,6 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
     updatePluginUI();
     // ----------------------------------------------------
 
-    console.log(`[DEBUG] ui.switchTab finished.`);
 }
 
 /**
@@ -1432,7 +1405,6 @@ export function openModal(modalElement) {
     if (modalElement) {
         modalElement.classList.add('show');
         if (elements.bodyElement) elements.bodyElement.classList.add('modal-open'); // Add null check
-        console.log(`[DEBUG] Modal opened: ${modalElement.id}`); // Add logging
     }
 }
 
@@ -1499,12 +1471,11 @@ export function handleStateChange_isRecording() {
 export function handleStateChange_isSocketConnected() {
     renderMicButtonState(); // Update mic button (e.g., disable if not connected)
     // Update status bar? Maybe not, status message handles connection status.
-    console.log(`[UI] WebSocket connection state changed: ${state.isSocketConnected}`);
+    // Update status bar? Maybe not, status message handles connection status.
 }
 
 // --- NEW: Handle Streaming Transcript Update ---
 export function handleStateChange_streamingTranscript() {
-    console.log(`[UI DEBUG] handleStateChange_streamingTranscript triggered with state.streamingTranscript: "${state.streamingTranscript}"`); // Add log with value
     renderStreamingTranscript(); // Update the target input field
 }
 
@@ -1566,7 +1537,6 @@ export function handleStateChange_pluginEnabled(pluginName) {
 }
 
 export function handleStateChange_currentTab() {
-    console.log(`[DEBUG] handleStateChange_currentTab called. State.currentTab is ${state.currentTab}`); // Added log
     // The switchTab function already handles rendering everything for the new tab
     // This handler might be redundant if switchTab is only called by eventListeners.js
     // reacting to the tab state change. Let's keep it simple and rely on eventListeners.js
@@ -1597,7 +1567,6 @@ export function renderStreamingTranscript() {
     // console.log(`[UI DEBUG] renderStreamingTranscript called. Context: ${context}, Transcript: "${transcript}"`); // Reduce noise
 
     if (context === 'chat' && elements.messageInput) {
-        console.log(`[UI DEBUG] renderStreamingTranscript: Updating messageInput value to: "${transcript}"`); // Add log
         elements.messageInput.value = transcript; // Update chat input
         // Auto-scroll input if needed (usually not necessary for single line)
     } else if (context === 'notes' && elements.notesTextarea) {

@@ -32,7 +32,6 @@ function isMimeTypeSupported() {
  * @param {'chat' | 'notes'} context - Where the transcription should go.
  */
 export async function startRecording(context) {
-    console.log(`[DEBUG] startRecording called with context: ${context}`);
     if (state.isRecording) {
         console.warn("[WARN] Already recording.");
         return;
@@ -45,7 +44,6 @@ export async function startRecording(context) {
 
     // --- Check element reference at the very start ---
     const cleanupBtnRefAtStart = elements.cleanupTranscriptButton;
-    console.log(`[DEBUG] elements.cleanupTranscriptButton at start of startRecording:`, cleanupBtnRefAtStart);
     // ---------------------------------------------
 
     // Clear previous streaming transcript state first
@@ -65,13 +63,11 @@ export async function startRecording(context) {
         // --- Request microphone access AFTER successful connection ---
         state.setStatusMessage("Requesting microphone access...");
         audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        console.log("[DEBUG] Microphone access granted.");
 
         // Log actual track settings
         const audioTracks = audioStream.getAudioTracks();
         if (audioTracks.length > 0) {
             const settings = audioTracks[0].getSettings();
-            console.log("[DEBUG] Actual audio track settings:", settings);
             // Backend handles Opus correctly regardless of sample rate specified here
         }
 
@@ -100,13 +96,10 @@ export async function startRecording(context) {
 
         // Make the onstop handler async to await the backend confirmation
         mediaRecorder.onstop = async () => {
-            console.log("[DEBUG] MediaRecorder stopped.");
 
             try {
                 // Signal end of audio stream and wait for backend confirmation
-                console.log("[DEBUG] Waiting for backend transcription completion signal...");
                 await api.stopAudioStream(); // This now returns a promise
-                console.log("[DEBUG] Backend transcription completion signal received.");
 
             } catch (error) {
                  console.error("[ERROR] Error waiting for transcription completion:", error);
@@ -124,7 +117,6 @@ export async function startRecording(context) {
             // The streaming transcript state already updates the input field in real-time via ui.js
             // We just need to ensure the final state is reflected.
             const finalTranscript = state.streamingTranscript.trim(); // Get the full assembled transcript
-            console.log(`[DEBUG] Final assembled transcript on stop: "${finalTranscript}"`);
 
             if (recordingContextOnStop === 'chat' && elements.messageInput) { // Use local variable
                 // Explicitly set the final transcript in the input field
@@ -160,14 +152,9 @@ export async function startRecording(context) {
 
             // --- Show Cleanup Button ---
             const cleanupBtnRefAtStop = elements.cleanupTranscriptButton; // Get reference again
-            console.log(`[DEBUG] elements.cleanupTranscriptButton inside onstop:`, cleanupBtnRefAtStop); // Log the element reference itself
-            console.log(`[DEBUG] Checking conditions to show cleanup button: context=${recordingContextOnStop}, buttonExists=${!!cleanupBtnRefAtStop}, transcriptNotEmpty=${!!finalTranscript}`); // Add log
             if (recordingContextOnStop === 'chat' && cleanupBtnRefAtStop && finalTranscript) {
-                console.log("[DEBUG] Conditions met. Showing cleanup button and setting dataset."); // Add log
                 cleanupBtnRefAtStop.dataset.rawTranscript = finalTranscript; // Store raw transcript
                 cleanupBtnRefAtStop.classList.remove('hidden'); // Make button visible
-            } else {
-                console.log("[DEBUG] Conditions NOT met. Cleanup button remains hidden."); // Add log
             }
             // -------------------------
         };
@@ -185,7 +172,6 @@ export async function startRecording(context) {
         // Set recording state *just before* starting
         state.setIsRecording(true, context); // Update state (notifies isRecording)
         mediaRecorder.start(TIMESLICE_MS);
-        console.log(`[DEBUG] MediaRecorder started with timeslice ${TIMESLICE_MS}ms.`);
         // Status message is already "Recording... Speak now." from api.js
 
     } catch (error) {
@@ -209,7 +195,6 @@ export async function startRecording(context) {
  * Stops the current audio recording.
  */
 export function stopRecording() {
-    console.log("[DEBUG] stopRecording called.");
     if (!state.isRecording || !mediaRecorder) {
         console.warn("[WARN] Not recording or mediaRecorder not initialized.");
         return;
@@ -219,7 +204,6 @@ export function stopRecording() {
         // Status message will be updated in onstop handler
         state.setStatusMessage("Stopping recording...");
         mediaRecorder.stop(); // This will trigger the 'onstop' event handler
-        console.log("[DEBUG] Requesting MediaRecorder stop.");
         // State isRecording will be set to false in onstop handler AFTER processing
         // We no longer disconnect the socket in the onstop handler by default.
     } else {
@@ -239,7 +223,6 @@ export function stopRecording() {
 function stopMediaStreamTracks() {
     if (audioStream) {
         audioStream.getTracks().forEach(track => track.stop());
-        console.log("[DEBUG] MediaStream audio tracks stopped.");
         audioStream = null; // Clear the stream reference
     }
     // mediaRecorder reference is cleared in onstop or onerror

@@ -119,15 +119,12 @@ export const elements = {
  * MUST be called after DOMContentLoaded.
  */
 export function populateElements() {
-    console.log("[DEBUG] populateElements called."); // Add logging
     elements.chatbox = document.getElementById('chatbox');
     elements.messageInput = document.getElementById('message-input');
     elements.micButton = document.getElementById('mic-button');
     // --- Add more detailed logging for cleanupTranscriptButton ---
     const cleanupBtnElement = document.getElementById('cleanup-transcript-btn');
-    console.log(`[DOM DEBUG] document.getElementById('cleanup-transcript-btn') returned:`, cleanupBtnElement);
     elements.cleanupTranscriptButton = cleanupBtnElement; // Assign the found element (or null)
-    console.log(`[DOM DEBUG] elements.cleanupTranscriptButton after assignment:`, elements.cleanupTranscriptButton);
     // ---------------------------------------------------------
     elements.sendButton = document.getElementById('send-button');
     elements.sidebar = document.getElementById('sidebar');
@@ -222,5 +219,4 @@ export function populateElements() {
     if (!elements.bodyElement || !elements.statusBar || !elements.chatbox) {
         console.error("Core DOM elements not found! Application might not work correctly.");
     }
-     console.log("[DEBUG] populateElements finished. elements.uploadedFilesList:", elements.uploadedFilesList); // Add logging for the specific element
 }

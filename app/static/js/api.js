@@ -74,7 +74,6 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
 
         // --- Temporary event handlers for this specific promise ---
         const handleStarted = (data) => {
-            console.log("Backend confirmed transcription started (handler):", data.message);
             setStatus("Recording... Speak now."); // Update status
             resolveOnce(); // Resolve the promise
         };
@@ -95,7 +94,6 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
 
         // --- Check existing socket state ---
         if (socket && socket.connected) {
-            console.log("WebSocket already connected. Requesting new stream start.");
             setStatus("Initializing transcription stream...");
 
             // Add temporary listeners for this specific request
@@ -112,7 +110,6 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
         // ------------------------------------
 
         // --- Create new socket connection if needed ---
-        console.log("No active WebSocket connection found. Creating new one.");
 
         // Ensure Socket.IO client library is loaded
         if (typeof io === 'undefined') {
@@ -136,7 +133,6 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
         // These handlers stay attached for the lifetime of the socket connection.
 
         socket.on('connect', () => {
-            console.log("WebSocket connected successfully:", socket.id);
             setStatus("Transcription service connected. Initializing stream..."); // Status on connect
             state.setIsSocketConnected(true); // Update state
 
@@ -176,7 +172,6 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
             // (Existing transcript update logic)
             if (data && data.transcript !== undefined) {
                 if (data.is_final) {
-                    console.log("Final transcript segment:", data.transcript);
                     // Append the final segment to the existing transcript state
                     const currentTranscript = state.streamingTranscript; // Read current state
                     const newFinalSegment = data.transcript.trim();
@@ -187,11 +182,9 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
                 } else {
                     // Only update with interim results if no final segment has been processed yet for this recording session
                     if (!state.finalTranscriptSegment) { // Check if finalTranscriptSegment is still empty/null
-                        console.log(`[API DEBUG] Received interim transcript: "${data.transcript}". Calling state.setStreamingTranscript.`); // Add log
                         state.setStreamingTranscript(data.transcript); // Update with interim result
                     } else {
                         // Optional: Log that an interim result was ignored after final
-                         console.log(`[API DEBUG] Ignoring interim result after final segment received: "${data.transcript}"`); // Add log
                     }
                 }
             }
@@ -215,7 +208,6 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
         // This permanent listener is just for logging subsequent starts if needed,
         // the promise resolution is handled by the temporary listener added above.
         socket.on('transcription_started', (data) => {
-             console.log("Log: Backend confirmed transcription started:", data.message);
              // Status is set by the temporary handler or subsequent calls
         });
 
@@ -227,7 +219,6 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
 
         // Optional: Keep for logging if needed, but completion is handled by the promise
         socket.on('transcription_stop_acknowledged', (data) => {
-            console.log("Backend acknowledged stop signal:", data.message);
         });
     }); //End of promise constructor
 }
@@ -259,8 +250,6 @@ export function stopAudioStream() {
             return reject(new Error("WebSocket not connected."));
         }
 
-        console.log("Signaling end of audio stream to backend.");
-
         // --- Promise state management ---
         let promiseResolved = false;
         let promiseRejected = false;
@@ -281,7 +270,6 @@ export function stopAudioStream() {
                 clearTimeout(timeoutId); // Clear timeout on resolve
                 promiseResolved = true;
                 removeListeners();
-                console.log(`[DEBUG] stopAudioStream Promise resolved: ${message}`);
                 resolve();
             }
         };
@@ -290,14 +278,12 @@ export function stopAudioStream() {
                 clearTimeout(timeoutId); // Clear timeout on reject
                 promiseRejected = true;
                 removeListeners();
-                console.error(`[DEBUG] stopAudioStream Promise rejected:`, error);
                 reject(error);
             }
         };
 
         // --- Temporary listeners for this stop request (using the functions defined above) ---
         const handleComplete = (data) => {
-            console.log("Backend confirmed transcription complete:", data.message);
             resolveOnce(data.message);
         };
         const handleError = (data) => {
@@ -335,7 +321,6 @@ export function stopAudioStream() {
  */
 export function disconnectTranscriptionSocket() {
     if (socket) {
-        console.log("Disconnecting WebSocket.");
         socket.disconnect();
         socket = null; // Clear reference
         state.setIsSocketConnected(false); // Update state
@@ -806,7 +791,6 @@ export async function loadSavedChats() {
 
 /** Starts a new chat session by calling the backend and updates state. */
 export async function startNewChat() {
-    console.log(`[DEBUG] startNewChat called.`);
     if (state.isLoading) return;
     setLoading(true, "Creating Chat");
     // Clear current chat state immediately
@@ -820,7 +804,6 @@ export async function startNewChat() {
         const response = await fetch('/api/chat', { method: 'POST' });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const newChat = await response.json();
-        console.log(`[DEBUG] startNewChat: Received new chat ID ${newChat.id}. Loading it...`);
 
         // Load the new chat (this updates state.currentChatId, loads history, resets context)
         await loadChat(newChat.id);
@@ -829,7 +812,6 @@ export async function startNewChat() {
         await loadSavedChats();
 
         setStatus(`New chat created (ID: ${newChat.id}).`);
-        console.log(`[DEBUG] startNewChat: Successfully created and loaded chat ${newChat.id}.`);
     } catch (error) {
         console.error('Error starting new chat:', error);
         // Add system message via state? Or let UI react to status?
@@ -843,7 +825,6 @@ export async function startNewChat() {
 
 /** Loads a specific chat's history and details from the backend and updates state. */
 export async function loadChat(chatId) {
-    console.log(`[DEBUG] loadChat(${chatId}) called.`);
     setLoading(true, "Loading Chat");
     // Clear chat history in state immediately to show loading state in UI
     state.setChatHistory([]); // Assuming you add setChatHistory to state.js
@@ -872,7 +853,6 @@ export async function loadChat(chatId) {
         // Plugin enabled states are loaded from localStorage in app.js init
 
         setStatus(`Chat ${state.currentChatId} loaded.`);
-        console.log(`[DEBUG] loadChat(${chatId}) finished successfully.`);
 
     } catch (error) {
         console.error(`Error loading chat ${chatId}:`, error);
@@ -1259,7 +1239,6 @@ export async function loadNote(noteId) {
 
 /** Saves the current note content and name by calling the backend and updates state. */
 export async function saveNote() {
-    console.log(`[DEBUG] saveNote called.`);
     if (state.isLoading || !state.currentNoteId || state.currentTab !== 'notes') {
         // Set status message if called when not appropriate
         if (state.currentTab !== 'notes') {
@@ -1353,7 +1332,6 @@ export async function handleDeleteNote(noteId) { // Removed listItemElement para
 
 /** Loads the history of a specific note from the backend and updates state. */
 export async function loadNoteHistory(noteId) {
-    console.log(`[DEBUG] loadNoteHistory(${noteId}) called.`);
     // Note: Loading state is handled by the caller (loadNote or saveNote)
     // setStatus("Loading note history..."); // Status handled by caller
 
@@ -1405,16 +1383,12 @@ export async function loadInitialChatData() {
     if (chatToLoadId !== null && state.savedChats.length > 0) {
         chatFoundInList = state.savedChats.some(chat => chat.id === chatToLoadId);
         if (!chatFoundInList) {
-            console.warn(`[DEBUG] loadInitialChatData: Persisted chat ID ${chatToLoadId} not found in saved chats list. Clearing persisted ID.`);
             state.setCurrentChatId(null); // Clear the stale ID state
             localStorage.removeItem('currentChatId');
             chatToLoadId = null; // Ensure fallback logic triggers
-        } else {
-             console.log(`[DEBUG] loadInitialChatData: Persisted chat ID ${chatToLoadId} found in saved chats list.`);
         }
     } else if (chatToLoadId !== null && state.savedChats.length === 0) {
          // If there's a persisted ID but no saved chats at all, it's definitely stale
-         console.warn(`[DEBUG] loadInitialChatData: Persisted chat ID ${chatToLoadId} found, but no saved chats exist. Clearing persisted ID.`);
          state.setCurrentChatId(null); // Clear the stale ID state
          localStorage.removeItem('currentChatId');
          chatToLoadId = null; // Ensure fallback logic triggers
@@ -1423,18 +1397,14 @@ export async function loadInitialChatData() {
 
     // If no valid persisted chat or loading failed, load most recent or start new
     if (state.currentChatId === null) { // Check state.currentChatId after attempts
-        console.log("[DEBUG] loadInitialChatData: No valid currentChatId after attempts, loading most recent or creating new.");
         const firstChat = state.savedChats.length > 0 ? state.savedChats[0] : null; // Get from state (already sorted by loadSavedChats)
         if (firstChat) {
             const mostRecentChatId = firstChat.id;
-            console.log(`[DEBUG] Loading most recent chat: ${mostRecentChatId}`);
             await loadChat(mostRecentChatId); // Updates state
         } else {
-            console.log("[DEBUG] No saved chats found, starting new chat.");
             await startNewChat(); // Updates state
         }
     }
-    console.log(`[DEBUG] loadInitialChatData finished. Final currentChatId: ${state.currentChatId}`);
 }
 
 /** Loads the initial data required for the Notes tab. */
@@ -1449,16 +1419,12 @@ export async function loadInitialNotesData() {
     if (noteToLoadId !== null && state.savedNotes.length > 0) {
         noteFoundInList = state.savedNotes.some(note => note.id === noteToLoadId);
         if (!noteFoundInList) {
-            console.warn(`[DEBUG] loadInitialNotesData: Persisted note ID ${noteToLoadId} not found in saved notes list. Clearing persisted ID.`);
             state.setCurrentNoteId(null); // Clear the stale ID state
             localStorage.removeItem('currentNoteId');
             noteToLoadId = null; // Ensure fallback logic triggers
-        } else {
-             console.log(`[DEBUG] loadInitialNotesData: Persisted note ID ${noteToLoadId} found in saved notes list.`);
         }
     } else if (noteToLoadId !== null && state.savedNotes.length === 0) {
          // If there's a persisted ID but no saved notes at all, it's definitely stale
-         console.warn(`[DEBUG] loadInitialNotesData: Persisted note ID ${noteToLoadId} found, but no saved notes exist. Clearing persisted ID.`);
          state.setCurrentNoteId(null); // Clear the stale ID state
          localStorage.removeItem('currentNoteId');
          noteToLoadId = null; // Ensure fallback logic triggers
@@ -1467,18 +1433,14 @@ export async function loadInitialNotesData() {
 
     // If no valid persisted note or loading failed, load most recent or start new
     if (state.currentNoteId === null) { // Check state.currentNoteId after attempts
-        console.log("[DEBUG] loadInitialNotesData: No valid currentNoteId after attempts, loading most recent or creating new.");
         const firstNote = state.savedNotes.length > 0 ? state.savedNotes[0] : null; // Get from state (already sorted by loadSavedNotes)
         if (firstNote) {
             const mostRecentNoteId = firstNote.id;
-            console.log(`[DEBUG] Loading most recent note: ${mostRecentNoteId}`);
             await loadNote(mostRecentNoteId); // Updates state
         } else {
-            console.log("[DEBUG] No saved notes found, starting new note.");
             await startNewNote(); // Updates state
         }
     }
 
     // Note mode is handled by UI reacting to state.currentNoteMode
-    console.log(`[DEBUG] loadInitialNotesData finished. Final currentNoteId: ${state.currentNoteId}`);
 }
