@@ -68,10 +68,11 @@ def create_app(test_config=None):
     # ai_services.configure_gemini(app) # Uncomment and adjust if needed
 
     # --- Register Blueprints ---
-    from .routes import main_routes, chat_routes, file_routes # Keep existing
+    from .routes import main_routes, chat_routes, file_routes # Keep existing routes
     app.register_blueprint(main_routes.bp)
     app.register_blueprint(chat_routes.bp)
     app.register_blueprint(file_routes.bp)
+    # Note: Logging registration message moved below after all blueprints attempted
     logger.info("Registered blueprints: main, chat_api, file_api")
 
     # --- Register Calendar Blueprint ---
@@ -94,6 +95,17 @@ def create_app(test_config=None):
         logger.error("Notes routes not found or import error, skipping registration.")
     except Exception as e:
         logger.error(f"Error registering notes blueprint: {e}")
+    # ---------------------------------
+
+    # --- Register Voice Blueprint ---
+    try:
+        from .routes import voice_routes
+        app.register_blueprint(voice_routes.bp)
+        logger.info("Registered blueprint: voice_api")
+    except ImportError:
+        logger.error("Voice routes not found or import error, skipping registration.")
+    except Exception as e:
+        logger.error(f"Error registering voice blueprint: {e}")
     # ---------------------------------
 
 

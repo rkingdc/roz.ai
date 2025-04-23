@@ -63,6 +63,12 @@ class Config:
     ]
     GEMINI_REQUEST_TIMEOUT = 300 # Timeout for Gemini API calls in seconds
 
+    # Google Cloud Speech-to-Text API Credentials
+    # Set the GOOGLE_APPLICATION_CREDENTIALS environment variable to the path of your service account key file.
+    # The google-cloud-speech library typically picks this up automatically.
+    # We can add it here for clarity or potential future use within the app if needed.
+    GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
     # Ensure API Key is present for core functionality
     if not API_KEY:
         logger.info("CRITICAL WARNING: GEMINI_API_KEY environment variable not set.")

@@ -9,6 +9,7 @@ releases/
 *.so
 token.json
 credentials.json
+google-credentials.json # Add this line for Google Cloud service account keys
 *.db
 
 # Distribution / packaging
