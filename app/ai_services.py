@@ -1396,7 +1396,7 @@ def clean_up_transcript(raw_transcript: str) -> str:
     # --- End AI Readiness Check ---
 
     # Determine model (use default or a specific one for cleaning if configured)
-    raw_model_name = current_app.config.get("CLEANUP_MODEL", current_app.config["DEFAULT_MODEL"])
+    raw_model_name = current_app.config.get("SUMMARY_MODEL", current_app.config["DEFAULT_MODEL"])
     model_to_use = (
         f"models/{raw_model_name}"
         if not raw_model_name.startswith("models/")
