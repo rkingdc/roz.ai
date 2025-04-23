@@ -566,8 +566,8 @@ export function setupEventListeners() {
 
     // --- Delegated Click Listener for Cleanup Buttons ---
     document.body.addEventListener('click', async (event) => {
-        // Log *every* click target on the body first
-        console.log("[DEBUG] Body Click Detected. Target:", event.target);
+        // Log *every* click target on the body first, including its ID and classes
+        console.log(`[DEBUG] Body Click Detected. Target Element: <${event.target.tagName} id="${event.target.id}" class="${event.target.className}">`);
 
         const chatCleanupBtn = event.target.closest('#cleanup-transcript-btn');
         const notesCleanupBtn = event.target.closest('#cleanup-transcript-btn-notes');
