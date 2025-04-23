@@ -22,8 +22,8 @@ LATEST_RELEASE := $(shell ls -td releases/*/ 2>/dev/null | head -n 1)
 # Use run:app which should contain the app instance created by create_app()
 GUNICORN_CMD = $(PYTHON) -m gunicorn --workers 1 --bind 0.0.0.0:8000 --timeout 120 run:app
 
-# Add migration commands to PHONY
-.PHONY: all venv install init-db upgrade migrate revision run start test lint deploy clean help stop start-dev
+# Add migration commands and auth check to PHONY
+.PHONY: all venv install init-db upgrade migrate revision run start test lint deploy clean help stop start-dev check-gcloud-auth
 
 all: install
 
@@ -67,8 +67,8 @@ migrate: revision
 #	@$(PYTHON) -m flask --app $(RUN_FILE) run --debug --port 5000 # Now uses .venv/bin/python3
 # Note: 'make run' is removed in favor of 'make start-dev' which uses uvicorn
 
-# Modified start target to run migrations first
-start: upgrade # Depends on upgrade now
+# Modified start target to run migrations and check auth first
+start: upgrade check-gcloud-auth # Depends on upgrade and check-gcloud-auth now
 	@if [ -z "$(LATEST_RELEASE)" ]; then \
 		echo "Error: No releases found in the 'releases/' directory."; \
 		echo "Run 'make deploy' first to create a release bundle."; \
@@ -78,8 +78,9 @@ start: upgrade # Depends on upgrade now
 	# Change directory to the latest release and run the app using the venv python
 	@cd $(LATEST_RELEASE) && DATABASE_NAME="../../$(PROD_DB)" $(GUNICORN_CMD)
 
-test: install
+test: install check-gcloud-auth # Depends on check-gcloud-auth now (if tests hit live APIs)
 	@echo "Running tests..."
+	# Note: If your tests mock Google Cloud APIs, you might remove the check-gcloud-auth dependency here.
 	@$(PYTHON) -m pytest $(TEST_DIR) # Now uses .venv/bin/python3
 
 lint: install
@@ -127,6 +128,25 @@ start-dev: install # Depends on install
 	# Start flask run with debug mode and set environment variables
 	@DATABASE_NAME=/tmp/assistant_dev_db.sqlite TEST_DATABASE=TRUE IS_DEV_SERVER=TRUE $(PYTHON) -m flask --app $(RUN_FILE) run --debug --port 5000
 
+
+# Target to check for Google Cloud Application Default Credentials
+check-gcloud-auth:
+	@echo "Checking for Google Cloud credentials..."
+	@if [ -z "$$GOOGLE_APPLICATION_CREDENTIALS" ] && [ ! -f "$$HOME/.config/gcloud/application_default_credentials.json" ]; then \
+		echo ""; \
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"; \
+		echo "ERROR: Google Cloud Application Default Credentials not found."; \
+		echo "Please configure authentication using ONE of the following methods:"; \
+		echo "  1. Set the GOOGLE_APPLICATION_CREDENTIALS environment variable:"; \
+		echo "     export GOOGLE_APPLICATION_CREDENTIALS=\"/path/to/your/service-account-key.json\""; \
+		echo "  2. Log in using gcloud CLI (if GOOGLE_APPLICATION_CREDENTIALS is not set):"; \
+		echo "     gcloud auth application-default login"; \
+		echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"; \
+		echo ""; \
+		exit 1; \
+	else \
+		echo "Google Cloud credentials found (either GOOGLE_APPLICATION_CREDENTIALS or gcloud ADC file)."; \
+	fi
 
 # Target to display help
 help:
