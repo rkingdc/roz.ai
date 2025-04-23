@@ -1351,6 +1351,115 @@ def _cleanup_temp_files(temp_files: list, context_msg: str):
         logger.info(f"Finished cleaning temp files for {context_msg}.")
 
 
+# --- Transcript Cleaning ---
+def clean_up_transcript(raw_transcript: str) -> str:
+    """
+    Uses an LLM to clean up a raw transcript, removing filler words, etc.
+    Falls back to the original transcript if cleaning fails.
+    """
+    logger.info("Entering clean_up_transcript.")
+
+    if not raw_transcript or raw_transcript.isspace():
+        logger.warning("clean_up_transcript received empty input.")
+        return "" # Return empty if input is empty
+
+    # --- AI Readiness Check ---
+    try:
+        try:
+            _ = current_app.config
+            logger.debug("clean_up_transcript: Flask request context is active.")
+        except RuntimeError:
+            logger.error(
+                "clean_up_transcript called outside active Flask context.", exc_info=True
+            )
+            return raw_transcript # Fallback
+
+        api_key = current_app.config.get("API_KEY")
+        if not api_key:
+            logger.error("API_KEY missing for clean_up_transcript.")
+            return raw_transcript # Fallback
+
+        try:
+            if "genai_client" not in g:
+                logger.info("Creating new genai.Client for clean_up_transcript.")
+                g.genai_client = genai.Client(api_key=api_key)
+            else:
+                logger.debug("Using cached genai.Client for clean_up_transcript.")
+            client = g.genai_client
+        except (GoogleAPIError, ClientError, ValueError, Exception) as e:
+            logger.error(f"Failed to get genai.Client for cleanup: {e}", exc_info=True)
+            return raw_transcript # Fallback
+
+    except Exception as e:
+        logger.error(f"Unexpected error during readiness check for cleanup: {e}", exc_info=True)
+        return raw_transcript # Fallback
+    # --- End AI Readiness Check ---
+
+    # Determine model (use default or a specific one for cleaning if configured)
+    raw_model_name = current_app.config.get("CLEANUP_MODEL", current_app.config["DEFAULT_MODEL"])
+    model_to_use = (
+        f"models/{raw_model_name}"
+        if not raw_model_name.startswith("models/")
+        else raw_model_name
+    )
+
+    prompt = f"""Clean the following text, removing punctuation and filler words to improve readability. Filler words include "um," "uh," "er," "like," "so," "you know," and "I mean," as well as conversational tags such as "right?", "okay?", and interjections such as "well," and "oh." Remove repetitions and incomplete sentences at the end. Remove any leading or trailing whitespace and newlines. Retain the original sentence structure.
+
+**Example:**
+
+**Input:**
+"Um, so, like, I went to the store, uh, and, um, I bought, like, milk, you know? Right?"
+
+**Output:**
+"I went to the store and I bought milk."
+
+**Now clean the following text. Return only the cleaned text:**
+
+{raw_transcript}
+"""
+
+    logger.info(f"Attempting transcript cleanup using model '{model_to_use}'...")
+    response = None
+    try:
+        # Use non-streaming generation for cleanup
+        response = client.models.generate_content(
+            model=model_to_use,
+            contents=prompt,
+        )
+
+        # Process response
+        if response.prompt_feedback and response.prompt_feedback.block_reason:
+            reason = response.prompt_feedback.block_reason.name
+            logger.warning(f"Transcript cleanup blocked by safety settings. Reason: {reason}")
+            return raw_transcript # Fallback
+
+        if (
+            response.candidates
+            and hasattr(response.candidates[0], "content")
+            and hasattr(response.candidates[0].content, "parts")
+            and response.candidates[0].content.parts
+        ):
+            cleaned_text = "".join(
+                part.text
+                for part in response.candidates[0].content.parts
+                if hasattr(part, "text")
+            ).strip() # Strip whitespace from the final result
+
+            if cleaned_text:
+                logger.info("Transcript cleaned successfully.")
+                return cleaned_text
+            else:
+                logger.warning("Transcript cleanup resulted in empty text. Falling back.")
+                return raw_transcript # Fallback if result is empty
+        else:
+            logger.warning(f"Transcript cleanup did not produce usable content. Falling back. Response: {response!r}")
+            return raw_transcript # Fallback
+
+    except (GoogleAPIError, InvalidArgument, DeadlineExceeded, NotFound, Exception) as e:
+        logger.error(f"Error during transcript cleanup API call: {e}", exc_info=True)
+        return raw_transcript # Fallback on any API error
+
+
 # --- Standalone Text Generation (Example) ---
 # Remove the decorator
 def generate_text(prompt: str, model_name: str = None) -> str:

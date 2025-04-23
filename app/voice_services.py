@@ -3,6 +3,8 @@ from google.cloud import speech
 from google.api_core.exceptions import GoogleAPICallError, NotFound, InvalidArgument
 import os
 from flask import current_app
+# Import the new cleanup function
+from app.ai_services import clean_up_transcript
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +60,22 @@ def transcribe_audio(audio_content: bytes, language_code: str = "en-US", sample_
 
         # Process the response
         if response.results:
-            # Get the most likely transcript
-            transcript = response.results[0].alternatives[0].transcript
-            logger.info(f"Transcription successful: '{transcript[:50]}...'")
-            return transcript
+            # Get the most likely raw transcript
+            raw_transcript = response.results[0].alternatives[0].transcript
+            logger.info(f"Raw transcription successful: '{raw_transcript[:50]}...'")
+
+            # Post-process the transcript using the LLM cleaner
+            logger.info("Attempting to clean up the transcript...")
+            cleaned_transcript = clean_up_transcript(raw_transcript)
+
+            # Check if cleanup returned the original or a cleaned version
+            if cleaned_transcript == raw_transcript:
+                logger.warning("Transcript cleanup failed or returned original. Using raw transcript.")
+            else:
+                logger.info(f"Cleaned transcript: '{cleaned_transcript[:50]}...'")
+
+            return cleaned_transcript # Return the cleaned (or original if cleanup failed) transcript
+
         else:
             logger.warning("Transcription returned no results.")
             return "" # Return empty string for no results vs None for error
