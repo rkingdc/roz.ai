@@ -78,7 +78,7 @@
      flex-direction: column;
      flex-shrink: 0;
      transition: width 0.3s ease-in-out, padding 0.3s ease-in-out, border 0.3s ease-in-out;
-     overflow-x: hidden;
+     /* overflow-x: hidden; */ /* REMOVED: This was hiding the toggle tab */
      /* Ensure content doesn't overlap the tab */
      /* padding-top: 40px; */ /* Adjust if tab overlaps content */
 }
@@ -95,7 +95,7 @@
      flex-direction: column;
      flex-shrink: 0;
      transition: width 0.3s ease-in-out, padding 0.3s ease-in-out, border 0.3s ease-in-out;
-     overflow-x: hidden;
+     /* overflow-x: hidden; */ /* REMOVED: This was hiding the toggle tab */
      /* Ensure content doesn't overlap the tab */
      /* padding-top: 40px; */ /* Adjust if tab overlaps content */
 }
