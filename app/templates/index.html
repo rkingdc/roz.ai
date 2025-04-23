@@ -167,11 +167,12 @@
                     <div class="input-wrapper flex-grow relative">
                         <textarea id="message-input" rows="2" class="w-full p-2 rounded-lg focus:outline-none resize-none text-sm border border-gray-300" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
                         <!-- Button Group for Mic and Cleanup -->
-                        <div class="inline-flex rounded-md shadow-sm absolute bottom-1 right-1" role="group">
-                            <button type="button" id="mic-button" class="btn-group-left" title="Record Voice">
+                        <div class="inline-flex items-center absolute bottom-1 right-1" role="group"> {# Removed rounded-md shadow-sm #}
+                            {# Apply standard button styles and add margin to the second button #}
+                            <button type="button" id="mic-button" class="btn btn-secondary p-2" title="Record Voice" style="height: 34px; width: 34px;">
                                 <i class="fas fa-microphone"></i>
                             </button>
-                            <button type="button" id="cleanup-transcript-btn" class="btn-group-right" title="Clean Up Transcript" disabled>
+                            <button type="button" id="cleanup-transcript-btn" class="btn btn-secondary p-2 ml-1" title="Clean Up Transcript" disabled style="height: 34px; width: 34px;"> {# Added ml-1 for spacing #}
                                 <i class="fas fa-wand-magic-sparkles"></i>
                             </button>
                         </div>
