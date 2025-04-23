@@ -116,6 +116,7 @@ export const elements = {
  * MUST be called after DOMContentLoaded.
  */
 export function populateElements() {
+    console.log("[DEBUG] populateElements called."); // Add logging
     elements.chatbox = document.getElementById('chatbox');
     elements.messageInput = document.getElementById('message-input');
     elements.sendButton = document.getElementById('send-button');
@@ -210,4 +211,5 @@ export function populateElements() {
     if (!elements.bodyElement || !elements.statusBar || !elements.chatbox) {
         console.error("Core DOM elements not found! Application might not work correctly.");
     }
+     console.log("[DEBUG] populateElements finished. elements.uploadedFilesList:", elements.uploadedFilesList); // Add logging for the specific element
 }

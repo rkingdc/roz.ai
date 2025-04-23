@@ -19,17 +19,24 @@ async function initializeApp() {
 
     try {
         // 1. Get references to all DOM elements and store them
-        populateElements();
-        console.log("DOM elements populated.");
+        // populateElements is now called in the DOMContentLoaded listener before initializeApp
+        // populateElements();
+        console.log("[DEBUG] DOM elements populated (via DOMContentLoaded listener).");
+
 
         // --- Load and Set Initial States from localStorage ---
         // Temporarily disable notifications during initial state load
         state.disableNotifications();
         loadPersistedStates(); // Updates state (non-UI related)
+        console.log("[DEBUG] Persisted states loaded from localStorage.");
+
         // UI-related collapsed states are loaded after elements are populated
         loadCollapsedStates(); // Updates state and UI for collapsed elements
+        console.log("[DEBUG] Collapsed states loaded and applied.");
+
         state.enableNotifications(); // Re-enable notifications
-        console.log("[DEBUG] Persisted states loaded.");
+        console.log("[DEBUG] State notifications enabled.");
+
 
         // --- Configure Marked.js ---
         if (typeof marked !== 'undefined') {
@@ -42,18 +49,26 @@ async function initializeApp() {
         }
 
         // --- Set up all event listeners (which includes subscribing UI to state changes) ---
-        setupEventListeners();
-        console.log("Event listeners set up.");
+        // setupEventListeners is now called in the DOMContentLoaded listener before initializeApp
+        // setupEventListeners();
+        console.log("[DEBUG] Event listeners set up (via DOMContentLoaded listener).");
 
 
         // --- Load Core Data (Chat & Note Lists, then specific Chat/Note) ---
         // These API calls update the state.
+        console.log("[DEBUG] Loading saved chats...");
         await api.loadSavedChats(); // Corrected function name based on api.js - Updates state.savedChats, isLoading, statusMessage
+        console.log("[DEBUG] Saved chats loaded.");
         // UI will react to state.savedChats change (renderSavedChats)
+
+        console.log("[DEBUG] Loading saved notes...");
         await api.loadSavedNotes(); // Corrected function name based on api.js - Updates state.savedNotes, isLoading, statusMessage
+        console.log("[DEBUG] Saved notes loaded.");
         // UI will react to state.savedNotes change (renderSavedNotes)
 
+
         // Load data for the initial tab based on persisted ID or default
+        console.log(`[DEBUG] Loading initial data for tab: ${state.currentTab}`);
         if (state.currentTab === 'chat') { // Use getter
              await api.loadInitialChatData(); // Updates state (currentChatId, chatHistory, attachedFiles, uploadedFiles, etc.)
              // UI updates triggered by state changes within loadInitialChatData (loadChat, startNewChat)
@@ -61,11 +76,14 @@ async function initializeApp() {
              await api.loadInitialNotesData(); // Updates state (currentNoteId, noteContent, uploadedFiles, etc.)
              // UI updates triggered by state changes within loadInitialNotesData (loadNote, startNewNote)
         }
+        console.log("[DEBUG] Initial tab data loaded.");
+
 
         // --- Final Initial UI Render ---
         // After all initial data is loaded into state, trigger the full UI render for the active tab.
         // This will render the UI based on the state populated by loadPersistedStates and initial data loads.
         // We notify all state changes that happened while notifications were disabled.
+        console.log("[DEBUG] Triggering initial UI render via state.notifyAll().");
         state.notifyAll(); // Trigger UI updates for all state that changed during loading
 
         console.log("[DEBUG] initializeApp finished successfully.");
@@ -83,6 +101,7 @@ async function initializeApp() {
 
 /** Loads persisted state values from localStorage into the state module */
 function loadPersistedStates() {
+    console.log("[DEBUG] loadPersistedStates called.");
     // Load simple boolean/string states
     state.setCalendarContextActive(localStorage.getItem('calendarContextActive') === 'true');
     state.setStreamingEnabled(localStorage.getItem(config.STREAMING_ENABLED_KEY) === null ? true : localStorage.getItem(config.STREAMING_ENABLED_KEY) === 'true');
@@ -110,10 +129,12 @@ function loadPersistedStates() {
     state.setWebSearchEnabled(localStorage.getItem('webSearchEnabled') === 'true'); // Assuming you persist this
 
     // Collapsed states are handled by loadCollapsedStates after elements are populated
+    console.log("[DEBUG] loadPersistedStates finished.");
 }
 
 // Helper function to load collapsed states after elements are populated
 function loadCollapsedStates() {
+    console.log("[DEBUG] loadCollapsedStates called.");
     if (!elements.sidebar || !elements.sidebarToggleButton || !elements.pluginsSidebar || !elements.pluginsToggleButton ||
         !elements.filePluginHeader || !elements.filePluginContent || !elements.calendarPluginHeader || !elements.calendarPluginContent ||
         !elements.historyPluginHeader || !elements.historyPluginContent) { // Added history elements
@@ -143,6 +164,7 @@ function loadCollapsedStates() {
     ui.setPluginSectionCollapsed(elements.historyPluginHeader, elements.historyPluginContent, historyPluginCollapsed, config.HISTORY_PLUGIN_COLLAPSED_KEY);
 
     // Note: Web Search plugin section is not collapsible in the current HTML
+    console.log("[DEBUG] loadCollapsedStates finished.");
 }
 
 
@@ -155,12 +177,15 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log("DOM elements populated.");
 
     // 2. Load persisted UI states that depend on elements existing (collapsed states)
-    loadCollapsedStates();
-    console.log("Collapsed states loaded.");
+    // loadCollapsedStates is now called inside initializeApp after populateElements
+    // loadCollapsedStates();
+    // console.log("Collapsed states loaded.");
 
 
     // 3. Set up all event listeners (which includes subscribing UI to state changes)
     setupEventListeners();
+    console.log("Event listeners set up.");
+
 
     // 4. Initialize the application state and load initial data
     initializeApp();
