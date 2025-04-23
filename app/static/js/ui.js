@@ -58,9 +58,12 @@ function makeHeadingsCollapsible(htmlString) {
             const headingElement = node.cloneNode(true); // Clone the original heading
             headingElement.classList.add('collapsible-heading');
             headingElement.style.cursor = 'pointer';
-            // Add a unique ID for TOC linking
+            // Add a unique, deterministic ID for TOC linking
+            const level = parseInt(node.nodeName.substring(1), 10);
             const headingText = node.textContent || `heading-${Date.now()}`;
-            const headingId = `heading-${headingText.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '')}-${Math.random().toString(36).substring(2, 7)}`;
+            const slug = headingText.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+            // Use level and slug, remove random part
+            const headingId = `toc-heading-level-${level}-${slug}`;
             headingElement.id = headingId;
 
             const toggleIcon = document.createElement('i');
@@ -1784,13 +1787,15 @@ function generateTocData() {
 
     tokens.forEach(token => {
         if (token.type === 'heading') {
-            // Generate a consistent ID based on text content for linking
+            // Generate a consistent, deterministic ID based on text and level for linking
+            const level = token.depth;
             const text = token.text || `heading-${Date.now()}`;
-            // Match ID generation in makeHeadingsCollapsible - ensure it's consistent
-            const targetId = `heading-${text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '')}-${Math.random().toString(36).substring(2, 7)}`;
+            const slug = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+            // Use level and slug, remove random part - MUST match makeHeadingsCollapsible
+            const targetId = `toc-heading-level-${level}-${slug}`;
             toc.push({
-                level: token.depth,
-                text: token.text,
+                level: level, // Use the level variable
+                text: token.text, // Keep original text for display
                 targetId: targetId // Store the generated ID
             });
         }
