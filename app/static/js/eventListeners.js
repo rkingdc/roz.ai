@@ -566,8 +566,16 @@ export function setupEventListeners() {
 
     // --- Delegated Click Listener for Cleanup Buttons ---
     document.body.addEventListener('click', async (event) => {
+        // Log *every* click target on the body first
+        console.log("[DEBUG] Body Click Detected. Target:", event.target);
+
         const chatCleanupBtn = event.target.closest('#cleanup-transcript-btn');
         const notesCleanupBtn = event.target.closest('#cleanup-transcript-btn-notes');
+
+        // Log results of closest() search
+        console.log("[DEBUG] Body Click - chatCleanupBtn match:", chatCleanupBtn);
+        console.log("[DEBUG] Body Click - notesCleanupBtn match:", notesCleanupBtn);
+
 
         if (chatCleanupBtn) {
             console.log(`[DEBUG] Delegated Chat Cleanup Button CLICKED! Disabled: ${chatCleanupBtn.disabled}`);
@@ -635,6 +643,10 @@ export function setupEventListeners() {
                  if (cleanedText === selectedText) { state.setStatusMessage("Cleanup did not change the selected text."); } else { state.setStatusMessage("Selected text cleaned."); }
             } catch (error) { console.error("Error cleaning selected text (Notes):", error); }
             finally { ui.updateNotesCleanupButtonState(); }
+        }
+        // Add else block for logging if neither button matched
+        else {
+             // console.log("[DEBUG] Body Click - Neither cleanup button matched."); // Optional: Can be noisy
         }
     });
     // ----------------------------------------------------
