@@ -9,6 +9,7 @@ export const elements = {
     chatbox: null,
     messageInput: null,
     micButton: null, // Added mic button reference
+    cleanupTranscriptButton: null, // Add cleanup button reference
     sendButton: null,
     modelSelector: null,
     modelSelectorContainer: null,
