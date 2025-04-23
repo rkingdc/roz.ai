@@ -118,7 +118,7 @@ def save_chat_model(chat_id):
 
 
 @bp.route("/chat/<int:chat_id>/message", methods=["POST"])
-def send_message_route(chat_id):
+async def send_message_route(chat_id):
     """API endpoint to handle user messages, potentially with attached files/calendar context, and get assistant responses."""
     logger.debug(f"Entering send_message_route for chat {chat_id}") # Added log
     data = request.json
@@ -169,8 +169,10 @@ def send_message_route(chat_id):
 
     try:
         # Call the AI service function to handle the core logic
+
         # This function is now *always* a generator function because it contains 'yield'
         assistant_response_generator = ai_services.generate_chat_response(
+
             chat_id=chat_id,
             user_message=user_message,
             attached_files=attached_files, # Pass the list of {id, filename, type}
