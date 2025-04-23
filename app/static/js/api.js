@@ -218,10 +218,13 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
              // Status is set by the temporary handler or subsequent calls
         });
 
-        socket.on('transcription_finished', (data) => {
-            console.log("Backend confirmed transcription finished:", data.message);
-        });
+        // Listener for the final completion signal from the backend
+        // This is now handled by the temporary listener within stopAudioStream promise
+        // socket.on('transcription_complete', (data) => {
+        //     console.log("Backend confirmed transcription complete (permanent listener):", data.message);
+        // });
 
+        // Optional: Keep for logging if needed, but completion is handled by the promise
         socket.on('transcription_stop_acknowledged', (data) => {
             console.log("Backend acknowledged stop signal:", data.message);
         });
@@ -244,17 +247,84 @@ export function sendAudioChunk(chunk) {
 }
 
 /**
- * Signals the backend that audio streaming is finished.
+ * Signals the backend that audio streaming is finished and returns a promise
+ * that resolves when the backend confirms completion, or rejects on error/disconnect.
+ * @returns {Promise<void>}
  */
 export function stopAudioStream() {
-     if (socket && socket.connected) {
+    return new Promise((resolve, reject) => {
+        if (!socket || !socket.connected) {
+            console.warn("Cannot signal stop: WebSocket not connected.");
+            return reject(new Error("WebSocket not connected."));
+        }
+
         console.log("Signaling end of audio stream to backend.");
+
+        // --- Promise state management ---
+        let promiseResolved = false;
+        let promiseRejected = false;
+
+        const resolveOnce = (message = "Transcription complete.") => {
+            if (!promiseResolved && !promiseRejected) {
+                promiseResolved = true;
+                removeListeners();
+                console.log(`[DEBUG] stopAudioStream Promise resolved: ${message}`);
+                resolve();
+            }
+        };
+        const rejectOnce = (error) => {
+             if (!promiseResolved && !promiseRejected) {
+                promiseRejected = true;
+                removeListeners();
+                console.error(`[DEBUG] stopAudioStream Promise rejected:`, error);
+                reject(error);
+            }
+        };
+
+        // --- Temporary listeners for this stop request ---
+        const handleComplete = (data) => {
+            console.log("Backend confirmed transcription complete:", data.message);
+            resolveOnce(data.message);
+        };
+        const handleError = (data) => {
+            console.error("Transcription error received while waiting for completion:", data.error);
+            rejectOnce(new Error(data.error));
+        };
+        const handleDisconnect = (reason) => {
+            console.warn(`WebSocket disconnected while waiting for transcription completion: ${reason}`);
+            rejectOnce(new Error(`WebSocket disconnected: ${reason}`));
+        };
+
+        const removeListeners = () => {
+            if (socket) {
+                socket.off('transcription_complete', handleComplete);
+                socket.off('transcription_error', handleError);
+                socket.off('disconnect', handleDisconnect);
+            }
+        };
+        // -------------------------------------------------
+
+        // Add listeners specifically for this stop request
+        socket.on('transcription_complete', handleComplete);
+        socket.on('transcription_error', handleError); // Catch errors during finalization
+        socket.on('disconnect', handleDisconnect);
+
+        // Emit the stop signal
         socket.emit('stop_transcription');
-        // The backend might send a final 'transcription_finished' event
-        // We don't disconnect immediately here, let the stopRecording flow handle it.
-    } else {
-        console.warn("Cannot signal stop: WebSocket not connected.");
-    }
+
+        // Optional: Add a timeout in case the backend never sends 'transcription_complete'
+        const timeoutDuration = 10000; // 10 seconds
+        const timeoutId = setTimeout(() => {
+             rejectOnce(new Error(`Timeout waiting for transcription completion after ${timeoutDuration}ms`));
+        }, timeoutDuration);
+
+        // Ensure timeout is cleared if promise resolves/rejects normally
+        const originalResolve = resolveOnce;
+        const originalReject = rejectOnce;
+        resolveOnce = (message) => { clearTimeout(timeoutId); originalResolve(message); };
+        rejectOnce = (error) => { clearTimeout(timeoutId); originalReject(error); };
+
+    }); // End of promise constructor
 }
 
 /**

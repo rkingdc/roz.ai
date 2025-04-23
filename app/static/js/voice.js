@@ -93,13 +93,23 @@ export async function startRecording(context) {
             }
         };
 
-        mediaRecorder.onstop = () => {
+        // Make the onstop handler async to await the backend confirmation
+        mediaRecorder.onstop = async () => {
             console.log("[DEBUG] MediaRecorder stopped.");
-            // Signal end of audio stream to backend via WebSocket
-            api.stopAudioStream();
 
-            // The final transcript is assembled via 'transcript_update' events.
-            // We might want to perform final actions here, like focusing the input.
+            try {
+                // Signal end of audio stream and wait for backend confirmation
+                console.log("[DEBUG] Waiting for backend transcription completion signal...");
+                await api.stopAudioStream(); // This now returns a promise
+                console.log("[DEBUG] Backend transcription completion signal received.");
+
+            } catch (error) {
+                 console.error("[ERROR] Error waiting for transcription completion:", error);
+                 // Set error status even if waiting failed, but still try to process transcript
+                 state.setStatusMessage(`Error finalizing transcription: ${error.message}`, true);
+            }
+
+            // --- Now process the final transcript AFTER waiting ---
 
             // --- Read context BEFORE resetting state ---
             const recordingContextOnStop = state.recordingContext;

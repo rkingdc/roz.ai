@@ -333,6 +333,15 @@ def _google_listen_print_loop(
                 # Remove the queue
                 del audio_queues[sid]
                 logger.info(f"Cleaned up audio queue for SID: {sid}")
+
+        # Emit a final completion signal AFTER cleanup attempt
+        try:
+            # Use socketio.emit directly
+            socketio.emit('transcription_complete', {'message': 'Transcription processing finished.'}, room=sid)
+            logger.info(f"Emitted transcription_complete for SID: {sid}")
+        except Exception as emit_err:
+            logger.error(f"Error emitting transcription_complete for SID {sid}: {emit_err}")
+
         logger.info(f"Google listener loop finished for SID: {sid}")
 
 
