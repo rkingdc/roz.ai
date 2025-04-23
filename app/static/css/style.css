@@ -687,6 +687,12 @@
      margin-right: 0;
 }
 
+/* Ensure clicks pass through icons inside specific buttons */
+#cleanup-transcript-btn i,
+#cleanup-transcript-btn-notes i {
+    pointer-events: none;
+}
+
 /* Button Group Styling */
  .btn-group-left, .btn-group-right {
      padding: 0.3rem 0.8rem; /* Adjust padding for smaller header buttons */
