@@ -26,27 +26,15 @@ export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 // Marked.js Renderer Configuration (can be done in app.js or ui.js)
 // Import escapeHtml from utils.js
-import { escapeHtml } from './utils.js';
+// import { escapeHtml } from './utils.js'; // No longer needed here
 
-// Create a custom renderer
-export const markedRenderer = new marked.Renderer();
-
-markedRenderer.code = function(code, language) {
-    let codeString = typeof code === 'object' && code !== null && typeof code.text === 'string' ? code.text : String(code);
-    const escapedCode = escapeHtml(codeString);
-    return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapedCode}</code></pre>`;
-};
-
-markedRenderer.codespan = function(text) {
-    let textString = typeof text === 'object' && text !== null && typeof text.text === 'string' ? text.text : String(text);
-    // Corrected: Escape the original textString, not an already escaped variable
-    const escapedText = escapeHtml(textString);
-    return `<code class="bg-gray-200 px-1 rounded text-sm font-mono">${escapedText}</code>`;
-};
+// REMOVED Custom Renderer Definition from config.js
+// The custom renderer is now defined and used directly in ui.js
 
 // Marked.js Options (to be used with marked.setOptions)
+// We don't set a default renderer here anymore.
+// The custom renderer is passed directly in ui.js where marked.parse is called.
 export const markedOptions = {
-    renderer: markedRenderer,
     breaks: true,
     gfm: true // Ensure GitHub Flavored Markdown is enabled
 };

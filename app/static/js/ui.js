@@ -21,11 +21,11 @@ const originalCodeRenderer = customMarkedRenderer.code.bind(customMarkedRenderer
 customMarkedRenderer.code = function(code, language, isEscaped) {
   language = (language || '').toLowerCase(); // Ensure language is lowercase
   if (language === 'drawio') {
-    // Don't escape the XML content for the data attribute initially,
-    // but escape it when setting the attribute value for safety.
+    // Output the div structure expected by viewer-static.min.js
+    // Escape the raw XML content before putting it into the data attribute.
     const escapedXml = escapeHtml(code);
-    // Output a placeholder div that the GraphViewer will target
-    return `<div class="drawio-diagram my-4 border border-gray-300 p-2 rounded" data-diagram-xml="${escapedXml}">Loading diagram...</div>`;
+    // Use class="mxgraph" and data-mxgraph attribute.
+    return `<div class="mxgraph my-4 border border-gray-300 p-2 rounded" style="max-width:100%;border:1px solid transparent;" data-mxgraph="${escapedXml}"></div>`;
   }
   // Fallback to original renderer for other languages
   return originalCodeRenderer(code, language, isEscaped);
@@ -34,54 +34,23 @@ customMarkedRenderer.code = function(code, language, isEscaped) {
 
 // --- Draw.io Rendering Function ---
 /**
- * Finds placeholder divs and renders Draw.io diagrams using GraphViewer.
- * @param {HTMLElement} containerElement - The element containing the rendered markdown.
+ * Processes elements with the 'mxgraph' class to render Draw.io diagrams.
  */
-function renderDrawioDiagrams(containerElement) {
+function renderDrawioDiagrams() {
     // Ensure GraphViewer library is loaded (it should be from index.html)
-    if (!containerElement || typeof GraphViewer === 'undefined') {
-        if (typeof GraphViewer === 'undefined') console.warn("GraphViewer library not found.");
+    if (typeof GraphViewer === 'undefined') {
+        console.warn("GraphViewer library not found. Cannot render Draw.io diagrams.");
         return;
     }
 
-    const diagrams = containerElement.querySelectorAll('.drawio-diagram');
-    diagrams.forEach(div => {
-        const xmlData = div.dataset.diagramXml;
-        if (xmlData) {
-            try {
-                // Decode the HTML entities back to XML string
-                // Use a temporary element to decode HTML entities safely
-                const tempEl = document.createElement('textarea');
-                tempEl.innerHTML = xmlData; // Browser decodes entities here
-                const decodedXml = tempEl.value;
-
-                // Clear the "Loading..." message
-                div.innerHTML = '';
-                div.style.cursor = 'default'; // Remove loading cursor if any
-
-                // Create a new GraphViewer instance for each diagram
-                // Ensure the container div itself is used for rendering
-                new GraphViewer(div, null, {
-                    xml: decodedXml,
-                    // Configuration options for the viewer
-                    lightbox: false, // Disable lightbox effect
-                    toolbar: null, // Hide toolbar
-                    resize: true, // Allow resizing if needed
-                    border: 0, // No border from the viewer itself
-                    responsive: true,
-                    // background: 'transparent' // Optional: Set background if needed
-                    'toolbar-nohide': true, // Keep toolbar visible if shown (though we hide it)
-                    'toolbar-position': 'top',
-                    // Add more config as needed: https://github.com/jgraph/drawio/blob/dev/src/main/webapp/js/viewer.min.js
-                });
-            } catch (e) {
-                console.error("Error rendering Draw.io diagram:", e);
-                div.innerHTML = '<p class="text-red-500 text-xs">Error rendering diagram.</p>';
-            }
-        } else {
-             div.innerHTML = '<p class="text-yellow-500 text-xs">Diagram data not found.</p>';
-        }
-    });
+    try {
+        // console.log("[DEBUG] Calling GraphViewer.processElements()"); // Optional debug log
+        GraphViewer.processElements(); // Automatically finds and renders divs with class="mxgraph"
+    } catch (e) {
+        console.error("Error processing Draw.io diagrams:", e);
+        // Optionally display a generic error message somewhere if needed
+        // state.setStatusMessage("Error rendering one or more diagrams.", true);
+    }
 }
 // ------------------------------------
 
@@ -1481,7 +1450,7 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
              // Apply prose styles to the container if desired
              notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
              // --- Render Draw.io diagrams AFTER adding HTML ---
-             renderDrawioDiagrams(notesPreview);
+             renderDrawioDiagrams(); // Call the simplified function
              // -----------------------------------------------
         } else {
              notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
@@ -1514,7 +1483,7 @@ export function updateNotesPreview() {
             // Apply prose styles
             notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
             // --- Render Draw.io diagrams AFTER adding HTML ---
-            renderDrawioDiagrams(notesPreview);
+            renderDrawioDiagrams(); // Call the simplified function
             // -----------------------------------------------
         } else {
             notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
