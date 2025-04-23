@@ -2,9 +2,8 @@
 import os
 from dotenv import load_dotenv
 
-# Configure logging
-import logging        
-logging.basicConfig(level=logging.INFO)
+# Configure logging - Removed basicConfig here
+import logging
 logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file if it exists
@@ -15,10 +14,26 @@ class Config:
 
     # General Config
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'a-default-secret-key-for-dev' # Change in production!
-    DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true' # Enable debug mode via env var
+    # DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true' # Enable debug mode via env var
+    # Let Flask's --debug flag control debug mode when using flask run
+    # Keep this setting for other contexts if needed, but it's less critical with --debug
+    # For consistency, let's rely on the FLASK_DEBUG env var or the --debug flag.
+    # If you want DEBUG=True always in dev, keep this line. If you want --debug to control it, remove it.
+    # Let's keep it for now, as it's harmless when --debug is also used.
+    DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+
 
     # Database
-    DB_NAME = os.environ.get('DATABASE_NAME', 'assistant_chat_v7.db') # Database filename
+    TEST_DATABASE = os.environ.get('TEST_DATABASE', 'FALSE').lower() == 'true' # Keep this flag separate for other logic
+    IS_DEV_SERVER = os.environ.get('IS_DEV_SERVER', 'FALSE').lower() == 'true' # New flag for dev server
+    # Always read DB_NAME from environment variable, default to file name
+    DB_NAME = os.environ.get('DATABASE_NAME', 'assistant_chat_v7.db')
+    logger.info(f"Database name configured as: {DB_NAME} (from DATABASE_NAME env var or default)")
+
+    # DATABASE_URI is not strictly needed if DB_NAME holds the full path
+    # Keeping it for potential compatibility, but DB_NAME is the source of truth for sqlite3.connect
+    DATABASE_URI = DB_NAME
+
 
     # File Uploads (Using BLOB storage now, UPLOAD_FOLDER not needed)
     # Define allowed extensions for frontend validation and potential backend checks
@@ -39,6 +54,7 @@ class Config:
         'gemini-1.5-pro-latest',
         'gemini-2.0-flash',
         'gemini-2.0-flash-thinking-exp-01-21',
+        'gemini-2.5-flash-preview-04-17',
         'gemini-2.5-pro-exp-03-25'
         # Add other valid models as needed
     ]

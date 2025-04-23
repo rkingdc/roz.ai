@@ -1,0 +1,8 @@
+        except Exception as e:
+            # Catch any unexpected exceptions that weren't caught inside the wrapped function
+            logger.error(
+                f"Decorator '{f.__name__}': Unexpected exception caught during execution: {e}",
+                exc_info=True, # Log traceback
+            )
+            error_msg = f"[Unexpected Error in AI Service Decorator: {type(e).__name__}]"
+            # ... yield/return error_msg ...

@@ -310,6 +310,37 @@
      border-top-left-radius: 0;
      border-bottom-left-radius: 0;
 }
+
+/* Settings Button (MODIFIED) */
+ #settings-btn {
+     /* Removed position: fixed and related properties */
+     /* Positioning and sizing now handled by parent flexbox and Tailwind classes */
+     cursor: pointer;
+     transition: background-color 0.2s ease-in-out;
+     /* box-shadow: 0px 0px 5px rgba(0,0,0,0.1); /* Removed box-shadow for a flatter look */
+     display: flex; /* Use flex to center icon */
+     align-items: center;
+     justify-content: center;
+     /* Padding and border-radius are now handled by Tailwind classes in HTML */
+     /* Color is now handled by Tailwind classes in HTML */
+     /* Hover background is now handled by Tailwind classes in HTML */
+     border: none; /* Ensure no default button border */
+     background: none; /* Ensure no default button background */
+}
+ #settings-btn i {
+     /* Color is now handled by Tailwind classes on the button itself */
+     /* color: var(--rz-sidebar-text); */
+     font-size: 1.2rem; /* Adjust icon size */
+}
+/* #settings-btn:hover { */
+    /* background-color: var(--rz-sidebar-hover-bg); /* Hover background is now handled by Tailwind */
+/* } */
+ #settings-btn:disabled {
+     opacity: 0.6;
+     cursor: not-allowed;
+}
+
+
 /* Message Styling */
  .message {
      padding: 0.75rem;
@@ -593,7 +624,7 @@
      border-color: var(--rz-button-primary-hover-bg);
 }
  .btn-secondary {
-     background-color: var(--rz-button-secondary-bg);
+     background-color: var(--rz-frame);
      color: var(--rz-button-secondary-text);
      border-color: var(--rz-button-secondary-bg);
 }
@@ -769,4 +800,4 @@
  input:checked + .toggle-slider::before {
      transform: translateX(14px);
 }
- 
+
