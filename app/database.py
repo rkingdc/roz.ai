@@ -204,6 +204,7 @@ def get_chat_history_from_db(chat_id, limit=100):
 # Added optional commit parameter
 def save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=True):
     """Saves file metadata and content blob using the File model."""
+    logger.debug(f"save_file_record_to_db called for '{filename}' with commit={commit}.")
     new_file = File(
         filename=filename,
         content=content_blob,
@@ -213,7 +214,7 @@ def save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=Tr
     )
     try:
         db.session.add(new_file)
-        logger.info(f"Added file record for '{filename}' to session.")
+        logger.debug(f"Added file record for '{filename}' to session.")
         if commit:
             logger.info(f"Attempting to commit file record for '{filename}'...")
             if _commit_session():
@@ -223,9 +224,9 @@ def save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=Tr
                 # _commit_session handles rollback and logging
                 return None # Commit failed
         else:
-            # Return ID (will be None until committed) and indicate no commit happened
-            logger.info(f"File record for '{filename}' added to session, commit deferred.")
-            return new_file.id # ID is None until commit
+            # Return the object itself so the caller can collect it
+            logger.debug(f"File record for '{filename}' added to session, commit deferred. Returning object.")
+            return new_file # Return the SQLAlchemy object
     except SQLAlchemyError as e:
         logger.error(f"Database error adding file record/BLOB for '{filename}' to session: {e}", exc_info=True)
         db.session.rollback() # Rollback the add operation if it failed
