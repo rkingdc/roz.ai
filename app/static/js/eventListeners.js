@@ -35,13 +35,18 @@ export function setupEventListeners() {
             if (state.currentTab === 'notes' && state.currentNoteId !== null) {
                 console.log("[DEBUG] Ctrl+S detected on Notes tab. Saving note...");
                 await api.saveNote(); // Save the current note
+                // --- NEW: Return focus to notes textarea after save ---
+                elements.notesTextarea?.focus();
+                // ----------------------------------------------------
             } else if (state.currentTab === 'chat' && state.currentChatId !== null) {
                  console.log("[DEBUG] Ctrl+S detected on Chat tab. Saving chat name...");
                  // Trigger the save chat name button click, which handles getting the name from the input
-                 elements.saveChatNameButton?.click(); // This button's ID is actually save-note-name-btn in the HTML, but it's used for chat name too.
-                                                       // Let's use the correct element reference from dom.js
-                 if (elements.saveChatNameButton) { // Use the correct element reference
+                 // Use the correct element reference from dom.js
+                 if (elements.saveChatNameButton) {
                      elements.saveChatNameButton.click();
+                     // --- NEW: Return focus to message input after save ---
+                     elements.messageInput?.focus();
+                     // ----------------------------------------------------
                  } else {
                      console.error("Save chat name button element not found!");
                      state.setStatusMessage("Error: Save button element missing.", true);
