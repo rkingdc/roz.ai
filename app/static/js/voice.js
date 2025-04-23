@@ -165,7 +165,7 @@ export async function startRecording(context) {
             if (recordingContextOnStop === 'chat' && cleanupBtnRefAtStop && finalTranscript) {
                 console.log("[DEBUG] Conditions met. Showing cleanup button and setting dataset."); // Add log
                 cleanupBtnRefAtStop.dataset.rawTranscript = finalTranscript; // Store raw transcript
-                elements.cleanupTranscriptButton.classList.remove('hidden'); // Make button visible
+                cleanupBtnRefAtStop.classList.remove('hidden'); // Make button visible
             } else {
                 console.log("[DEBUG] Conditions NOT met. Cleanup button remains hidden."); // Add log
             }
