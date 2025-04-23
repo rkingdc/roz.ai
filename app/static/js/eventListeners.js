@@ -84,9 +84,18 @@ export function setupEventListeners() {
         }
         // UI updates are triggered by state notifications (isRecording)
     });
-    elements.cleanupTranscriptButton?.addEventListener('click', async () => {
-        // Button should already be disabled if no selection, but double-check
-        if (state.isLoading || elements.cleanupTranscriptButton?.disabled || !elements.messageInput) return;
+
+    // --- Chat Cleanup Button Listener ---
+    const chatCleanupButton = elements.cleanupTranscriptButton;
+    if (chatCleanupButton) {
+        console.log("[DEBUG] Attaching listener to Chat Cleanup Button:", chatCleanupButton);
+        chatCleanupButton.addEventListener('click', async () => {
+            console.log("[DEBUG] Chat Cleanup Button CLICKED!"); // Log click
+            // Button should already be disabled if no selection, but double-check
+            if (state.isLoading || elements.cleanupTranscriptButton?.disabled || !elements.messageInput) {
+                 console.log("[DEBUG] Chat Cleanup: Click ignored (loading, disabled, or no input).");
+                 return;
+            }
 
         const inputField = elements.messageInput;
         const selectionStart = inputField.selectionStart;
@@ -205,9 +214,18 @@ export function setupEventListeners() {
         }
         // UI updates are triggered by state notifications (isRecording)
     });
-    elements.cleanupTranscriptButtonNotes?.addEventListener('click', async () => {
-        // Button should already be disabled if no selection, but double-check
-        if (state.isLoading || elements.cleanupTranscriptButtonNotes?.disabled || !elements.notesTextarea) return;
+
+    // --- Notes Cleanup Button Listener ---
+    const notesCleanupButton = elements.cleanupTranscriptButtonNotes;
+    if (notesCleanupButton) {
+        console.log("[DEBUG] Attaching listener to Notes Cleanup Button:", notesCleanupButton);
+        notesCleanupButton.addEventListener('click', async () => {
+            console.log("[DEBUG] Notes Cleanup Button CLICKED!"); // Log click
+            // Button should already be disabled if no selection, but double-check
+            if (state.isLoading || elements.cleanupTranscriptButtonNotes?.disabled || !elements.notesTextarea) {
+                 console.log("[DEBUG] Notes Cleanup: Click ignored (loading, disabled, or no textarea).");
+                 return;
+            }
 
         const textarea = elements.notesTextarea;
         const selectionStart = textarea.selectionStart;
