@@ -82,7 +82,15 @@
      /* Ensure content doesn't overlap the tab */
      /* padding-top: 40px; */ /* Adjust if tab overlaps content */
 }
-/* --- REMOVED body.sidebar-collapsed rule --- */
+/* --- NEW: Styles for collapsed sidebar --- */
+#sidebar.collapsed {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-right-width: 0;
+    overflow: hidden; /* Hide content when collapsed */
+}
+/* --- End NEW Styles --- */
 /* Right Sidebar (Plugins) */
  #plugins-sidebar {
      position: relative; /* Needed for absolute positioning of the tab */
@@ -99,7 +107,15 @@
      /* Ensure content doesn't overlap the tab */
      /* padding-top: 40px; */ /* Adjust if tab overlaps content */
 }
-/* --- REMOVED body.plugins-collapsed rule --- */
+/* --- NEW: Styles for collapsed plugins sidebar --- */
+#plugins-sidebar.collapsed {
+    width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    border-left-width: 0;
+    overflow: hidden; /* Hide content when collapsed */
+}
+/* --- End NEW Styles --- */
 
 /* --- NEW Sidebar Toggle Tab Styles --- */
 .sidebar-toggle-tab {
