@@ -51,12 +51,10 @@ markedRenderer.code = function(code, language, isEscaped) {
                      <p class="text-center text-gray-500 p-4">Processing diagram...</p>
                 </div>`;
     } else {
-        // Fallback to original renderer for other code blocks
-        // Manually create pre/code block, ensuring proper escaping
-        const escapedCode = escapeHtml(codeString);
-        const langClass = language ? `language-${escapeHtml(language)}` : '';
-        // Ensure a newline at the end inside the code tag for better formatting
-        return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code class="${langClass}">${escapedCode}\n</code></pre>`;
+        // Fallback for non-Draw.io code blocks: Basic escaping and pre/code tags.
+        // Stringify code just in case, then escape. Ignore language hints for simplicity.
+        const escapedCode = escapeHtml(String(code)); // Ensure string conversion before escaping
+        return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapedCode}\n</code></pre>`;
     }
 };
 

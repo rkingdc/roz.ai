@@ -21,10 +21,10 @@ import { markedRenderer } from './config.js'; // Import the custom renderer from
 /**
  * Waits for GraphViewer to be available and then processes diagrams.
  * Polls for a limited number of attempts.
- * @param {number} [maxAttempts=10] - Maximum number of times to check.
+ * @param {number} [maxAttempts=30] - Maximum number of times to check (increased to 30).
  * @param {number} [delay=100] - Delay between checks in milliseconds.
  */
-function waitForGraphViewerAndProcess(maxAttempts = 10, delay = 100) {
+function waitForGraphViewerAndProcess(maxAttempts = 30, delay = 100) { // Increased maxAttempts
     let attempts = 0;
 
     function checkAndProcess() {
