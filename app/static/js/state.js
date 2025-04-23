@@ -1,5 +1,7 @@
 // js/state.js
 
+import { elements } from './dom.js'; // Import elements object
+
 // Application State Variables
 // Use 'export let' to allow them to be reassigned by other modules
 export let currentChatId = null;
