@@ -413,10 +413,11 @@
     right: 8px; /* Adjust as needed */
     bottom: 8px; /* Adjust as needed */
     z-index: 10; /* Ensure it's above the textarea */
-    /* Use theme colors */
-    background-color: var(--rz-frame);
-    color: var(--rz-button-secondary-text);
-    border: 1px solid var(--rz-button-secondary-bg);
+    /* --- Updated Mic Button Colors --- */
+    background-color: var(--rz-popup); /* Light gray background */
+    color: var(--rz-toolbar-text); /* Gold icon color */
+    border: 1px solid var(--rz-tab-line); /* Subtle border */
+    /* --------------------------------- */
     border-radius: 50%; /* Make it circular */
     padding: 0; /* Remove default button padding */
     display: flex;
@@ -424,10 +425,11 @@
     justify-content: center;
 }
 .input-wrapper #mic-button:hover:not(:disabled) {
-    background-color: var(--rz-button-secondary-hover-bg);
+    background-color: var(--rz-tab-line); /* Slightly darker gray on hover */
+    color: var(--rz-toolbar-field); /* Darker icon on hover for contrast */
 }
 .input-wrapper #mic-button.recording {
-    background-color: #dc2626; /* Example: Red background when recording */
+    background-color: #dc2626; /* Keep Red background when recording */
     color: white;
     border-color: #b91c1c;
 }
