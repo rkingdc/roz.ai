@@ -124,6 +124,7 @@ export function populateElements() {
     elements.messageInput = document.getElementById('message-input');
     elements.micButton = document.getElementById('mic-button');
     elements.cleanupTranscriptButton = document.getElementById('cleanup-transcript-btn'); // Populate cleanup button reference
+    console.log(`[DOM DEBUG] Populating elements.cleanupTranscriptButton:`, elements.cleanupTranscriptButton); // Add log
     elements.sendButton = document.getElementById('send-button');
     elements.sidebar = document.getElementById('sidebar');
     elements.savedChatsList = document.getElementById('saved-chats-list');
