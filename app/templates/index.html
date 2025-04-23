@@ -153,31 +153,43 @@
             <div id="input-area" class="flex flex-col gap-2 p-4 border-t border-gray-300 bg-gray-100 flex-shrink-0">
                  <!-- Container for ALL attached files (session + plugin) -->
                  <div id="selected-files-container" class="hidden"></div>
+                 <!-- NEW Top Controls Row -->
+                 <div class="flex items-center gap-2 mb-2">
+                     <!-- Attach Session File Button -->
+                     <label class="btn btn-secondary btn-sm p-1 flex-shrink-0" id="file-upload-session-label" for="file-upload-session-input" title="Attach file to message" style="height: 34px; width: 34px; line-height: normal;"> {# Adjusted style #}
+                         <i class="fas fa-paperclip"></i>
+                     </label>
+                     <!-- Mic/Cleanup Button Group -->
+                     <div class="inline-flex items-center" role="group">
+                         <button type="button" id="mic-button" class="btn btn-secondary p-2" title="Record Voice" style="height: 34px; width: 34px;">
+                             <i class="fas fa-microphone"></i>
+                         </button>
+                         <button type="button" id="cleanup-transcript-btn" class="btn btn-secondary p-2 ml-1" title="Clean Up Transcript" disabled style="height: 34px; width: 34px;">
+                             <i class="fas fa-wand-magic-sparkles"></i>
+                         </button>
+                     </div>
+                     <!-- Spacer to push Web Search to the right -->
+                     <div class="flex-grow"></div>
+                     <!-- Web Search Toggle -->
+                     <label class="toggle-switch text-xs" id="web-search-toggle-label" title="Include web search results in the AI's context">
+                         <input type="checkbox" id="web-search-toggle">
+                         <span class="toggle-slider"></span>
+                         Web Search
+                     </label>
+                 </div>
+                 <!-- End NEW Top Controls Row -->
                  <div id="input-controls" class="flex items-center gap-2">
-                    <!-- File upload trigger moved here -->
-                    <label class="btn btn-secondary btn-sm p-1 flex-shrink-0 self-end mb-1 me-1" id="file-upload-session-label" for="file-upload-session-input" title="Attach file to message" style="height: 42px; line-height: 1.5rem;">
-                        <i class="fas fa-paperclip"></i>
-                    </label>
+                    <!-- File upload trigger MOVED TO TOP ROW -->
                    <div id="file-upload-session-container" class="hidden">
                         <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf">
-                        <!-- Label moved to input-controls div -->
                         <!-- <div id="session-file-display"></div> --> <!-- This div is no longer used -->
                     </div>
-                    <!-- Wrapper for textarea and mic/cleanup button group -->
+                    <!-- Wrapper for textarea -->
                     <div class="input-wrapper flex-grow relative">
                         <textarea id="message-input" rows="2" class="w-full p-2 rounded-lg focus:outline-none resize-none text-sm border border-gray-300" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
-                        <!-- Button Group for Mic and Cleanup -->
-                        <div class="inline-flex items-center absolute bottom-1 right-1" role="group"> {# Removed rounded-md shadow-sm #}
-                            {# Apply standard button styles and add margin to the second button #}
-                            <button type="button" id="mic-button" class="btn btn-secondary p-2" title="Record Voice" style="height: 34px; width: 34px;">
-                                <i class="fas fa-microphone"></i>
-                            </button>
-                            <button type="button" id="cleanup-transcript-btn" class="btn btn-secondary p-2 ml-1" title="Clean Up Transcript" disabled style="height: 34px; width: 34px;"> {# Added ml-1 for spacing #}
-                                <i class="fas fa-wand-magic-sparkles"></i>
-                            </button>
-                        </div>
+                        <!-- Button Group MOVED TO TOP ROW -->
                     </div>
-                    <div class="flex flex-col items-center self-end flex-shrink-0"> <!-- Container for Send button and checkbox -->
+                    <div class="flex flex-col items-center flex-shrink-0"> <!-- Container for Send button - Removed self-end -->
                         <!-- Web Search Toggle - Visibility controlled by plugin setting -->
                         <label class="toggle-switch text-xs mb-1" id="web-search-toggle-label" title="Include web search results in the AI's context">
                             <input type="checkbox" id="web-search-toggle">
