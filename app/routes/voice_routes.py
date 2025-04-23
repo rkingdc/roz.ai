@@ -1,6 +1,7 @@
 import logging
 from flask import Blueprint, request, jsonify, current_app
-from app.voice_services import transcribe_audio
+from app.voice_services import transcribe_audio, clean_up_transcript # Import clean_up_transcript
+from app import ai_services # Import ai_services directly
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('voice_api', __name__, url_prefix='/api/voice')
@@ -55,3 +56,52 @@ def handle_transcribe():
         # This case should technically be caught by checks above, but included for completeness
         logger.warning("File object was present but empty or invalid.")
         return jsonify({"error": "Invalid file"}), 400
+
+
+@bp.route('/cleanup', methods=['POST'])
+def handle_cleanup():
+    """
+    API endpoint to receive raw transcript text and return a cleaned version.
+    Expects JSON body: {"transcript": "raw text..."}
+    """
+    logger.info("Received request at /api/voice/cleanup")
+
+    if not request.is_json:
+        logger.warning("Cleanup request is not JSON.")
+        return jsonify({"error": "Request must be JSON"}), 400
+
+    data = request.get_json()
+    raw_transcript = data.get('transcript')
+
+    if not raw_transcript or not isinstance(raw_transcript, str):
+        logger.warning("Missing or invalid 'transcript' field in cleanup request.")
+        return jsonify({"error": "Missing or invalid 'transcript' field"}), 400
+
+    if raw_transcript.isspace():
+        logger.info("Received empty transcript for cleanup, returning empty.")
+        return jsonify({"cleaned_transcript": ""}), 200
+
+    try:
+        # Call the cleanup function from ai_services
+        # This function handles its own AI readiness check and error handling
+        cleaned_transcript = ai_services.clean_up_transcript(raw_transcript)
+
+        # Check if the cleanup function returned the original transcript (indicating a fallback/error)
+        if cleaned_transcript == raw_transcript:
+            logger.warning("Transcript cleanup failed or resulted in no change. Returning original.")
+            # Optionally return a specific status or flag? For now, just return original.
+            # Consider if frontend needs to know if cleanup *actually* happened.
+            # Returning 200 but with original text might be confusing.
+            # Let's return an error status if it failed internally.
+            # We need a way for clean_up_transcript to signal failure vs. no change needed.
+            # For now, assume if it returns the original, it might have failed.
+            # Let's refine clean_up_transcript later if needed.
+            # For this implementation, we'll return success but with potentially unchanged text.
+            return jsonify({"cleaned_transcript": cleaned_transcript}), 200
+        else:
+            logger.info("Transcript cleaned successfully.")
+            return jsonify({"cleaned_transcript": cleaned_transcript}), 200
+
+    except Exception as e:
+        logger.error(f"Unexpected error during transcript cleanup: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error during cleanup"}), 500

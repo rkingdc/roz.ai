@@ -92,24 +92,29 @@ export function setupEventListeners() {
             return;
         }
 
-        // Placeholder for cleanup logic
-        state.setStatusMessage("Cleanup requested...", false);
-        console.log("Cleanup button clicked. Raw transcript:", rawTranscript);
-        // TODO: Implement API call to backend for cleanup
-        // Example:
-        // try {
-        //     const cleanedTranscript = await api.cleanupTranscript(rawTranscript);
-        //     if (elements.messageInput) elements.messageInput.value = cleanedTranscript;
-        //     state.setStatusMessage("Transcript cleaned.", false);
-        // } catch (error) {
-        //     state.setStatusMessage(`Cleanup failed: ${error.message}`, true);
-        // } finally {
-        //     // Disable button again after cleanup? Or leave enabled?
-        //     if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = true;
-        // }
-        alert("Cleanup functionality not yet implemented."); // Temporary alert
-        if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = true; // Disable after click for now
+        // Disable button immediately
+        if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = true;
+        const originalText = elements.messageInput?.value || ''; // Store original text in case of error
 
+        try {
+            // Call the new API function
+            const cleanedTranscript = await api.cleanupTranscript(rawTranscript);
+
+            // Update the input field ONLY if cleanup was successful
+            if (elements.messageInput) {
+                elements.messageInput.value = cleanedTranscript;
+            }
+            // Status is set by api.cleanupTranscript on success/failure
+
+        } catch (error) {
+            // Error status is already set by api.cleanupTranscript
+            // Restore original text if cleanup failed
+            if (elements.messageInput) {
+                elements.messageInput.value = originalText;
+            }
+            // Button remains disabled due to the immediate disable above
+        }
+        // No finally block needed here, button is disabled at the start or on error
     });
 
     // --- Sidebar & Chat Management ---

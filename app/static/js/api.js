@@ -1366,6 +1366,44 @@ export async function loadNoteHistory(noteId) {
 }
 
 
+// --- Transcript Cleanup API ---
+/**
+ * Sends raw transcript text to the backend for cleanup.
+ * @param {string} rawTranscript - The raw transcript text.
+ * @returns {Promise<string>} A promise that resolves with the cleaned transcript or rejects on error.
+ */
+export async function cleanupTranscript(rawTranscript) {
+    if (state.isLoading) {
+        throw new Error("Application is busy."); // Throw error if already loading
+    }
+    setLoading(true, "Cleaning Transcript");
+
+    try {
+        const response = await fetch('/api/voice/cleanup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transcript: rawTranscript })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP error! status: ${response.status}`);
+        }
+
+        setStatus("Transcript cleaned."); // Set status on success
+        return data.cleaned_transcript; // Return the cleaned text
+
+    } catch (error) {
+        console.error('Error cleaning transcript:', error);
+        setStatus(`Cleanup failed: ${error.message}`, true); // Set error status
+        throw error; // Re-throw the error for the caller to handle
+    } finally {
+        setLoading(false);
+    }
+}
+
+
 // --- Initial Data Loading ---
 
 /** Loads the initial data required for the Chat tab. */
