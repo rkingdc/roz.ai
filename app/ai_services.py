@@ -761,9 +761,12 @@ def _generate_chat_response_non_stream(
         logger.info(
             f"Calling model.generate_content (non-streaming) for chat {chat_id}"
         )
+        system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
+
         response = client.models.generate_content(
             model=model_to_use,
             contents=full_conversation,
+            system_instruction=system_prompt, # Add system instruction
         )
         logger.info(f"Non-streaming generate_content call returned for chat {chat_id}.")
 
@@ -934,10 +937,13 @@ def _generate_chat_response_stream(
         # --- Call Gemini API (Streaming) ---
         full_conversation = history + [Content(role="user", parts=current_turn_parts)]
 
+        system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
+
         logger.info(f"Calling model.generate_content (streaming) for chat {chat_id}")
         response_iterator = client.models.generate_content_stream(
             model=model_to_use,
             contents=full_conversation,
+            system_instruction=system_prompt, # Add system instruction
         )
         logger.info(
             f"Streaming generate_content call returned iterator for chat {chat_id}."
