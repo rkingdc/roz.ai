@@ -116,6 +116,31 @@ export function setupEventListeners() {
         }
         // No finally block needed here, button is disabled at the start or on error
     });
+
+    // --- Notes Textarea Listeners for Cleanup Button State ---
+    if (elements.notesTextarea) {
+        const updateCleanupState = () => ui.updateNotesCleanupButtonState(); // Alias for brevity
+        // Update button state when selection changes within the document
+        document.addEventListener('selectionchange', () => {
+            // Check if the notes textarea is the active element when selection changes
+            if (document.activeElement === elements.notesTextarea) {
+                updateCleanupState();
+            } else {
+                // If selection changes outside the textarea, disable the button
+                if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = true;
+            }
+        });
+        // Also update when typing or clicking within the textarea might clear selection
+        elements.notesTextarea.addEventListener('input', updateCleanupState);
+        elements.notesTextarea.addEventListener('click', updateCleanupState); // Handle clicks that might clear selection
+        elements.notesTextarea.addEventListener('focus', updateCleanupState); // Update on focus
+        elements.notesTextarea.addEventListener('blur', () => { // Disable when focus leaves
+             if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = true;
+        });
+        // Initial state check might be needed after elements are populated, or rely on tab switch
+    }
+    // -------------------------------------------------------
+
     elements.micButtonNotes?.addEventListener('click', () => {
         if (state.currentTab !== 'notes') return; // Only allow in notes
 
