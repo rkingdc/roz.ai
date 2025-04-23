@@ -36,11 +36,96 @@ function setStatus(message, isError = false) {
  * Connects to the WebSocket server for transcription.
  * @param {string} languageCode - e.g., 'en-US'
  * @param {string} audioFormat - e.g., 'WEBM_OPUS' (must match frontend recording)
+ * @returns {Promise<void>} A promise that resolves when the backend confirms transcription started, or rejects on error.
  */
 export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat = 'WEBM_OPUS') {
-    if (socket && socket.connected) {
-        console.warn("WebSocket already connected.");
-        return;
+    // Return a promise
+    return new Promise((resolve, reject) => {
+        if (socket && socket.connected) {
+            console.warn("WebSocket already connected.");
+            // If already connected, assume backend might need re-initiation?
+            // Or just resolve immediately? Let's assume re-initiation is needed.
+            // For simplicity now, let's reject if already connected to avoid complex state.
+            // reject(new Error("WebSocket already connected.")); // Or resolve()?
+            // Let's allow re-connection attempt for now, might clear old state.
+             disconnectTranscriptionSocket(); // Disconnect first
+        }
+
+        // Ensure Socket.IO client library is loaded
+        if (typeof io === 'undefined') {
+            console.error("Socket.IO client library not found. Make sure it's included.");
+            setStatus("Error: Missing Socket.IO library.", true);
+            reject(new Error("Socket.IO client library not found.")); // Reject the promise
+            return;
+        }
+
+        setStatus("Connecting to transcription service...");
+        state.setIsSocketConnected(false); // Update state
+
+        // Connect to the Socket.IO server
+        socket = io();
+
+        // --- Event Handlers ---
+        socket.on('connect', () => {
+            console.log("WebSocket connected successfully:", socket.id);
+            setStatus("Transcription service connected. Waiting for backend readiness..."); // Updated status
+            state.setIsSocketConnected(true); // Update state
+            socket.emit('start_transcription', { languageCode, audioFormat });
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error("WebSocket connection error:", error);
+            setStatus(`Transcription connection failed: ${error.message}`, true);
+            state.setIsSocketConnected(false); // Update state
+            socket = null;
+            reject(error); // Reject the promise
+        });
+
+        socket.on('disconnect', (reason) => {
+            console.log("WebSocket disconnected:", reason);
+            if (!state.isErrorStatus) {
+                setStatus("Transcription service disconnected.");
+            }
+            state.setIsSocketConnected(false);
+            state.setStreamingTranscript("");
+            socket = null;
+            // Don't reject here, disconnect might be normal. Let caller handle state.
+        });
+
+        socket.on('transcript_update', (data) => {
+            // (Existing transcript update logic)
+            if (data && data.transcript !== undefined) {
+                if (data.is_final) {
+                    console.log("Final transcript segment:", data.transcript);
+                    state.appendStreamingTranscript(data.transcript + ' ');
+                    state.setFinalTranscriptSegment(data.transcript);
+                } else {
+                    state.setStreamingTranscript(data.transcript);
+                }
+            }
+        });
+
+        socket.on('transcription_error', (data) => {
+            console.error("Transcription error from backend:", data.error);
+            setStatus(`Transcription Error: ${data.error}`, true);
+            disconnectTranscriptionSocket();
+            reject(new Error(data.error)); // Reject the promise on backend error
+        });
+
+        socket.on('transcription_started', (data) => {
+            console.log("Backend confirmed transcription started:", data.message);
+            setStatus("Recording... Speak now."); // Update status
+            resolve(); // Resolve the promise, signaling backend is ready
+        });
+
+        socket.on('transcription_finished', (data) => {
+            console.log("Backend confirmed transcription finished:", data.message);
+        });
+
+        socket.on('transcription_stop_acknowledged', (data) => {
+            console.log("Backend acknowledged stop signal:", data.message);
+        });
+    }); // End of Promise constructor
     }
 
     // Ensure Socket.IO client library is loaded

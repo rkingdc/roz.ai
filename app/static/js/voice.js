@@ -150,10 +150,34 @@ export async function startRecording(context) {
         console.log(`[DEBUG] MediaRecorder started with timeslice ${TIMESLICE_MS}ms.`);
         state.setIsRecording(true, context); // Update state (notifies isRecording)
         // Status message updated by 'transcription_started' event from backend
-        state.setStatusMessage("Waiting for transcription service...");
+        // --- Wait for backend confirmation before starting recorder ---
+        // We need a way to know when the 'transcription_started' event is received.
+        // Let's modify connectTranscriptionSocket to return a promise that resolves on 'transcription_started'.
+
+        // Connect WebSocket and wait for backend readiness
+        const backendReadyPromise = api.connectTranscriptionSocket('en-US', 'WEBM_OPUS'); // Use appropriate lang code and format
+
+        // Set recording state and context *before* awaiting backend confirmation
+        state.setIsRecording(true, context); // Update state (notifies isRecording)
+
+        // Wait for the promise to resolve (or reject on error)
+        await backendReadyPromise; // This pauses execution until the backend confirms
+
+        // If we reach here, the backend is ready. Now start the recorder.
+        // Check if recording was stopped while waiting (e.g., due to error)
+        if (!state.isRecording || !mediaRecorder) {
+             console.warn("[WARN] Recording stopped before MediaRecorder could start (likely due to connection error).");
+             // Cleanup might have already happened in error handler, but ensure tracks are stopped
+             stopMediaStreamTracks();
+             return; // Exit startRecording
+        }
+        mediaRecorder.start(TIMESLICE_MS);
+        console.log(`[DEBUG] MediaRecorder started with timeslice ${TIMESLICE_MS}ms after backend confirmation.`);
+        // Status message is already set to "Recording... Speak now." by the 'transcription_started' handler in api.js
 
     } catch (error) {
-        console.error("[ERROR] Error accessing microphone or starting recorder:", error);
+        // Handle errors from connectTranscriptionSocket promise or getUserMedia/MediaRecorder setup
+        console.error("[ERROR] Error during recording setup:", error);
         if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
             state.setStatusMessage("Microphone access denied. Please allow access in browser settings.", true);
         } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
