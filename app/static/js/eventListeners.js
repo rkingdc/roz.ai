@@ -755,11 +755,20 @@ export function setupEventListeners() {
     }
 
     // --- Notes Interactions ---
-    // Note textarea input updates state.noteContent - handler already does this and calls ui.updateNotesPreview
+    // Note textarea input updates state.noteContent AND triggers auto-resize
     elements.notesTextarea?.addEventListener('input', (e) => {
         state.setNoteContent(e.target.value); // Update state (notifies noteContent, currentNote)
+        ui.autoResizeTextarea(elements.notesTextarea); // Call the reusable UI function
         // UI update is triggered by state notifications
     });
+    // --- Add paste listener for notes textarea auto-resize ---
+    elements.notesTextarea?.addEventListener('paste', () => {
+        // Use setTimeout to allow the paste operation to complete before resizing
+        setTimeout(() => {
+            ui.autoResizeTextarea(elements.notesTextarea);
+        }, 0);
+    });
+    // -------------------------------------------------------
     elements.newNoteButton?.addEventListener('click', async () => {
         await api.startNewNote(); // Updates state (currentNoteId, savedNotes, noteContent, isLoading, statusMessage, etc.)
         // UI updates are triggered by state notifications.
