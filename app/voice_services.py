@@ -283,11 +283,11 @@ def _google_listen_print_loop(
 
             # Display interim results, but don't store them permanently yet
             if not result.is_final:
-                # logger.debug(f"SID {sid} - Interim transcript: {transcript}")
+                logger.debug(f"SID {sid} - Emitting Interim transcript: {transcript}") # Add specific log
                 # Use socketio.emit directly
                 socketio.emit('transcript_update', {'transcript': transcript, 'is_final': False}, room=sid)
             else:
-                logger.info(f"SID {sid} - Final transcript: {transcript}")
+                logger.info(f"SID {sid} - Emitting Final transcript: {transcript}") # Add specific log
                 # Use socketio.emit directly
                 socketio.emit('transcript_update', {'transcript': transcript, 'is_final': True}, room=sid)
                 # Here you could potentially trigger the LLM cleanup if desired,

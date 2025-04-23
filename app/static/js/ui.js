@@ -1594,10 +1594,10 @@ export function handleStateChange_noteHistory() {
 export function renderStreamingTranscript() {
     const transcript = state.streamingTranscript; // Read from state
     const context = state.recordingContext; // Read context
-    console.log(`[UI DEBUG] renderStreamingTranscript called. Context: ${context}, Transcript: "${transcript}"`); // Add log
+    // console.log(`[UI DEBUG] renderStreamingTranscript called. Context: ${context}, Transcript: "${transcript}"`); // Reduce noise
 
     if (context === 'chat' && elements.messageInput) {
-        console.log(`[UI DEBUG] Updating messageInput value to: "${transcript}"`); // Add log
+        // console.log(`[UI DEBUG] Updating messageInput value to: "${transcript}"`); // Reduce noise
         elements.messageInput.value = transcript; // Update chat input
         // Auto-scroll input if needed (usually not necessary for single line)
     } else if (context === 'notes' && elements.notesTextarea) {

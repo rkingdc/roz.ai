@@ -319,10 +319,18 @@ export function stopAudioStream() {
         }, timeoutDuration);
 
         // Ensure timeout is cleared if promise resolves/rejects normally
-        const originalResolve = resolveOnce;
-        const originalReject = rejectOnce;
-        resolveOnce = (message) => { clearTimeout(timeoutId); originalResolve(message); };
-        rejectOnce = (error) => { clearTimeout(timeoutId); originalReject(error); };
+        // Modify the original functions to include clearTimeout
+        const originalResolveOnce = resolveOnce;
+        resolveOnce = (message) => {
+            clearTimeout(timeoutId);
+            originalResolveOnce(message); // Call the original function
+        };
+
+        const originalRejectOnce = rejectOnce;
+        rejectOnce = (error) => {
+            clearTimeout(timeoutId);
+            originalRejectOnce(error); // Call the original function
+        };
 
     }); // End of promise constructor
 }
