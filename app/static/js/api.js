@@ -1373,7 +1373,9 @@ export async function loadNoteHistory(noteId) {
  * @returns {Promise<string>} A promise that resolves with the cleaned transcript or rejects on error.
  */
 export async function cleanupTranscript(rawTranscript) {
+    console.log("[DEBUG] cleanupTranscript API called with:", rawTranscript); // Log input
     if (state.isLoading) {
+        console.warn("[WARN] cleanupTranscript called while loading.");
         throw new Error("Application is busy."); // Throw error if already loading
     }
     setLoading(true, "Cleaning Transcript");
@@ -1385,17 +1387,34 @@ export async function cleanupTranscript(rawTranscript) {
             body: JSON.stringify({ transcript: rawTranscript })
         });
 
-        const data = await response.json();
+        console.log("[DEBUG] cleanupTranscript API response status:", response.status);
+        const responseText = await response.text(); // Get raw text first for logging
+        console.log("[DEBUG] cleanupTranscript API raw response body:", responseText);
+
+        let data;
+        try {
+            data = JSON.parse(responseText); // Try parsing JSON
+        } catch (parseError) {
+            console.error("[ERROR] Failed to parse cleanupTranscript API response as JSON:", parseError);
+            throw new Error(`Failed to parse API response. Status: ${response.status}`);
+        }
+
 
         if (!response.ok) {
+            console.error("[ERROR] cleanupTranscript API returned error:", data.error || `HTTP ${response.status}`);
             throw new Error(data.error || `HTTP error! status: ${response.status}`);
         }
 
+        const cleanedTranscript = data.cleaned_transcript;
+        console.log("[DEBUG] cleanupTranscript API success. Cleaned text:", cleanedTranscript);
+
         setStatus("Transcript cleaned."); // Set status on success
-        return data.cleaned_transcript; // Return the cleaned text
+        return cleanedTranscript; // Return the cleaned text
 
     } catch (error) {
-        console.error('Error cleaning transcript:', error);
+        // Error is already logged above if it's an API error
+        // This catch block handles network errors or JSON parsing errors primarily
+        console.error('Error during cleanupTranscript fetch/processing:', error);
         setStatus(`Cleanup failed: ${error.message}`, true); // Set error status
         throw error; // Re-throw the error for the caller to handle
     } finally {

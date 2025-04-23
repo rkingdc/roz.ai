@@ -103,9 +103,11 @@ export function setupEventListeners() {
         // Disable button during processing (handled by global isLoading state via ui.updateChatCleanupButtonState)
         // state.setIsLoading(true); // api.cleanupTranscript handles this
 
+        console.log(`[DEBUG] Chat Cleanup: Selected text: "${selectedText}"`);
         try {
             // Call the existing API function with the selected text
             const cleanedText = await api.cleanupTranscript(selectedText);
+            console.log(`[DEBUG] Chat Cleanup: Received cleaned text: "${cleanedText}"`);
 
             // Get the potentially updated text *after* API call returns
             const currentFullText = inputField.value;
@@ -115,6 +117,7 @@ export function setupEventListeners() {
             const textBefore = currentFullText.substring(0, selectionStart);
             const textAfter = currentFullText.substring(selectionEnd);
             const newFullText = textBefore + cleanedText + textAfter;
+            console.log(`[DEBUG] Chat Cleanup: Replacing with new full text: "${newFullText}"`);
 
             // Update the input field directly
             console.log("[DEBUG] Chat Cleanup: Replacing text in input field.");
@@ -220,9 +223,11 @@ export function setupEventListeners() {
         // Disable button during processing (handled by global isLoading state via ui.updateNotesCleanupButtonState)
         // state.setIsLoading(true); // api.cleanupTranscript handles this
 
+        console.log(`[DEBUG] Notes Cleanup: Selected text: "${selectedText}"`);
         try {
             // Call the existing API function with the selected text
             const cleanedText = await api.cleanupTranscript(selectedText);
+            console.log(`[DEBUG] Notes Cleanup: Received cleaned text: "${cleanedText}"`);
 
             // Get the potentially updated text *after* API call returns
             const currentFullText = textarea.value;
@@ -232,6 +237,7 @@ export function setupEventListeners() {
             const textBefore = currentFullText.substring(0, selectionStart);
             const textAfter = currentFullText.substring(selectionEnd);
             const newFullText = textBefore + cleanedText + textAfter;
+            console.log(`[DEBUG] Notes Cleanup: Replacing with new full text: "${newFullText}"`);
 
             // Update the textarea directly
             console.log("[DEBUG] Notes Cleanup: Replacing text in textarea.");
