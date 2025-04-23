@@ -1109,9 +1109,10 @@
 
 /* --- Notes TOC Drawer Styles --- */
 .notes-toc-drawer {
-    margin-top: 1rem; /* Space above the drawer */
+    /* REMOVED margin-top */
     border: 1px solid var(--rz-sidebar-border);
     border-radius: 0.5rem;
+    /* display: flex; flex-direction: column-reverse; Added via HTML classes */
     background-color: var(--rz-sidebar-bg);
     overflow: hidden; /* Important for collapse transition */
     flex-shrink: 0; /* Prevent shrinking */
@@ -1123,12 +1124,15 @@
     align-items: center;
     padding: 0.5rem 0.75rem;
     background-color: var(--rz-frame);
-    border-bottom: 1px solid var(--rz-sidebar-border);
+    /* border-bottom: 1px solid var(--rz-sidebar-border); REMOVED */
+    border-top: 1px solid var(--rz-sidebar-border); /* ADDED */
     color: var(--rz-sidebar-text);
     font-weight: 500;
     cursor: pointer;
-    border-top-left-radius: 0.5rem; /* Match container */
-    border-top-right-radius: 0.5rem; /* Match container */
+    /* border-top-left-radius: 0.5rem; REMOVED */
+    /* border-top-right-radius: 0.5rem; REMOVED */
+    border-bottom-left-radius: 0.5rem; /* ADDED */
+    border-bottom-right-radius: 0.5rem; /* ADDED */
 }
 
 .toc-toggle-button {
@@ -1144,9 +1148,10 @@
     transition: transform 0.2s ease-in-out;
 }
 
-.toc-drawer-header.collapsed .toc-toggle-icon {
-    transform: rotate(180deg); /* Point down when collapsed */
-}
+/* REMOVED CSS rotation - JS handles icon class toggling */
+/* .toc-drawer-header.collapsed .toc-toggle-icon { */
+    /* transform: rotate(180deg); */ /* Point down when collapsed */
+/* } */
 
 .toc-drawer-content {
     padding: 0.5rem;
@@ -1169,7 +1174,8 @@
     padding-top: 0;
     padding-bottom: 0;
     opacity: 0;
-    border-top: none; /* If header border is conditional */
+    /* border-top: none; REMOVED - No border needed here */
+    border-bottom: none; /* Ensure no bottom border when collapsed */
 }
 
 .toc-item {
@@ -1199,4 +1205,16 @@
 .toc-level-4 { padding-left: 2.75rem; }
 .toc-level-5 { padding-left: 3.5rem; }
 .toc-level-6 { padding-left: 4.25rem; }
+
+/* --- NEW: Style for the notes list scroll container --- */
+.notes-list-container {
+    /* flex-grow: 1; Added via HTML */
+    /* overflow-y: auto; Added via HTML */
+    /* min-height: 0; Added via HTML */
+    /* Add scrollbar styling if desired, similar to .toc-drawer-content */
+}
+.notes-list-container::-webkit-scrollbar { width: 5px; height: 5px; }
+.notes-list-container::-webkit-scrollbar-track { background: var(--rz-frame); border-radius: 10px; }
+.notes-list-container::-webkit-scrollbar-thumb { background: var(--rz-tab-line); border-radius: 10px; }
+.notes-list-container::-webkit-scrollbar-thumb:hover { background: var(--rz-toolbar-text); }
 /* --- End Notes TOC Drawer Styles --- */

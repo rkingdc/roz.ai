@@ -68,7 +68,8 @@
         <!-- End Chat Sidebar Content -->
 
         <!-- Notes Sidebar Content (Initially Hidden) -->
-        <div id="notes-sidebar-content" class="hidden">
+        {# Added flex, flex-col, h-full, overflow-hidden #}
+        <div id="notes-sidebar-content" class="hidden flex flex-col h-full overflow-hidden">
              <button id="new-note-btn" class="btn btn-primary w-full mb-4 flex-shrink-0">
                 <i class="fas fa-plus"></i> New Note
             </button>
@@ -83,21 +84,28 @@
                 </div>
                  <div id="current-note-id-display" class="text-xs text-rz-tab-background-text mt-1 whitespace-nowrap">ID: -</div>
             </div>
-            <div class="flex flex-col min-h-0 flex-grow sidebar-section-container">
+            {# NEW Scrollable container for notes list #}
+            <div class="flex flex-col min-h-0 flex-grow overflow-y-auto mb-2 notes-list-container">
                 <h3 class="text-lg font-medium mb-1 border-t border-rz-sidebar-border pt-3 flex-shrink-0 whitespace-nowrap">Saved Notes</h3>
+                {# Removed flex-grow from sidebar-list itself #}
                 <div id="saved-notes-list" class="sidebar-list">
                     <p class="text-rz-sidebar-text opacity-75 text-sm p-1">Loading notes...</p>
                 </div>
             </div>
+            {# End Scrollable container #}
 
-            <!-- NEW Notes TOC Drawer -->
-            <div id="notes-toc-drawer" class="notes-toc-drawer flex-shrink-0">
+            <!-- Notes TOC Drawer (Moved outside scrollable area) -->
+            {# Added flex, flex-col-reverse #}
+            <div id="notes-toc-drawer" class="notes-toc-drawer flex-shrink-0 flex flex-col-reverse">
+                {# Header now comes AFTER content in flex-col-reverse #}
                 <div id="notes-toc-header" class="toc-drawer-header">
                     <span><i class="fas fa-list-ul mr-2"></i> Contents</span>
                     <button id="notes-toc-toggle" class="toc-toggle-button" title="Toggle Table of Contents">
-                        <i class="fas fa-chevron-up toc-toggle-icon"></i>
+                        {# Icon will be toggled by JS #}
+                        <i class="fas fa-chevron-down toc-toggle-icon"></i>
                     </button>
                 </div>
+                 {# Content now comes BEFORE header in flex-col-reverse #}
                 <div id="notes-toc-list" class="toc-drawer-content">
                     <p class="text-rz-sidebar-text opacity-75 text-xs p-1">No headings found.</p>
                 </div>
