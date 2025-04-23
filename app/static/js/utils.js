@@ -28,5 +28,23 @@ export function escapeHtml(html) {
         .replace(/'/g, '&#039;');
 }
 
+/**
+ * Debounce function to limit the rate at which a function can fire.
+ * @param {function} func - The function to debounce.
+ * @param {number} wait - The number of milliseconds to delay.
+ * @returns {function} The debounced function.
+ */
+export function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 // Note: The marked.js renderer configuration is in config.js
 // Note: updateStatus and setLoadingState are in ui.js as they directly manipulate the DOM.
