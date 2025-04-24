@@ -120,6 +120,7 @@ export const elements = {
     bodyElement: null,
     chatNavButton: null,
     notesNavButton: null,
+    toastContainer: null, // *** ADDED: Toast Container ***
 };
 
 /**
@@ -229,10 +230,16 @@ export function populateElements() {
     elements.notesTocHeader = document.getElementById('notes-toc-header');
     elements.notesTocToggle = document.getElementById('notes-toc-toggle');
     elements.notesTocList = document.getElementById('notes-toc-list');
+    elements.toastContainer = document.getElementById('toast-container'); // *** ADDED ***
 
 
     // Basic check
     if (!elements.bodyElement || !elements.statusBar || !elements.chatbox) {
         console.error("Core DOM elements not found! Application might not work correctly.");
     }
+    // *** ADDED: Check for toast container after attempting to populate ***
+    if (!elements.toastContainer) {
+        console.warn("Toast container element (#toast-container) not found during populateElements.");
+    }
+    // --------------------------------------------------------------------
 }
