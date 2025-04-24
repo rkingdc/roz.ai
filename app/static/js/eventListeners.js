@@ -887,23 +887,68 @@ export function setupEventListeners() {
     // -----------------------------------------------------------------
 
 
-    // --- Delegated Click Listener for Collapsible Headings ---
+    // --- Delegated Click Listener for Collapsible Headings (Hierarchical) ---
     function handleCollapsibleClick(event) {
+        // Only apply hierarchical logic within the notes preview
+        const notesPreview = event.target.closest('#notes-preview');
+        if (!notesPreview) {
+            // --- Keep original simple toggle logic for chatbox or other areas ---
+            const simpleHeading = event.target.closest('.collapsible-heading');
+            if (!simpleHeading) return;
+            const targetId = simpleHeading.dataset.target;
+            const content = targetId ? document.querySelector(targetId) : null;
+            const icon = simpleHeading.querySelector('.collapsible-toggle');
+            if (content && icon) {
+                const isCollapsed = content.classList.toggle('collapsed'); // Assuming 'collapsed' means hidden for simple toggle
+                icon.classList.toggle('fa-chevron-down', !isCollapsed);
+                icon.classList.toggle('fa-chevron-right', isCollapsed);
+            }
+            // --- End simple toggle logic ---
+            return;
+        }
+
+        // --- Hierarchical Logic for Notes Preview ---
         const heading = event.target.closest('.collapsible-heading');
         if (!heading) return;
 
-        const targetId = heading.dataset.target;
-        const content = targetId ? document.querySelector(targetId) : null;
         const icon = heading.querySelector('.collapsible-toggle');
+        if (!icon) return; // Need an icon to toggle
 
-        if (content) {
-            const isCollapsed = content.classList.toggle('collapsed');
-            // Toggle icon direction
-            if (icon) {
-                icon.classList.toggle('fa-chevron-down', !isCollapsed);
-                icon.classList.toggle('fa-chevron-right', isCollapsed); // Point right when collapsed
+        const headingTag = heading.tagName.toUpperCase(); // e.g., "H1", "H2"
+        if (!headingTag.startsWith('H') || headingTag.length !== 2) return; // Only process H1-H6
+        const headingLevel = parseInt(headingTag[1]);
+
+        const isCollapsing = !heading.classList.contains('collapsed'); // Check current state before toggling
+
+        // Toggle the heading's own state class
+        heading.classList.toggle('collapsed', isCollapsing);
+
+        // Update the icon
+        icon.classList.toggle('fa-chevron-down', !isCollapsing);
+        icon.classList.toggle('fa-chevron-right', isCollapsing);
+
+        // Iterate through subsequent siblings
+        let nextElement = heading.nextElementSibling;
+        while (nextElement) {
+            const nextElementTag = nextElement.tagName.toUpperCase();
+            let stop = false;
+
+            if (nextElementTag.startsWith('H') && nextElementTag.length === 2) {
+                const nextElementLevel = parseInt(nextElementTag[1]);
+                if (nextElementLevel <= headingLevel) {
+                    stop = true; // Stop when we hit a heading of the same or higher level
+                }
             }
-            // Optional: Store state in localStorage/sessionStorage if persistence is needed
+
+            if (stop) {
+                break; // Exit the loop
+            }
+
+            // Apply/remove 'hidden' class based on the action (collapsing/expanding)
+            nextElement.classList.toggle('hidden', isCollapsing);
+
+            // Move to the next sibling
+            nextElement = nextElement.nextElementSibling;
         }
     }
 
