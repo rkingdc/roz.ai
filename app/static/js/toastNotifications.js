@@ -14,9 +14,15 @@ export function initializeToastContainer(containerElement) {
         // containerElement.id = 'toast-container';
         // containerElement.className = 'fixed bottom-5 right-5 z-50 space-y-2 w-auto max-w-sm'; // Match HTML
         // document.body.appendChild(containerElement);
+        console.error("[DEBUG] initializeToastContainer: containerElement parameter was null or undefined."); // ADD LOGGING
     }
     toastContainer = containerElement;
-    console.log("[DEBUG] Toast container initialized:", toastContainer); // Add log
+    // Log whether the assignment was successful
+    if (toastContainer) {
+        console.log("[DEBUG] Toast container initialized successfully:", toastContainer);
+    } else {
+        console.error("[DEBUG] Toast container initialization FAILED. toastContainer variable is still null."); // ADD LOGGING
+    }
 }
 
 /**
