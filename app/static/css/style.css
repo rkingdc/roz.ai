@@ -1083,9 +1083,9 @@
     /* --- Fill parent height & scroll styles --- */
     /* REMOVED fixed height (from h-full class in HTML) */
     /* REMOVED min-height */
-    height: 100%; /* Make textarea fill its parent container (.note-mode-element) */
+    /* REMOVED height: 100%; Let flexbox handle the height via parent */
     /* Max height is implicitly controlled by the parent flex container (#notes-section > .note-mode-element) */
-    overflow-y: auto; /* Show scrollbar ONLY when content exceeds the 100% height */
+    overflow-y: auto; /* Show scrollbar ONLY when content exceeds the available space */
     /* --------------------------- */
 }
 
