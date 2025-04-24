@@ -1576,15 +1576,10 @@ export function renderNoteHistory() {
                  summaryText = "Summary unavailable";
                  summaryTitle = "Could not generate summary for this version.";
                  diffDiv.classList.add('text-red-400'); // Indicate error subtly
-            } else {
-                 // Truncate long summaries for display
-                 const maxLength = 100;
-                 if (summaryText.length > maxLength) {
-                     summaryText = summaryText.substring(0, maxLength) + "...";
-                 }
             }
+            // Removed manual character truncation - line-clamp handles it
         } else {
-            // If summary is null/empty and not initial version (shouldn't happen often with new logic)
+            // If summary is null/empty and not initial version
             summaryText = "Summary pending...";
             summaryTitle = "Summary is being generated or was not created.";
             diffDiv.classList.add('opacity-60'); // Dim pending text
