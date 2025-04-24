@@ -868,12 +868,54 @@ export function setupEventListeners() {
         const historyEntry = state.noteHistory.find(entry => entry.id === historyId);
 
         if (historyEntry) {
-            // Update the state with the history entry's content and name
-            state.setNoteContent(historyEntry.content); // Notifies noteContent, currentNote
-            state.setCurrentNoteName(historyEntry.name); // Notifies currentNoteName, currentNote
+            let proceedToLoad = true;
 
-            // --- REMOVED: Do NOT change the note mode when loading history ---
-            // state.setCurrentNoteMode('edit'); // Notifies currentNoteMode
+            // --- NEW: Check if summary needs generation ---
+            const needsSummary = !historyEntry.note_diff || historyEntry.note_diff === "[Summary pending...]"; // Check if diff is missing or pending marker
+            const isInitial = state.noteHistory.findIndex(entry => entry.id === historyId) === state.noteHistory.length - 1; // Check if it's the initial version
+
+            if (needsSummary && !isInitial) {
+                console.log(`[DEBUG] History item ${historyId} needs summary generation. Calling API...`);
+                // Disable the list item temporarily to prevent double clicks while generating
+                listItem.style.pointerEvents = 'none';
+                listItem.style.opacity = '0.7';
+
+                const generationSuccess = await api.generateNoteDiffSummaryForHistoryItem(state.currentNoteId, historyId);
+
+                // Re-enable the list item
+                listItem.style.pointerEvents = '';
+                listItem.style.opacity = '';
+
+                if (!generationSuccess) {
+                    // If generation failed, maybe don't load the content? Or load anyway?
+                    // Let's proceed to load the content even if summary generation failed,
+                    // but the status message will indicate the error.
+                    console.warn(`[WARN] Summary generation failed for history ${historyId}, but proceeding to load content.`);
+                    // proceedToLoad = false; // Uncomment to prevent loading content on summary failure
+                } else {
+                     console.log(`[DEBUG] Summary generation successful (or already existed) for history ${historyId}.`);
+                     // History list state is reloaded by the API function, UI will update.
+                }
+            }
+            // ---------------------------------------------
+
+            if (proceedToLoad) {
+                // Update the state with the history entry's content and name
+                // Use the potentially updated history entry from state after generation/reload
+                const updatedHistoryEntry = state.noteHistory.find(entry => entry.id === historyId) || historyEntry; // Fallback to original if not found after reload
+
+                state.setNoteContent(updatedHistoryEntry.content); // Notifies noteContent, currentNote
+                state.setCurrentNoteName(updatedHistoryEntry.name); // Notifies currentNoteName, currentNote
+
+                // --- REMOVED: Do NOT change the note mode when loading history ---
+                // state.setCurrentNoteMode('edit'); // Notifies currentNoteMode
+                // -----------------------------------------------------------------
+
+                state.setStatusMessage(`Loaded history version ${historyId}.`); // Update state
+                // UI updates are triggered by state notifications
+            }
+        } else {
+            console.warn(`[DEBUG] History entry with ID ${historyId} not found in state.noteHistory.`);
             // -----------------------------------------------------------------
 
             state.setStatusMessage(`Loaded history version ${historyId}.`); // Update state

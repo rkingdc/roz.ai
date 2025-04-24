@@ -1374,6 +1374,68 @@ export async function loadNoteHistory(noteId) {
 
 // --- Removed Note Diff Summary Generation API function ---
 // Summary generation is now handled during note save.
+
+// --- NEW: On-Demand Note Diff Summary Generation API ---
+/**
+ * Calls the backend to generate and save an AI diff summary for a specific note history entry.
+ * This is typically called when clicking a history item with a pending summary.
+ * @param {number} noteId - The ID of the parent note.
+ * @param {number} historyId - The ID of the specific history entry.
+ * @returns {Promise<boolean>} True if summary was generated/saved successfully or already existed, false otherwise.
+ */
+export async function generateNoteDiffSummaryForHistoryItem(noteId, historyId) {
+    if (state.isLoading) {
+        setStatus("Cannot generate summary: Application is busy.", true);
+        return false; // Indicate failure
+    }
+    // Use a more specific loading message
+    setLoading(true, `Generating summary for version ${historyId}...`);
+
+    try {
+        const response = await fetch(`/api/notes/${noteId}/history/${historyId}/generate_summary`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // No body needed for this request
+        });
+
+        const data = await response.json(); // Always expect JSON back
+
+        if (!response.ok) {
+            // Throw error even if backend returns a summary but failed to save
+            throw new Error(data.error || `HTTP error! status: ${response.status}`);
+        }
+
+        // Check if the backend reported a save error despite 2xx status
+        if (data.error && data.error.includes("Failed to save")) {
+             setStatus(`Summary generated for version ${historyId}, but failed to save.`, true);
+             // Reload history anyway to show the generated (but unsaved) summary if backend sent it
+             await loadNoteHistory(noteId);
+             return false; // Indicate failure due to save error
+        } else if (data.message && data.message.includes("already existed")) {
+             setStatus(`Summary for version ${historyId} already existed.`);
+             // No need to reload history if it already existed
+             return true; // Indicate success (already existed)
+        } else {
+             setStatus(`Summary generated for version ${historyId}.`);
+             // Reload history for this note to show the new summary
+             await loadNoteHistory(noteId); // This updates state.noteHistory
+             return true; // Indicate success
+        }
+
+    } catch (error) {
+        console.error(`Error generating/saving summary for history ${historyId}:`, error);
+        setStatus(`Error generating summary: ${error.message}`, true);
+        // Attempt to reload history even on error to reset UI state if needed
+        try {
+            await loadNoteHistory(noteId);
+        } catch (reloadError) {
+            console.error(`Error reloading note history after summary generation failure:`, reloadError);
+        }
+        return false; // Indicate failure
+    } finally {
+        setLoading(false);
+    }
+}
 // -----------------------------------------
 
 

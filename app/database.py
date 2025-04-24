@@ -561,7 +561,27 @@ def get_note_history_entry_from_db(history_id):
         logger.error(f"Database error getting history entry {history_id}: {e}", exc_info=True)
         return None
 
-# Removed save_note_diff_summary_in_db function
+# Function to update the note_diff for a specific history entry
+def update_note_history_diff(history_id, diff_summary):
+    """Updates the note_diff field for a specific NoteHistory entry."""
+    try:
+        entry = db.session.get(NoteHistory, history_id)
+        if not entry:
+            logger.warning(f"Note history entry not found with ID: {history_id} for diff update.")
+            return False
+
+        entry.note_diff = diff_summary
+        logger.info(f"Attempting to save generated diff summary for history ID: {history_id}...")
+        if _commit_session():
+            logger.info(f"Successfully saved generated diff summary for history ID: {history_id}")
+            return True
+        else:
+            # Commit failed, _commit_session handles rollback and logging
+            return False
+    except SQLAlchemyError as e:
+        logger.error(f"Database error saving generated diff summary for history {history_id}: {e}", exc_info=True)
+        db.session.rollback()
+        return False
 
 # Function to get note history
 def get_note_history_from_db(note_id, limit=None):
