@@ -1,6 +1,6 @@
 import logging
 from flask import Blueprint, request, jsonify
-from app import database
+from app import database, db # Import db instance
 from app.models import NoteHistory # Import NoteHistory model
 
 # Configure logging
