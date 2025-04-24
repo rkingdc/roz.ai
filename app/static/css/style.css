@@ -432,36 +432,45 @@
 /* Reduce margins for common block elements within chat messages */
 /* Reduce margins for common block elements within chat messages using rem units */
 /* Reduce margins for common block elements within chat messages using rem units */
+/* Reduce margins for common block elements within chat messages using rem units */
+/* More aggressive reduction */
 .message.prose p,
-.message.prose ul,
-.message.prose ol,
 .message.prose dl,
 .message.prose pre,
 .message.prose blockquote,
 .message.prose figure,
 .message.prose table {
-    margin-top: 0.4rem;    /* Slightly reduced */
-    margin-bottom: 0.4rem; /* Slightly reduced */
+    margin-top: 0.3rem;
+    margin-bottom: 0.3rem;
 }
+
+/* Reduce margins for lists themselves */
+.message.prose ul,
+.message.prose ol {
+    margin-top: 0.3rem;
+    margin-bottom: 0.3rem;
+    padding-left: 1.25em; /* Keep standard list indentation */
+}
+
 
 /* Further reduce margins specifically for paragraphs */
 .message.prose p {
-    margin-top: 0.2rem;    /* Slightly reduced */
-    margin-bottom: 0.2rem; /* Slightly reduced */
+    margin-top: 0.15rem; /* Further reduced */
+    margin-bottom: 0.15rem; /* Further reduced */
 }
 
 /* Adjust list item spacing if necessary */
 .message.prose li {
-    margin-top: 0.1rem; /* Slightly reduced */
-    margin-bottom: 0.1rem;
+    margin-top: 0.05rem; /* Minimal top margin */
+    margin-bottom: 0.05rem; /* Minimal bottom margin */
 }
 
-/* --- NEW: Target paragraphs *inside* list items --- */
-.message.prose li p {
-    margin-top: 0.1rem;    /* Reduce margin for paragraphs within list items */
-    margin-bottom: 0.1rem; /* Reduce margin for paragraphs within list items */
+/* --- Force ZERO margin for paragraphs *inside* list items --- */
+.message.prose li > p { /* Use direct child selector for specificity */
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
 }
-/* --- End NEW --- */
+/* --- End --- */
 
 
 /* Adjust heading margins */
@@ -471,8 +480,8 @@
 .message.prose h4,
 .message.prose h5,
 .message.prose h6 {
-    margin-top: 0.6rem;    /* Slightly reduced */
-    margin-bottom: 0.2rem; /* Slightly reduced */
+    margin-top: 0.5rem;    /* Further reduced */
+    margin-bottom: 0.15rem; /* Further reduced */
 }
 
 /* Remove potential extra margin on the first/last element within the message content */
