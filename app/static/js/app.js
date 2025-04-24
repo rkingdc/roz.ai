@@ -158,15 +158,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Get references to all DOM elements and store them
     populateElements();
 
+    // --- NEW: Initialize Toast System *before* setting up listeners ---
+    // Ensure the container element exists before initializing
+    if (elements.toastContainer) {
+        initializeToastContainer(elements.toastContainer);
+    } else {
+        console.error("Toast container element not found, cannot initialize toast system.");
+    }
+    // -----------------------------------------------------------------
+
     // 2. Load persisted UI states that depend on elements existing (collapsed states)
     // loadCollapsedStates is now called inside initializeApp after populateElements
     // loadCollapsedStates();
 
 
     // 3. Set up all event listeners (which includes subscribing UI to state changes)
-    setupEventListeners();
+    setupEventListeners(); // Now called AFTER toast initialization
 
 
     // 4. Initialize the application state and load initial data
-    initializeApp();
+    initializeApp(); // initializeApp no longer needs to call initializeToastContainer
 });
