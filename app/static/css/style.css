@@ -453,20 +453,25 @@
 .message.prose h6 {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
-    line-height: 1.4 !important; /* Tighter line height */
+    line-height: 1.3 !important; /* Even tighter line height */
 }
+/* Explicitly reset padding on list items */
+.message.prose li {
+    padding: 0 !important;
+}
+
 
 /* Add back minimal spacing ONLY where needed */
 
 /* Space below paragraphs that are NOT inside list items */
 .message.prose > p, /* Direct child paragraph */
 .message.prose .collapsible-content > p /* Paragraph inside collapsible, not list */ {
-    margin-bottom: 0.4rem !important; /* Adjust this value as needed */
+    margin-bottom: 0.25rem !important; /* Reduced spacing */
 }
 /* Add minimal space below lists */
 .message.prose ul,
 .message.prose ol {
-     margin-bottom: 0.4rem !important; /* Space after the entire list */
+     margin-bottom: 0.25rem !important; /* Reduced spacing */
      padding-left: 1.25em; /* Keep standard list indentation */
 }
 
@@ -479,8 +484,8 @@
 .message.prose h4,
 .message.prose h5,
 .message.prose h6 {
-    margin-bottom: 0.3rem !important; /* Space after headings */
-    line-height: 1.3 !important; /* Slightly tighter for headings */
+    margin-bottom: 0.2rem !important; /* Reduced spacing */
+    line-height: 1.25 !important; /* Even tighter for headings */
 }
 
 
