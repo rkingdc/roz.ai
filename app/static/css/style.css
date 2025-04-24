@@ -1067,11 +1067,12 @@
     resize: none;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 
-    /* --- Auto-resizing styles --- */
-    /* REMOVED fixed height (from h-full class) */
-    min-height: 150px; /* Start with a minimum height */
-    /* Max height is implicitly controlled by the parent flex container (.note-mode-element) */
-    overflow-y: auto; /* Show scrollbar ONLY when content exceeds available space */
+    /* --- Fill parent height & scroll styles --- */
+    /* REMOVED fixed height (from h-full class in HTML) */
+    /* REMOVED min-height */
+    height: 100%; /* Make textarea fill its parent container (.note-mode-element) */
+    /* Max height is implicitly controlled by the parent flex container (#notes-section > .note-mode-element) */
+    overflow-y: auto; /* Show scrollbar ONLY when content exceeds the 100% height */
     /* --------------------------- */
 }
 
