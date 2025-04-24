@@ -1,6 +1,7 @@
 # app/database.py - Refactored for Flask-SQLAlchemy ORM
 
 import logging
+import difflib # Import difflib for calculating differences
 from datetime import datetime, timezone
 from flask import current_app
 from sqlalchemy.exc import SQLAlchemyError
@@ -417,14 +418,40 @@ def save_note_to_db(note_id, name, content):
         # capturing the state *as it is about to be saved*
         # Only create history if something actually changed
         if content_changed or name_changed:
+            # Calculate diff before creating the history entry
+            note_diff_text = None
+            if content_changed:
+                # Get the previous content from the last history entry if it exists
+                last_history = NoteHistory.query.filter_by(note_id=note.id)\
+                                                .order_by(NoteHistory.saved_at.desc())\
+                                                .first()
+                previous_content = last_history.content if last_history else ""
+                # Ensure both are strings for diffing
+                old_content_str = old_content if old_content is not None else ""
+                new_content_str = note.content if note.content is not None else ""
+
+                # Generate unified diff
+                diff_lines = difflib.unified_diff(
+                    old_content_str.splitlines(keepends=True),
+                    new_content_str.splitlines(keepends=True),
+                    fromfile=f"Version {last_history.id if last_history else 'Initial'}",
+                    tofile=f"Version {note_id} (Current Save)",
+                    lineterm='\n'
+                )
+                note_diff_text = "".join(diff_lines)
+                if not note_diff_text: # If diff is empty (e.g., only whitespace changes ignored by splitlines)
+                    note_diff_text = "[No textual changes detected]" if old_content_str != new_content_str else None
+
+
             history_entry = NoteHistory(
                 note_id=note.id,
                 name=note.name,      # Save the name *after* the update
-                content=note.content # Save the content *after* the update
+                content=note.content, # Save the content *after* the update
+                note_diff=note_diff_text # Save the calculated diff
                 # saved_at defaults to now()
             )
             db.session.add(history_entry)
-            logger.info(f"Created history entry for note ID {note_id} capturing the new state.")
+            logger.info(f"Created history entry for note ID {note_id} capturing the new state and diff.")
         else:
             logger.info(f"No changes detected for note ID {note_id}, skipping history entry creation.")
 
@@ -475,6 +502,7 @@ def get_note_history_from_db(note_id, limit=None):
                 'note_id': entry.note_id,
                 'name': entry.name,
                 'content': entry.content,
+                'note_diff': entry.note_diff, # Include the diff
                 'saved_at': entry.saved_at
             } for entry in history_entries
         ]

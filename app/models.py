@@ -58,6 +58,7 @@ class NoteHistory(db.Model):
     note_id = db.Column(db.Integer, db.ForeignKey('notes.id', ondelete='CASCADE'), nullable=False, index=True)
     name = db.Column(db.String(150), nullable=True) # Store the name at this point in history
     content = db.Column(db.Text, nullable=True) # Store the content at this point in history
+    note_diff = db.Column(db.Text, nullable=True) # Store the diff from the previous version
     saved_at = db.Column(db.DateTime(timezone=True), nullable=False, default=default_utcnow, index=True)
 
     # Define relationship back to Note
