@@ -1559,10 +1559,10 @@ export function renderNoteHistory() {
         if (isInitialVersion) {
             summaryText = "Initial version";
             summaryTitle = "Initial version of the note.";
-        } else if (entry.note_diff_summary) {
+        } else if (entry.note_diff) {
             // Display existing summary or marker text
-            summaryText = entry.note_diff_summary;
-            summaryTitle = entry.note_diff_summary; // Use full summary for tooltip
+            summaryText = entry.note_diff;
+            summaryTitle = entry.note_diff; // Use full summary for tooltip
 
             // Handle specific markers
             if (summaryText === "[Initial version]") { // Should be caught by isInitialVersion, but double-check
