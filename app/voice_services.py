@@ -162,12 +162,30 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
 
         audio = speech.RecognitionAudio(content=audio_bytes)
 
-        logger.info("Sending audio data to Google Speech-to-Text non-streaming API (recognize)...")
-        response = client.recognize(config=config, audio=audio)
-        logger.info("Received response from Google Speech-to-Text API.")
+        logger.info("Sending audio data to Google Speech-to-Text non-streaming API (long_running_recognize)...")
+        # Use long_running_recognize for audio > 60 seconds
+        operation = client.long_running_recognize(config=config, audio=audio)
+        logger.info("Waiting for long-running transcription operation to complete...")
+
+        # Wait for the operation to complete. Timeout needs to be long enough for transcription.
+        # Example: 300 seconds (5 minutes). Adjust as needed based on expected max audio length.
+        # Consider making this timeout configurable.
+        try:
+            # Use google.api_core.exceptions.TimeoutError if needed, but standard TimeoutError should work
+            from concurrent.futures import TimeoutError
+            response = operation.result(timeout=300)
+            logger.info("Long-running transcription operation finished.")
+        except TimeoutError:
+            logger.error("Timeout waiting for long-running transcription operation to complete.")
+            # Optionally try to cancel the operation: operation.cancel()
+            return None
+        except Exception as op_error:
+            logger.error(f"Error during long-running transcription operation: {op_error}", exc_info=True)
+            return None
+
 
         if not response.results:
-            logger.warning("Transcription response contained no results.")
+            logger.warning("Long-running transcription response contained no results.")
             return "" # Return empty string if no speech detected
 
         # Concatenate results if multiple are returned (unlikely for recognize but safe)
