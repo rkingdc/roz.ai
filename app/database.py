@@ -578,7 +578,7 @@ def get_note_history_from_db(note_id, limit=None):
                 'note_id': entry.note_id,
                 'name': entry.name,
                 'content': entry.content,
-                'note_diff': entry.note_diff, # Include the AI summary
+                'note_diff': entry.note_diff, # Include the AI summary (Corrected field name)
                 'saved_at': entry.saved_at
             } for entry in history_entries
         ]
