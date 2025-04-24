@@ -1129,20 +1129,33 @@ export function renderMicButtonState() {
 
     if (!targetButton) return; // No button to update for the current tab
 
-    // Find the icon element within the target button
-    const icon = targetButton.querySelector('i'); // Use targetButton here
-    if (!icon) return;
+    // Find the icon wrapper and SVG container
+    const iconWrapper = targetButton.querySelector('.mic-icon-wrapper');
+    // const stopIconWrapper = targetButton.querySelector('.mic-stop-icon-wrapper'); // Not using separate wrapper
+    const progressRing = targetButton.querySelector('.mic-progress-ring'); // Find SVG
 
     if (isRecording) {
         targetButton.title = "Stop Recording";
-        targetButton.classList.add('recording'); // Add class for potential styling (e.g., red background)
-        icon.classList.remove('fa-microphone');
-        icon.classList.add('fa-stop');
+        targetButton.classList.add('recording'); // Add class for styling and SVG visibility
+        // Hide mic icon wrapper, show stop icon (by changing class), show progress ring via CSS
+        // If using the same <i> tag, change its class:
+        const iconElement = iconWrapper?.querySelector('i'); // Find icon inside wrapper
+        if (iconElement) {
+            iconElement.classList.remove('fa-microphone');
+            iconElement.classList.add('fa-stop');
+            if (iconWrapper) iconWrapper.style.display = 'inline-block'; // Ensure wrapper is visible if reusing icon
+        }
+
     } else {
         targetButton.title = activeTab === 'chat' ? "Record Voice" : "Record Voice into Note";
-        targetButton.classList.remove('recording');
-        icon.classList.remove('fa-stop');
-        icon.classList.add('fa-microphone');
+        targetButton.classList.remove('recording'); // Remove class to hide SVG via CSS
+        // Show mic icon wrapper, hide stop icon (by changing class back)
+         const iconElement = iconWrapper?.querySelector('i'); // Find icon inside wrapper
+         if (iconElement) {
+            iconElement.classList.remove('fa-stop');
+            iconElement.classList.add('fa-microphone');
+            if (iconWrapper) iconWrapper.style.display = 'inline-block'; // Ensure wrapper is visible
+         }
     }
 
     // Disable button if loading

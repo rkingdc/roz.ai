@@ -279,12 +279,21 @@ export function stopRecording() {
         // api.disconnectTranscriptionSocket();
         state.setIsRecording(false);
         mediaRecorder = null; // Ensure reference is cleared
-        // --- Ensure timer is cleared on setup error ---
+        // --- Clear Timer on Stop ---
         if (recordingTimerInterval) {
             clearInterval(recordingTimerInterval);
             recordingTimerInterval = null;
+            // Reset progress ring on the button that was active
+            const context = state.recordingContext; // Get context before state is cleared
+            const progressRingElement = (context === 'chat' ? elements.micButton : elements.micButtonNotes)?.querySelector('.mic-progress-ring');
+            const progressArc = progressRingElement?.querySelector('.progress-ring-arc');
+            if (progressRingElement && progressArc) {
+                 const radius = parseFloat(progressArc.getAttribute('r'));
+                 const circumference = 2 * Math.PI * radius;
+                 progressRingElement.style.setProperty('--progress-offset', circumference); // Reset offset
+            }
         }
-        // --------------------------------------------
+        // -------------------------
     }
 }
 
