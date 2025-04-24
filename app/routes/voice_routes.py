@@ -1,7 +1,7 @@
 import logging
 from flask import Blueprint, request, jsonify, current_app
-from app.voice_services import transcribe_audio, clean_up_transcript # Import clean_up_transcript
-from app import ai_services # Import ai_services directly
+# Import voice_services directly
+from app import voice_services, ai_services # Import ai_services and voice_services
 
 logger = logging.getLogger(__name__)
 bp = Blueprint('voice_api', __name__, url_prefix='/api/voice')
@@ -162,8 +162,8 @@ def transcribe_long_audio_route():
             return jsonify({"error": "Empty audio file received"}), 400
 
         # Call the non-streaming transcription service
-        # Ensure voice_services is imported correctly at the top
-        transcript = ai_services.voice_services.transcribe_audio_file( # Assuming voice_services is under ai_services or imported directly
+        # Use the directly imported voice_services
+        transcript = voice_services.transcribe_audio_file(
             audio_bytes=audio_bytes,
             language_code=language_code,
             encoding=encoding # Pass the determined encoding
