@@ -1816,21 +1816,24 @@ export function updateChatCleanupButtonState() {
 
 // --- UPDATED: Render Streaming Transcript ---
 /**
- * Updates the appropriate input field with the current streaming transcript based on context.
+ * Updates the appropriate input field with the combined finalized and interim transcript.
  */
 export function renderStreamingTranscript() {
-    const transcript = state.streamingTranscript; // Read from state
-    const context = state.recordingContext; // Read context
+    // Combine finalized and interim transcripts from state
+    const finalized = state.finalizedTranscript;
+    const interim = state.currentInterimTranscript;
+    const fullTranscript = finalized ? `${finalized} ${interim}` : interim; // Add space only if finalized part exists
 
+    const context = state.recordingContext; // Read context
     const targetElement = getInputElementForContext(context);
 
     if (targetElement) {
         if (context === 'notes' && originalNoteTextBeforeRecording !== null) {
-            // Append to original text for notes
-            targetElement.value = originalNoteTextBeforeRecording + (originalNoteTextBeforeRecording ? "\n\n" : "") + transcript; // Add newline separator
+            // Append combined transcript to original text for notes
+            targetElement.value = originalNoteTextBeforeRecording + (originalNoteTextBeforeRecording ? "\n\n" : "") + fullTranscript.trim(); // Trim combined transcript
         } else {
             // Overwrite for chat or if original notes text wasn't stored
-            targetElement.value = transcript;
+            targetElement.value = fullTranscript.trim(); // Trim combined transcript
         }
         // Optional: Auto-scroll if needed, especially for textarea
         // if (targetElement.scrollHeight > targetElement.clientHeight) {

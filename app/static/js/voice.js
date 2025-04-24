@@ -66,8 +66,8 @@ export async function startRecording(context) {
     // ---------------------------------------------
 
     // Clear previous streaming transcript state first
-    state.setStreamingTranscript("");
-    state.setFinalTranscriptSegment("");
+    state.setFinalizedTranscript(""); // Clear finalized part
+    state.setCurrentInterimTranscript(""); // Clear interim part
 
     // Store original text if recording into notes
     if (context === 'notes' && elements.notesTextarea) {
@@ -138,17 +138,16 @@ export async function startRecording(context) {
 
             // --- Read context BEFORE resetting state ---
             const recordingContextOnStop = state.recordingContext;
-            // console.log(`[DEBUG] mediaRecorder.onstop: Context is "${recordingContextOnStop}"`); // Log context in onstop
             // -----------------------------------------
 
-            // Append the final transcript segment (if any) to the input field
-            // The streaming transcript state already updates the input field in real-time via ui.js
-            // We just need to ensure the final state is reflected.
-            const finalTranscript = state.streamingTranscript.trim(); // Get the full assembled transcript
+            // Get the final combined transcript from the new state variables
+            const finalized = state.finalizedTranscript;
+            const interim = state.currentInterimTranscript; // Should be empty after stop signal, but check anyway
+            const finalTranscript = finalized ? `${finalized} ${interim}`.trim() : interim.trim(); // Combine and trim
 
-            if (recordingContextOnStop === 'chat' && elements.messageInput) { // Use local variable
+            if (recordingContextOnStop === 'chat' && elements.messageInput) {
                 // Explicitly set the final transcript in the input field
-                elements.messageInput.value = finalTranscript;
+                elements.messageInput.value = finalTranscript; // Use combined transcript
                 elements.messageInput.focus();
                 state.setStatusMessage("Recording stopped. Transcript added to input.");
             } else if (recordingContextOnStop === 'notes' && elements.notesTextarea) { // Use local variable
