@@ -71,7 +71,7 @@ class Config:
         # For now, allows app to run but AI features will fail.
 
         # Google Cloud Storage (for long audio transcription)
-        GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
-        if not GCS_BUCKET_NAME:
-            logger.warning("GCS_BUCKET_NAME environment variable not set. Long audio transcription (>1 min) will fail.")
+    GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
+    if not GCS_BUCKET_NAME:
+        logger.warning("GCS_BUCKET_NAME environment variable not set. Long audio transcription (>1 min) will fail.")
 
