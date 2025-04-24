@@ -45,8 +45,22 @@ export function showToast(content, options = {}) {
     const toastElement = document.createElement('div');
     toastElement.id = toastId;
     toastElement.dataset.toastId = toastId; // Store ID for removal
-    // Apply base and type-specific styles using theme variables
-    toastElement.className = `toast p-3 rounded shadow-md text-sm max-w-sm mb-2 ${getToastBgColor(type)} text-white`; // Added mb-2 for spacing
+    // Base classes
+    let classes = 'toast p-3 rounded shadow-md text-sm max-w-sm mb-2';
+    // Get color info
+    const colorInfo = getToastColorInfo(type);
+
+    // Apply background color
+    if (colorInfo.variable) {
+        toastElement.style.backgroundColor = `var(${colorInfo.variable})`;
+    } else if (colorInfo.class) {
+        classes += ` ${colorInfo.class}`;
+    }
+
+    // Apply text color class
+    classes += ` ${colorInfo.textColorClass}`;
+
+    toastElement.className = classes;
     toastElement.setAttribute('role', 'alert');
     toastElement.innerHTML = content; // Allow HTML content for buttons
 
@@ -105,21 +119,39 @@ export function updateToast(toastId, newContent) { // Added export keyword
 /**
  * Gets the background color class based on the toast type.
  * Uses CSS variables defined in style.css :root.
+ * Gets the background color (CSS variable or class) and text color class based on the toast type.
  * @param {'info' | 'success' | 'warning' | 'error'} type - The toast type.
- * @returns {string} Tailwind background color class.
+ * @returns {{variable: string|null, class: string|null, textColorClass: string}} Color information.
  */
-function getToastBgColor(type) {
-    // Using Tailwind classes directly for simplicity here.
-    // You could map these to your --rz variables if preferred,
-    // but that would require setting background-color directly via style attribute.
+function getToastColorInfo(type) {
+    // Default text color
+    let textColorClass = 'text-white'; // Default text color
+
     switch (type) {
-        case 'success': return 'bg-green-600'; // Example: Green
-        case 'error': return 'bg-red-600';     // Example: Red
-        case 'warning': return 'bg-yellow-500 text-black'; // Example: Yellow (added text-black)
+        case 'success':
+            // Use Gold background, Dark Maroon text
+            textColorClass = 'text-[--rz-toolbar-field]'; // Use CSS var for text color
+            return { variable: '--rz-toolbar-text', class: null, textColorClass: textColorClass };
+        case 'warning':
+             // Use Gold background, Dark Maroon text (same as success for now)
+            textColorClass = 'text-[--rz-toolbar-field]'; // Use CSS var for text color
+            return { variable: '--rz-toolbar-text', class: null, textColorClass: textColorClass };
+        case 'error':
+            // Keep distinct red background for errors, white text
+            return { variable: null, class: 'bg-red-600', textColorClass: 'text-white' };
         case 'info':
-        default: return 'bg-blue-600';      // Example: Blue
+        default:
+            // Use Maroon background, white text
+            return { variable: '--rz-toolbar-opaque', class: null, textColorClass: 'text-white' };
     }
-    // If using CSS variables:
+    // --- Old implementation using Tailwind classes ---
+    // switch (type) {
+    //     case 'success': return 'bg-green-600';
+    //     case 'error': return 'bg-red-600';
+    //     case 'warning': return 'bg-yellow-500 text-black'; // Needs specific text color
+    //     case 'info': default: return 'bg-blue-600';
+    // }
+    // --- If using CSS variables for background ---
     // switch (type) {
     //     case 'success': return 'var(--rz-success-bg)'; // Define --rz-success-bg etc.
     //     case 'error': return 'var(--rz-error-bg)';
