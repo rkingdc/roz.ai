@@ -147,6 +147,11 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         if not gcs_bucket_name:
             logger.error("GCS_BUCKET_NAME not configured in Flask app.")
             raise ValueError("GCS bucket name not configured.")
+        # --- ADD Check for invalid bucket name format ---
+        if "://" in gcs_bucket_name:
+            logger.error(f"Invalid GCS_BUCKET_NAME format: '{gcs_bucket_name}'. It should not contain '://'. Please check environment variable.")
+            raise ValueError("Invalid GCS bucket name format.")
+        # ---------------------------------------------
 
         storage_client = storage.Client() # Assumes GOOGLE_APPLICATION_CREDENTIALS
         bucket = storage_client.bucket(gcs_bucket_name)
