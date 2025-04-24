@@ -1060,6 +1060,15 @@
 /* The renderer already applies specific classes, so these fallback styles
    should not interfere with the working code rendering. */
 
+/* --- ADDED: Ensure pre tags within messages and notes wrap correctly --- */
+#notes-preview pre,
+.message pre {
+    white-space: pre-wrap;       /* Allow wrapping */
+    word-wrap: break-word;       /* Break long words/lines */
+    overflow-wrap: break-word;   /* Ensure breaking */
+}
+/* --- End Added Styles --- */
+
 /* --- End Fallback Markdown Styling --- */
 
 /* --- Notes Section Container --- */
