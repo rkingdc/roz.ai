@@ -1054,6 +1054,11 @@
 
 /* --- End Fallback Markdown Styling --- */
 
+/* --- Common Styling for Note Edit/View Containers --- */
+.note-mode-element {
+    min-height: 0; /* Crucial for flex children that need to scroll */
+}
+
 /* --- Notes Preview Styling (View Mode) --- */
 #notes-preview {
     /* Inherited from Tailwind: flex-grow w-full p-3 border ... overflow-y-auto prose ... */
