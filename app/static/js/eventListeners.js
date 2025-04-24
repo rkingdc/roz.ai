@@ -54,6 +54,18 @@ export function setupEventListeners() {
                 // state.setStatusMessage("Nothing to save.", true); // Avoid noisy status messages
             // }
         }
+
+        // --- NEW: Notes Mode Switching Shortcuts ---
+        if (state.currentTab === 'notes' && event.ctrlKey) {
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault(); // Prevent potential browser back navigation
+                elements.editNoteButton?.click(); // Switch to Edit mode
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault(); // Prevent potential browser forward navigation
+                elements.viewNoteButton?.click(); // Switch to View mode
+            }
+        }
+        // -----------------------------------------
     });
     // console.log("Global keyboard listeners set up.");
 
