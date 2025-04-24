@@ -20,10 +20,10 @@ LATEST_RELEASE := $(shell ls -td releases/*/ 2>/dev/null | head -n 1)
 # Define the gunicorn command using the venv python
 # Increase timeout to 120 seconds for potentially long AI operations
 # Use run:app which should contain the app instance created by create_app()
-GUNICORN_CMD = $(PYTHON) -m gunicorn --workers 1 --bind 0.0.0.0:8000 --timeout 120 run:app
+GUNICORN_CMD = $(PYTHON) flask --workers 1 --bind 0.0.0.0:8000 --timeout 120 run:app
 
 # Add migration commands and auth check to PHONY
-.PHONY: all venv install init-db upgrade migrate revision run start test lint deploy clean help stop start-dev check-gcloud-auth
+.PHONY: all venv install init-db upgrade migrate revision run start auth test lint deploy clean help stop start-dev check-gcloud-auth
 
 all: install
 
@@ -51,6 +51,9 @@ upgrade: install
 	@$(PYTHON) -m flask --app $(RUN_FILE) db upgrade
 	@echo "Database is up-to-date."
 
+auth:
+	@gcloud auth application-default login
+
 # Target to generate a new migration script after model changes
 # Usage: make revision msg="Your description"
 revision: install
@@ -76,7 +79,10 @@ start: upgrade check-gcloud-auth # Depends on upgrade and check-gcloud-auth now
 	fi; \
 	echo "Starting latest release: $(LATEST_RELEASE)"; \
 	# Change directory to the latest release and run the app using the venv python
-	@cd $(LATEST_RELEASE) && DATABASE_NAME="../../$(PROD_DB)" $(GUNICORN_CMD)
+	@cd $(LATEST_RELEASE) && DATABASE_NAME="../../$(PROD_DB)" flask --app $(RUN_FILE) run --port 8000
+
+launch:
+	firefox --new-tab localhost:8000 > /dev/null 
 
 test: install check-gcloud-auth # Depends on check-gcloud-auth now (if tests hit live APIs)
 	@echo "Running tests..."
