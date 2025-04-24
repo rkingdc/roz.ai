@@ -226,6 +226,7 @@ export async function startRecording(context) {
                     console.warn(`[WARN] Streaming time limit (${STREAMING_LIMIT_SECONDS}s) reached. Stopping recording.`);
                     showToast(`Streaming time limit reached. Stopping.`, { type: 'warning' });
                     stopRecording(); // Automatically stop recording
+                    // No need to clear interval here, stopRecording() handles it
                 }
             }, 500); // Update timer twice per second
         } else {
