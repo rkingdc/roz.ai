@@ -249,10 +249,10 @@
             <!-- Removed labels for Markdown Input and Preview -->
 
             <!-- Textarea for Markdown Input - Added relative positioning -->
-            {# Added overflow-hidden and min-h-0 to ensure textarea does not expand beyond this div and respects flex constraints #}
-            <div class="note-mode-element flex-grow w-full relative overflow-hidden min-h-0"> {# Wrap textarea to position buttons #}
-                {# Added h-full class to make textarea fill parent height and 'isolate' to potentially fix rendering/scroll issues #}
-                <textarea id="notes-textarea" class="isolate w-full h-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
+            {# Replaced flex-grow with h-full. Kept overflow-hidden and min-h-0 for Firefox compatibility. #}
+            <div class="note-mode-element h-full w-full relative overflow-hidden min-h-0"> {# Wrap textarea to position buttons #}
+                {# Kept h-full class to make textarea fill parent height. Removed 'isolate'. #}
+                <textarea id="notes-textarea" class="w-full h-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
                 <!-- Button Group MOVED to header -->
             </div>
 
