@@ -340,7 +340,7 @@ export async function startLongRecording() {
         console.log("[DEBUG] startLongRecording: Attempting to show persistent recording toast...");
         const toastId = showToast( // *** Show the persistent recording toast ***
             `<div>
-                <span>Long recording active...</span>
+                <span>Extended transcription active...</span>
                 <button class="toast-stop-long-rec-button ml-2 px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-300">Stop</button>
             </div>`,
             { autoClose: false, type: 'info' } // Keep it open
