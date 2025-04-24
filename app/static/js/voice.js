@@ -12,6 +12,12 @@ let mediaRecorder = null;
 let audioStream = null; // Store the stream to stop tracks later
 export let originalNoteTextBeforeRecording = null; // Store original notes text - EXPORTED
 
+// --- NEW: Timer for streaming limit ---
+let recordingTimerInterval = null;
+const STREAMING_LIMIT_SECONDS = 290; // 4 minutes 50 seconds (slightly less than 5 min)
+let recordingStartTime = null;
+// ------------------------------------
+
 // --- NEW: Array for long recording chunks ---
 let audioChunks = [];
 // ------------------------------------------
@@ -197,8 +203,44 @@ export async function startRecording(context) {
         mediaRecorder.start(TIMESLICE_MS);
         // Status message is already "Recording... Speak now." from api.js
 
+        // --- Start Progress Timer ---
+        const progressRingElement = (context === 'chat' ? elements.micButton : elements.micButtonNotes)?.querySelector('.mic-progress-ring');
+        const progressArc = progressRingElement?.querySelector('.progress-ring-arc');
+
+        if (progressRingElement && progressArc) {
+            const radius = parseFloat(progressArc.getAttribute('r'));
+            const circumference = 2 * Math.PI * radius;
+            progressArc.style.strokeDasharray = `${circumference} ${circumference}`;
+            progressRingElement.style.setProperty('--progress-offset', circumference); // Reset offset
+
+            recordingStartTime = Date.now();
+            if (recordingTimerInterval) clearInterval(recordingTimerInterval); // Clear previous timer just in case
+
+            recordingTimerInterval = setInterval(() => {
+                const elapsedSeconds = (Date.now() - recordingStartTime) / 1000;
+                const progress = Math.min(elapsedSeconds / STREAMING_LIMIT_SECONDS, 1); // Cap at 1
+                const offset = circumference * (1 - progress);
+                progressRingElement.style.setProperty('--progress-offset', offset);
+
+                if (elapsedSeconds >= STREAMING_LIMIT_SECONDS) {
+                    console.warn(`[WARN] Streaming time limit (${STREAMING_LIMIT_SECONDS}s) reached. Stopping recording.`);
+                    showToast(`Streaming time limit reached. Stopping.`, { type: 'warning' });
+                    stopRecording(); // Automatically stop recording
+                }
+            }, 500); // Update timer twice per second
+        } else {
+            console.warn("[WARN] Could not find progress ring elements for timer.");
+        }
+        // --------------------------
+
     } catch (error) {
         // Handle errors from connectTranscriptionSocket promise or getUserMedia
+        // --- Ensure timer is cleared on setup error ---
+        if (recordingTimerInterval) {
+            clearInterval(recordingTimerInterval);
+            recordingTimerInterval = null;
+        }
+        // --------------------------------------------
         console.error("[ERROR] Error during recording setup:", error);
         if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
             state.setStatusMessage("Microphone access denied. Please allow access in browser settings.", true);
@@ -237,6 +279,12 @@ export function stopRecording() {
         // api.disconnectTranscriptionSocket();
         state.setIsRecording(false);
         mediaRecorder = null; // Ensure reference is cleared
+        // --- Ensure timer is cleared on setup error ---
+        if (recordingTimerInterval) {
+            clearInterval(recordingTimerInterval);
+            recordingTimerInterval = null;
+        }
+        // --------------------------------------------
     }
 }
 

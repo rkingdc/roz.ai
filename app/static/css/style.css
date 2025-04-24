@@ -1359,3 +1359,49 @@
 .notes-list-container::-webkit-scrollbar-thumb { background: var(--rz-tab-line); border-radius: 10px; }
 .notes-list-container::-webkit-scrollbar-thumb:hover { background: var(--rz-toolbar-text); }
 /* --- End Notes TOC Drawer Styles --- */
+
+
+/* --- NEW: Microphone Progress Ring Styles --- */
+.mic-progress-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none; /* Hidden by default */
+    pointer-events: none; /* Don't interfere with button clicks */
+    /* CSS variable for progress offset, controlled by JS */
+    --progress-offset: 0;
+}
+
+/* Show the ring when the parent button has the .recording class */
+.btn.recording .mic-progress-ring {
+    display: block;
+}
+
+/* Hide the regular icon when recording and showing the ring */
+.btn.recording .mic-icon-wrapper {
+    display: none;
+}
+/* Show the stop icon when recording */
+/* We will reuse the same icon wrapper and change the icon class via JS */
+/* .btn.recording .mic-stop-icon-wrapper { */
+    /* display: inline-block; /* Or flex, depending on structure */
+/* } */
+
+
+.progress-ring-track {
+    stroke: var(--rz-frame); /* Background track color (e.g., dark grey) */
+    opacity: 0.5;
+}
+
+.progress-ring-arc {
+    stroke: var(--rz-toolbar-text); /* Progress arc color (e.g., gold) */
+    stroke-linecap: round; /* Optional: makes the arc ends rounded */
+    transform: rotate(-90deg); /* Start from the top */
+    transform-origin: center;
+    transition: stroke-dashoffset 0.1s linear; /* Smooth transition for offset changes */
+    /* stroke-dasharray and stroke-dashoffset will be set dynamically if needed,
+       but we can use the CSS variable approach */
+    stroke-dashoffset: var(--progress-offset); /* Use CSS variable */
+}
+/* --- End Microphone Progress Ring Styles --- */
