@@ -1,5 +1,6 @@
 import logging
-from google.cloud import speech
+import uuid # For generating unique filenames
+from google.cloud import speech, storage # Import storage client
 from google.api_core.exceptions import (
     GoogleAPICallError,
     NotFound,
@@ -133,9 +134,36 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
     Returns:
         The full transcript string, or None if transcription fails.
     """
-    logger.info(f"Starting non-streaming transcription for audio chunk ({len(audio_bytes)} bytes), encoding: {encoding}")
+    logger.info(f"Starting non-streaming transcription for audio ({len(audio_bytes)} bytes), encoding: {encoding}")
+
+    gcs_uri = None
+    gcs_blob_name = None
+    storage_client = None
+    bucket = None
+
     try:
-        client = speech.SpeechClient() # Assumes GOOGLE_APPLICATION_CREDENTIALS is set
+        # --- Upload audio to GCS ---
+        gcs_bucket_name = current_app.config.get("GCS_BUCKET_NAME")
+        if not gcs_bucket_name:
+            logger.error("GCS_BUCKET_NAME not configured in Flask app.")
+            raise ValueError("GCS bucket name not configured.")
+
+        storage_client = storage.Client() # Assumes GOOGLE_APPLICATION_CREDENTIALS
+        bucket = storage_client.bucket(gcs_bucket_name)
+
+        # Generate a unique blob name
+        gcs_blob_name = f"audio-transcripts-temp/{uuid.uuid4()}.webm" # Store in a subfolder
+        blob = bucket.blob(gcs_blob_name)
+
+        logger.info(f"Uploading audio to GCS: gs://{gcs_bucket_name}/{gcs_blob_name}")
+        # Upload the bytes directly
+        blob.upload_from_string(audio_bytes, content_type='audio/webm') # Specify content type
+        gcs_uri = f"gs://{gcs_bucket_name}/{gcs_blob_name}"
+        logger.info("Audio uploaded successfully to GCS.")
+        # --- End GCS Upload ---
+
+
+        client = speech.SpeechClient() # Speech client
 
         # Determine the correct RecognitionConfig.AudioEncoding based on the input string
         try:
@@ -160,10 +188,11 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
             enable_automatic_punctuation=True,
         )
 
-        audio = speech.RecognitionAudio(content=audio_bytes)
+        # --- Use GCS URI for audio source ---
+        audio = speech.RecognitionAudio(uri=gcs_uri)
+        # ------------------------------------
 
-        logger.info("Sending audio data to Google Speech-to-Text non-streaming API (long_running_recognize)...")
-        # Use long_running_recognize for audio > 60 seconds
+        logger.info(f"Sending GCS URI ({gcs_uri}) to Google Speech-to-Text API (long_running_recognize)...")
         operation = client.long_running_recognize(config=config, audio=audio)
         logger.info("Waiting for long-running transcription operation to complete...")
 
@@ -219,6 +248,19 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
     except Exception as e:
         logger.error(f"Error during non-streaming transcription: {e}", exc_info=True)
         return None
+    finally:
+        # --- Clean up GCS file ---
+        if gcs_blob_name and bucket:
+            try:
+                logger.info(f"Attempting to delete temporary GCS file: {gcs_blob_name}")
+                blob_to_delete = bucket.blob(gcs_blob_name)
+                blob_to_delete.delete()
+                logger.info(f"Successfully deleted temporary GCS file: {gcs_blob_name}")
+            except NotFound:
+                logger.warning(f"Temporary GCS file not found for deletion: {gcs_blob_name}")
+            except Exception as delete_err:
+                logger.error(f"Failed to delete temporary GCS file {gcs_blob_name}: {delete_err}", exc_info=True)
+        # --- End GCS Cleanup ---
 
 
 # --- Streaming Transcription ---
