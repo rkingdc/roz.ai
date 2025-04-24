@@ -5,6 +5,7 @@
 
 import { elements } from './dom.js'; // Still need elements to read input values sometimes
 import * as state from './state.js'; // API updates the state
+import * as ui from './ui.js'; // Import ui module to access autoResizeTextarea
 import { escapeHtml, formatFileSize } from './utils.js';
 import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js';
 // Import Socket.IO client library (assuming it's loaded via script tag or bundler)
@@ -908,11 +909,16 @@ export async function sendMessage() {
         return;
     }
 
-    // Clear input in DOM immediately
-    if (elements.messageInput) elements.messageInput.value = '';
+   // Clear input in DOM immediately
+   if (elements.messageInput) {
+       elements.messageInput.value = '';
+       // --- NEW: Resize textarea back to default after clearing ---
+       ui.autoResizeTextarea(elements.messageInput);
+       // ---------------------------------------------------------
+   }
 
-    // Add user message to state immediately
-    // UI will react to this state change to display the message
+   // Add user message to state immediately
+   // UI will react to this state change to display the message
     state.addMessageToHistory({ role: 'user', content: message }); // Assuming addMessageToHistory in state.js
 
     setLoading(true, "Sending");
