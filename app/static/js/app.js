@@ -158,9 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Get references to all DOM elements and store them
     populateElements();
 
-    // --- REMOVED: Toast Initialization Call ---
-    // Toast system now initializes itself within toastNotifications.js
-    // ----------------------------------------
+    // --- RE-ADDED: Initialize Toast System *after* populating elements ---
+    if (elements.toastContainer) {
+        initializeToastContainer(elements.toastContainer);
+    } else {
+        // This case should ideally not happen if populateElements works correctly
+        console.error("Toast container element not found in dom.js elements object after populateElements!");
+    }
+    // --------------------------------------------------------------------
 
     // 2. Load persisted UI states that depend on elements existing (collapsed states)
     // loadCollapsedStates is now called inside initializeApp after populateElements

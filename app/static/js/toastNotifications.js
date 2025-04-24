@@ -1,32 +1,26 @@
-// --- NEW: Import elements ---
-import { elements } from './dom.js'; // Import elements object to get container reference
 
 let toastContainer = null; // Module-level variable to hold the container
 let toastCounter = 0;
 
-// --- NEW: Self-Initialization on DOMContentLoaded ---
-document.addEventListener('DOMContentLoaded', () => {
-    // Ensure elements are populated (populateElements is called in app.js first)
-    if (elements.toastContainer) {
-        toastContainer = elements.toastContainer; // Assign the module-level variable
-        console.log("[DEBUG] toastNotifications.js: Self-initialized toastContainer:", toastContainer);
-    } else {
-        // This might happen if dom.js hasn't populated elements yet, though unlikely with current app.js structure
-        console.error("[DEBUG] toastNotifications.js: DOMContentLoaded fired, but elements.toastContainer not found in dom.js elements object!");
-        // Attempt to find it directly as a fallback?
-        const directFind = document.getElementById('toast-container');
-        if (directFind) {
-             toastContainer = directFind;
-             console.warn("[DEBUG] toastNotifications.js: Found toast-container directly as fallback.");
-        } else {
-             console.error("[DEBUG] toastNotifications.js: Failed to find toast-container element even directly.");
-        }
+// --- REMOVED Self-Initialization ---
+
+/**
+ * Initializes the toast notification system with a container element.
+ * MUST be called after the container element exists in the DOM.
+ * @param {HTMLElement} containerElement - The DOM element to append toasts to.
+ */
+export function initializeToastContainer(containerElement) { // Added export back
+    if (!containerElement) {
+        console.error("[DEBUG] initializeToastContainer: containerElement parameter was null or undefined.");
     }
-});
-// --- End Self-Initialization ---
-
-
-// REMOVED initializeToastContainer function export
+    toastContainer = containerElement;
+    // Log whether the assignment was successful
+    if (toastContainer) {
+        console.log("[DEBUG] Toast container initialized successfully via initializeToastContainer:", toastContainer);
+    } else {
+        console.error("[DEBUG] Toast container initialization FAILED via initializeToastContainer. toastContainer variable is still null.");
+    }
+}
 
 /**
  * Displays a toast notification.
