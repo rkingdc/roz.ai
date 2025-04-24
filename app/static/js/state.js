@@ -63,6 +63,12 @@ export let isSocketConnected = false; // WebSocket connection status for transcr
 export let streamingTranscript = ""; // Holds the current real-time transcript
 export let finalTranscriptSegment = ""; // Holds the last final transcript segment received
 
+// --- NEW: Long Recording State ---
+export let isLongRecordingActive = false; // Tracks the non-streaming recording state
+export let longRecordingToastId = null; // To manage the persistent recording toast
+export let lastLongTranscript = ''; // Store the last successful long transcript
+// ---------------------------------
+
 
 // --- Observer Pattern ---
 // Map to store listeners for different state change events
@@ -158,6 +164,11 @@ export function notifyAll() {
     notify('isSocketConnected', isSocketConnected); // Notify socket status
     notify('streamingTranscript', streamingTranscript); // Notify streaming transcript
     notify('finalTranscriptSegment', finalTranscriptSegment); // Notify final segment
+    // --- NEW: Notify long recording state ---
+    notify('isLongRecordingActive', isLongRecordingActive);
+    notify('longRecordingToastId', longRecordingToastId); // If UI needs to react to toast ID changes
+    notify('lastLongTranscript', lastLongTranscript); // If UI needs to react to transcript changes
+    // ---------------------------------------
 
 
     // Also notify combined states if listeners are subscribed to them
@@ -527,3 +538,24 @@ export function getInputElementForContext(context) { // Add export keyword
     }
     return null;
 }
+
+
+// --- NEW: Long Recording State Functions ---
+export function setIsLongRecordingActive(isActive) {
+    if (isLongRecordingActive !== isActive) {
+        isLongRecordingActive = isActive;
+        notify('isLongRecordingActive', isLongRecordingActive);
+    }
+}
+
+export function setLongRecordingToastId(toastId) {
+    // No need to check for change, just set it and notify if needed
+    longRecordingToastId = toastId;
+    // notify('longRecordingToastId', longRecordingToastId); // Usually not needed to notify for this
+}
+
+export function setLastLongTranscript(transcript) {
+    lastLongTranscript = transcript;
+    notify('lastLongTranscript', lastLongTranscript); // Notify if UI needs to display this elsewhere
+}
+// -----------------------------------------

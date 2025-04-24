@@ -105,3 +105,80 @@ def handle_cleanup():
     except Exception as e:
         logger.error(f"Unexpected error during transcript cleanup: {e}", exc_info=True)
         return jsonify({"error": "Internal server error during cleanup"}), 500
+
+
+# --- NEW Route for Long Recording Transcription ---
+@bp.route('/transcribe_long', methods=['POST'])
+def transcribe_long_audio_route():
+    """
+    API endpoint to receive a complete audio file (blob) and return its transcription
+    using the non-streaming API.
+    Expects 'audio_blob' in files and 'languageCode', 'mimeType' in form data.
+    """
+    logger.info("Received request at /api/voice/transcribe_long")
+
+    if 'audio_blob' not in request.files:
+        logger.warning("Missing 'audio_blob' in request files.")
+        return jsonify({"error": "Missing audio file part ('audio_blob')"}), 400
+
+    audio_file = request.files['audio_blob']
+    language_code = request.form.get('languageCode', 'en-US')
+    # Get MIME type to determine encoding - crucial for Google API config
+    mime_type = request.form.get('mimeType')
+
+    if not mime_type:
+        logger.warning("Missing 'mimeType' in request form data.")
+        return jsonify({"error": "Missing mimeType parameter"}), 400
+
+    # Map MIME type to the encoding string expected by voice_services.transcribe_audio_file
+    # Ensure this mapping aligns with the frontend's MIME_TYPE and voice_services expectations
+    encoding_map = {
+        "audio/webm;codecs=opus": "WEBM_OPUS",
+        "audio/ogg;codecs=opus": "OGG_OPUS",
+        "audio/wav": "LINEAR16", # Example if you support WAV
+        # Add other mappings based on MIME_TYPE in voice.js if needed
+    }
+    # Normalize mime_type (lowercase, ignore parameters after ';')
+    normalized_mime_type = mime_type.split(';')[0].lower()
+    encoding = encoding_map.get(normalized_mime_type)
+
+    if not encoding:
+        logger.error(f"Unsupported or unmapped MIME type received: {mime_type} (Normalized: {normalized_mime_type})")
+        return jsonify({"error": f"Unsupported MIME type: {mime_type}"}), 400
+
+    # Log file size (using content_length is an estimate, reading is more accurate)
+    # file_size = request.content_length # Approximate size
+    # logger.info(f"Processing audio file: name='{audio_file.filename}', approx size='{file_size}', language='{language_code}', mime='{mime_type}', mapped encoding='{encoding}'")
+    logger.info(f"Processing audio file: name='{audio_file.filename}', language='{language_code}', mime='{mime_type}', mapped encoding='{encoding}'")
+
+
+    try:
+        audio_bytes = audio_file.read()
+        actual_size = len(audio_bytes)
+        logger.info(f"Read {actual_size} bytes from audio file.")
+
+        if not audio_bytes:
+            logger.warning("Received empty audio file.")
+            return jsonify({"error": "Empty audio file received"}), 400
+
+        # Call the non-streaming transcription service
+        # Ensure voice_services is imported correctly at the top
+        transcript = ai_services.voice_services.transcribe_audio_file( # Assuming voice_services is under ai_services or imported directly
+            audio_bytes=audio_bytes,
+            language_code=language_code,
+            encoding=encoding # Pass the determined encoding
+        )
+
+        if transcript is None:
+            logger.error("Transcription failed (transcribe_audio_file returned None).")
+            return jsonify({"error": "Transcription failed"}), 500
+
+        logger.info("Successfully transcribed long audio.")
+        # Optional: Clean the transcript here if desired
+        # cleaned_transcript = ai_services.clean_up_transcript(transcript)
+        # return jsonify({"transcript": cleaned_transcript}), 200
+        return jsonify({"transcript": transcript}), 200
+
+    except Exception as e:
+        logger.error(f"Error processing long audio transcription request: {e}", exc_info=True)
+        return jsonify({"error": "Internal server error during transcription"}), 500
