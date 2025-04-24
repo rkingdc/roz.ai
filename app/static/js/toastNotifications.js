@@ -34,6 +34,8 @@ export function initializeToastContainer(containerElement) {
  * @returns {string | null} The unique ID of the created toast, or null if container not ready.
  */
 export function showToast(content, options = {}) {
+    // ADD LOG: Check the current value of the module-level variable when showToast is called
+    console.log(`[DEBUG] showToast entered. Current toastContainer value:`, toastContainer);
     if (!toastContainer) {
         console.error("Toast container not initialized. Call initializeToastContainer first.");
         return null;
