@@ -8,6 +8,9 @@ import * as ui from './ui.js';
 import * as api from './api.js';
 import * as config from './config.js'; // Import config
 import { setupEventListeners } from './eventListeners.js';
+// --- RE-ADDED: Toast Initializer Import ---
+import { initializeToastContainer } from './toastNotifications.js';
+// ------------------------------------
 
 /**
  * Initializes the application on page load.
