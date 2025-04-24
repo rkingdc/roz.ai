@@ -430,6 +430,7 @@
 
 /* --- Custom Prose Styles for Chat Messages --- */
 /* Reduce margins for common block elements within chat messages */
+/* Reduce margins for common block elements within chat messages using rem units */
 .message.prose p,
 .message.prose ul,
 .message.prose ol,
@@ -438,32 +439,50 @@
 .message.prose blockquote,
 .message.prose figure,
 .message.prose table {
-    margin-top: 0.75em; /* Reduced from default prose values */
-    margin-bottom: 0.75em; /* Reduced from default prose values */
+    margin-top: 0.5rem;    /* Equivalent to Tailwind's my-2 */
+    margin-bottom: 0.5rem; /* Equivalent to Tailwind's my-2 */
 }
 
-/* Further reduce margins specifically for paragraphs if needed */
+/* Further reduce margins specifically for paragraphs */
 .message.prose p {
-    margin-top: 0.5em;
-    margin-bottom: 0.5em;
+    margin-top: 0.25rem;    /* Equivalent to Tailwind's my-1 */
+    margin-bottom: 0.25rem; /* Equivalent to Tailwind's my-1 */
 }
 
 /* Adjust list item spacing if necessary */
 .message.prose li {
-    margin-top: 0.2em;
-    margin-bottom: 0.2em;
+    margin-top: 0.125rem; /* Smaller spacing for list items */
+    margin-bottom: 0.125rem;
 }
 
-/* Adjust heading margins if they also seem too large */
+/* Adjust heading margins */
 .message.prose h1,
 .message.prose h2,
 .message.prose h3,
 .message.prose h4,
 .message.prose h5,
 .message.prose h6 {
-    margin-top: 1em;
-    margin-bottom: 0.5em;
+    margin-top: 0.75rem;    /* Equivalent to Tailwind's mt-3 */
+    margin-bottom: 0.25rem; /* Equivalent to Tailwind's mb-1 */
 }
+
+/* Remove potential extra margin on the first/last element within the message content */
+/* This targets direct children of the .message element if prose is applied directly */
+.message.prose > :first-child {
+    margin-top: 0;
+}
+.message.prose > :last-child {
+    margin-bottom: 0;
+}
+/* Also target first/last within collapsible content divs */
+.message.prose .collapsible-content > :first-child {
+     margin-top: 0;
+}
+.message.prose .collapsible-content > :last-child {
+     margin-bottom: 0;
+}
+
+
 /* --- End Custom Prose Styles --- */
 
 
