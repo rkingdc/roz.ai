@@ -60,8 +60,10 @@ export let noteHistory = []; // History entries for the currently selected note
 export let isRecording = false; // Whether audio is currently being recorded
 export let recordingContext = null; // Context associated with the current recording (e.g., 'chat', 'note')
 export let isSocketConnected = false; // WebSocket connection status for transcription
-export let streamingTranscript = ""; // Holds the current real-time transcript
-export let finalTranscriptSegment = ""; // Holds the last final transcript segment received
+// --- REPLACED streamingTranscript & finalTranscriptSegment ---
+export let finalizedTranscript = ""; // Holds the concatenated FINAL results for the current session
+export let currentInterimTranscript = ""; // Holds the LATEST interim result
+// -----------------------------------------------------------
 
 // --- NEW: Long Recording State ---
 export let isLongRecordingActive = false; // Tracks the non-streaming recording state
@@ -162,8 +164,10 @@ export function notifyAll() {
     notify('isRecording', isRecording);
     notify('recordingContext', recordingContext);
     notify('isSocketConnected', isSocketConnected); // Notify socket status
-    notify('streamingTranscript', streamingTranscript); // Notify streaming transcript
-    notify('finalTranscriptSegment', finalTranscriptSegment); // Notify final segment
+    // --- Notify NEW transcript states ---
+    notify('finalizedTranscript', finalizedTranscript);
+    notify('currentInterimTranscript', currentInterimTranscript);
+    // ----------------------------------
     // --- NEW: Notify long recording state ---
     notify('isLongRecordingActive', isLongRecordingActive);
     notify('longRecordingToastId', longRecordingToastId); // If UI needs to react to toast ID changes
@@ -510,24 +514,35 @@ export function setIsSocketConnected(connected) {
     }
 }
 
-export function setStreamingTranscript(transcript) {
-    if (streamingTranscript !== transcript) {
-        streamingTranscript = transcript;
-        notify('streamingTranscript', streamingTranscript);
+// --- REMOVED Old Transcript Setters ---
+// export function setStreamingTranscript(transcript) { ... }
+// export function appendStreamingTranscript(text) { ... }
+// export function setFinalTranscriptSegment(text) { ... }
+// ------------------------------------
+
+// --- NEW: Setters for New Transcript State ---
+export function setFinalizedTranscript(transcript) {
+    if (finalizedTranscript !== transcript) {
+        finalizedTranscript = transcript;
+        notify('finalizedTranscript', finalizedTranscript);
     }
 }
 
-// Function to append to the streaming transcript (useful for interim results)
-export function appendStreamingTranscript(text) {
-    streamingTranscript += text;
-    notify('streamingTranscript', streamingTranscript);
+export function appendFinalizedTranscript(segment) {
+    // Append with a space if the current finalized transcript isn't empty
+    const separator = finalizedTranscript ? " " : "";
+    finalizedTranscript += separator + segment;
+    notify('finalizedTranscript', finalizedTranscript);
 }
 
-// Function to store the last final segment
-export function setFinalTranscriptSegment(text) {
-    finalTranscriptSegment = text;
-    notify('finalTranscriptSegment', finalTranscriptSegment);
+export function setCurrentInterimTranscript(transcript) {
+     if (currentInterimTranscript !== transcript) {
+        currentInterimTranscript = transcript;
+        notify('currentInterimTranscript', currentInterimTranscript);
+    }
 }
+// -----------------------------------------
+
 
 // --- NEW: Function to get the appropriate input element based on context ---
 export function getInputElementForContext(context) { // Add export keyword
