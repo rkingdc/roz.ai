@@ -572,9 +572,14 @@
      flex-basis: 0; /* ADDED: Crucial for scrollable flex items */
 }
  .sidebar-list {
-     /* flex-grow: 1; /* REMOVED */
-     /* overflow-y: auto; /* REMOVED */
+     /* flex-grow: 1; /* REMOVED */ /* <-- This comment is now wrong, ADD it back */
+     /* overflow-y: auto; /* REMOVED */ /* <-- This comment is now wrong, ADD it back */
      margin-top: 0.5rem;
+     /* --- ADD THESE LINES --- */
+     flex-grow: 1;
+     overflow-y: auto;
+     min-height: 0; /* Important for scrollable flex children */
+     /* --- END ADDED LINES --- */
 }
  .list-item {
      display: flex; /* Keep flex display */
