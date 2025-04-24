@@ -151,68 +151,9 @@ def get_note_history(note_id):
 
     except Exception as e:
         logger.error(f"An unexpected error occurred while getting note history for {note_id}: {e}", exc_info=True)
+        logger.error(f"An unexpected error occurred while getting note history for {note_id}: {e}", exc_info=True)
         return jsonify({"error": "An unexpected error occurred"}), 500
 
-# --- NEW: API endpoint to generate and save note diff summary ---
-@bp.route('/notes/<int:note_id>/history/<int:history_id>/generate_diff_summary', methods=['POST'])
-def generate_and_save_note_diff_summary(note_id, history_id):
-    """
-    API endpoint to generate an AI summary of the difference between a specific
-    note history entry and its previous version, then save it to the database.
-    """
-    logger.info(f"Received POST request for /api/notes/{note_id}/history/{history_id}/generate_diff_summary")
-
-    try:
-        # 1. Get the target history entry
-        target_entry = database.get_note_history_entry_from_db(history_id)
-        if not target_entry or target_entry['note_id'] != note_id:
-            logger.warning(f"Target history entry {history_id} not found or doesn't belong to note {note_id}.")
-            return jsonify({"error": "History entry not found"}), 404
-
-        # 2. Get the *previous* history entry (the one saved immediately before the target)
-        # Since history is ordered DESC by saved_at, the previous one has a saved_at < target_entry['saved_at']
-        previous_entry = NoteHistory.query.filter(
-            NoteHistory.note_id == note_id,
-            NoteHistory.saved_at < target_entry['saved_at']
-        ).order_by(NoteHistory.saved_at.desc()).first()
-
-        # If no previous entry, this is the initial version (shouldn't happen if called correctly)
-        # If no previous entry, this is the initial version.
-        if not previous_entry:
-            logger.info(f"Marking history entry {history_id} as initial version (no previous entry found).")
-            # Save the marker to the summary column.
-            if database.save_note_diff_summary_in_db(history_id, "[Initial version]"):
-                 return jsonify({"summary": "[Initial version]"}) # Return the marker as the summary
-            else:
-                 logger.error(f"Failed to save '[Initial version]' marker for history ID {history_id}")
-                 return jsonify({"error": "Failed to mark entry as initial version"}), 500
-
-
-        # 3. Get content for both versions
-        version_1_content = previous_entry.content if previous_entry.content is not None else ""
-        version_2_content = target_entry['content'] if target_entry['content'] is not None else ""
-
-        # 4. Call AI service to generate summary
-        # Make sure ai_services is imported
-        from app import ai_services # Import inside function or at top if preferred
-        logger.info(f"Calling AI service to generate diff summary between history {previous_entry.id} and {history_id}.")
-        diff_summary = ai_services.generate_note_diff_summary(version_1_content, version_2_content)
-
-        # Check for AI errors
-        if diff_summary.startswith(("[Error", "[AI Error", "[System Note")):
-            logger.error(f"AI service failed to generate diff summary for history {history_id}: {diff_summary}")
-            # Don't save the error message as the diff, return it to the client
-            return jsonify({"error": f"AI Generation Failed: {diff_summary}"}), 500
-
-        # 5. Save the generated summary to the target history entry
-        if database.save_note_diff_summary_in_db(history_id, diff_summary):
-            logger.info(f"Successfully generated and saved diff summary for history ID: {history_id}")
-            return jsonify({"summary": diff_summary})
-        else:
-            logger.error(f"Failed to save generated diff summary for history ID: {history_id}")
-            return jsonify({"error": "Failed to save generated diff summary"}), 500
-
-    except Exception as e:
-        logger.error(f"An unexpected error occurred while generating/saving diff summary for history {history_id}: {e}", exc_info=True)
-        return jsonify({"error": "An unexpected error occurred"}), 500
+# --- Removed generate_and_save_note_diff_summary endpoint ---
+# Summary generation is now handled within the PUT /api/note/<note_id> endpoint (via database.save_note_to_db)
 # -------------------------------------------------------

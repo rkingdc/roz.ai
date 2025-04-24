@@ -886,31 +886,8 @@ export function setupEventListeners() {
     });
     // -----------------------------------------------------------------
 
-    // --- NEW: Add click listener for Generate Diff Summary button (delegated) ---
-    elements.noteHistoryList?.addEventListener('click', async (event) => {
-        const generateButton = event.target.closest('.generate-diff-btn');
-        if (!generateButton || generateButton.disabled) return; // Ignore if not the button or disabled
-
-        const historyId = parseInt(generateButton.dataset.historyId);
-        const noteId = parseInt(generateButton.dataset.noteId);
-
-        if (isNaN(historyId) || isNaN(noteId)) {
-            console.error("Missing historyId or noteId on generate diff button.");
-            state.setStatusMessage("Error: Could not identify history item.", true);
-            return;
-        }
-
-        // Disable button immediately to prevent double clicks
-        generateButton.disabled = true;
-        generateButton.textContent = 'Generating...';
-
-        // Call the API function
-        await api.generateAndSaveNoteDiffSummary(noteId, historyId); // Updates state (noteHistory, isLoading, statusMessage)
-
-        // UI updates (including button state/text) are triggered by state notifications
-        // specifically the 'noteHistory' notification which calls renderNoteHistory.
-        // No need to re-enable the button here, renderNoteHistory will replace it or show the summary.
-    });
+    // --- Removed Generate Diff Summary button listener ---
+    // Summary generation is now handled during note save.
     // -----------------------------------------------------------------------
 
 

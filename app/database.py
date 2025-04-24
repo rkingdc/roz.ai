@@ -1,10 +1,13 @@
 # app/database.py - Refactored for Flask-SQLAlchemy ORM
 
 import logging
-import difflib # Import difflib for calculating differences
+# Removed difflib import
 from datetime import datetime, timezone
 from flask import current_app
 from sqlalchemy.exc import SQLAlchemyError
+
+# Import AI services for summary generation
+from app import ai_services
 
 # Import db instance and models
 from app import db
@@ -416,54 +419,103 @@ def save_note_to_db(note_id, name, content):
 
         # Create a history entry *after* updating the note object,
         # capturing the state *as it is about to be saved*
+        history_entry = None # Initialize history_entry
+        last_history_id = None # To store the ID of the previous history entry
+
         # Only create history if something actually changed
         if content_changed or name_changed:
-            # Calculate diff before creating the history entry
-            note_diff_text = None
-            if content_changed:
-                # Get the previous content from the last history entry if it exists
-                last_history = NoteHistory.query.filter_by(note_id=note.id)\
-                                                .order_by(NoteHistory.saved_at.desc())\
-                                                .first()
-                previous_content = last_history.content if last_history else ""
-                # Ensure both are strings for diffing
-                old_content_str = old_content if old_content is not None else ""
-                new_content_str = note.content if note.content is not None else ""
+            # Get the previous history entry *before* creating the new one
+            last_history = NoteHistory.query.filter_by(note_id=note.id)\
+                                            .order_by(NoteHistory.saved_at.desc())\
+                                            .first()
+            last_history_id = last_history.id if last_history else None
 
-                # Generate unified diff
-                diff_lines = difflib.unified_diff(
-                    old_content_str.splitlines(keepends=True),
-                    new_content_str.splitlines(keepends=True),
-                    fromfile=f"Version {last_history.id if last_history else 'Initial'}",
-                    tofile=f"Version {note_id} (Current Save)",
-                    lineterm='\n'
-                )
-                note_diff_text = "".join(diff_lines)
-                # Don't add placeholder text for raw diff if it's empty
-                # if not note_diff_text: # If diff is empty (e.g., only whitespace changes ignored by splitlines)
-                #     note_diff_text = "[No textual changes detected]" if old_content_str != new_content_str else None
-
-
+            # Create the history entry *without* the summary first
             history_entry = NoteHistory(
                 note_id=note.id,
                 name=note.name,      # Save the name *after* the update
                 content=note.content, # Save the content *after* the update
-                note_diff_raw=note_diff_text # Save the calculated raw diff
-                # note_diff_summary is left null initially
+                note_diff_summary=None # Summary will be generated after adding
                 # saved_at defaults to now()
             )
             db.session.add(history_entry)
-            logger.info(f"Created history entry for note ID {note_id} capturing the new state and raw diff.")
+            # We need to flush to get the ID of the new history_entry if needed,
+            # but we won't commit yet. The AI generation happens before the final commit.
+            db.session.flush() # Assigns ID to history_entry
+            logger.info(f"Created history entry (ID: {history_entry.id}) for note ID {note_id} capturing the new state. Summary generation pending.")
         else:
             logger.info(f"No changes detected for note ID {note_id}, skipping history entry creation.")
 
+        # --- Attempt to commit the main note save and the history entry (without summary yet) ---
+        logger.info(f"Attempting initial commit for note ID: {note_id} (name: '{effective_name}')...")
+        if not _commit_session():
+            logger.error(f"Initial commit failed for note {note_id}. Aborting summary generation.")
+            return False # Main save failed
 
-        logger.info(f"Attempting to save note content for ID: {note_id} (name: '{effective_name}')...")
-        if _commit_session():
-            logger.info(f"Successfully saved note content for ID: {note_id}.")
-            return True
-        else:
-            return False # Commit failed
+        # --- If initial commit succeeded AND a history entry was created, generate summary ---
+        if history_entry:
+            logger.info(f"Note {note_id} saved. Proceeding with summary generation for history entry {history_entry.id}.")
+            summary_to_save = None
+            try:
+                # Get previous content (use the last_history object fetched earlier)
+                previous_content_str = last_history.content if last_history else ""
+                # Ensure current content is string
+                current_content_str = note.content if note.content is not None else ""
+
+                if not last_history:
+                    # This is the first version saved
+                    summary_to_save = "[Initial version]"
+                    logger.info(f"Marking history entry {history_entry.id} as initial version.")
+                elif not content_changed:
+                    # Only name changed, no content diff to summarize
+                    summary_to_save = "[Metadata change only]"
+                    logger.info(f"Marking history entry {history_entry.id} as metadata change only.")
+                else:
+                    # Generate AI summary
+                    logger.info(f"Calling AI service to generate diff summary between history {last_history_id} and {history_entry.id}.")
+                    generated_summary = ai_services.generate_note_diff_summary(previous_content_str, current_content_str)
+
+                    # Check for AI errors, but save a marker instead of failing the whole process
+                    if generated_summary.startswith(("[Error", "[AI Error", "[System Note")):
+                        logger.error(f"AI service failed to generate diff summary for history {history_entry.id}: {generated_summary}")
+                        summary_to_save = "[AI summary generation failed]" # Save error marker
+                    else:
+                        summary_to_save = generated_summary
+                        logger.info(f"AI summary generated successfully for history entry {history_entry.id}.")
+
+                # --- Save the summary (or marker) to the existing history entry ---
+                # Fetch the entry again within this session context to update it
+                hist_entry_to_update = db.session.get(NoteHistory, history_entry.id)
+                if hist_entry_to_update:
+                    hist_entry_to_update.note_diff_summary = summary_to_save
+                    logger.info(f"Attempting to commit summary '{summary_to_save[:30]}...' for history ID: {history_entry.id}...")
+                    if _commit_session():
+                        logger.info(f"Successfully saved summary for history ID: {history_entry.id}")
+                    else:
+                        # Log error, but don't return False, as the main note save succeeded
+                        logger.error(f"Failed to commit summary update for history ID: {history_entry.id}. Note content was saved.")
+                else:
+                     logger.error(f"Could not find history entry {history_entry.id} in session to save summary. Note content was saved.")
+
+            except Exception as ai_err:
+                # Catch any unexpected error during AI call or summary saving logic
+                logger.error(f"Unexpected error during AI summary generation/saving for history {history_entry.id}: {ai_err}", exc_info=True)
+                # Attempt to save a generic error marker
+                try:
+                    hist_entry_to_update = db.session.get(NoteHistory, history_entry.id)
+                    if hist_entry_to_update and hist_entry_to_update.note_diff_summary is None: # Avoid overwriting previous marker
+                        hist_entry_to_update.note_diff_summary = "[Summary generation error]"
+                        _commit_session() # Attempt commit, ignore failure here
+                except Exception as marker_err:
+                    logger.error(f"Failed to save error marker for history {history_entry.id}: {marker_err}")
+                # Do not return False, main save succeeded.
+
+        # If we reached here, the main note save was successful
+        logger.info(f"save_note_to_db completed for note ID: {note_id}.")
+        return True
+
+    except SQLAlchemyError as e:
+        logger.error(f"Database error during save_note_to_db for note {note_id}: {e}", exc_info=True)
     except SQLAlchemyError as e:
         logger.error(f"Database error saving note {note_id}: {e}", exc_info=True)
         db.session.rollback()
@@ -500,7 +552,7 @@ def get_note_history_entry_from_db(history_id):
                 'note_id': entry.note_id,
                 'name': entry.name,
                 'content': entry.content,
-                'note_diff_raw': entry.note_diff_raw,
+                # 'note_diff_raw': entry.note_diff_raw, # Removed
                 'note_diff_summary': entry.note_diff_summary,
                 'saved_at': entry.saved_at
             }
@@ -546,7 +598,7 @@ def get_note_history_from_db(note_id, limit=None):
                 'note_id': entry.note_id,
                 'name': entry.name,
                 'content': entry.content,
-                'note_diff_raw': entry.note_diff_raw, # Include the raw diff
+                # 'note_diff_raw': entry.note_diff_raw, # Removed
                 'note_diff_summary': entry.note_diff_summary, # Include the AI summary
                 'saved_at': entry.saved_at
             } for entry in history_entries

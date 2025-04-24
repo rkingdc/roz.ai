@@ -58,7 +58,7 @@ class NoteHistory(db.Model):
     note_id = db.Column(db.Integer, db.ForeignKey('notes.id', ondelete='CASCADE'), nullable=False, index=True)
     name = db.Column(db.String(150), nullable=True) # Store the name at this point in history
     content = db.Column(db.Text, nullable=True) # Store the content at this point in history
-    note_diff_raw = db.Column(db.Text, nullable=True) # Store the raw diff from the previous version
+    # note_diff_raw column removed
     note_diff_summary = db.Column(db.Text, nullable=True) # Store the AI-generated summary of the diff
     saved_at = db.Column(db.DateTime(timezone=True), nullable=False, default=default_utcnow, index=True)
 

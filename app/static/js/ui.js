@@ -1553,32 +1553,47 @@ export function renderNoteHistory() {
 
         // Check if this is the oldest entry (last in the DESC sorted list)
         const isInitialVersion = index === history.length - 1;
+        let summaryText = "";
+        let summaryTitle = ""; // Tooltip text
 
         if (isInitialVersion) {
-            diffDiv.textContent = "Initial version";
-        // Prioritize showing the AI summary if it exists
-        } else if (entry.note_diff_summary && entry.note_diff_summary.trim() !== "" && !entry.note_diff_summary.startsWith("[Initial version]")) {
-            // Display existing AI summary (truncate for display)
-            const maxLength = 100; // Max length for display in sidebar
-            let displaySummary = entry.note_diff_summary;
-            if (displaySummary.length > maxLength) {
-                displaySummary = displaySummary.substring(0, maxLength) + "...";
+            summaryText = "Initial version";
+            summaryTitle = "Initial version of the note.";
+        } else if (entry.note_diff_summary) {
+            // Display existing summary or marker text
+            summaryText = entry.note_diff_summary;
+            summaryTitle = entry.note_diff_summary; // Use full summary for tooltip
+
+            // Handle specific markers
+            if (summaryText === "[Initial version]") { // Should be caught by isInitialVersion, but double-check
+                 summaryText = "Initial version";
+                 summaryTitle = "Initial version of the note.";
+            } else if (summaryText === "[Metadata change only]") {
+                 summaryText = "Name/Metadata changed";
+                 summaryTitle = "Only the note name or other metadata changed in this version.";
+            } else if (summaryText.startsWith("[AI summary generation failed]") || summaryText.startsWith("[Summary generation error]")) {
+                 summaryText = "Summary unavailable";
+                 summaryTitle = "Could not generate summary for this version.";
+                 diffDiv.classList.add('text-red-400'); // Indicate error subtly
+            } else {
+                 // Truncate long summaries for display
+                 const maxLength = 100;
+                 if (summaryText.length > maxLength) {
+                     summaryText = summaryText.substring(0, maxLength) + "...";
+                 }
             }
-            diffDiv.textContent = displaySummary;
-            // Optionally show the raw diff in the tooltip if available, otherwise show the full summary
-            diffDiv.title = entry.note_diff_raw || entry.note_diff_summary;
         } else {
-            // Show "Generate Summary" button if summary is missing (and not initial version)
-            const generateButton = document.createElement('button');
-            generateButton.classList.add('btn', 'btn-xs', 'btn-outline', 'generate-diff-btn', 'p-0.5'); // Added specific class
-            generateButton.textContent = 'Generate Diff Summary';
-            generateButton.dataset.historyId = entry.id; // Store history ID on button
-            generateButton.dataset.noteId = currentNoteId; // Store note ID on button
-            generateButton.title = 'Generate AI summary of changes from previous version';
-            diffDiv.appendChild(generateButton);
+            // If summary is null/empty and not initial version (shouldn't happen often with new logic)
+            summaryText = "Summary pending...";
+            summaryTitle = "Summary is being generated or was not created.";
+            diffDiv.classList.add('opacity-60'); // Dim pending text
         }
+
+        diffDiv.textContent = summaryText;
+        diffDiv.title = summaryTitle; // Set tooltip
+
         listItem.appendChild(diffDiv);
-        // ------------------------------------------------
+        // --- Removed Generate Button Logic ---
 
         noteHistoryList.appendChild(listItem);
     }); // End forEach
