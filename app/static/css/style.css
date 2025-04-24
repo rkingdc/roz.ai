@@ -565,7 +565,7 @@
 /* Sidebar Specific Styling */
  .sidebar-section-container {
      flex-grow: 1;
-     overflow-y: hidden;
+     /* overflow-y: hidden; /* REMOVED to allow child scroll */
      display: flex;
      flex-direction: column;
      min-height: 0;
