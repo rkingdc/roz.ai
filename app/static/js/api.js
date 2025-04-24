@@ -374,8 +374,8 @@ export async function transcribeLongAudio(audioBlob, languageCode = 'en-US') {
         const snippet = data.transcript.substring(0, 70) + (data.transcript.length > 70 ? '...' : '');
         // Ensure buttons have data attributes to identify target and action
         const toastContent = `
-            <div class="flex flex-col space-y-1 relative pr-4"> {# Added relative positioning and padding-right #}
-                <button class="toast-close-button absolute top-0 right-0 px-1 py-0 text-white hover:text-gray-300 text-lg leading-none" title="Close">&times;</button> {# Added close button #}
+            <div class="flex flex-col space-y-1 relative pr-4">
+                <button class="toast-close-button absolute top-0 right-0 px-1 py-0 text-white hover:text-gray-300 text-lg leading-none" title="Close">&times;</button>
                 <span class="font-medium">Transcription Complete:</span>
                 <span class="text-xs italic">"${escapeHtml(snippet)}"</span>
                 <button class="toast-copy-button self-end mt-1 px-2 py-0.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300" data-transcript-target="long">Copy</button>
