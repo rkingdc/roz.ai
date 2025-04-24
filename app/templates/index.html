@@ -60,7 +60,8 @@
                 </div>
                 <div id="current-chat-id-display" class="text-xs text-rz-tab-background-text mt-1 whitespace-nowrap">ID: -</div>
             </div>
-            <div class="flex flex-col min-h-0 flex-grow sidebar-section-container">
+            {# Added overflow-y-auto here #}
+            <div class="flex flex-col min-h-0 flex-grow overflow-y-auto sidebar-section-container">
                 <h3 class="text-lg font-medium mb-1 border-t border-rz-sidebar-border pt-3 flex-shrink-0 whitespace-nowrap">Saved Chats</h3>
                 <div id="saved-chats-list" class="sidebar-list">
                     <p class="text-rz-sidebar-text opacity-75 text-sm p-1">Loading chats...</p>
