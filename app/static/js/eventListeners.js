@@ -398,6 +398,14 @@ export function setupEventListeners() {
         let targetElement = null;
         if (state.currentNoteMode === 'view') {
             targetElement = elements.notesPreview?.querySelector(`#${targetId}`);
+            if (targetElement && elements.notesPreview) {
+                // --- UPDATED: Use scrollTop for more reliable scrolling in view mode ---
+                const targetOffsetTop = targetElement.offsetTop;
+                elements.notesPreview.scrollTop = targetOffsetTop;
+                // ---------------------------------------------------------------------
+            } else {
+                console.warn(`[DEBUG] TOC link clicked, but target heading #${targetId} not found in view mode.`);
+            }
         } else { // 'edit' mode
             // In edit mode, we need to find the corresponding line in the textarea
             // This is tricky and less reliable than scrolling the rendered view.
@@ -425,15 +433,6 @@ export function setupEventListeners() {
             } else {
                  state.setStatusMessage("Could not find heading in editor.", true);
             }
-            return; // Exit after handling edit mode
-        }
-
-
-        if (targetElement && state.currentNoteMode === 'view') {
-            // Scroll the preview container to the heading
-            targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else {
-            console.warn(`[DEBUG] TOC link clicked, but target heading #${targetId} not found or not in view mode.`);
         }
     });
     // ---------------------------------------
