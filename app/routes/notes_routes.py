@@ -177,12 +177,14 @@ def generate_and_save_note_diff_summary(note_id, history_id):
         ).order_by(NoteHistory.saved_at.desc()).first()
 
         # If no previous entry, this is the initial version (shouldn't happen if called correctly)
+        # If no previous entry, this is the initial version.
         if not previous_entry:
-            logger.warning(f"Cannot generate diff summary for history entry {history_id} as it appears to be the initial version.")
-            # Save a specific marker instead of generating
+            logger.info(f"Marking history entry {history_id} as initial version (no previous entry found).")
+            # Save the marker to the summary column.
             if database.save_note_diff_summary_in_db(history_id, "[Initial version]"):
-                 return jsonify({"summary": "[Initial version]"})
+                 return jsonify({"summary": "[Initial version]"}) # Return the marker as the summary
             else:
+                 logger.error(f"Failed to save '[Initial version]' marker for history ID {history_id}")
                  return jsonify({"error": "Failed to mark entry as initial version"}), 500
 
 

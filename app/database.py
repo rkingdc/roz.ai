@@ -439,19 +439,21 @@ def save_note_to_db(note_id, name, content):
                     lineterm='\n'
                 )
                 note_diff_text = "".join(diff_lines)
-                if not note_diff_text: # If diff is empty (e.g., only whitespace changes ignored by splitlines)
-                    note_diff_text = "[No textual changes detected]" if old_content_str != new_content_str else None
+                # Don't add placeholder text for raw diff if it's empty
+                # if not note_diff_text: # If diff is empty (e.g., only whitespace changes ignored by splitlines)
+                #     note_diff_text = "[No textual changes detected]" if old_content_str != new_content_str else None
 
 
             history_entry = NoteHistory(
                 note_id=note.id,
                 name=note.name,      # Save the name *after* the update
                 content=note.content, # Save the content *after* the update
-                note_diff=note_diff_text # Save the calculated diff
+                note_diff_raw=note_diff_text # Save the calculated raw diff
+                # note_diff_summary is left null initially
                 # saved_at defaults to now()
             )
             db.session.add(history_entry)
-            logger.info(f"Created history entry for note ID {note_id} capturing the new state and diff.")
+            logger.info(f"Created history entry for note ID {note_id} capturing the new state and raw diff.")
         else:
             logger.info(f"No changes detected for note ID {note_id}, skipping history entry creation.")
 
@@ -498,7 +500,8 @@ def get_note_history_entry_from_db(history_id):
                 'note_id': entry.note_id,
                 'name': entry.name,
                 'content': entry.content,
-                'note_diff': entry.note_diff,
+                'note_diff_raw': entry.note_diff_raw,
+                'note_diff_summary': entry.note_diff_summary,
                 'saved_at': entry.saved_at
             }
         else:
@@ -509,17 +512,17 @@ def get_note_history_entry_from_db(history_id):
 
 # Function to save the generated diff summary for a history entry
 def save_note_diff_summary_in_db(history_id, diff_summary):
-    """Saves the generated diff summary for a specific note history entry."""
+    """Saves the generated AI diff summary for a specific note history entry."""
     try:
         entry = db.session.get(NoteHistory, history_id)
         if not entry:
             logger.warning(f"Note history entry not found with ID: {history_id} for diff summary update.")
             return False
 
-        entry.note_diff = diff_summary
-        logger.info(f"Attempting to save diff summary for history ID: {history_id}...")
+        entry.note_diff_summary = diff_summary # Save to the new summary column
+        logger.info(f"Attempting to save AI diff summary for history ID: {history_id}...")
         if _commit_session():
-            logger.info(f"Successfully saved diff summary for history ID: {history_id}")
+            logger.info(f"Successfully saved AI diff summary for history ID: {history_id}")
             return True
         else:
             return False # Commit failed
@@ -543,7 +546,8 @@ def get_note_history_from_db(note_id, limit=None):
                 'note_id': entry.note_id,
                 'name': entry.name,
                 'content': entry.content,
-                'note_diff': entry.note_diff, # Include the diff
+                'note_diff_raw': entry.note_diff_raw, # Include the raw diff
+                'note_diff_summary': entry.note_diff_summary, # Include the AI summary
                 'saved_at': entry.saved_at
             } for entry in history_entries
         ]

@@ -1556,17 +1556,19 @@ export function renderNoteHistory() {
 
         if (isInitialVersion) {
             diffDiv.textContent = "Initial version";
-        } else if (entry.note_diff && entry.note_diff.trim() !== "" && !entry.note_diff.startsWith("[Initial version]")) {
-            // Display existing diff summary (truncate for display)
+        // Prioritize showing the AI summary if it exists
+        } else if (entry.note_diff_summary && entry.note_diff_summary.trim() !== "" && !entry.note_diff_summary.startsWith("[Initial version]")) {
+            // Display existing AI summary (truncate for display)
             const maxLength = 100; // Max length for display in sidebar
-            let displayDiff = entry.note_diff;
-            if (displayDiff.length > maxLength) {
-                displayDiff = displayDiff.substring(0, maxLength) + "...";
+            let displaySummary = entry.note_diff_summary;
+            if (displaySummary.length > maxLength) {
+                displaySummary = displaySummary.substring(0, maxLength) + "...";
             }
-            diffDiv.textContent = displayDiff;
-            diffDiv.title = entry.note_diff; // Show full diff on hover
+            diffDiv.textContent = displaySummary;
+            // Optionally show the raw diff in the tooltip if available, otherwise show the full summary
+            diffDiv.title = entry.note_diff_raw || entry.note_diff_summary;
         } else {
-            // Show "Generate Summary" button
+            // Show "Generate Summary" button if summary is missing (and not initial version)
             const generateButton = document.createElement('button');
             generateButton.classList.add('btn', 'btn-xs', 'btn-outline', 'generate-diff-btn', 'p-0.5'); // Added specific class
             generateButton.textContent = 'Generate Diff Summary';
