@@ -328,14 +328,14 @@ export function setupEventListeners() {
                             .then(() => {
                                 console.log("Long transcript copied to clipboard.");
                                 copyButton.textContent = 'Copied!';
-                                copyButton.disabled = true;
-                                // Optionally remove the toast after a delay
+                                copyButton.disabled = true; // Keep disabled briefly for visual feedback
+                                // Remove the toast after a short delay
                                 setTimeout(() => {
                                     const toastElement = copyButton.closest('.toast');
                                     if (toastElement && toastElement.dataset.toastId) {
-                                        removeToast(toastElement.dataset.toastId);
+                                        removeToast(toastElement.dataset.toastId); // Remove the toast
                                     }
-                                }, 1500);
+                                }, 1000); // Shortened delay to 1 second
                             })
                             .catch(err => {
                                 console.error('Failed to copy long transcript: ', err);
