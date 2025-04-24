@@ -1547,9 +1547,10 @@ export function renderNoteHistory() {
         listItem.appendChild(headerDiv);
         listItem.appendChild(timestampDiv);
 
-        // --- NEW: Add Diff Summary or Generate Button ---
+        // --- NEW: Add Diff Summary ---
         const diffDiv = document.createElement('div');
-        diffDiv.classList.add('text-xs', 'mt-1', 'text-rz-sidebar-text', 'opacity-80', 'note-diff-summary'); // Added class for targeting
+        // Add line-clamp-2 for two-line truncation with ellipsis
+        diffDiv.classList.add('text-xs', 'mt-1', 'text-rz-sidebar-text', 'opacity-80', 'note-diff-summary', 'line-clamp-2');
 
         // Check if this is the oldest entry (last in the DESC sorted list)
         const isInitialVersion = index === history.length - 1;
