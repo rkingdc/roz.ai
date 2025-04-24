@@ -132,18 +132,19 @@ def transcribe_long_audio_route():
 
     # Map MIME type to the encoding string expected by voice_services.transcribe_audio_file
     # Ensure this mapping aligns with the frontend's MIME_TYPE and voice_services expectations
+    # Use lowercase keys for case-insensitive matching after normalizing the input mime_type
     encoding_map = {
-        "audio/webm;codecs=opus": "WEBM_OPUS",
-        "audio/ogg;codecs=opus": "OGG_OPUS",
-        "audio/wav": "LINEAR16", # Example if you support WAV
-        # Add other mappings based on MIME_TYPE in voice.js if needed
+        "audio/webm": "WEBM_OPUS", # Match base type after splitting
+        "audio/ogg": "OGG_OPUS",   # Match base type after splitting
+        "audio/wav": "LINEAR16",   # Example if you support WAV
+        # Add other base types as needed
     }
     # Normalize mime_type (lowercase, ignore parameters after ';')
     normalized_mime_type = mime_type.split(';')[0].lower()
-    encoding = encoding_map.get(normalized_mime_type)
+    encoding = encoding_map.get(normalized_mime_type) # Look up using the normalized base type
 
     if not encoding:
-        logger.error(f"Unsupported or unmapped MIME type received: {mime_type} (Normalized: {normalized_mime_type})")
+        logger.error(f"Unsupported or unmapped MIME type received: {mime_type} (Normalized base type: {normalized_mime_type})")
         return jsonify({"error": f"Unsupported MIME type: {mime_type}"}), 400
 
     # Log file size (using content_length is an estimate, reading is more accurate)
