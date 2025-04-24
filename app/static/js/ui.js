@@ -263,6 +263,9 @@ function addMessageToDom(role, content, isError = false) {
              messageElement.appendChild(collapsibleFragment); // Append the processed fragment
              // Apply prose styles to the container if desired, but be mindful of conflicts
              // messageElement.classList.add('prose', 'prose-sm', 'max-w-none'); // Apply prose styles if needed
+             // --- Process Draw.io diagrams AFTER adding HTML ---
+             waitForGraphViewerAndProcess();
+             // -------------------------------------------------
          } else {
              messageElement.textContent = content; // Fallback
          }
