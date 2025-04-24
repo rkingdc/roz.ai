@@ -78,6 +78,7 @@ export const elements = {
     notesMicButtonGroup: null,
     micButtonNotes: null,
     cleanupTranscriptButtonNotes: null,
+    longRecButtonNotes: null, // *** ADDED: Long Record Button ***
     notesTocDrawer: null, // TOC Drawer elements
     notesTocHeader: null,
     notesTocToggle: null,
@@ -223,6 +224,7 @@ export function populateElements() {
     elements.notesMicButtonGroup = document.getElementById('notes-mic-button-group');
     elements.micButtonNotes = document.getElementById('mic-button-notes');
     elements.cleanupTranscriptButtonNotes = document.getElementById('cleanup-transcript-btn-notes');
+    elements.longRecButtonNotes = document.getElementById('long-rec-button-notes'); // *** ADDED ***
     elements.notesTocDrawer = document.getElementById('notes-toc-drawer'); // TOC Drawer elements
     elements.notesTocHeader = document.getElementById('notes-toc-header');
     elements.notesTocToggle = document.getElementById('notes-toc-toggle');
