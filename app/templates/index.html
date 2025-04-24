@@ -248,13 +248,11 @@
             <!-- Removed the inner flex container that created side-by-side layout -->
             <!-- Removed labels for Markdown Input and Preview -->
 
-            <!-- Textarea for Markdown Input - Added relative positioning -->
-            {# Replaced flex-grow with h-full. Kept overflow-hidden and min-h-0 for Firefox compatibility. #}
-            <div class="note-mode-element h-full w-full relative overflow-hidden min-h-0"> {# Wrap textarea to position buttons #}
-                {# Kept h-full class to make textarea fill parent height. Removed 'isolate'. #}
-                <textarea id="notes-textarea" class="w-full h-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
-                <!-- Button Group MOVED to header -->
-            </div>
+            <!-- Textarea for Markdown Input - REMOVED WRAPPER DIV -->
+            {# Added note-mode-element, flex-grow, relative, min-h-0 directly to textarea #}
+            <textarea id="notes-textarea" class="note-mode-element flex-grow relative min-h-0 w-full h-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
+            <!-- Button Group MOVED to header -->
+            {# Preview Area remains unchanged structurally, but is now a direct sibling textarea #}
 
             <!-- Preview Area -->
             <!-- Added flex-grow and overflow-y-auto to make preview fill its container and scroll -->
