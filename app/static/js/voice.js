@@ -367,6 +367,7 @@ export async function startLongRecording() {
 
 /** Stops the current non-streaming long recording. */
 export function stopLongRecording(isErrorCleanup = false) {
+    console.log("[DEBUG] Entering stopLongRecording function."); // ADD LOGGING
     if (!state.isLongRecordingActive || !mediaRecorder) {
         console.warn("[WARN] Not in long recording state or mediaRecorder not initialized.");
         if (state.isLongRecordingActive) state.setIsLongRecordingActive(false);
@@ -381,17 +382,23 @@ export function stopLongRecording(isErrorCleanup = false) {
     // Remove the persistent toast immediately
     if (state.longRecordingToastId) {
         console.log(`[DEBUG] stopLongRecording: Removing persistent toast ID: ${state.longRecordingToastId}`);
-        removeToast(state.longRecordingToastId); // *** Remove the persistent recording toast ***
+        removeToast(state.longRecordingToastId);
         state.setLongRecordingToastId(null);
+    } else {
+        console.warn("[DEBUG] stopLongRecording: No longRecordingToastId found in state to remove."); // ADD LOGGING
     }
 
     // Stop the microphone tracks *before* stopping the recorder for long recording
+    console.log("[DEBUG] stopLongRecording: Calling stopMediaStreamTracks()."); // ADD LOGGING
     stopMediaStreamTracks();
 
     // Update state *before* stopping recorder (UI reflects stopping state)
+    console.log("[DEBUG] stopLongRecording: Setting isLongRecordingActive state to false."); // ADD LOGGING
     state.setIsLongRecordingActive(false);
 
+    console.log(`[DEBUG] stopLongRecording: Checking mediaRecorder state: ${mediaRecorder?.state}`); // ADD LOGGING
     if (mediaRecorder.state === "recording" || mediaRecorder.state === "paused") {
+        console.log("[DEBUG] stopLongRecording: Calling mediaRecorder.stop()."); // ADD LOGGING
         mediaRecorder.stop(); // This will trigger the 'onstop' event handler where processing happens
     } else {
         console.warn(`[WARN] MediaRecorder state is already '${mediaRecorder.state}', cannot stop. Forcing cleanup.`);
