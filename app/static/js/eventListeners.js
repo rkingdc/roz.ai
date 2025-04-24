@@ -916,12 +916,6 @@ export function setupEventListeners() {
             }
         } else {
             console.warn(`[DEBUG] History entry with ID ${historyId} not found in state.noteHistory.`);
-            // -----------------------------------------------------------------
-
-            state.setStatusMessage(`Loaded history version ${historyId}.`); // Update state
-            // UI updates are triggered by state notifications
-        } else {
-            console.warn(`[DEBUG] History entry with ID ${historyId} not found in state.noteHistory.`);
             state.setStatusMessage(`Error: History version ${historyId} not found.`, true); // Update state
             // UI update is triggered by statusMessage notification
         }
