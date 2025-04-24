@@ -303,6 +303,58 @@ export function setupEventListeners() {
     // -----------------------------------------
 
 
+    // --- NEW: Delegated Listener for Toast Buttons ---
+    console.log("[DEBUG] Attempting to add listener to toastContainer. Element:", elements.toastContainer); // ADD LOGGING
+    if (elements.toastContainer) {
+        elements.toastContainer.addEventListener('click', (event) => {
+            console.log("[DEBUG] Click detected inside toast container. Target:", event.target); // Log target
+            const stopLongRecButton = event.target.closest('.toast-stop-long-rec-button');
+            const copyButton = event.target.closest('.toast-copy-button');
+
+            console.log("[DEBUG] stopLongRecButton found:", stopLongRecButton); // Log if button found
+            console.log("[DEBUG] copyButton found:", copyButton); // Log if button found
+
+            if (stopLongRecButton) {
+                console.log("[DEBUG] Stop long recording button identified. Calling voice.stopLongRecording()."); // Log before call
+                voice.stopLongRecording(); // Call the function in voice.js
+                // UI update will happen via state change
+            } else if (copyButton) {
+                console.log("[DEBUG] Copy transcript button identified."); // Log copy button
+                const target = copyButton.dataset.transcriptTarget; // Check if it's for long transcript
+                if (target === 'long') {
+                    const transcriptToCopy = state.lastLongTranscript; // Get from state
+                    if (transcriptToCopy) {
+                        navigator.clipboard.writeText(transcriptToCopy)
+                            .then(() => {
+                                console.log("Long transcript copied to clipboard.");
+                                copyButton.textContent = 'Copied!';
+                                copyButton.disabled = true;
+                                // Optionally remove the toast after a delay
+                                setTimeout(() => {
+                                    const toastElement = copyButton.closest('.toast');
+                                    if (toastElement && toastElement.dataset.toastId) {
+                                        removeToast(toastElement.dataset.toastId);
+                                    }
+                                }, 1500);
+                            })
+                            .catch(err => {
+                                console.error('Failed to copy long transcript: ', err);
+                                showToast("Failed to copy transcript.", { type: 'error' });
+                            });
+                    } else {
+                         console.warn("No long transcript found in state to copy.");
+                         showToast("No transcript available to copy.", { type: 'warning' });
+                    }
+                }
+                // Add else if for other potential copy targets if needed
+            }
+        });
+    } else {
+        console.warn("Toast container not found, cannot add delegated listener for toast buttons.");
+    }
+    // ----------------------------------------------
+
+
     // --- Notes Cleanup Button Listener ---
     const notesCleanupButton = elements.cleanupTranscriptButtonNotes;
     if (notesCleanupButton) {
