@@ -1372,6 +1372,53 @@ export async function loadNoteHistory(noteId) {
 }
 
 
+// --- NEW: Note Diff Summary Generation API ---
+/**
+ * Calls the backend to generate and save an AI diff summary for a note history entry.
+ * @param {number} noteId - The ID of the parent note.
+ * @param {number} historyId - The ID of the specific history entry.
+ */
+export async function generateAndSaveNoteDiffSummary(noteId, historyId) {
+    if (state.isLoading) {
+        setStatus("Cannot generate diff summary: Application is busy.", true);
+        return;
+    }
+    setLoading(true, `Generating diff summary for history ${historyId}...`);
+
+    try {
+        const response = await fetch(`/api/notes/${noteId}/history/${historyId}/generate_diff_summary`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            // No body needed for this request
+        });
+
+        const data = await response.json(); // Always expect JSON back
+
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP error! status: ${response.status}`);
+        }
+
+        setStatus(`Diff summary generated for history ${historyId}.`);
+
+        // Reload history for this note to show the new summary
+        await loadNoteHistory(noteId); // This updates state.noteHistory
+
+    } catch (error) {
+        console.error(`Error generating/saving diff summary for history ${historyId}:`, error);
+        setStatus(`Error generating diff summary: ${error.message}`, true);
+        // Reload history even on error to potentially reset button state if needed
+        try {
+            await loadNoteHistory(noteId);
+        } catch (reloadError) {
+            console.error(`Error reloading note history after diff generation failure:`, reloadError);
+        }
+    } finally {
+        setLoading(false);
+    }
+}
+// -----------------------------------------
+
+
 // --- Transcript Cleanup API ---
 /**
  * Sends raw transcript text to the backend for cleanup.
