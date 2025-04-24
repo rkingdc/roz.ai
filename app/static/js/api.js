@@ -8,6 +8,10 @@ import * as state from './state.js'; // API updates the state
 import * as ui from './ui.js'; // Import ui module to access autoResizeTextarea
 import { escapeHtml, formatFileSize } from './utils.js';
 import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js';
+// --- NEW: Import Toast and MIME_TYPE ---
+import { showToast, removeToast, updateToast } from './toastNotifications.js'; // Adjust path if needed
+import { MIME_TYPE } from './voice.js'; // Import MIME_TYPE constant
+// ---------------------------------------
 // Import Socket.IO client library (assuming it's loaded via script tag or bundler)
 // If using a script tag, it attaches to `window.io`
 // const io = window.io; // Uncomment if using script tag
@@ -329,6 +333,70 @@ export function disconnectTranscriptionSocket() {
         // state.setStreamingTranscript("");
     }
 }
+
+
+// --- NEW: Long Audio Transcription API Call ---
+export async function transcribeLongAudio(audioBlob, languageCode = 'en-US') {
+    // Show a specific "transcribing" toast
+    const transcribingToastId = showToast("Transcribing recorded audio...", { autoClose: false, type: 'info' });
+    console.log(`[DEBUG] transcribeLongAudio: Showing transcribing toast ID: ${transcribingToastId}`); // Add log
+
+    const formData = new FormData();
+    // Use a generic filename, backend doesn't rely on it but it's good practice
+    formData.append('audio_blob', audioBlob, `long_recording.${MIME_TYPE.split('/')[1].split(';')[0]}`); // e.g., long_recording.webm
+    formData.append('languageCode', languageCode);
+    // *** Crucially, send the MIME type used for recording ***
+    formData.append('mimeType', MIME_TYPE);
+
+    try {
+        const response = await fetch('/api/voice/transcribe_long', {
+            method: 'POST',
+            body: formData,
+            // No 'Content-Type' header needed for FormData, browser sets it with boundary
+        });
+
+        console.log(`[DEBUG] transcribeLongAudio: Removing transcribing toast ID: ${transcribingToastId}`); // Add log
+        removeToast(transcribingToastId); // Remove "transcribing" toast regardless of outcome
+
+        if (!response.ok) {
+            // Try to parse error JSON, provide fallback
+            const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
+            console.error('Long transcription API error:', response.status, errorData);
+            showToast(`Transcription Error: ${errorData.error || response.statusText}`, { type: 'error' }); // Show error toast
+            state.setLastLongTranscript(''); // Clear any previous transcript on error
+            return null; // Indicate failure
+        }
+
+        const data = await response.json();
+        state.setLastLongTranscript(data.transcript); // Store transcript in state
+
+        // Show success toast with snippet and copy button
+        const snippet = data.transcript.substring(0, 70) + (data.transcript.length > 70 ? '...' : '');
+        // Ensure button has data attribute to identify target
+        const toastContent = `
+            <div class="flex flex-col space-y-1">
+                <span class="font-medium">Transcription Complete:</span>
+                <span class="text-xs italic">"${escapeHtml(snippet)}"</span>
+                <button class="toast-copy-button self-end mt-1 px-2 py-0.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300" data-transcript-target="long">Copy</button>
+            </div>
+        `;
+        showToast(toastContent, { type: 'success', autoClose: 20000 }); // Show success toast
+
+        return data.transcript; // Return the full transcript
+
+    } catch (error) {
+        console.error('Network or other error during long transcription:', error);
+        // Ensure toast is removed on network error, even if it wasn't explicitly removed above
+        if (transcribingToastId) {
+             console.log(`[DEBUG] transcribeLongAudio (catch): Removing transcribing toast ID: ${transcribingToastId}`); // Add log
+             removeToast(transcribingToastId);
+        }
+        showToast(`Transcription Error: ${error.message}`, { type: 'error' }); // Show error toast
+        state.setLastLongTranscript(''); // Clear any previous transcript on error
+        return null; // Indicate failure
+    }
+}
+// -----------------------------------------
 
 
 // --- File API --- (Keep existing file API functions)
