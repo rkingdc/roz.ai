@@ -41,10 +41,14 @@ class Config:
     # File Uploads (Using BLOB storage now, UPLOAD_FOLDER not needed)
     # Define allowed extensions for frontend validation and potential backend checks
     ALLOWED_EXTENSIONS = {'txt', 'py', 'js', 'html', 'css', 'md', 'json', 'csv', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'mp3'}
-    MAX_FILE_SIZE_MB = 10
-    MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+    # MAX_FILE_SIZE_MB is now less relevant for direct uploads if we allow larger requests
+    # MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
     # Flask's MAX_CONTENT_LENGTH for request size limit (includes overhead)
-    MAX_CONTENT_LENGTH = MAX_FILE_SIZE_BYTES + (2 * 1024 * 1024) # Add 2MB buffer
+    # Increase significantly to allow large audio uploads (e.g., 100MB)
+    # Adjust this value based on expected maximum recording size + overhead
+    MAX_CONTENT_LENGTH_MB = 100
+    MAX_CONTENT_LENGTH = MAX_CONTENT_LENGTH_MB * 1024 * 1024
 
     # Gemini API
     API_KEY = os.getenv("GEMINI_API_KEY")
