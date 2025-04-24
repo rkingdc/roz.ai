@@ -1421,7 +1421,8 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
         notesPreview.classList.add('hidden');
         editNoteButton.classList.add('active');
         viewNoteButton.classList.remove('active');
-        notesMicButtonGroup.classList.remove('hidden'); // Show mic buttons in edit mode
+        // Explicitly remove 'hidden' class for edit mode
+        notesMicButtonGroup.classList.remove('hidden');
         // Ensure preview is updated if switching back to edit after viewing
         if (typeof marked !== 'undefined') {
              notesPreview.innerHTML = marked.parse(notesTextarea.value); // Read from DOM for immediate preview update
@@ -1431,7 +1432,8 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
     } else { // state.currentNoteMode === 'view'
         notesTextarea.classList.add('hidden');
         notesPreview.classList.remove('hidden');
-        notesMicButtonGroup.classList.add('hidden'); // Hide mic buttons in view mode
+        // Explicitly add 'hidden' class for view mode
+        notesMicButtonGroup.classList.add('hidden');
         editNoteButton.classList.remove('active');
         viewNoteButton.classList.add('active');
         // Render markdown and make headings collapsible in the preview area
