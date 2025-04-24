@@ -1054,9 +1054,25 @@
 
 /* --- End Fallback Markdown Styling --- */
 
-/* --- Custom Notes Textarea Font --- */
+/* --- Custom Notes Textarea Font & Auto-Resize --- */
 #notes-textarea {
+    /* Inherited from Tailwind classes: w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto */
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--rz-input-border); /* Use theme variable */
+    border-radius: 0.375rem;
+    /* box-shadow: ... */ /* Assuming shadow-sm is applied */
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    resize: none;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+    /* --- Auto-resizing styles --- */
+    /* REMOVED fixed height (from h-full class) */
+    min-height: 150px; /* Start with a minimum height */
+    /* Max height is implicitly controlled by the parent flex container (.note-mode-element) */
+    overflow-y: auto; /* Show scrollbar ONLY when content exceeds available space */
+    /* --------------------------- */
 }
 
 /* --- Collapsible Heading Styles --- */

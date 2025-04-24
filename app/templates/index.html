@@ -250,7 +250,8 @@
 
             <!-- Textarea for Markdown Input - Added relative positioning -->
             <div class="note-mode-element flex-grow w-full relative"> {# Wrap textarea to position buttons #}
-                <textarea id="notes-textarea" class="h-full w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
+                {# REMOVED h-full class to allow auto-resizing #}
+                <textarea id="notes-textarea" class="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
                 <!-- Button Group MOVED to header -->
             </div>
 
