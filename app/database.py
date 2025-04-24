@@ -435,7 +435,7 @@ def save_note_to_db(note_id, name, content):
                 note_id=note.id,
                 name=note.name,      # Save the name *after* the update
                 content=note.content, # Save the content *after* the update
-                note_diff_summary=None # Summary will be generated after adding
+                note_diff=None # Summary will be generated after adding
                 # saved_at defaults to now()
             )
             db.session.add(history_entry)
@@ -487,7 +487,7 @@ def save_note_to_db(note_id, name, content):
                 # Fetch the entry again within this session context to update it
                 hist_entry_to_update = db.session.get(NoteHistory, history_entry.id)
                 if hist_entry_to_update:
-                    hist_entry_to_update.note_diff_summary = summary_to_save
+                    hist_entry_to_update.note_diff = summary_to_save
                     logger.info(f"Attempting to commit summary '{summary_to_save[:30]}...' for history ID: {history_entry.id}...")
                     if _commit_session():
                         logger.info(f"Successfully saved summary for history ID: {history_entry.id}")
@@ -503,8 +503,8 @@ def save_note_to_db(note_id, name, content):
                 # Attempt to save a generic error marker
                 try:
                     hist_entry_to_update = db.session.get(NoteHistory, history_entry.id)
-                    if hist_entry_to_update and hist_entry_to_update.note_diff_summary is None: # Avoid overwriting previous marker
-                        hist_entry_to_update.note_diff_summary = "[Summary generation error]"
+                    if hist_entry_to_update and hist_entry_to_update.note_diff is None: # Avoid overwriting previous marker
+                        hist_entry_to_update.note_diff = "[Summary generation error]"
                         _commit_session() # Attempt commit, ignore failure here
                 except Exception as marker_err:
                     logger.error(f"Failed to save error marker for history {history_entry.id}: {marker_err}")
@@ -552,8 +552,7 @@ def get_note_history_entry_from_db(history_id):
                 'note_id': entry.note_id,
                 'name': entry.name,
                 'content': entry.content,
-                # 'note_diff_raw': entry.note_diff_raw, # Removed
-                'note_diff_summary': entry.note_diff_summary,
+                'note_diff': entry.note_diff,
                 'saved_at': entry.saved_at
             }
         else:
@@ -579,8 +578,7 @@ def get_note_history_from_db(note_id, limit=None):
                 'note_id': entry.note_id,
                 'name': entry.name,
                 'content': entry.content,
-                # 'note_diff_raw': entry.note_diff_raw, # Removed
-                'note_diff_summary': entry.note_diff_summary, # Include the AI summary
+                'note_diff': entry.note_diff, # Include the AI summary
                 'saved_at': entry.saved_at
             } for entry in history_entries
         ]
