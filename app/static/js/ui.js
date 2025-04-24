@@ -275,6 +275,15 @@ function addMessageToDom(role, content, isError = false) {
         } else if (role === 'system') {
              messageElement.classList.add('bg-yellow-100', 'text-yellow-800', 'self-center', 'text-center', 'italic');
         }
+
+        // Add copy button only for user and assistant messages (not system or error)
+        if ((role === 'user' || role === 'assistant') && !isError) {
+            const copyButton = document.createElement('button');
+            copyButton.classList.add('copy-message-button'); // Class for event listener
+            copyButton.title = 'Copy raw text';
+            copyButton.innerHTML = '<i class="far fa-copy"></i>'; // Use 'far' for regular style copy icon
+            messageElement.appendChild(copyButton);
+        }
     }
     elements.chatbox.appendChild(messageElement);
 
