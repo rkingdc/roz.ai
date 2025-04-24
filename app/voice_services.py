@@ -153,6 +153,10 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
             encoding=google_encoding,
             language_code=language_code,
             # sample_rate_hertz=48000, # Example: Add if needed for your encoding (e.g., LINEAR16)
+            # --- FIX: Explicitly set channel count to match WEBM header ---
+            audio_channel_count=2,
+            # enable_separate_recognition_per_channel=True, # Consider if stereo separation is needed
+            # -------------------------------------------------------------
             enable_automatic_punctuation=True,
         )
 
