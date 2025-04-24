@@ -1412,6 +1412,8 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
         return;
     }
 
+    console.log(`[DEBUG] setNoteMode called with mode: '${mode}'. notesMicButtonGroup exists: ${!!notesMicButtonGroup}`); // ADD LOGGING
+
     // State is already updated by the event listener calling this function
     // state.setCurrentNoteMode(mode);
     // localStorage.setItem(config.CURRENT_NOTE_MODE_KEY, mode);
@@ -1419,6 +1421,7 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
     if (state.currentNoteMode === 'edit') { // Read from state
         notesTextarea.classList.remove('hidden');
         notesPreview.classList.add('hidden');
+        console.log("[DEBUG] setNoteMode: Setting to EDIT mode. Removing 'hidden' from notesMicButtonGroup."); // ADD LOGGING
         editNoteButton.classList.add('active');
         viewNoteButton.classList.remove('active');
         // Explicitly remove 'hidden' class for edit mode
@@ -1433,6 +1436,7 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
         notesTextarea.classList.add('hidden');
         notesPreview.classList.remove('hidden');
         // Explicitly add 'hidden' class for view mode
+        console.log("[DEBUG] setNoteMode: Setting to VIEW mode. Adding 'hidden' to notesMicButtonGroup."); // ADD LOGGING
         notesMicButtonGroup.classList.add('hidden');
         editNoteButton.classList.remove('active');
         viewNoteButton.classList.add('active');
