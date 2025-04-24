@@ -278,6 +278,31 @@ export function setupEventListeners() {
         // UI updates are triggered by state notifications (isRecording)
     });
 
+    // --- NEW: Listener for Long Record Button ---
+    console.log("[DEBUG] Attempting to add listener to longRecButtonNotes. Element:", elements.longRecButtonNotes); // ADD LOGGING
+    if (elements.longRecButtonNotes) {
+        elements.longRecButtonNotes.addEventListener('click', () => {
+            console.log("[DEBUG] Long Record Button CLICKED!"); // Keep this log
+            if (state.currentTab !== 'notes') {
+                console.log("[DEBUG] Long Record Button: Ignored (not on notes tab).");
+                return;
+            }
+            // Button should be disabled if already active, but handle defensively
+            if (!state.isLongRecordingActive) {
+                console.log("[DEBUG] Long Record Button: Calling voice.startLongRecording()."); // Keep this log
+                voice.startLongRecording();
+            } else {
+                console.warn("Long record button clicked while already active.");
+                // Stop is handled via toast
+            }
+            // UI update happens via state change reaction in ui.js
+        });
+    } else {
+        console.warn("Long Record button (notes) not found during listener setup.");
+    }
+    // -----------------------------------------
+
+
     // --- Notes Cleanup Button Listener ---
     const notesCleanupButton = elements.cleanupTranscriptButtonNotes;
     if (notesCleanupButton) {
