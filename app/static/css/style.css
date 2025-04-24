@@ -1054,6 +1054,12 @@
 
 /* --- End Fallback Markdown Styling --- */
 
+/* --- Notes Section Container --- */
+#notes-section {
+    /* Inherited from Tailwind: flex flex-col flex-grow p-4 overflow-hidden hidden */
+    min-height: 0; /* Ensure it respects parent height constraints */
+}
+
 /* --- Common Styling for Note Edit/View Containers --- */
 .note-mode-element {
     min-height: 0; /* Crucial for flex children that need to scroll */
