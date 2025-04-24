@@ -1520,7 +1520,7 @@ export function renderNoteHistory() {
     }
 
     // History is already sorted by saved_at DESC from the backend query
-    history.forEach(entry => {
+    history.forEach((entry, index) => { // Add index here
         const listItem = document.createElement('div');
         listItem.classList.add('list-item', 'history-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
         listItem.dataset.historyId = entry.id;
@@ -1547,8 +1547,39 @@ export function renderNoteHistory() {
         listItem.appendChild(headerDiv);
         listItem.appendChild(timestampDiv);
 
+        // --- NEW: Add Diff Summary or Generate Button ---
+        const diffDiv = document.createElement('div');
+        diffDiv.classList.add('text-xs', 'mt-1', 'text-rz-sidebar-text', 'opacity-80', 'note-diff-summary'); // Added class for targeting
+
+        // Check if this is the oldest entry (last in the DESC sorted list)
+        const isInitialVersion = index === history.length - 1;
+
+        if (isInitialVersion) {
+            diffDiv.textContent = "Initial version";
+        } else if (entry.note_diff && entry.note_diff.trim() !== "" && !entry.note_diff.startsWith("[Initial version]")) {
+            // Display existing diff summary (truncate for display)
+            const maxLength = 100; // Max length for display in sidebar
+            let displayDiff = entry.note_diff;
+            if (displayDiff.length > maxLength) {
+                displayDiff = displayDiff.substring(0, maxLength) + "...";
+            }
+            diffDiv.textContent = displayDiff;
+            diffDiv.title = entry.note_diff; // Show full diff on hover
+        } else {
+            // Show "Generate Summary" button
+            const generateButton = document.createElement('button');
+            generateButton.classList.add('btn', 'btn-xs', 'btn-outline', 'generate-diff-btn', 'p-0.5'); // Added specific class
+            generateButton.textContent = 'Generate Diff Summary';
+            generateButton.dataset.historyId = entry.id; // Store history ID on button
+            generateButton.dataset.noteId = currentNoteId; // Store note ID on button
+            generateButton.title = 'Generate AI summary of changes from previous version';
+            diffDiv.appendChild(generateButton);
+        }
+        listItem.appendChild(diffDiv);
+        // ------------------------------------------------
+
         noteHistoryList.appendChild(listItem);
-    });
+    }); // End forEach
 
     // No active styling needed for history items based on the request, but could be added
 }

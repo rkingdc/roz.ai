@@ -487,9 +487,50 @@ def delete_note_from_db(note_id):
         db.session.rollback()
         return False
 
-# New function to get note history (optional, but useful for undo)
+# Function to get a single note history entry
+def get_note_history_entry_from_db(history_id):
+    """Retrieves a single note history entry by its ID."""
+    try:
+        entry = db.session.get(NoteHistory, history_id)
+        if entry:
+            return {
+                'id': entry.id,
+                'note_id': entry.note_id,
+                'name': entry.name,
+                'content': entry.content,
+                'note_diff': entry.note_diff,
+                'saved_at': entry.saved_at
+            }
+        else:
+            return None
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting history entry {history_id}: {e}", exc_info=True)
+        return None
+
+# Function to save the generated diff summary for a history entry
+def save_note_diff_summary_in_db(history_id, diff_summary):
+    """Saves the generated diff summary for a specific note history entry."""
+    try:
+        entry = db.session.get(NoteHistory, history_id)
+        if not entry:
+            logger.warning(f"Note history entry not found with ID: {history_id} for diff summary update.")
+            return False
+
+        entry.note_diff = diff_summary
+        logger.info(f"Attempting to save diff summary for history ID: {history_id}...")
+        if _commit_session():
+            logger.info(f"Successfully saved diff summary for history ID: {history_id}")
+            return True
+        else:
+            return False # Commit failed
+    except SQLAlchemyError as e:
+        logger.error(f"Database error saving diff summary for history {history_id}: {e}", exc_info=True)
+        db.session.rollback()
+        return False
+
+# Function to get note history
 def get_note_history_from_db(note_id, limit=None):
-    """Retrieves history entries for a specific note_id, ordered by saved_at."""
+    """Retrieves history entries for a specific note_id, ordered by saved_at descending."""
     try:
         query = NoteHistory.query.filter_by(note_id=note_id).order_by(NoteHistory.saved_at.desc())
         if limit is not None:
