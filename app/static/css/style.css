@@ -1054,7 +1054,15 @@
 
 /* --- End Fallback Markdown Styling --- */
 
-/* --- Custom Notes Textarea Font & Auto-Resize --- */
+/* --- Notes Preview Styling (View Mode) --- */
+#notes-preview {
+    /* Inherited from Tailwind: flex-grow w-full p-3 border ... overflow-y-auto prose ... */
+    min-height: 0; /* Crucial for flex children that need to scroll */
+    /* Ensure it tries to fill the parent's height like the textarea */
+    /* height: 100%; /* Let flex-grow handle height, min-height: 0 handles shrinking/scrolling */
+}
+
+/* --- Custom Notes Textarea Font & Auto-Resize (Edit Mode) --- */
 #notes-textarea {
     /* Inherited from Tailwind classes: w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto */
     width: 100%;
