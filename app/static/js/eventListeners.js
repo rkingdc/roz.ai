@@ -419,19 +419,34 @@ export function setupEventListeners() {
                 // Match lines like '# Heading', '## Heading', etc.
                 return trimmedLine.match(/^#+\s+/) && trimmedLine.substring(trimmedLine.indexOf(' ')+1).trim() === headingText.trim();
             });
-
+ 
             if (lineIndex !== -1 && elements.notesTextarea) {
-                // Estimate scroll position (very approximate)
-                const lineHeight = parseFloat(getComputedStyle(elements.notesTextarea).lineHeight) || 18; // Default line height
-                const scrollTop = lineIndex * lineHeight;
-                elements.notesTextarea.scrollTop = scrollTop;
-                // Optionally, try to set cursor position (might be jarring)
-                // const position = lines.slice(0, lineIndex).join('\n').length + (lineIndex > 0 ? 1 : 0);
-                // elements.notesTextarea.focus();
-                // elements.notesTextarea.setSelectionRange(position, position);
-                state.setStatusMessage(`Jumped to heading in editor (approximate).`);
+                // --- Calculate character position of the start of the line ---
+                // Sum lengths of previous lines + newline characters
+                let position = 0;
+                for (let i = 0; i < lineIndex; i++) {
+                    position += lines[i].length + 1; // +1 for the newline character
+                }
+ 
+                // --- Set cursor position and focus ---
+                try {
+                    elements.notesTextarea.focus(); // Focus first
+                    // Set selection start and end to the same point to place the cursor
+                    elements.notesTextarea.setSelectionRange(position, position);
+ 
+                    // --- Optional: Attempt scrollIntoView (might not be perfect) ---
+                    // This is less reliable than focus/setSelectionRange for bringing
+                    // the exact line into view, but can help in some browsers.
+                    // elements.notesTextarea.scrollIntoView({ block: 'nearest' });
+ 
+                    state.setStatusMessage(`Jumped to heading in editor.`);
+                } catch (e) {
+                    console.error("Error setting cursor position or focusing:", e);
+                    state.setStatusMessage("Error jumping to heading in editor.", true);
+                }
+ 
             } else {
-                 state.setStatusMessage("Could not find heading in editor.", true);
+                state.setStatusMessage("Could not find heading in editor.", true);
             }
         }
     });
