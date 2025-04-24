@@ -3,16 +3,24 @@
 import * as state from './state.js';
 import * as api from './api.js'; // To manage WebSocket connection and send chunks
 import { elements } from './dom.js';
+// --- NEW: Import Toast ---
+import { showToast, removeToast, updateToast } from './toastNotifications.js'; // Adjust path if needed
+// -----------------------
 
 let mediaRecorder = null;
 // let audioChunks = []; // No longer needed to store chunks locally for blob creation
 let audioStream = null; // Store the stream to stop tracks later
 export let originalNoteTextBeforeRecording = null; // Store original notes text - EXPORTED
 
+// --- NEW: Array for long recording chunks ---
+let audioChunks = [];
+// ------------------------------------------
+
 // --- Configuration ---
 // Google Speech-to-Text streaming API works well with LINEAR16 or Opus in WebM/Ogg.
 // Since we fixed the backend for WEBM_OPUS, let's stick with that.
-const MIME_TYPE = 'audio/webm;codecs=opus';
+// Export MIME_TYPE so api.js can use it when sending the blob
+export const MIME_TYPE = 'audio/webm;codecs=opus'; // Or 'audio/ogg;codecs=opus' etc.
 const TIMESLICE_MS = 500; // Send audio chunks every 500ms
 
 /**
@@ -242,3 +250,154 @@ function stopMediaStreamTracks() {
     }
     // mediaRecorder reference is cleared in onstop or onerror
 }
+
+
+// --- NEW: Long Recording Functions ---
+
+/** Starts the non-streaming long recording process. */
+export async function startLongRecording() {
+    console.log("[DEBUG] Entering startLongRecording function.");
+    if (state.isLongRecordingActive) {
+        console.warn("[WARN] Long recording is already active. Exiting.");
+        return;
+    }
+    // Prevent starting if streaming recording is active
+    if (state.isRecording) {
+        console.warn("[WARN] Cannot start long recording while streaming mic is active.");
+        showToast("Stop streaming recording first.", { type: 'warning' });
+        return;
+    }
+
+    console.log("[DEBUG] startLongRecording: Checking MIME type support...");
+    if (!isMimeTypeSupported()) {
+        console.error("[DEBUG] startLongRecording: MIME type not supported. Exiting.");
+        showToast(`Audio format (${MIME_TYPE}) not supported by this browser.`, { type: 'error' });
+        return;
+    }
+
+    console.log("[INFO] Attempting to start long recording...");
+    state.setStatusMessage("Initializing microphone for long recording...");
+
+    try {
+        console.log("[DEBUG] startLongRecording: Requesting microphone access...");
+        audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("[INFO] Microphone access granted for long recording.");
+
+        audioChunks = []; // Reset chunks array for new recording
+        console.log("[DEBUG] startLongRecording: Initializing MediaRecorder...");
+        mediaRecorder = new MediaRecorder(audioStream, { mimeType: MIME_TYPE });
+
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+                // console.log(`[DEBUG] Collected audio chunk for long recording: ${event.data.size} bytes`);
+            }
+        };
+
+        mediaRecorder.onstop = async () => {
+            // --- This onstop is ONLY for LONG RECORDING ---
+            console.log("[INFO] Long recording stopped by user or error. Processing collected audio.");
+
+            // --- Combine chunks and send ---
+            if (audioChunks.length > 0) {
+                const audioBlob = new Blob(audioChunks, { type: MIME_TYPE });
+                console.log(`[INFO] Combined audio blob size: ${audioBlob.size} bytes`);
+                const chunksToClear = audioChunks; // Reference before async call
+                audioChunks = []; // Clear chunks array immediately
+
+                // Call the API function to upload and transcribe
+                state.setStatusMessage("Transcribing recorded audio..."); // Update status before API call
+                await api.transcribeLongAudio(audioBlob, 'en-US'); // API call handles its own toasts
+                state.setStatusMessage("Idle"); // Reset general status after API call finishes
+
+            } else {
+                console.warn("[WARN] No audio data collected during long recording.");
+                showToast("No audio data was recorded.", { type: 'warning' }); // Toast for no data
+                state.setStatusMessage("Idle");
+            }
+            // Clear recorder reference after processing
+            mediaRecorder = null;
+        };
+
+        mediaRecorder.onerror = (event) => {
+            // --- This onerror is ONLY for LONG RECORDING ---
+            console.error("[ERROR] MediaRecorder error during long recording:", event.error);
+            showToast(`Long Recording Error: ${event.error.message}`, { type: 'error' }); // Toast for error
+            // Clean up state and resources on error
+            if (state.isLongRecordingActive) {
+                 stopLongRecording(true); // Call stop with error flag
+            }
+             state.setStatusMessage(`Error: ${event.error.message}`, true);
+        };
+
+        // Start recording
+        mediaRecorder.start(TIMESLICE_MS); // Collect chunks periodically
+        state.setIsLongRecordingActive(true); // Update long recording state
+        console.log("[INFO] Long recording started successfully.");
+        state.setStatusMessage("Long recording in progress..."); // More specific status
+
+        // Show persistent toast with a stop button
+        console.log("[DEBUG] startLongRecording: Attempting to show persistent recording toast...");
+        const toastId = showToast( // *** Show the persistent recording toast ***
+            `<div>
+                <span>Long recording active...</span>
+                <button class="toast-stop-long-rec-button ml-2 px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 focus:outline-none focus:ring-1 focus:ring-red-300">Stop</button>
+            </div>`,
+            { autoClose: false, type: 'info' } // Keep it open
+        );
+        console.log(`[DEBUG] startLongRecording: Toast ID received: ${toastId}`);
+        state.setLongRecordingToastId(toastId); // Store toast ID in state
+
+    } catch (err) {
+        console.error("[ERROR] Failed to start long recording:", err);
+        let errorMsg = `Error starting long recording: ${err.message}`;
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            errorMsg = "Microphone access denied. Please allow access in browser settings.";
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+             errorMsg = "No microphone found. Please ensure one is connected and enabled.";
+        }
+        showToast(errorMsg, { type: 'error' }); // Toast for startup error
+        // Ensure cleanup if getUserMedia failed
+        stopMediaStreamTracks();
+        mediaRecorder = null;
+        state.setIsLongRecordingActive(false);
+        state.setStatusMessage("Idle");
+    }
+}
+
+/** Stops the current non-streaming long recording. */
+export function stopLongRecording(isErrorCleanup = false) {
+    if (!state.isLongRecordingActive || !mediaRecorder) {
+        console.warn("[WARN] Not in long recording state or mediaRecorder not initialized.");
+        if (state.isLongRecordingActive) state.setIsLongRecordingActive(false);
+        return;
+    }
+
+    console.log(`[INFO] Attempting to stop long recording... (Error cleanup: ${isErrorCleanup})`);
+    if (!isErrorCleanup) {
+        state.setStatusMessage("Stopping long recording...");
+    }
+
+    // Remove the persistent toast immediately
+    if (state.longRecordingToastId) {
+        console.log(`[DEBUG] stopLongRecording: Removing persistent toast ID: ${state.longRecordingToastId}`);
+        removeToast(state.longRecordingToastId); // *** Remove the persistent recording toast ***
+        state.setLongRecordingToastId(null);
+    }
+
+    // Stop the microphone tracks *before* stopping the recorder for long recording
+    stopMediaStreamTracks();
+
+    // Update state *before* stopping recorder (UI reflects stopping state)
+    state.setIsLongRecordingActive(false);
+
+    if (mediaRecorder.state === "recording" || mediaRecorder.state === "paused") {
+        mediaRecorder.stop(); // This will trigger the 'onstop' event handler where processing happens
+    } else {
+        console.warn(`[WARN] MediaRecorder state is already '${mediaRecorder.state}', cannot stop. Forcing cleanup.`);
+         mediaRecorder = null;
+         audioChunks = []; // Clear any stale chunks
+         if (!isErrorCleanup) state.setStatusMessage("Idle");
+    }
+}
+// -----------------------------------------
