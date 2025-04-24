@@ -1415,19 +1415,27 @@ def clean_up_transcript(raw_transcript: str) -> str:
         else raw_model_name
     )
 
-    prompt = f"""You are a skilled Markdown editor.  Take the following transcribed speech and convert it into a well-formatted Markdown document.
+    prompt=f"""
+    You are a skilled technical writer whose role is to format audio transcriptions into well-structured Markdown documents while preserving *as much detail as possible*. Your focus is on formatting, *not summarizing unless absolutely necessary*.
 
-*   Identify key topics and create appropriate headings (using `#`, `##`, `###`, etc.).  Use bold or italic formatting for emphasis when appropriate.
-*   Extract key points and represent them as bullet points (`*` or `-`).
-*   Recognize numbered lists or iterative steps and format them as numbered lists (`1.`, `2.`, `3.`).
-*   Retain the original order of the content as much as possible. Minor rephrasing for clarity is acceptable, but avoid significant changes to the content or meaning.
-*   Remove filler words and conversational elements like "um," "uh," "okay," "you know," and repeated phrases, but only where doing so improves readability.
-*   Output *only* the Markdown text.
+*   **Headings:** Identify all distinct topics and subtopics in the transcript and create corresponding headings and subheadings (using #, ##, ###, etc.). Headings should be descriptive but concise.
+
+*   **Bullet Points (Detailed):** Extract key points, examples, arguments, and supporting details and represent them as bullet points (* or -). *Each bullet point should contain enough information to be understood independently.* Avoid overly concise summaries that lose important nuances.
+
+*   **Numbered Lists:** Accurately format all numbered lists, steps, or sequences from the transcript as numbered lists (1., 2., 3., etc.). Do not omit steps or details.
+
+*   **Order Preservation:** Maintain the original order of topics, bullet points, and numbered list items as closely as possible. Only reorder if the original order is demonstrably illogical.
+
+*   **Limited Filler Removal:** Remove filler words (um, uh, okay, you know, etc.) *only if their removal does not alter the meaning or clarity of the sentence*. In some cases, these words may convey emphasis or tone, which should be preserved.
+
+*   **Verbatim Phrases (When Appropriate):** If a particular phrase or sentence is especially well-articulated or insightful, consider including it verbatim (within quotation marks) as a bullet point or within the text.
+
+*   **Markdown Output Only:** Provide the complete Markdown document as the sole output.
 
 Here is the transcribed speech:
-    
-{raw_transcript}
-"""
+    {raw_transcript}
+    """
+
 
     logger.info(f"Attempting transcript cleanup using model '{model_to_use}'...")
     response = None
