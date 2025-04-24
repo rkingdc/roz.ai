@@ -571,8 +571,8 @@
      min-height: 0;
 }
  .sidebar-list {
-     flex-grow: 1;
-     overflow-y: auto;
+     /* flex-grow: 1; /* REMOVED */
+     /* overflow-y: auto; /* REMOVED */
      margin-top: 0.5rem;
 }
  .list-item {
@@ -1116,7 +1116,7 @@
 }
 
 .collapsible-content {
-    /* transition: max-height 0.3s ease-out, opacity 0.3s ease-out; */
+    /* transition: max-height 0.3s ease-out, opacity 0.3s ease-out, padding 0.3s ease-out; */
     overflow: hidden;
     /* max-height: 10000px; /* Set a large max-height for transition */
     /* opacity: 1; */
