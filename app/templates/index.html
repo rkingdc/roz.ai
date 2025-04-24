@@ -46,7 +46,8 @@
         <!-- End button group -->
 
         <!-- Chat Sidebar Content -->
-        <div id="chat-sidebar-content">
+        {# Added flex, flex-col, flex-grow, min-h-0 to make this container fill remaining space #}
+        <div id="chat-sidebar-content" class="flex flex-col flex-grow min-h-0">
             <button id="new-chat-btn" class="btn btn-primary w-full mb-4 flex-shrink-0">
                 <i class="fas fa-plus"></i> New Chat
             </button>
