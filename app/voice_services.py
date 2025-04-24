@@ -185,6 +185,7 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         config = speech.RecognitionConfig(
             encoding=google_encoding,
             language_code=language_code,
+            model='latest_long',
             # sample_rate_hertz=48000, # Example: Add if needed for your encoding (e.g., LINEAR16)
             # --- FIX: Explicitly set channel count to match WEBM header ---
             audio_channel_count=2,
