@@ -1169,6 +1169,38 @@ function subscribeStateChangeListeners() {
     state.subscribe('isNotesTocCollapsed', ui.handleStateChange_isNotesTocCollapsed);
     // ----------------------------------------------------
 
+    // --- NEW: Delegated Listener for Message Copy Buttons ---
+    elements.chatbox?.addEventListener('click', (event) => {
+        const copyButton = event.target.closest('.copy-message-button');
+        if (!copyButton) return; // Click wasn't on a copy button
+
+        const messageElement = copyButton.closest('.message');
+        if (!messageElement) return; // Should not happen if button is inside message
+
+        const rawContent = messageElement.dataset.rawContent;
+        if (rawContent) {
+            navigator.clipboard.writeText(rawContent)
+                .then(() => {
+                    console.log("Message content copied to clipboard.");
+                    // Provide visual feedback
+                    copyButton.innerHTML = '<i class="fas fa-check"></i>'; // Change to checkmark
+                    copyButton.disabled = true;
+                    setTimeout(() => {
+                        copyButton.innerHTML = '<i class="far fa-copy"></i>'; // Revert icon
+                        copyButton.disabled = false;
+                    }, 1500); // Revert after 1.5 seconds
+                })
+                .catch(err => {
+                    console.error('Failed to copy message content: ', err);
+                    showToast("Failed to copy text.", { type: 'error' }); // Use toast for error
+                });
+        } else {
+            console.warn("Could not find raw content to copy for message:", messageElement);
+            showToast("Could not find content to copy.", { type: 'warning' });
+        }
+    });
+    // ------------------------------------------------------
+
 }
 
 

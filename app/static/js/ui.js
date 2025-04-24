@@ -246,7 +246,11 @@ function addMessageToDom(role, content, isError = false) {
     }
 
     const messageElement = document.createElement('div');
-    messageElement.classList.add('message', `${role}-msg`, 'p-3', 'mb-2', 'rounded-lg', 'whitespace-pre-wrap');
+    // Add base classes and role-specific class
+    messageElement.classList.add('message', `${role}-msg`, 'p-3', 'mb-2', 'rounded-lg', 'whitespace-pre-wrap', 'relative'); // Added relative positioning
+
+    // Store raw content for copying
+    messageElement.dataset.rawContent = content;
 
     if (isError) {
         messageElement.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-400');

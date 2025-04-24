@@ -1405,3 +1405,37 @@
     stroke-dashoffset: var(--progress-offset); /* Use CSS variable */
 }
 /* --- End Microphone Progress Ring Styles --- */
+
+
+/* --- NEW: Message Copy Button Styles --- */
+.copy-message-button {
+    position: absolute;
+    bottom: 4px; /* Adjust as needed */
+    right: 6px;  /* Adjust as needed */
+    background-color: rgba(0, 0, 0, 0.1); /* Subtle background */
+    color: rgba(0, 0, 0, 0.4); /* Subtle icon color */
+    border: none;
+    border-radius: 4px;
+    padding: 2px 4px; /* Small padding */
+    cursor: pointer;
+    font-size: 0.7rem; /* Smaller icon */
+    line-height: 1;
+    opacity: 0; /* Hidden by default */
+    transition: opacity 0.2s ease-in-out, background-color 0.2s, color 0.2s;
+}
+
+/* Show button on message hover */
+.message:hover .copy-message-button {
+    opacity: 1;
+}
+
+.copy-message-button:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+    color: rgba(0, 0, 0, 0.7);
+}
+
+/* Style for the checkmark feedback */
+.copy-message-button i.fa-check {
+    color: var(--rz-toolbar-text); /* Use theme color for success */
+}
+/* --- End Message Copy Button Styles --- */
