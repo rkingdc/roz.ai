@@ -200,8 +200,8 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
                     state.setStreamingTranscript(updatedTranscriptWithInterim);
                 } else {
                     // Ignore empty final segments (data.is_final is true but newSegment is empty)
-                    }
                 }
+                // Removed extra closing brace here
             }
         });
 
