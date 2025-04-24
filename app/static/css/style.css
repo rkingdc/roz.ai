@@ -428,6 +428,45 @@
 }
 */
 
+/* --- Custom Prose Styles for Chat Messages --- */
+/* Reduce margins for common block elements within chat messages */
+.message.prose p,
+.message.prose ul,
+.message.prose ol,
+.message.prose dl,
+.message.prose pre,
+.message.prose blockquote,
+.message.prose figure,
+.message.prose table {
+    margin-top: 0.75em; /* Reduced from default prose values */
+    margin-bottom: 0.75em; /* Reduced from default prose values */
+}
+
+/* Further reduce margins specifically for paragraphs if needed */
+.message.prose p {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+}
+
+/* Adjust list item spacing if necessary */
+.message.prose li {
+    margin-top: 0.2em;
+    margin-bottom: 0.2em;
+}
+
+/* Adjust heading margins if they also seem too large */
+.message.prose h1,
+.message.prose h2,
+.message.prose h3,
+.message.prose h4,
+.message.prose h5,
+.message.prose h6 {
+    margin-top: 1em;
+    margin-bottom: 0.5em;
+}
+/* --- End Custom Prose Styles --- */
+
+
 /* --- End Chat Message Styling --- */
 
 
