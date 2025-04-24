@@ -119,6 +119,86 @@ def transcribe_audio(
         return None
 
 
+# --- NEW: Non-Streaming Transcription Function ---
+def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", encoding: str = "WEBM_OPUS") -> str | None:
+    """
+    Transcribes a complete audio file using Google Cloud Speech-to-Text non-streaming API.
+
+    Args:
+        audio_bytes: The raw bytes of the audio file.
+        language_code: The language code for transcription.
+        encoding: The audio encoding format. Needs to match the frontend recording format.
+                  Supported values correspond to RecognitionConfig.AudioEncoding names.
+
+    Returns:
+        The full transcript string, or None if transcription fails.
+    """
+    logger.info(f"Starting non-streaming transcription for audio chunk ({len(audio_bytes)} bytes), encoding: {encoding}")
+    try:
+        client = speech.SpeechClient() # Assumes GOOGLE_APPLICATION_CREDENTIALS is set
+
+        # Determine the correct RecognitionConfig.AudioEncoding based on the input string
+        try:
+            google_encoding = getattr(speech.RecognitionConfig.AudioEncoding, encoding.upper())
+        except AttributeError:
+            logger.error(f"Unsupported audio encoding string for Google API: {encoding}")
+            # Fallback or raise error - Returning None is safer than guessing
+            return None
+
+        # Prepare configuration
+        # Note: sample_rate_hertz might be needed for uncompressed formats like LINEAR16
+        # but often not required for compressed formats like WEBM_OPUS/OGG_OPUS.
+        # If needed, you might have to get this info from the frontend or assume a standard rate.
+        config = speech.RecognitionConfig(
+            encoding=google_encoding,
+            language_code=language_code,
+            # sample_rate_hertz=48000, # Example: Add if needed for your encoding (e.g., LINEAR16)
+            enable_automatic_punctuation=True,
+        )
+
+        audio = speech.RecognitionAudio(content=audio_bytes)
+
+        logger.info("Sending audio data to Google Speech-to-Text non-streaming API (recognize)...")
+        response = client.recognize(config=config, audio=audio)
+        logger.info("Received response from Google Speech-to-Text API.")
+
+        if not response.results:
+            logger.warning("Transcription response contained no results.")
+            return "" # Return empty string if no speech detected
+
+        # Concatenate results if multiple are returned (unlikely for recognize but safe)
+        full_transcript = " ".join(
+            result.alternatives[0].transcript for result in response.results if result.alternatives
+        )
+        logger.info(f"Non-streaming transcription successful. Transcript length: {len(full_transcript)}")
+
+        # --- Optional: Apply LLM cleanup ---
+        # logger.info("Attempting to clean up the non-streaming transcript...")
+        # cleaned_transcript = clean_up_transcript(full_transcript.strip())
+        # if cleaned_transcript == full_transcript.strip():
+        #     logger.warning("Non-streaming transcript cleanup failed or returned original. Using raw transcript.")
+        # else:
+        #     logger.info(f"Cleaned non-streaming transcript: '{cleaned_transcript[:50]}...'")
+        # return cleaned_transcript
+        # --- End Optional Cleanup ---
+
+        # Return raw transcript for now
+        return full_transcript.strip()
+
+    except InvalidArgument as e:
+        logger.error(
+            f"Google Speech API Invalid Argument during non-streaming: {e}. Check encoding/sample rate.",
+            exc_info=True,
+        )
+        return None
+    except GoogleAPICallError as e:
+        logger.error(f"Google Speech API call failed during non-streaming: {e}", exc_info=True)
+        return None
+    except Exception as e:
+        logger.error(f"Error during non-streaming transcription: {e}", exc_info=True)
+        return None
+
+
 # --- Streaming Transcription ---
 
 # Google API constraints
