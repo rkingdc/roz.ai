@@ -11,6 +11,9 @@ import * as config from './config.js'; // Import config
 import * as voice from './voice.js'; // Import voice recording functions
 import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js'; // Import file size constants
 import { formatFileSize, debounce, escapeHtml } from './utils.js'; // Import debounce and escapeHtml
+// --- NEW: Import toast functions ---
+import { showToast, removeToast } from './toastNotifications.js'; // Adjust path if needed
+// -----------------------------------
 
 /**
  * Sets up all event listeners for the application.
@@ -307,19 +310,20 @@ export function setupEventListeners() {
     console.log("[DEBUG] Attempting to add listener to toastContainer. Element:", elements.toastContainer); // ADD LOGGING
     if (elements.toastContainer) {
         elements.toastContainer.addEventListener('click', (event) => {
-            console.log("[DEBUG] Click detected inside toast container. Target:", event.target); // Log target
+            console.log("[DEBUG] Click detected inside toast container. Target:", event.target);
             const stopLongRecButton = event.target.closest('.toast-stop-long-rec-button');
             const copyButton = event.target.closest('.toast-copy-button');
+            const closeButton = event.target.closest('.toast-close-button'); // Find close button
 
-            console.log("[DEBUG] stopLongRecButton found:", stopLongRecButton); // Log if button found
-            console.log("[DEBUG] copyButton found:", copyButton); // Log if button found
+            console.log("[DEBUG] stopLongRecButton found:", stopLongRecButton);
+            console.log("[DEBUG] copyButton found:", copyButton);
+            console.log("[DEBUG] closeButton found:", closeButton); // Log if close button found
 
             if (stopLongRecButton) {
-                console.log("[DEBUG] Stop long recording button identified. Calling voice.stopLongRecording()."); // Log before call
-                voice.stopLongRecording(); // Call the function in voice.js
-                // UI update will happen via state change
+                console.log("[DEBUG] Stop long recording button identified. Calling voice.stopLongRecording().");
+                voice.stopLongRecording();
             } else if (copyButton) {
-                console.log("[DEBUG] Copy transcript button identified."); // Log copy button
+                console.log("[DEBUG] Copy transcript button identified.");
                 const target = copyButton.dataset.transcriptTarget; // Check if it's for long transcript
                 if (target === 'long') {
                     const transcriptToCopy = state.lastLongTranscript; // Get from state
@@ -329,13 +333,14 @@ export function setupEventListeners() {
                                 console.log("Long transcript copied to clipboard.");
                                 copyButton.textContent = 'Copied!';
                                 copyButton.disabled = true; // Keep disabled briefly for visual feedback
-                                // Remove the toast after a short delay
-                                setTimeout(() => {
-                                    const toastElement = copyButton.closest('.toast');
-                                    if (toastElement && toastElement.dataset.toastId) {
-                                        removeToast(toastElement.dataset.toastId); // Remove the toast
-                                    }
-                                }, 1000); // Shortened delay to 1 second
+                                // --- REMOVED: Do not automatically remove toast after copy ---
+                                // setTimeout(() => {
+                                //     const toastElement = copyButton.closest('.toast');
+                                //     if (toastElement && toastElement.dataset.toastId) {
+                                //         removeToast(toastElement.dataset.toastId);
+                                //     }
+                                // }, 1000);
+                                // ---------------------------------------------------------
                             })
                             .catch(err => {
                                 console.error('Failed to copy long transcript: ', err);
@@ -347,6 +352,15 @@ export function setupEventListeners() {
                     }
                 }
                 // Add else if for other potential copy targets if needed
+            } else if (closeButton) { // Handle close button click
+                console.log("[DEBUG] Close toast button identified.");
+                const toastElement = closeButton.closest('.toast');
+                if (toastElement && toastElement.dataset.toastId) {
+                    console.log(`[DEBUG] Removing toast ID: ${toastElement.dataset.toastId}`);
+                    removeToast(toastElement.dataset.toastId); // Remove the specific toast
+                } else {
+                    console.warn("[DEBUG] Could not find toast element or toast ID for close button.");
+                }
             }
         });
     } else {
