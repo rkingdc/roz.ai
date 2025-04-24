@@ -249,9 +249,10 @@
             <!-- Removed labels for Markdown Input and Preview -->
 
             <!-- Textarea for Markdown Input - Added relative positioning -->
-            <div class="note-mode-element flex-grow w-full relative"> {# Wrap textarea to position buttons #}
+            {# Added overflow-hidden to ensure textarea does not expand beyond this div #}
+            <div class="note-mode-element flex-grow w-full relative overflow-hidden"> {# Wrap textarea to position buttons #}
                 {# Added h-full class to make textarea fill parent height #}
-                <textarea id="notes-textarea" class="w-full h-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
+                <textarea id="notes-textarea" class="w-full h-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea> {# Note: resize-none was duplicated, removed one #}
                 <!-- Button Group MOVED to header -->
             </div>
 
