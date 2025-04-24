@@ -162,12 +162,6 @@
 }
 /* --- End Sidebar Toggle Tab Styles --- */
 
-/* --- NEW: Debug border for toast container --- */
-#toast-container {
-    border: 2px dashed red; /* TEMPORARY: Add a visible border */
-}
-/* --- End Debug border --- */
-
 /* Main Content Area */
  #main-content {
      flex-grow: 1;
