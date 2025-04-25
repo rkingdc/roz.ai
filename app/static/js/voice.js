@@ -170,13 +170,23 @@ export async function startRecording(context) {
             // For now, let's keep the connection open unless an error occurs.
             // api.disconnectTranscriptionSocket();
 
+            // --- Clear Timer and Reset Ring (Safeguard) ---
+            // Although stopRecording should clear it, clear again here in case onstop
+            // is triggered unexpectedly or after a delay.
+            if (recordingTimerInterval) {
+                clearInterval(recordingTimerInterval);
+                recordingTimerInterval = null;
+            }
+            resetProgressRing(); // Reset the visual progress
+            // --------------------------------------------
+
             // Reset recording state *after* processing transcript and context
             state.setIsRecording(false); // This will trigger UI update for button
 
             // Reset mediaRecorder reference
             mediaRecorder = null;
 
-            // --- Enable Chat Cleanup Button (REMOVED) ---
+            // --- Chat Cleanup Button Logic (REMOVED) ---
             // Chat cleanup button is now handled by text selection in the input field, not recording completion.
             // The button's state will be managed by ui.updateChatCleanupButtonState based on selection.
             // Ensure it's disabled here if it was previously enabled by recording.
@@ -190,6 +200,13 @@ export async function startRecording(context) {
         mediaRecorder.onerror = (event) => {
             console.error("[ERROR] MediaRecorder error:", event.error);
             state.setStatusMessage(`Recording error: ${event.error.message}`, true);
+            // --- Clear Timer and Reset Ring on Error ---
+            if (recordingTimerInterval) {
+                clearInterval(recordingTimerInterval);
+                recordingTimerInterval = null;
+            }
+            resetProgressRing();
+            // -----------------------------------------
             stopMediaStreamTracks(); // Clean up stream tracks
             api.disconnectTranscriptionSocket(); // Disconnect socket on media recorder error
             state.setIsRecording(false); // Reset state
@@ -260,8 +277,18 @@ export async function startRecording(context) {
  * Stops the current audio recording.
  */
 export function stopRecording() {
+    // --- Clear Timer FIRST ---
+    // Ensure the timer is always cleared when stop is initiated, regardless of state.
+    if (recordingTimerInterval) {
+        clearInterval(recordingTimerInterval);
+        recordingTimerInterval = null;
+    }
+    // -------------------------
+
     if (!state.isRecording || !mediaRecorder) {
-        console.warn("[WARN] Not recording or mediaRecorder not initialized.");
+        console.warn("[WARN] stopRecording called but not recording or mediaRecorder not initialized.");
+        // Timer is already cleared above. Reset progress ring just in case.
+        resetProgressRing();
         return;
     }
 
@@ -279,21 +306,27 @@ export function stopRecording() {
         // api.disconnectTranscriptionSocket();
         state.setIsRecording(false);
         mediaRecorder = null; // Ensure reference is cleared
-        // --- Clear Timer on Stop ---
-        if (recordingTimerInterval) {
-            clearInterval(recordingTimerInterval);
-            recordingTimerInterval = null;
-            // Reset progress ring on the button that was active
-            const context = state.recordingContext; // Get context before state is cleared
-            const progressRingElement = (context === 'chat' ? elements.micButton : elements.micButtonNotes)?.querySelector('.mic-progress-ring');
-            const progressArc = progressRingElement?.querySelector('.progress-ring-arc');
-            if (progressRingElement && progressArc) {
-                 const radius = parseFloat(progressArc.getAttribute('r'));
-                 const circumference = 2 * Math.PI * radius;
-                 progressRingElement.style.setProperty('--progress-offset', circumference); // Reset offset
-            }
-        }
+        // --- Reset Progress Ring ---
+        // Timer is cleared at the start of the function now.
+        resetProgressRing();
         // -------------------------
+    }
+}
+
+/** Helper function to reset the progress ring UI */
+function resetProgressRing() {
+    // Reset progress ring on the button that was active *during* recording
+    // Use recordingContext from state as it might be cleared soon
+    const context = state.recordingContext;
+    const progressRingElement = (context === 'chat' ? elements.micButton : elements.micButtonNotes)?.querySelector('.mic-progress-ring');
+    const progressArc = progressRingElement?.querySelector('.progress-ring-arc');
+    if (progressRingElement && progressArc) {
+         const radius = parseFloat(progressArc.getAttribute('r'));
+         const circumference = 2 * Math.PI * radius;
+         // Ensure transition is brief or disabled during reset to avoid visual glitches
+         // progressRingElement.style.transition = 'stroke-dashoffset 0.1s linear'; // Optional: faster reset transition
+         progressRingElement.style.setProperty('--progress-offset', circumference); // Reset offset
+         // setTimeout(() => progressRingElement.style.transition = '', 100); // Optional: remove temporary transition
     }
 }
 
