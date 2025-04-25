@@ -145,19 +145,19 @@ def perform_web_search(query, num_results=3):
             link = item.get("link", "no link")
             snippet = item.get("snippet", "No Snippet Available")
             # link = item.get('link') # You could include the link if desired
-            formatted_result = f"{i+1}. {title}: {snippet.replace(chr(10), ' ').replace(chr(13), ' ')}"  # Remove newlines from snippet
+            formatted_result = f"[Title]\n{title}\n[Snippet]\n{snippet.replace(chr(10), ' ').replace(chr(13), ' ')}\n[Link]\n{link}"  # Remove newlines from snippet
 
+            
             # Check if the URL is a Wikipedia article
-            if link:
-                logger.info(link)
-                if "wikipedia.org" in link:
-                    content = fetch_wikipedia_content(link)
-                else:
-                    content = fetch_web_content(link)
-                if content:
-                    formatted_result += "\n[Web Content]\n" + content
-                else:
-                    formatted_result += "\n[Failed to retrieve full website content.]"
+            logger.info(formatted_result)
+            if "wikipedia.org" in link:
+                content = fetch_wikipedia_content(link)
+            else:
+                content = fetch_web_content(link)
+            if content:
+                formatted_result += "\n[Web Content]\n" + content
+            else:
+                formatted_result += "\n[Failed to retrieve full website content.]"
 
             search_snippets.append(formatted_result)
 

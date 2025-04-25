@@ -64,7 +64,7 @@ def transcribe_audio(
             # Explicitly set channel count based on error message (WebM header indicates 2)
             audio_channel_count=2,
             # enable_separate_recognition_per_channel=True, # Keep removed for now, add back if needed after fixing channel count
-            # model="telephony", # Optional: Specify model for better accuracy in some cases
+            model="latest_long", # Optional: Specify model for better accuracy in some cases
             # enable_automatic_punctuation=True, # Optional: Add punctuation
         )
 

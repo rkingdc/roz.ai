@@ -7,11 +7,11 @@ from google.genai.types import (
     Part,
     Content,
     GenerateContentResponse,
-    Blob,       # Import Blob for inline data
+    Blob,  # Import Blob for inline data
     Candidate,  # Import Candidate for error response structure
-    FileData,   # Import FileData for referencing uploaded files
+    FileData,  # Import FileData for referencing uploaded files
 )
-import binascii # Import binascii for the correct exception type
+import binascii  # Import binascii for the correct exception type
 from flask import current_app, g  # Import g for request context caching
 import tempfile
 import os
@@ -213,9 +213,9 @@ def generate_summary(file_id):
 
         # Use the client.models attribute to generate content
         # Summary generation is NOT streamed, always get full response
-        response =  client.models.generate_content(
+        response = client.models.generate_content(
             model=summary_model_name,
-            contents=content_parts, 
+            contents=content_parts,
         )
 
         # --- Process Response ---
@@ -581,8 +581,10 @@ def _yield_streaming_error(error_msg: str):
     logger.debug(f"Yielding streaming error: {error_msg}")
     # Create a valid structure: Response -> Candidates -> Candidate -> Content -> Parts -> Part
     error_part = Part(text=error_msg)
-    error_content = Content(parts=[error_part], role="model") # Assign role for Content
-    error_candidate = Candidate(content=error_content, finish_reason="ERROR") # Use ERROR finish reason
+    error_content = Content(parts=[error_part], role="model")  # Assign role for Content
+    error_candidate = Candidate(
+        content=error_content, finish_reason="ERROR"
+    )  # Use ERROR finish reason
     yield GenerateContentResponse(candidates=[error_candidate])
 
 
@@ -761,12 +763,13 @@ def _generate_chat_response_non_stream(
         logger.info(
             f"Calling model.generate_content (non-streaming) for chat {chat_id}"
         )
-        system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
+
+        system_prompt = f"""You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read. {web_prompt}"""
 
         response = client.models.generate_content(
             model=model_to_use,
             contents=full_conversation,
-            system_instruction=system_prompt, # Add system instruction
+            system_instruction=system_prompt,  # Add system instruction
         )
         logger.info(f"Non-streaming generate_content call returned for chat {chat_id}.")
 
@@ -1173,7 +1176,11 @@ def _prepare_chat_content(
                                     },
                                 )
                                 # Create a Part with FileData referencing the uploaded file URI
-                                file_data_part = Part(file_data=FileData(mime_type=mimetype, file_uri=uploaded_file.uri))
+                                file_data_part = Part(
+                                    file_data=FileData(
+                                        mime_type=mimetype, file_uri=uploaded_file.uri
+                                    )
+                                )
                                 current_turn_parts.append(file_data_part)
                                 logger.info(
                                     f"Attached DB file '{filename}' via File API using URI: {uploaded_file.uri}"
@@ -1257,10 +1264,12 @@ def _prepare_chat_content(
                         "video/",
                         "application/pdf",
                         "text/",
-                    ) # Simplified check for inline data support
+                    )  # Simplified check for inline data support
                     if mimetype.startswith(supported_mimetypes):
                         # Create an inline data Part directly using Blob
-                        inline_part = Part(inline_data=Blob(mime_type=mimetype, data=content_blob))
+                        inline_part = Part(
+                            inline_data=Blob(mime_type=mimetype, data=content_blob)
+                        )
                         current_turn_parts.append(inline_part)
                         logger.info(
                             f"Attached session file '{filename}' ({mimetype}) as inline data."
@@ -1310,6 +1319,7 @@ def _prepare_chat_content(
                             Part(text="--- End Web Search Results ---"),
                         ]
                     )
+
                 else:
                     current_turn_parts.append(
                         Part(text="[System Note: Web search performed, no results.]")
@@ -1326,6 +1336,21 @@ def _prepare_chat_content(
             current_turn_parts.append(
                 Part(text="[User provided no text, only attachments or context.]")
             )
+        if web_search_enabled:
+            current_turn_parts.extend([
+                Part(text="--- special instructions ---"),
+                Part(
+                    text="""When responding, prioritize using information from the provided web search results to ensure accuracy and up-to-dateness. If information from the web search results is used to answer a question, cite the source using bracketed numerical citations (e.g., [1], [2], [3], etc.) directly after the relevant statement or fact.
+
+At the end of your response, include a list of the cited sources, formatted as follows, noting the markdown-style links:
+
+[1] [First Source Title](https://www.the.first.source.com) - "A quote from the source that was used.."
+[2] [Other Source Title](https://www.the.other.source.com) - "A snippet from the source **and a specific important word** from that source"
+[3] [Another Title](https://www.another.example.com) - "More context from this link"
+"""
+                ),
+                Part(text="--- End special instructions ---"),
+           ] )
 
         logger.info(
             f"Prepared {len(current_turn_parts)} current turn parts for chat {chat_id}."
@@ -1373,7 +1398,7 @@ def clean_up_transcript(raw_transcript: str) -> str:
 
     if not raw_transcript or raw_transcript.isspace():
         logger.warning("clean_up_transcript received empty input.")
-        return "" # Return empty if input is empty
+        return ""  # Return empty if input is empty
 
     # --- AI Readiness Check ---
     try:
@@ -1382,14 +1407,15 @@ def clean_up_transcript(raw_transcript: str) -> str:
             logger.debug("clean_up_transcript: Flask request context is active.")
         except RuntimeError:
             logger.error(
-                "clean_up_transcript called outside active Flask context.", exc_info=True
+                "clean_up_transcript called outside active Flask context.",
+                exc_info=True,
             )
-            return raw_transcript # Fallback
+            return raw_transcript  # Fallback
 
         api_key = current_app.config.get("API_KEY")
         if not api_key:
             logger.error("API_KEY missing for clean_up_transcript.")
-            return raw_transcript # Fallback
+            return raw_transcript  # Fallback
 
         try:
             if "genai_client" not in g:
@@ -1400,22 +1426,26 @@ def clean_up_transcript(raw_transcript: str) -> str:
             client = g.genai_client
         except (GoogleAPIError, ClientError, ValueError, Exception) as e:
             logger.error(f"Failed to get genai.Client for cleanup: {e}", exc_info=True)
-            return raw_transcript # Fallback
+            return raw_transcript  # Fallback
 
     except Exception as e:
-        logger.error(f"Unexpected error during readiness check for cleanup: {e}", exc_info=True)
-        return raw_transcript # Fallback
+        logger.error(
+            f"Unexpected error during readiness check for cleanup: {e}", exc_info=True
+        )
+        return raw_transcript  # Fallback
     # --- End AI Readiness Check ---
 
     # Determine model (use default or a specific one for cleaning if configured)
-    raw_model_name = current_app.config.get("SUMMARY_MODEL", current_app.config["DEFAULT_MODEL"])
+    raw_model_name = current_app.config.get(
+        "SUMMARY_MODEL", current_app.config["DEFAULT_MODEL"]
+    )
     model_to_use = (
         f"models/{raw_model_name}"
         if not raw_model_name.startswith("models/")
         else raw_model_name
     )
 
-    prompt=f"""
+    prompt = f"""
     You are a skilled technical writer whose role is to format audio transcriptions into well-structured Markdown documents while preserving *as much detail as possible*. Your focus is on formatting, *not summarizing unless absolutely necessary*.
 
 *   **Headings:** Identify all distinct topics and subtopics in the transcript and create corresponding headings and subheadings (using #, ##, ###, etc.). Headings should be descriptive but concise.
@@ -1436,7 +1466,6 @@ Here is the transcribed speech:
     {raw_transcript}
     """
 
-
     logger.info(f"Attempting transcript cleanup using model '{model_to_use}'...")
     response = None
     try:
@@ -1449,8 +1478,10 @@ Here is the transcribed speech:
         # Process response
         if response.prompt_feedback and response.prompt_feedback.block_reason:
             reason = response.prompt_feedback.block_reason.name
-            logger.warning(f"Transcript cleanup blocked by safety settings. Reason: {reason}")
-            return raw_transcript # Fallback
+            logger.warning(
+                f"Transcript cleanup blocked by safety settings. Reason: {reason}"
+            )
+            return raw_transcript  # Fallback
 
         if (
             response.candidates
@@ -1462,21 +1493,31 @@ Here is the transcribed speech:
                 part.text
                 for part in response.candidates[0].content.parts
                 if hasattr(part, "text")
-            ).strip() # Strip whitespace from the final result
+            ).strip()  # Strip whitespace from the final result
 
             if cleaned_text:
                 logger.info("Transcript cleaned successfully.")
                 return cleaned_text
             else:
-                logger.warning("Transcript cleanup resulted in empty text. Falling back.")
-                return raw_transcript # Fallback if result is empty
+                logger.warning(
+                    "Transcript cleanup resulted in empty text. Falling back."
+                )
+                return raw_transcript  # Fallback if result is empty
         else:
-            logger.warning(f"Transcript cleanup did not produce usable content. Falling back. Response: {response!r}")
-            return raw_transcript # Fallback
+            logger.warning(
+                f"Transcript cleanup did not produce usable content. Falling back. Response: {response!r}"
+            )
+            return raw_transcript  # Fallback
 
-    except (GoogleAPIError, InvalidArgument, DeadlineExceeded, NotFound, Exception) as e:
+    except (
+        GoogleAPIError,
+        InvalidArgument,
+        DeadlineExceeded,
+        NotFound,
+        Exception,
+    ) as e:
         logger.error(f"Error during transcript cleanup API call: {e}", exc_info=True)
-        return raw_transcript # Fallback on any API error
+        return raw_transcript  # Fallback on any API error
 
 
 # --- Note Diff Summary Generation ---
@@ -1493,7 +1534,8 @@ def generate_note_diff_summary(version_1_content: str, version_2_content: str) -
             logger.debug("generate_note_diff_summary: Flask request context is active.")
         except RuntimeError:
             logger.error(
-                "generate_note_diff_summary called outside active Flask context.", exc_info=True
+                "generate_note_diff_summary called outside active Flask context.",
+                exc_info=True,
             )
             return "[Error: AI Service called outside request context]"
 
@@ -1507,21 +1549,30 @@ def generate_note_diff_summary(version_1_content: str, version_2_content: str) -
                 logger.info("Creating new genai.Client for generate_note_diff_summary.")
                 g.genai_client = genai.Client(api_key=api_key)
             else:
-                logger.debug("Using cached genai.Client for generate_note_diff_summary.")
+                logger.debug(
+                    "Using cached genai.Client for generate_note_diff_summary."
+                )
             client = g.genai_client
         except (GoogleAPIError, ClientError, ValueError, Exception) as e:
-            logger.error(f"Failed to get genai.Client for diff summary: {e}", exc_info=True)
+            logger.error(
+                f"Failed to get genai.Client for diff summary: {e}", exc_info=True
+            )
             if "api key not valid" in str(e).lower():
                 return "[Error: Invalid Gemini API Key]"
             return "[Error: Failed to initialize AI client]"
 
     except Exception as e:
-        logger.error(f"Unexpected error during readiness check for diff summary: {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error during readiness check for diff summary: {e}",
+            exc_info=True,
+        )
         return f"[CRITICAL Unexpected Error during AI Service readiness check: {type(e).__name__}]"
     # --- End AI Readiness Check ---
 
     # Determine model (use default or summary model)
-    raw_model_name = current_app.config.get("SUMMARY_MODEL", current_app.config["DEFAULT_MODEL"])
+    raw_model_name = current_app.config.get(
+        "SUMMARY_MODEL", current_app.config["DEFAULT_MODEL"]
+    )
     model_to_use = (
         f"models/{raw_model_name}"
         if not raw_model_name.startswith("models/")
@@ -1550,7 +1601,9 @@ Summary of Changes:"""
         # Process response
         if response.prompt_feedback and response.prompt_feedback.block_reason:
             reason = response.prompt_feedback.block_reason.name
-            logger.warning(f"Note diff summary blocked by safety settings. Reason: {reason}")
+            logger.warning(
+                f"Note diff summary blocked by safety settings. Reason: {reason}"
+            )
             return f"[Error: Diff summary generation blocked due to safety settings (Reason: {reason})]"
 
         if (
@@ -1572,7 +1625,9 @@ Summary of Changes:"""
                 logger.warning("Note diff summary generation resulted in empty text.")
                 return "[System Note: AI generated an empty diff summary.]"
         else:
-            logger.warning(f"Note diff summary generation did not produce usable content. Response: {response!r}")
+            logger.warning(
+                f"Note diff summary generation did not produce usable content. Response: {response!r}"
+            )
             finish_reason = "UNKNOWN"
             if response.candidates and hasattr(response.candidates[0], "finish_reason"):
                 finish_reason = response.candidates[0].finish_reason.name
@@ -1580,7 +1635,8 @@ Summary of Changes:"""
 
     except InvalidArgument as e:
         logger.error(
-            f"InvalidArgument error during note diff summary generation: {e}.", exc_info=True
+            f"InvalidArgument error during note diff summary generation: {e}.",
+            exc_info=True,
         )
         return f"[AI Error: Invalid argument ({type(e).__name__}).]"
     except NotFound:
@@ -1593,7 +1649,9 @@ Summary of Changes:"""
             return "[Error: API quota or rate limit exceeded. Please try again later.]"
         return f"[AI API Error: {type(e).__name__}]"
     except Exception as e:
-        logger.error(f"Unexpected error during note diff summary generation: {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error during note diff summary generation: {e}", exc_info=True
+        )
         return f"[Unexpected AI Error: {type(e).__name__}]"
 
 
@@ -1670,7 +1728,7 @@ def generate_text(prompt: str, model_name: str = None) -> str:
         # Standalone text generation is NOT streamed
         response = client.models.generate_content(
             model=model_to_use,
-            contents=prompt, 
+            contents=prompt,
         )
 
         # Process response similar to non-streaming chat
