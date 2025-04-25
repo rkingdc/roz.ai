@@ -764,7 +764,7 @@ def _generate_chat_response_non_stream(
             f"Calling model.generate_content (non-streaming) for chat {chat_id}"
         )
 
-        system_prompt = f"""You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read. {web_prompt}"""
+        system_prompt = f"""You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
 
         response = client.models.generate_content(
             model=model_to_use,
