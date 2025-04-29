@@ -4,12 +4,12 @@
 // It reads from the state module and updates the DOM via the elements module.
 // It does NOT directly manipulate the DOM or call UI rendering functions.
 
-import { elements } from './dom.js'; // Import elements from dom.js
+import { elements } from './dom.js'; // Import elements object
 import * as state from './state.js'; // UI reads from state
 import { getInputElementForContext } from './state.js'; // Import the helper function
 import { originalNoteTextBeforeRecording } from './voice.js'; // Import original text holder
 import * as config from './config.js'; // Import config for keys
-import { escapeHtml, formatFileSize } from './utils.js'; // Import utility functions
+import { escapeHtml, formatFileSize, debounce } from './utils.js'; // Import utility functions, including debounce
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js'; // Import marked for lexer
 import { markedRenderer } from './config.js'; // Import the custom renderer from config.js
 // No direct imports of api.js here to break the cycle.
@@ -49,17 +49,7 @@ function waitForGraphViewerAndProcess(maxAttempts = 30, delay = 100) { // Increa
 
 
 // Debounce function
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-    };
-}
+// Moved debounce to utils.js and imported
 
 
 /**
@@ -124,7 +114,7 @@ function makeHeadingsCollapsible(htmlString) {
                 // Append to the content div of the most recent heading
                 currentContentDiv.appendChild(node.cloneNode(true));
             } else {
-                // Append directly to the fragment if before the first heading
+                // If before the first heading, append directly to the fragment
                 resultFragment.appendChild(node.cloneNode(true));
             }
         }
@@ -186,6 +176,7 @@ export function updateLoadingState() {
     if (elements.viewNoteButton) elements.viewNoteButton.disabled = isLoading;
     if (elements.markdownTipsButton) elements.markdownTipsButton.disabled = isLoading;
     if (elements.micButton) elements.micButton.disabled = isLoading; // Disable mic button when loading
+    if (elements.micButtonNotes) elements.micButtonNotes.disabled = isLoading; // Disable notes mic button when loading
 
 
     // Disable/enable list items for chats/notes/files
@@ -495,6 +486,8 @@ export function updateActiveChatListItem() {
             if (deleteButton) {
                 deleteButton.classList.add('active-trash');
             }
+            // Scroll the active item into view if it's not already visible
+            item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } else {
             item.classList.remove('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
@@ -601,7 +594,7 @@ function createNoteItem(note) {
     // Default color is text-rz-tab-background-text (greyish) based on provided HTML
     timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-toolbar-field-text'); // Use specific classes and mt-0.5 - color handled by CSS
     try {
-        const date = new Date(note.last_saved_at);
+        const date = new Date(note.last_saved_at); // Use uploaded_at for files
         // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
         const now = new Date();
         const yesterday = new Date(now);
@@ -658,6 +651,8 @@ export function updateActiveNoteListItem() {
             if (deleteButton) {
                 deleteButton.classList.add('active-trash');
             }
+            // Scroll the active item into view if it's not already visible
+            item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } else {
             item.classList.remove('active'); // Use 'active'
             item.classList.remove('active-selection'); // Remove old class
@@ -696,6 +691,9 @@ export function renderNoteContent() {
         notesTextarea.value = state.noteContent || ''; // Read from state
         notesTextarea.placeholder = state.isLoading ? "Loading note..." : "Start typing your markdown notes here...";
         notesTextarea.disabled = state.isLoading || state.currentNoteId === null; // Disable if loading or no note loaded
+        // --- NEW: Trigger auto-resize after updating value ---
+        autoResizeTextarea(notesTextarea);
+        // -----------------------------------------------------
     }
     if (notesPreview) {
         // Update preview based on current mode and content
@@ -1262,8 +1260,8 @@ export function updatePluginUI() {
 
     // Add null checks for all elements accessed in this function
     if (!elements.filePluginSection || !elements.fileUploadSessionLabel || !elements.selectedFilesContainer ||
-        !elements.calendarPluginSection || !elements.calendarToggleInputArea || !elements.webSearchToggleLabel ||
-        !elements.uploadedFilesList || !elements.manageFilesList || !elements.calendarStatus || !elements.calendarToggle ||
+        !elements.calendarPluginSection || !elements.calendarToggle || !elements.webSearchToggleLabel ||
+        !elements.uploadedFilesList || !elements.manageFilesList || !elements.calendarStatus ||
         !elements.viewCalendarButton || !elements.webSearchToggle || !elements.historyPluginSection || !elements.noteHistoryList ||
         !elements.pluginsSidebar || !elements.pluginsToggleTab) { // Use the new reference name
         console.warn("Missing core plugin elements for updatePluginUI.");
@@ -1376,7 +1374,7 @@ export function updateCalendarStatus() {
  */
 export function renderChatInputArea() {
     const {
-        fileUploadSessionLabel, selectedFilesContainer, calendarToggleInputArea,
+        fileUploadSessionLabel, selectedFilesContainer,
         webSearchToggleLabel, webSearchToggle, calendarToggle
     } = elements;
 
@@ -1386,9 +1384,10 @@ export function renderChatInputArea() {
     }
     // Visibility of selectedFilesContainer is handled by renderAttachedAndSessionFiles
 
-    if (calendarToggleInputArea) { // Add null check
-        calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
-    }
+    // Calendar toggle is now part of the plugin section, not input area
+    // if (calendarToggleInputArea) { // Add null check
+    //     calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
+    // }
     if (calendarToggle) { // Add null check
         calendarToggle.checked = state.isCalendarContextActive; // Read from state
     }
@@ -1489,6 +1488,7 @@ export function switchTab(tab) { // Made synchronous, state is already updated b
     // based on the newly active tab and plugin enabled states.
     updatePluginUI();
     updateNotesCleanupButtonState(); // Update button state when switching tabs
+    updateChatCleanupButtonState(); // Update button state when switching tabs
     // ----------------------------------------------------
 
 }
@@ -1525,6 +1525,9 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
         } else {
              notesPreview.textContent = notesTextarea.value; // Read from DOM
         }
+        // --- NEW: Trigger auto-resize after switching to edit mode ---
+        autoResizeTextarea(notesTextarea);
+        // -------------------------------------------------------------
     } else { // state.currentNoteMode === 'view'
         notesTextarea.classList.add('hidden');
         notesPreview.classList.remove('hidden');

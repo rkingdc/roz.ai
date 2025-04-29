@@ -12,7 +12,7 @@ import * as voice from './voice.js'; // Import voice recording functions
 import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js'; // Import file size constants
 import { formatFileSize, debounce, escapeHtml } from './utils.js'; // Import debounce and escapeHtml
 // --- NEW: Import toast functions ---
-import { showToast, removeToast } from './toastNotifications.js'; // Adjust path if needed
+import { showToast, removeToast, updateToast } from './toastNotifications.js'; // Adjust path if needed
 // -----------------------------------
 
 /**
@@ -69,6 +69,92 @@ export function setupEventListeners() {
             }
         }
         // -----------------------------------------
+
+        // --- NEW: Sidebar List Navigation Shortcuts (Ctrl + Up/Down) ---
+        // Only handle this shortcut if the user is NOT currently typing in a text input or textarea
+        const activeElement = document.activeElement;
+        const isTypingInput = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
+
+        if ((event.ctrlKey || event.metaKey) && (event.key === 'ArrowUp' || event.key === 'ArrowDown') && !isTypingInput) {
+            event.preventDefault(); // Prevent default scrolling behavior
+
+            const currentTab = state.currentTab;
+            let items = [];
+            let currentId = null;
+            let listElement = null;
+            let idAttribute = '';
+            let loadItemFunction = null; // Use API load function
+            let itemClass = ''; // Class to select list items
+
+            if (currentTab === 'chat') {
+                listElement = elements.savedChatsList;
+                currentId = state.currentChatId;
+                idAttribute = 'chatId';
+                loadItemFunction = api.loadChat; // Use loadChat API function
+                itemClass = '.chat-list-item';
+            } else if (currentTab === 'notes') {
+                listElement = elements.savedNotesList;
+                currentId = state.currentNoteId;
+                idAttribute = 'noteId';
+                loadItemFunction = api.loadNote; // Use loadNote API function
+                itemClass = '.note-list-item';
+            } else {
+                // Not on a tab with a navigable list
+                return;
+            }
+
+            // Ensure we have the list element and there are items in the list
+            if (!listElement || listElement.children.length === 0) {
+                 console.log(`[DEBUG] Keyboard navigation: No list element or list is empty for tab ${currentTab}.`);
+                return;
+            }
+
+            // Get all list items
+            items = Array.from(listElement.querySelectorAll(itemClass));
+
+            // If no item is currently selected, find the index of the first/last item
+            let currentIndex = -1;
+            if (currentId !== null) {
+                 currentIndex = items.findIndex(item => parseInt(item.dataset[idAttribute]) === currentId);
+            }
+
+            let newIndex = currentIndex;
+
+            if (event.key === 'ArrowUp') {
+                // If no item is selected, select the last one when pressing Up
+                if (currentIndex === -1) {
+                    newIndex = items.length - 1;
+                } else {
+                    newIndex = currentIndex - 1;
+                }
+            } else if (event.key === 'ArrowDown') {
+                 // If no item is selected, select the first one when pressing Down
+                 if (currentIndex === -1) {
+                     newIndex = 0;
+                 } else {
+                     newIndex = currentIndex + 1;
+                 }
+            }
+
+            // Check if the new index is within bounds
+            if (newIndex >= 0 && newIndex < items.length) {
+                const newItem = items[newIndex];
+                const newId = parseInt(newItem.dataset[idAttribute]);
+
+                // Load the new item using the API function
+                if (loadItemFunction) {
+                    console.log(`[DEBUG] Keyboard navigation: Loading new ${idAttribute} ${newId}`);
+                    loadItemFunction(newId); // Call the API function
+                    // State update and UI rendering will happen via API's state changes
+                } else {
+                     console.error(`API function to load ${idAttribute} is not available.`);
+                }
+            } else {
+                // Boundary reached (top or bottom) - do nothing
+                console.log(`[DEBUG] Keyboard navigation: Boundary reached. Current index: ${currentIndex}, New index attempt: ${newIndex}`);
+            }
+        }
+        // -------------------------------------------------------------
     });
     // console.log("Global keyboard listeners set up.");
 
@@ -522,7 +608,7 @@ export function setupEventListeners() {
                 // Match lines like '# Heading', '## Heading', etc.
                 return trimmedLine.match(/^#+\s+/) && trimmedLine.substring(trimmedLine.indexOf(' ')+1).trim() === headingText.trim();
             });
- 
+
             if (lineIndex !== -1 && elements.notesTextarea) {
                 // --- Calculate character position of the start of the line ---
                 // Sum lengths of previous lines + newline characters
@@ -530,24 +616,24 @@ export function setupEventListeners() {
                 for (let i = 0; i < lineIndex; i++) {
                     position += lines[i].length + 1; // +1 for the newline character
                 }
- 
+
                 // --- Set cursor position and focus ---
                 try {
                     elements.notesTextarea.focus(); // Focus first
                     // Set selection start and end to the same point to place the cursor
                     elements.notesTextarea.setSelectionRange(position, position);
- 
+
                     // --- Optional: Attempt scrollIntoView (might not be perfect) ---
                     // This is less reliable than focus/setSelectionRange for bringing
                     // the exact line into view, but can help in some browsers.
                     // elements.notesTextarea.scrollIntoView({ block: 'nearest' });
- 
+
                     state.setStatusMessage(`Jumped to heading in editor.`);
                 } catch (e) {
                     console.error("Error setting cursor position or focusing:", e);
                     state.setStatusMessage("Error jumping to heading in editor.", true);
                 }
- 
+
             } else {
                 state.setStatusMessage("Could not find heading in editor.", true);
             }
@@ -661,7 +747,7 @@ export function setupEventListeners() {
         const hasSummary = hasSummaryDataset === 'true' || hasSummaryDataset === '1';
         if (isNaN(fileId) || !filename) return;
 
-        const isCurrentlySelected = state.sidebarSelectedFiles.some(f => f.id === fileId);
+        const isCurrentlySelected = state.sidebarSelectedFiles.some(sf => sf.id === fileId);
 
         if (isCurrentlySelected) {
             state.removeSidebarSelectedFileById(fileId); // Update state (notifies sidebarSelectedFiles)
@@ -674,7 +760,7 @@ export function setupEventListeners() {
 
 
     // --- Manage Files Modal ---
-    elements.closeManageFilesModalButton?.addEventListener('click', () => ui.closeModal(elements.manageFilesModal)); // UI-only modal close
+    elements.closeManageFilesModal?.addEventListener('click', () => ui.closeModal(elements.manageFilesModal)); // UI-only modal close
     elements.manageFilesModal?.addEventListener('click', (event) => {
         if (event.target === elements.manageFilesModal) ui.closeModal(elements.manageFilesModal); // UI-only modal close
     });
@@ -696,7 +782,7 @@ export function setupEventListeners() {
     });
 
     // --- URL Modal ---
-    elements.closeUrlModalButton?.addEventListener('click', () => ui.closeModal(elements.urlModal)); // UI-only modal close
+    elements.closeUrlModal?.addEventListener('click', () => ui.closeModal(elements.urlModal)); // UI-only modal close
     elements.urlModal?.addEventListener('click', (event) => {
         if (event.target === elements.urlModal) ui.closeModal(elements.urlModal); // UI-only modal close
     });
@@ -774,7 +860,7 @@ export function setupEventListeners() {
 
 
     // --- Summary Modal ---
-    elements.closeSummaryModalButton?.addEventListener('click', () => ui.closeModal(elements.summaryModal)); // UI-only modal close
+    elements.closeSummaryModal?.addEventListener('click', () => ui.closeModal(elements.summaryModal)); // UI-only modal close
     elements.summaryModal?.addEventListener('click', (event) => {
         if (event.target === elements.summaryModal) ui.closeModal(elements.summaryModal); // UI-only modal close
     });
@@ -808,14 +894,14 @@ export function setupEventListeners() {
         ui.showModal(elements.calendarModal, 'calendar', 'chat'); // UI-only modal show
         // Calendar content rendering in modal is handled by UI reacting to state.calendarContext
     });
-    elements.closeCalendarModalButton?.addEventListener('click', () => ui.closeModal(elements.calendarModal)); // UI-only modal close
+    elements.closeCalendarModal?.addEventListener('click', () => ui.closeModal(elements.calendarModal)); // UI-only modal close
     elements.calendarModal?.addEventListener('click', (event) => {
         if (event.target === elements.calendarModal) ui.closeModal(elements.calendarModal); // UI-only modal close
     });
 
     // --- Settings Modal & Toggles ---
     elements.settingsButton?.addEventListener('click', () => ui.showModal(elements.settingsModal)); // UI-only modal show
-    elements.closeSettingsModalButton?.addEventListener('click', () => ui.closeModal(elements.settingsModal)); // UI-only modal close
+    elements.closeSettingsModal?.addEventListener('click', () => ui.closeModal(elements.settingsModal)); // UI-only modal close
     elements.settingsModal?.addEventListener('click', (event) => {
         if (event.target === elements.settingsModal) ui.closeModal(elements.settingsModal); // UI-only modal close
     });
@@ -914,7 +1000,7 @@ export function setupEventListeners() {
         // UI update is triggered by currentNoteMode notification
     });
     elements.markdownTipsButton?.addEventListener('click', () => ui.showModal(elements.markdownTipsModal, null, 'notes')); // UI-only modal show
-    elements.closeMarkdownTipsModalButton?.addEventListener('click', () => ui.closeModal(elements.markdownTipsModal)); // UI-only modal close
+    elements.closeMarkdownTipsModal?.addEventListener('click', () => ui.closeModal(elements.markdownTipsModal)); // UI-only modal close
     elements.markdownTipsModal?.addEventListener('click', (event) => {
         if (event.target === elements.markdownTipsModal) ui.closeModal(elements.markdownTipsModal); // UI-only modal close
     });
@@ -1015,8 +1101,6 @@ export function setupEventListeners() {
 
     // --- Removed Generate Diff Summary button listener ---
     // Summary generation is now handled during note save.
-    // -----------------------------------------------------------------------
-
 
     // --- Delegated Click Listener for Collapsible Headings (Hierarchical) ---
     function handleCollapsibleClick(event) {

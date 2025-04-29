@@ -16,7 +16,7 @@ export const elements = {
     webSearchToggle: null,
     webSearchToggleLabel: null,
     calendarToggle: null,
-    calendarToggleInputArea: null,
+    calendarToggleInputArea: null, // This element doesn't exist in HTML, remove or fix
     fileUploadSessionLabel: null,
     fileUploadSessionInput: null,
     selectedFilesContainer: null,
@@ -86,34 +86,34 @@ export const elements = {
 
     // Modal Elements
     summaryModal: null,
-    closeSummaryModalButton: null,
+    closeSummaryModal: null, // Corrected ID to match HTML
     summaryModalFilename: null,
     summaryTextarea: null,
     saveSummaryButton: null,
     summaryStatus: null,
     calendarModal: null,
-    closeCalendarModalButton: null,
+    closeCalendarModal: null, // Corrected ID to match HTML
     calendarModalContent: null,
     urlModal: null,
-    closeUrlModalButton: null,
+    closeUrlModal: null, // Corrected ID to match HTML
     urlInput: null,
     fetchUrlButton: null,
     urlStatus: null,
     manageFilesModal: null,
-    closeManageFilesModalButton: null,
+    closeManageFilesModal: null, // Corrected ID to match HTML
     manageFilesList: null,
     fileUploadModalInput: null,
     fileUploadModalLabel: null,
     addUrlModalButton: null,
     settingsModal: null,
     settingsButton: null,
-    closeSettingsModalButton: null,
+    closeSettingsModal: null, // Corrected ID to match HTML
     streamingToggle: null,
     filesPluginToggle: null,
     calendarPluginToggle: null,
     webSearchPluginToggle: null,
     markdownTipsModal: null,
-    closeMarkdownTipsModalButton: null,
+    closeMarkdownTipsModal: null, // Corrected ID to match HTML
 
     // Other Elements
     statusBar: null,
@@ -155,7 +155,7 @@ export function populateElements() {
     elements.attachFullButton = document.getElementById('attach-full-btn');
     elements.attachSummaryButton = document.getElementById('attach-summary-btn');
     elements.summaryModal = document.getElementById('summary-modal');
-    elements.closeSummaryModalButton = document.getElementById('close-summary-modal');
+    elements.closeSummaryModal = document.getElementById('close-summary-modal'); // Corrected ID
     elements.summaryModalFilename = document.getElementById('summary-modal-filename');
     elements.summaryTextarea = document.getElementById('summary-textarea');
     elements.saveSummaryButton = document.getElementById('save-summary-btn');
@@ -168,25 +168,25 @@ export function populateElements() {
     elements.calendarStatus = document.getElementById('calendar-status');
     elements.viewCalendarButton = document.getElementById('view-calendar-btn');
     elements.calendarModal = document.getElementById('calendar-modal');
-    elements.closeCalendarModalButton = document.getElementById('close-calendar-modal');
+    elements.closeCalendarModal = document.getElementById('close-calendar-modal'); // Corrected ID
     elements.calendarModalContent = document.getElementById('calendar-modal-content');
     elements.webSearchToggle = document.getElementById('web-search-toggle');
     elements.webSearchToggleLabel = document.getElementById('web-search-toggle-label');
     elements.urlModal = document.getElementById('url-modal');
-    elements.closeUrlModalButton = document.getElementById('close-url-modal');
+    elements.closeUrlModal = document.getElementById('close-url-modal'); // Corrected ID
     elements.urlInput = document.getElementById('url-input');
     elements.fetchUrlButton = document.getElementById('fetch-url-btn');
     elements.urlStatus = document.getElementById('url-status');
     elements.manageFilesButton = document.getElementById('manage-files-btn');
     elements.manageFilesModal = document.getElementById('manage-files-modal');
-    elements.closeManageFilesModalButton = document.getElementById('close-manage-files-modal');
+    elements.closeManageFilesModal = document.getElementById('close-manage-files-modal'); // Corrected ID
     elements.manageFilesList = document.getElementById('manage-files-list');
     elements.fileUploadModalInput = document.getElementById('file-upload-modal-input');
     elements.fileUploadModalLabel = document.getElementById('file-upload-modal-label');
     elements.addUrlModalButton = document.getElementById('add-url-modal-btn');
     elements.settingsButton = document.getElementById('settings-btn');
     elements.settingsModal = document.getElementById('settings-modal');
-    elements.closeSettingsModalButton = document.getElementById('close-settings-modal');
+    elements.closeSettingsModal = document.getElementById('close-settings-modal'); // Corrected ID
     elements.streamingToggle = document.getElementById('streaming-toggle');
     elements.filesPluginToggle = document.getElementById('files-plugin-toggle');
     elements.calendarPluginToggle = document.getElementById('calendar-plugin-toggle');
@@ -194,7 +194,7 @@ export function populateElements() {
     elements.filePluginSection = document.getElementById('file-plugin-section');
     elements.calendarPluginSection = document.getElementById('calendar-plugin-section');
     elements.fileUploadSessionLabel = document.getElementById('file-upload-session-label');
-    elements.calendarToggleInputArea = elements.calendarToggle?.closest('label'); // Use optional chaining
+    // elements.calendarToggleInputArea = elements.calendarToggle?.closest('label'); // This element doesn't exist in HTML, remove or fix
     elements.fileUploadSessionInput = document.getElementById('file-upload-session-input');
     elements.chatNavButton = document.getElementById('chat-nav-btn');
     elements.notesNavButton = document.getElementById('notes-nav-btn');
@@ -216,7 +216,7 @@ export function populateElements() {
     elements.markdownTipsButton = document.getElementById('markdown-tips-btn');
     elements.notesModeElements = document.getElementById('notes-mode-elements');
     elements.markdownTipsModal = document.getElementById('markdown-tips-modal');
-    elements.closeMarkdownTipsModalButton = document.getElementById('close-markdown-tips-modal');
+    elements.closeMarkdownTipsModal = document.getElementById('close-markdown-tips-modal'); // Corrected ID
     elements.inputArea = document.getElementById('input-area');
     elements.historyPluginSection = document.getElementById('history-plugin-section'); // Added history plugin elements
     elements.historyPluginHeader = document.getElementById('history-plugin-header');
