@@ -7,30 +7,11 @@ from typing import List, Tuple, Dict, Any
 # Assuming ai_services.py and web_search.py are in the same directory
 # or accessible via the Python path.
 # Use appropriate import style for your project structure (e.g., relative imports if part of a package)
-try:
-    from ai_services import generate_text  # For LLM interactions
-    from web_search import (
+from .ai_services import generate_text  # For LLM interactions
+from .plugins.web_search import (
         perform_web_search,
         fetch_web_content,
     )  # For web searching and scraping
-except ImportError as e:
-    print(f"Error importing modules: {e}")
-    print("Please ensure ai_services.py and web_search.py are accessible.")
-
-    # Define dummy functions to allow script structure to load, but it won't work.
-    def generate_text(prompt: str, model_name: str = None) -> str:
-        print(f"[Dummy] generate_text called with prompt: {prompt[:50]}...")
-        return "[Dummy LLM Response]"
-
-    def perform_web_search(query: str, num_results: int = 3) -> List[str]:
-        print(f"[Dummy] perform_web_search called with query: {query}")
-        return [
-            "[Dummy] Title: Dummy Result\nSnippet: Dummy snippet.\nLink: https://example.com/dummy\n[Web Content]\nDummy web content."
-        ]
-
-    def fetch_web_content(url: str) -> str:
-        print(f"[Dummy] fetch_web_content called with url: {url}")
-        return "[Dummy Fetched Content]"
 
 
 import logging
@@ -263,7 +244,7 @@ def scrape_web(search_result_string: str) -> str:
             content = ""  # Reset content to trigger refetch
         elif content:
             logger.debug(f"Extracted existing web content (length: {len(content)}).")
-            return content  # Return existing content if valid
+            return link, content  # Return existing content if valid
 
     # If no valid content exists and we have a link, try fetching now
     if not content and link:
@@ -278,20 +259,20 @@ def scrape_web(search_result_string: str) -> str:
                 logger.info(
                     f"Successfully scraped content (length: {len(fetched_content)}) from {link}."
                 )
-                return fetched_content
+                return link, fetched_content
             else:
                 logger.warning(f"Scraping returned no content from {link}.")
-                return f"[Scraping failed for URL: {link}]"
+                return link, f"[Scraping failed for URL: {link}]"
         except Exception as e:
             logger.error(f"Error scraping URL {link}: {e}", exc_info=True)
-            return f"[Scraping error for URL: {link} - {e}]"
+            return link, f"[Scraping error for URL: {link} - {e}]"
     elif not link:
         logger.warning("Could not extract link from search result string to scrape.")
-        return "[Scraping failed: No link found in result string]"
+        return link, "[Scraping failed: No link found in result string]"
     else:
         # This case should ideally not be reached if content_match logic is correct
         logger.debug("Content was present but empty, returning empty string.")
-        return ""
+        return link, ""
 
 
 def query_and_research_to_updated_plan(
@@ -310,7 +291,7 @@ def query_and_research_to_updated_plan(
         if research_items:
             # Provide first N characters of each item as a snippet
             snippets = [
-                f"- {item[:200]}..." for item in research_items[:2]
+                f"- {item[:500]}..." for item in research_items
             ]  # Show snippets from first 2 results
             research_summary += "\n".join(snippets)
             if len(research_items) > 2:
@@ -320,26 +301,35 @@ def query_and_research_to_updated_plan(
         research_summary += "\n"
 
     prompt = f"""
-    Given the original user query and the collected research snippets below, create a refined plan for writing a final report.
-    This plan should outline the main sections of the report.
-    Each step should have a concise 'section_name' (suitable as a report heading) and a 'section_description' outlining the key points to cover in that section, based *only* on the research gathered.
-    Return the plan as a JSON list of lists, where each inner list is [section_name, section_description].
+Given the original user query and the collected research snippets below, create a **detailed and comprehensive** plan for writing a final report. This plan should outline the **main sections** of the report, **reflecting the key areas identified in the query and the significant findings from the research.**
 
-    Example Format:
-    ```json
-    [
-      ["Introduction", "Define the core concepts based on research findings and state the report's purpose."],
-      ["Key Players Analysis", "Discuss the roles and impacts of the identified individuals/organizations based on research."],
-      ["Current Landscape", "Summarize the trends and challenges discovered during research."]
-    ]
-    ```
+**Ensure the plan is broken down into multiple logical sections that cover the breadth of the research findings relevant to the user query. Avoid collapsing distinct topics or significant findings into a single section if the research provides sufficient information for separate discussion.**
 
-    Original User Query: "{query}"
+Each step should represent a distinct section of the report and have a concise 'section_name' (suitable as a report heading). The 'section_description' for each step should outline the key points to cover in that specific section, **based *only* on the research gathered. Elaborate on the findings within each section description.**
 
-    Collected Research Snippets:
-    {research_summary}
+Return the plan as a JSON list of lists, where each inner list is [section_name, section_description].
 
-    Refined Report Plan (JSON):
+Example Format:
+```json
+[
+  ["Introduction", "Define the core concepts based on research findings and state the report's purpose, drawing from the query and snippets."],
+  ["Historical Context of [Topic]", "Based on research, detail the background and evolution of the topic."],
+  ["Key Drivers and Factors", "Summarize the main influences and contributing factors identified in the snippets."],
+  ["Challenges and Obstacles", "Outline the primary difficulties and impediments found in the research."],
+  ["Potential Solutions or Approaches", "Describe possible ways to address the challenges, if supported by research."],
+  ["Future Outlook/Trends", "Present any forward-looking insights or observed trends from the snippets."],
+  ["Conclusion", "Synthesize the main findings from the research snippets and summarize the report's key takeaways."]
+]
+
+
+Note: This example structure is illustrative and the actual sections should be derived directly from the research and query.
+
+Original User Query: "{query}"
+
+Collected Research Snippets:
+{research_summary}
+
+Refined Report Plan (JSON):
     """
     try:
         llm_response = generate_text(prompt)
@@ -649,7 +639,7 @@ def final_report(
 {report_body}
 
 ---
-
+    
 {next_steps}
 
 ---
@@ -708,7 +698,8 @@ def perform_deep_research(query: str) -> str:
                 if scraped_content and not scraped_content.startswith(
                     "[Scraping failed"
                 ):
-                    collected_research[step_name].append(scraped_content)
+                    collected_research[step_name].append({"content":scraped_content,
+                                                          "link": "result_string"})
                 else:
                     logger.debug(
                         f"No useful content scraped from a result for query '{search_query}'."
