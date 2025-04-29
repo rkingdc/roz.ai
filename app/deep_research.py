@@ -289,10 +289,10 @@ def query_and_research_to_updated_plan(
     for step_name, research_items in collected_research.items():
         research_summary += f"\n**Research Step: {step_name}**\n"
         if research_items:
-            # Provide first N characters of each item as a snippet
+            # Provide first N characters of the 'content' key as a snippet
             snippets = [
-                f"- {item[:500]}..." for item in research_items
-            ]  # Show snippets from first 2 results
+                f"- {item.get('content', '')[:500]}..." for item in research_items[:2] # Show snippets from first 2 results
+            ]
             research_summary += "\n".join(snippets)
             if len(research_items) > 2:
                 research_summary += f"\n- ... ({len(research_items) - 2} more items)"
@@ -381,10 +381,10 @@ def synthesize_research_into_report_section(
             [],
         )
 
-    # Format research for the prompt
+    # Format research for the prompt, accessing the 'content' key
     formatted_research = "\n\n---\n\n".join(
         [
-            f"Source {i+1}:\n{research}"
+            f"Source {i+1}:\n{research.get('content', '[Content not available]')}"
             for i, research in enumerate(collected_research_for_step)
         ]
     )
@@ -547,25 +547,28 @@ def create_works_cited(
     logger.info("Generating works cited section.")
 
     cited_items = []
-    source_details = {}  # Store details like link/title for each original source item
+    source_details = {}  # Store details like link for each original source item
 
-    # First, parse the original collected_research to extract links/titles if possible
+    # First, iterate through collected_research to build source details from the dict structure
     source_counter = 1
     for step_name, research_items in collected_research.items():
-        for item_string in research_items:
+        for item_dict in research_items:
             source_id = f"Source {source_counter}"
-            link = None
-            title = None
-            # Try extracting link and title (adjust regex if format changes)
-            link_match = re.search(r"\n\[Link\]\n(.*?)\n", item_string)
-            title_match = re.search(r"\[Title\]\n(.*?)\n", item_string)
-            if link_match:
-                link = link_match.group(1).strip()
-            if title_match:
-                title = title_match.group(1).strip()
+            link = item_dict.get("link")
+            # We don't have a reliable title field, use link or a placeholder
+            title = f"Source {source_counter}" # Placeholder title
+            if link:
+                # Try to create a slightly better title from the link if possible
+                try:
+                    hostname = re.match(r"https?://(?:www\.)?([^/]+)", link).group(1)
+                    if hostname:
+                        title = f"Content from {hostname}"
+                except Exception:
+                    pass # Keep placeholder if regex fails
+
             source_details[source_id] = {
                 "link": link,
-                "title": title,
+                "title": title, # Use generated or placeholder title
                 "original_index": source_counter,
             }
             source_counter += 1
@@ -586,13 +589,12 @@ def create_works_cited(
         details = source_details.get(source_id)
         if details:
             entry = f"{details['original_index']}. "  # Start with original index number
-            if details["title"] and details["title"] != "No Title":
-                entry += f"*{details['title']}*"
-            else:
-                entry += "Source"  # Fallback title
+            # Use the title we stored (placeholder or derived from hostname)
+            entry += f"*{details.get('title', 'Source')}*"
 
-            if details["link"] and details["link"] != "no link":
-                entry += f" - Available at: <{details['link']}>"  # Use angle brackets for URL
+            link = details.get("link")
+            if link:
+                entry += f" - Available at: <{link}>"  # Use angle brackets for URL
             else:
                 entry += " (Link not available)"
             cited_items.append(entry)
