@@ -28,6 +28,7 @@ export let isFilePluginEnabled = true;
 export let isCalendarPluginEnabled = true;
 export let isWebSearchPluginEnabled = true;
 export let isWebSearchEnabled = false; // Toggle state for including web search in current message
+export let isDeepResearchEnabled = false; // Toggle state for deep research mode
 
 // Tab and Note Mode states
 export let currentTab = 'chat';
@@ -149,6 +150,7 @@ export function notifyAll() {
     notify('isCalendarPluginEnabled', isCalendarPluginEnabled);
     notify('isWebSearchPluginEnabled', isWebSearchPluginEnabled);
     notify('isWebSearchEnabled', isWebSearchEnabled);
+    notify('isDeepResearchEnabled', isDeepResearchEnabled); // Notify deep research state
     notify('currentTab', currentTab);
     notify('currentNoteMode', currentNoteMode);
     notify('savedChats', savedChats);
@@ -185,6 +187,10 @@ export function notifyAll() {
     notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Include mode in combined state
     notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
     notify('pluginEnabled', 'all'); // Generic notification for any plugin state change
+
+    // Notify combined states including deep research
+    notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled });
+    notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
 }
 
 
@@ -195,7 +201,7 @@ export function setCurrentChatId(id) {
     if (currentChatId !== id) {
         currentChatId = id;
         notify('currentChatId', currentChatId);
-        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled }); // Notify combined chat state
     }
 }
 
@@ -362,6 +368,23 @@ export function setCalendarPluginEnabled(enabled) {
     }
 }
 
+export function setWebSearchEnabled(enabled) {
+    if (isWebSearchEnabled !== enabled) {
+        isWebSearchEnabled = enabled;
+        notify('isWebSearchEnabled', isWebSearchEnabled);
+    }
+}
+
+export function setDeepResearchEnabled(enabled) {
+    if (isDeepResearchEnabled !== enabled) {
+        isDeepResearchEnabled = enabled;
+        notify('isDeepResearchEnabled', isDeepResearchEnabled);
+        // Also notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled });
+    }
+}
+
+
 export function setWebSearchPluginEnabled(enabled) {
     if (isWebSearchPluginEnabled !== enabled) {
         isWebSearchPluginEnabled = enabled;
@@ -431,7 +454,7 @@ export function setCurrentChatName(name) {
     if (currentChatName !== name) {
         currentChatName = name;
         notify('currentChatName', currentChatName);
-        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled }); // Notify combined chat state
     }
 }
 
@@ -439,7 +462,7 @@ export function setCurrentChatModel(modelName) {
     if (currentChatModel !== modelName) {
         currentChatModel = modelName;
         notify('currentChatModel', currentChatModel);
-        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled }); // Notify combined chat state
     }
 }
 
@@ -448,7 +471,7 @@ export function setCurrentChatMode(mode) {
     if (currentChatMode !== mode) {
         currentChatMode = mode;
         notify('currentChatMode', currentChatMode);
-        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled }); // Notify combined chat state
     }
 }
 // -----------------------------

@@ -15,8 +15,10 @@ export const elements = {
     modelSelectorContainer: null,
     webSearchToggle: null,
     webSearchToggleLabel: null,
+    deepResearchToggle: null, // Added deep research toggle reference
+    deepResearchToggleLabel: null, // Added deep research toggle label reference
     calendarToggle: null,
-    calendarToggleInputArea: null, // This element doesn't exist in HTML, remove or fix
+    // calendarToggleInputArea: null, // This element doesn't exist in HTML, remove or fix
     fileUploadSessionLabel: null,
     fileUploadSessionInput: null,
     selectedFilesContainer: null,
@@ -172,6 +174,8 @@ export function populateElements() {
     elements.calendarModalContent = document.getElementById('calendar-modal-content');
     elements.webSearchToggle = document.getElementById('web-search-toggle');
     elements.webSearchToggleLabel = document.getElementById('web-search-toggle-label');
+    elements.deepResearchToggle = document.getElementById('deep-research-toggle'); // Added deep research toggle
+    elements.deepResearchToggleLabel = document.getElementById('deep-research-toggle-label'); // Added deep research toggle label
     elements.urlModal = document.getElementById('url-modal');
     elements.closeUrlModal = document.getElementById('close-url-modal'); // Corrected ID
     elements.urlInput = document.getElementById('url-input');

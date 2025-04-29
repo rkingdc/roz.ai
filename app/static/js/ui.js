@@ -1375,7 +1375,8 @@ export function updateCalendarStatus() {
 export function renderChatInputArea() {
     const {
         fileUploadSessionLabel, selectedFilesContainer,
-        webSearchToggleLabel, webSearchToggle, calendarToggle
+        webSearchToggleLabel, webSearchToggle, calendarToggle,
+        deepResearchToggleLabel, deepResearchToggle // Add deep research elements
     } = elements;
 
     // Add null checks for individual elements
@@ -1398,6 +1399,15 @@ export function renderChatInputArea() {
     }
     if (webSearchToggle) { // Add null check
         webSearchToggle.checked = state.isWebSearchEnabled; // Read from state
+    }
+
+    // Deep Research Toggle (Always visible when chat input is visible)
+    if (deepResearchToggleLabel) { // Add null check
+        // Visibility is handled by the parent input-area visibility
+        deepResearchToggleLabel.classList.toggle('hidden', false); // Ensure it's not hidden
+    }
+    if (deepResearchToggle) { // Add null check
+        deepResearchToggle.checked = state.isDeepResearchEnabled; // Read from state
     }
 }
 

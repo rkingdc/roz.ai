@@ -948,6 +948,13 @@ export function setupEventListeners() {
         state.setWebSearchEnabled(e.target.checked); // Update state (notifies isWebSearchEnabled)
         // UI update is triggered by isWebSearchEnabled notification
     });
+    // Add listener for the new Deep Research toggle
+    elements.deepResearchToggle?.addEventListener('change', (e) => {
+        state.setDeepResearchEnabled(e.target.checked); // Update state (notifies isDeepResearchEnabled)
+        // UI update is triggered by isDeepResearchEnabled notification
+        // No functional effect yet, just updates state and UI
+        console.log(`Deep Research Toggled: ${e.target.checked}`);
+    });
 
 
     // --- Tab Navigation ---
@@ -1264,6 +1271,7 @@ function subscribeStateChangeListeners() {
     state.subscribe('calendarContext', ui.handleStateChange_calendarContext);
     state.subscribe('isCalendarContextActive', ui.handleStateChange_isCalendarContextActive);
     state.subscribe('isWebSearchEnabled', ui.handleStateChange_isWebSearchEnabled);
+    state.subscribe('isDeepResearchEnabled', ui.handleStateChange_isDeepResearchEnabled); // Subscribe deep research handler
 
     // Generic plugin enabled state change handler
     state.subscribe('pluginEnabled', ui.handleStateChange_pluginEnabled);
