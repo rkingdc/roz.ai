@@ -1876,6 +1876,12 @@ export function handleStateChange_currentNoteMode() {
     // renderNoteContent(); // Called by setNoteMode (also triggers TOC update)
 }
 
+// --- NEW: State Change Handler for Deep Research Toggle ---
+export function handleStateChange_isDeepResearchEnabled() {
+    renderChatInputArea(); // Updates deep research toggle checked state
+}
+// -------------------------------------------------------
+
 // --- NEW: State Change Handler for Note History ---
 export function handleStateChange_noteHistory() {
     renderNoteHistory(); // Re-render the history list when history state changes
