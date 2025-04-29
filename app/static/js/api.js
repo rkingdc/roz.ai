@@ -959,9 +959,9 @@ function resetChatContext() {
 
 /**
  * Sends the user message and context to the backend.
- * @param {string} mode - The mode for the AI interaction ('chat' or 'deep_research').
+ * Determines the mode ('chat' or 'deep_research') based on state.
  */
-export async function sendMessage(mode = 'chat') { // Added mode parameter with default
+export async function sendMessage() {
     if (state.isLoading || !state.currentChatId || state.currentTab !== 'chat') {
         setStatus("Cannot send: No active chat, busy, or not on Chat tab.", true);
         return;
@@ -976,6 +976,10 @@ export async function sendMessage(mode = 'chat') { // Added mode parameter with 
     const sessionFileToSend = state.isFilePluginEnabled ? state.sessionFile : null;
     const calendarContextToSend = (state.isCalendarPluginEnabled && state.isCalendarContextActive && state.calendarContext) ? state.calendarContext : null;
     const webSearchEnabledToSend = state.isWebSearchPluginEnabled && state.isWebSearchEnabled; // Read web search state
+    const deepResearchEnabled = state.isDeepResearchEnabled; // Read deep research state
+
+    // Determine the mode based on the toggle state
+    const mode = deepResearchEnabled ? 'deep_research' : 'chat';
 
     // --- Validation based on mode ---
     if (mode === 'deep_research') {
@@ -1009,7 +1013,7 @@ export async function sendMessage(mode = 'chat') { // Added mode parameter with 
    // UI will react to this state change to display the message
     state.addMessageToHistory({ role: 'user', content: message }); // Assuming addMessageToHistory in state.js
 
-    setLoading(true, mode === 'deep_research' ? "Performing Deep Research..." : "Sending"); // Update loading message based on mode
+    setLoading(true, mode === 'deep_research' ? "Performing Deep Research..." : "Sending"); // Update loading message based on determined mode
 
     const payload = {
         chat_id: state.currentChatId,
@@ -1024,9 +1028,8 @@ export async function sendMessage(mode = 'chat') { // Added mode parameter with 
         enable_files_plugin: state.isFilePluginEnabled,
         enable_calendar_plugin: state.isCalendarPluginEnabled,
         enable_web_search_plugin: state.isWebSearchPluginEnabled,
-        // --- NEW: Include the selected mode ---
+        // Include the determined mode
         mode: mode,
-        // -------------------------------------
     };
 
     const sentSessionFile = state.sessionFile; // Store to clear later
