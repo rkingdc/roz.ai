@@ -630,26 +630,70 @@ def create_works_cited(
 def final_report(
     executive_summary: str, report_body: str, next_steps: str, works_cited: str
 ) -> str:
-    """Combines all parts into a single final report string using Markdown."""
-    logger.info("Assembling final report.")
-    # Basic assembly, LLM could be used for more complex formatting/transitions if needed
-    final_report_content = f"""
+    """Uses an LLM to assemble and format the final report from its components."""
+    logger.info("Formatting final report using LLM.")
+
+    prompt = f"""
+You are tasked with assembling and formatting a final research report from its constituent parts using Markdown.
+Ensure the report flows logically, uses appropriate headings (e.g., #, ##), and applies selective bolding for emphasis on key terms or findings.
+
+**Crucially, you must convert simple source references within the report body into proper Markdown links.**
+The 'Works Cited' section provided below contains the mapping between source numbers and their details (including URLs if available).
+When you encounter a reference like '[Source N]' or similar patterns indicating a citation within the 'Report Body' text, replace it with a Markdown link like '[N](URL)' if a URL exists for that source number in the 'Works Cited' section, or just '[N]' if no URL is available. Use the number from the 'Works Cited' entry (e.g., '1.', '2.') as the link text 'N'.
+
+Here are the components:
+
+**1. Executive Summary:**
+--- START ---
 {executive_summary}
+--- END ---
 
----
-
+**2. Report Body (contains the main sections):**
+--- START ---
 {report_body}
+--- END ---
 
----
-    
+**3. Next Steps / Further Research:**
+--- START ---
 {next_steps}
+--- END ---
 
----
-
+**4. Works Cited (use this to create Markdown links in the body):**
+--- START ---
 {works_cited}
-    """
-    logger.info("Final report assembled.")
-    return final_report_content.strip()
+--- END ---
+
+**Instructions:**
+1. Combine these sections into a single, coherent Markdown document.
+2. Use appropriate Markdown heading levels (e.g., `# Executive Summary`, `## Section Title`, `# Next Steps / Further Research`, `# Works Cited`).
+3. Apply selective **bolding** to highlight important terms, concepts, or conclusions within the text.
+4. **Convert references:** Find patterns like '[Source N]' in the 'Report Body' and replace them with Markdown links `[N](URL)` using the corresponding URL from the 'Works Cited' section. If a source number in 'Works Cited' does not have a URL, use `[N]`. Match the number 'N' to the number at the start of the entry in 'Works Cited'.
+5. Ensure the final 'Works Cited' section is included at the end, formatted clearly (e.g., as a numbered list).
+6. Do not add any commentary outside the report content itself.
+
+**Final Formatted Report (Markdown):**
+"""
+
+    try:
+        formatted_report = generate_text(prompt)
+        if (
+            formatted_report
+            and not formatted_report.startswith("[Error")
+            and not formatted_report.startswith("[System Note")
+        ):
+            logger.info("Successfully formatted final report using LLM.")
+            # Clean up potential markdown code block fences if the LLM adds them
+            formatted_report = re.sub(r"^```markdown\n?", "", formatted_report, flags=re.IGNORECASE)
+            formatted_report = re.sub(r"\n?```$", "", formatted_report)
+            return formatted_report.strip()
+        else:
+            logger.error(f"LLM failed to format the final report: {formatted_report}")
+            # Fallback to basic concatenation if LLM fails
+            return f"{executive_summary}\n\n---\n\n{report_body}\n\n---\n\n{next_steps}\n\n---\n\n{works_cited}".strip()
+    except Exception as e:
+        logger.error(f"Error during final report formatting: {e}", exc_info=True)
+        # Fallback to basic concatenation on exception
+        return f"{executive_summary}\n\n---\n\n{report_body}\n\n---\n\n{next_steps}\n\n---\n\n{works_cited}".strip()
 
 
 # --- Main Execution Function ---
