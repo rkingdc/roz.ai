@@ -11,9 +11,8 @@ import * as config from './config.js'; // Import config
 import * as voice from './voice.js'; // Import voice recording functions
 import { MAX_FILE_SIZE_BYTES, MAX_FILE_SIZE_MB } from './config.js'; // Import file size constants
 import { formatFileSize, debounce, escapeHtml } from './utils.js'; // Import debounce and escapeHtml
-// --- NEW: Import toast functions ---
 import { showToast, removeToast, updateToast } from './toastNotifications.js'; // Adjust path if needed
-// -----------------------------------
+
 
 /**
  * Sets up all event listeners for the application.
@@ -36,17 +35,15 @@ export function setupEventListeners() {
 
             if (state.currentTab === 'notes' && state.currentNoteId !== null) {
                 await api.saveNote(); // Save the current note
-                // --- NEW: Return focus to notes textarea after save ---
+                // Return focus to notes textarea after save
                 elements.notesTextarea?.focus();
-                // ----------------------------------------------------
             } else if (state.currentTab === 'chat' && state.currentChatId !== null) {
                  // Trigger the save chat name button click, which handles getting the name from the input
                  // Use the correct element reference from dom.js
                  if (elements.saveChatNameButton) {
                      elements.saveChatNameButton.click();
-                     // --- NEW: Return focus to message input after save ---
+                     // Return focus to message input after save
                      elements.messageInput?.focus();
-                     // ----------------------------------------------------
                  } else {
                      console.error("Save chat name button element not found!");
                      state.setStatusMessage("Error: Save button element missing.", true);
@@ -58,22 +55,61 @@ export function setupEventListeners() {
             // }
         }
 
-        // --- NEW: Notes Mode Switching Shortcuts ---
-        if (state.currentTab === 'notes' && event.ctrlKey) {
-            if (event.key === 'ArrowLeft') {
-                event.preventDefault(); // Prevent potential browser back navigation
-                elements.editNoteButton?.click(); // Switch to Edit mode
-            } else if (event.key === 'ArrowRight') {
-                event.preventDefault(); // Prevent potential browser forward navigation
-                elements.viewNoteButton?.click(); // Switch to View mode
-            }
-        }
-        // -----------------------------------------
-
-        // --- NEW: Sidebar List Navigation Shortcuts (Ctrl + Up/Down) ---
+        // --- NEW: Tab and Notes Mode Switching Shortcuts (Ctrl + Left/Right) ---
         // Only handle this shortcut if the user is NOT currently typing in a text input or textarea
         const activeElement = document.activeElement;
         const isTypingInput = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
+
+        if ((event.ctrlKey || event.metaKey) && (event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !isTypingInput) {
+             event.preventDefault(); // Prevent default browser navigation/scrolling
+
+             const currentTab = state.currentTab;
+             const currentNoteMode = state.currentNoteMode;
+
+             if (event.key === 'ArrowLeft') {
+                 // Ctrl + Left
+                 if (currentTab === 'notes') {
+                     if (currentNoteMode === 'edit') {
+                         // Notes Edit -> Chat
+                         console.log("[DEBUG] Ctrl+Left: Switching from Notes Edit to Chat.");
+                         await handleTabSwitchClick('chat');
+                     } else { // currentNoteMode === 'view'
+                         // Notes View -> Notes Edit
+                         console.log("[DEBUG] Ctrl+Left: Switching from Notes View to Notes Edit.");
+                         state.setCurrentNoteMode('edit');
+                         localStorage.setItem(config.CURRENT_NOTE_MODE_KEY, 'edit');
+                     }
+                 }
+                 // If on Chat tab, Ctrl+Left does nothing (as per list navigation request)
+
+             } else if (event.key === 'ArrowRight') {
+                 // Ctrl + Right
+                 if (currentTab === 'chat') {
+                     // Chat -> Notes Edit
+                     console.log("[DEBUG] Ctrl+Right: Switching from Chat to Notes Edit.");
+                     await handleTabSwitchClick('notes');
+                     // Ensure Notes is in Edit mode after switching tabs
+                     state.setCurrentNoteMode('edit');
+                     localStorage.setItem(config.CURRENT_NOTE_MODE_KEY, 'edit');
+                 } else { // currentTab === 'notes'
+                     if (currentNoteMode === 'edit') {
+                         // Notes Edit -> Notes View
+                         console.log("[DEBUG] Ctrl+Right: Switching from Notes Edit to Notes View.");
+                         state.setCurrentNoteMode('view');
+                         localStorage.setItem(config.CURRENT_NOTE_MODE_KEY, 'view');
+                     }
+                     // If on Notes View, Ctrl+Right does nothing
+                 }
+             }
+        }
+        // -----------------------------------------------------------------------
+
+
+        // --- Sidebar List Navigation Shortcuts (Ctrl + Up/Down) ---
+        // Only handle this shortcut if the user is NOT currently typing in a text input or textarea
+        // This check is already done above for Left/Right, but needs to be here too if this block is separate
+        // const activeElement = document.activeElement;
+        // const isTypingInput = activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA');
 
         if ((event.ctrlKey || event.metaKey) && (event.key === 'ArrowUp' || event.key === 'ArrowDown') && !isTypingInput) {
             event.preventDefault(); // Prevent default scrolling behavior
@@ -430,7 +466,7 @@ export function setupEventListeners() {
                             })
                             .catch(err => {
                                 console.error('Failed to copy long transcript: ', err);
-                                showToast("Failed to copy transcript.", { type: 'error' });
+                                showToast("Failed to copy text.", { type: 'error' });
                             });
                     } else {
                          console.warn("No long transcript found in state to copy.");
@@ -588,10 +624,9 @@ export function setupEventListeners() {
         if (state.currentNoteMode === 'view') {
             targetElement = elements.notesPreview?.querySelector(`#${targetId}`);
             if (targetElement && elements.notesPreview) {
-                // --- UPDATED: Use scrollTop for more reliable scrolling in view mode ---
+                // Use scrollTop for more reliable scrolling in view mode
                 const targetOffsetTop = targetElement.offsetTop;
                 elements.notesPreview.scrollTop = targetOffsetTop;
-                // ---------------------------------------------------------------------
             } else {
                 console.warn(`[DEBUG] TOC link clicked, but target heading #${targetId} not found in view mode.`);
             }
@@ -610,20 +645,20 @@ export function setupEventListeners() {
             });
 
             if (lineIndex !== -1 && elements.notesTextarea) {
-                // --- Calculate character position of the start of the line ---
+                // Calculate character position of the start of the line
                 // Sum lengths of previous lines + newline characters
                 let position = 0;
                 for (let i = 0; i < lineIndex; i++) {
                     position += lines[i].length + 1; // +1 for the newline character
                 }
 
-                // --- Set cursor position and focus ---
+                // Set cursor position and focus
                 try {
                     elements.notesTextarea.focus(); // Focus first
                     // Set selection start and end to the same point to place the cursor
                     elements.notesTextarea.setSelectionRange(position, position);
 
-                    // --- Optional: Attempt scrollIntoView (might not be perfect) ---
+                    // Optional: Attempt scrollIntoView (might not be perfect)
                     // This is less reliable than focus/setSelectionRange for bringing
                     // the exact line into view, but can help in some browsers.
                     // elements.notesTextarea.scrollIntoView({ block: 'nearest' });
