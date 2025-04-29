@@ -72,7 +72,7 @@ class Config:
     # Flask's MAX_CONTENT_LENGTH for request size limit (includes overhead)
     # Increase significantly to allow large audio uploads (e.g., 100MB)
     # Adjust this value based on expected maximum recording size + overhead
-    MAX_CONTENT_LENGTH_MB = 100
+    MAX_CONTENT_LENGTH_MB = 200
     MAX_CONTENT_LENGTH = MAX_CONTENT_LENGTH_MB * 1024 * 1024
 
     # Gemini API
