@@ -11,6 +11,7 @@ import os
 from flask import current_app, g  # Import g for potential context caching if needed
 import threading
 import queue  # For passing audio chunks between threads
+from datetime import datetime, timedelta # Import datetime and timedelta
 
 # Import the new cleanup function
 from app.ai_services import clean_up_transcript
@@ -140,6 +141,7 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
     gcs_blob_name = None
     storage_client = None
     bucket = None
+    blob = None # Keep blob reference for setting expiration
 
     try:
         # --- Upload audio to GCS ---
@@ -158,7 +160,7 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
 
         # Generate a unique blob name
         gcs_blob_name = f"audio-transcripts-temp/{uuid.uuid4()}.webm" # Store in a subfolder
-        blob = bucket.blob(gcs_blob_name)
+        blob = bucket.blob(gcs_blob_name) # Assign to blob variable
 
         logger.info(f"Uploading audio to GCS: gs://{gcs_bucket_name}/{gcs_blob_name}")
         # Upload the bytes directly
@@ -229,6 +231,18 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         )
         logger.info(f"Non-streaming transcription successful. Transcript length: {len(full_transcript)}")
 
+        # --- Set GCS object expiration ---
+        if blob: # Ensure blob object was created
+            try:
+                expiration_date = datetime.utcnow() + timedelta(days=7)
+                blob.time_deleted = expiration_date
+                blob.patch() # Update the blob metadata in GCS
+                logger.info(f"Set GCS object '{gcs_blob_name}' expiration to {expiration_date.isoformat()}Z")
+            except Exception as expire_err:
+                logger.error(f"Failed to set expiration on GCS object {gcs_blob_name}: {expire_err}", exc_info=True)
+        # --- End Set GCS object expiration ---
+
+
         # --- Optional: Apply LLM cleanup ---
         # logger.info("Attempting to clean up the non-streaming transcript...")
         # cleaned_transcript = clean_up_transcript(full_transcript.strip())
@@ -255,18 +269,20 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         logger.error(f"Error during non-streaming transcription: {e}", exc_info=True)
         return None
     finally:
-        # --- Clean up GCS file ---
-        if gcs_blob_name and bucket:
-            try:
-                logger.info(f"Attempting to delete temporary GCS file: {gcs_blob_name}")
-                blob_to_delete = bucket.blob(gcs_blob_name)
-                blob_to_delete.delete()
-                logger.info(f"Successfully deleted temporary GCS file: {gcs_blob_name}")
-            except NotFound:
-                logger.warning(f"Temporary GCS file not found for deletion: {gcs_blob_name}")
-            except Exception as delete_err:
-                logger.error(f"Failed to delete temporary GCS file {gcs_blob_name}: {delete_err}", exc_info=True)
-        # --- End GCS Cleanup ---
+        # --- REMOVED: Explicit GCS file deletion ---
+        # The file will now be automatically deleted by GCS based on the time_deleted metadata.
+        # if gcs_blob_name and bucket:
+        #     try:
+        #         logger.info(f"Attempting to delete temporary GCS file: {gcs_blob_name}")
+        #         blob_to_delete = bucket.blob(gcs_blob_name)
+        #         blob_to_delete.delete()
+        #         logger.info(f"Successfully deleted temporary GCS file: {gcs_blob_name}")
+        #     except NotFound:
+        #         logger.warning(f"Temporary GCS file not found for deletion: {gcs_blob_name}")
+        #     except Exception as delete_err:
+        #         logger.error(f"Failed to delete temporary GCS file {gcs_blob_name}: {delete_err}", exc_info=True)
+        # --- End REMOVED GCS Cleanup ---
+        pass # Keep the finally block but remove the deletion logic
 
 
 # --- Streaming Transcription ---
