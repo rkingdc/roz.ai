@@ -695,13 +695,12 @@ def perform_deep_research(query: str) -> str:
                 search_query
             )  # Gets formatted strings
             for result_string in search_results:
-                # Extract/scrape content from the result string
-                scraped_content: str = scrape_web(result_string)
-                if scraped_content and not scraped_content.startswith(
-                    "[Scraping failed"
-                ):
-                    collected_research[step_name].append({"content":scraped_content,
-                                                          "link": "result_string"})
+                # Extract/scrape content and link from the result string
+                link, scraped_content = scrape_web(result_string)
+                if scraped_content and not scraped_content.startswith("[Scraping failed"):
+                    # Store as dict including the link
+                    research_item = {"content": scraped_content, "link": link}
+                    collected_research[step_name].append(research_item)
                 else:
                     logger.debug(
                         f"No useful content scraped from a result for query '{search_query}'."
