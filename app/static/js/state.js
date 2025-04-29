@@ -42,6 +42,9 @@ export let uploadedFiles = []; // Array of { id, filename, mimetype, filesize, h
 export let currentChatName = '';
 export let currentChatModel = '';
 export let chatHistory = []; // Array of { role, content, isError }
+// --- NEW: Chat Mode State ---
+export let currentChatMode = 'chat'; // 'chat' or 'deep_research'
+// ----------------------------
 
 // Note specific state
 export let currentNoteName = ''; // Already exists, but adding for clarity
@@ -154,6 +157,9 @@ export function notifyAll() {
     notify('currentChatName', currentChatName);
     notify('currentChatModel', currentChatModel);
     notify('chatHistory', chatHistory);
+    // --- NEW: Notify Chat Mode State ---
+    notify('currentChatMode', currentChatMode);
+    // ----------------------------------
     notify('noteContent', noteContent);
     notify('currentNoteName', currentNoteName);
     notify('isSidebarCollapsed', isSidebarCollapsed);
@@ -176,7 +182,7 @@ export function notifyAll() {
 
 
     // Also notify combined states if listeners are subscribed to them
-    notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel });
+    notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Include mode in combined state
     notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
     notify('pluginEnabled', 'all'); // Generic notification for any plugin state change
 }
@@ -189,7 +195,7 @@ export function setCurrentChatId(id) {
     if (currentChatId !== id) {
         currentChatId = id;
         notify('currentChatId', currentChatId);
-        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel }); // Notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Notify combined chat state
     }
 }
 
@@ -364,13 +370,6 @@ export function setWebSearchPluginEnabled(enabled) {
     }
 }
 
-export function setWebSearchEnabled(enabled) {
-    if (isWebSearchEnabled !== enabled) {
-        isWebSearchEnabled = enabled;
-        notify('isWebSearchEnabled', isWebSearchEnabled);
-    }
-}
-
 
 export function setCurrentTab(tab) {
     if (currentTab !== tab) {
@@ -432,7 +431,7 @@ export function setCurrentChatName(name) {
     if (currentChatName !== name) {
         currentChatName = name;
         notify('currentChatName', currentChatName);
-        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel }); // Notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Notify combined chat state
     }
 }
 
@@ -440,9 +439,19 @@ export function setCurrentChatModel(modelName) {
     if (currentChatModel !== modelName) {
         currentChatModel = modelName;
         notify('currentChatModel', currentChatModel);
-        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel }); // Notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Notify combined chat state
     }
 }
+
+// --- NEW: Chat Mode Setter ---
+export function setCurrentChatMode(mode) {
+    if (currentChatMode !== mode) {
+        currentChatMode = mode;
+        notify('currentChatMode', currentChatMode);
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Notify combined chat state
+    }
+}
+// -----------------------------
 
 // --- Note Content Functions ---
 export function setNoteContent(content) {

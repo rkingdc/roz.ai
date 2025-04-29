@@ -223,7 +223,7 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
         });
     }); //End of promise constructor
 }
-    
+
 /**
  * Sends an audio chunk over the WebSocket.
  * @param {Blob | ArrayBuffer | Buffer} chunk - The audio data chunk.
@@ -866,6 +866,7 @@ export async function startNewChat() {
     state.setCurrentChatModel(''); // Assuming setCurrentChatModel in state.js
     state.setChatHistory([]); // Clear history for the new empty chat
     resetChatContext(); // Clear chat-specific context states
+    state.setCurrentChatMode('chat'); // Reset mode to default 'chat' for new chat
 
     try {
         const response = await fetch('/api/chat', { method: 'POST' });
@@ -910,6 +911,7 @@ export async function loadChat(chatId) {
         state.setCurrentChatName(data.details.name || ''); // Assuming you add setCurrentChatName to state.js
         state.setCurrentChatModel(data.details.model_name || ''); // Assuming you add setCurrentChatModel to state.js
         state.setChatHistory(data.history || []); // Update state with history
+        state.setCurrentChatMode('chat'); // Always default to 'chat' mode when loading a chat
 
         // Reset chat-specific context states (files, calendar, web search toggle)
         resetChatContext(); // This updates state variables
@@ -934,6 +936,7 @@ export async function loadChat(chatId) {
         state.setCurrentChatModel('');
         state.setChatHistory([]);
         resetChatContext(); // Clear files, calendar, etc. state
+        state.setCurrentChatMode('chat'); // Reset mode on error
 
         throw error; // Re-throw for initializeApp or switchTab to handle
     } finally {
@@ -954,8 +957,11 @@ function resetChatContext() {
 }
 
 
-/** Sends the user message and context to the backend. */
-export async function sendMessage() {
+/**
+ * Sends the user message and context to the backend.
+ * @param {string} mode - The mode for the AI interaction ('chat' or 'deep_research').
+ */
+export async function sendMessage(mode = 'chat') { // Added mode parameter with default
     if (state.isLoading || !state.currentChatId || state.currentTab !== 'chat') {
         setStatus("Cannot send: No active chat, busy, or not on Chat tab.", true);
         return;
@@ -965,15 +971,31 @@ export async function sendMessage() {
     const message = elements.messageInput?.value.trim() || '';
 
     // Files to send are the permanently attached files PLUS the session file
+    // Note: Files/context are ignored in 'deep_research' mode on the backend, but we still send them.
     const filesToAttach = state.isFilePluginEnabled ? state.attachedFiles : [];
     const sessionFileToSend = state.isFilePluginEnabled ? state.sessionFile : null;
     const calendarContextToSend = (state.isCalendarPluginEnabled && state.isCalendarContextActive && state.calendarContext) ? state.calendarContext : null;
     const webSearchEnabledToSend = state.isWebSearchPluginEnabled && state.isWebSearchEnabled; // Read web search state
 
-    if (!message && filesToAttach.length === 0 && !sessionFileToSend && !calendarContextToSend && !webSearchEnabledToSend) {
-        setStatus("Cannot send: Empty message and no context/files attached.", true);
-        return;
+    // --- Validation based on mode ---
+    if (mode === 'deep_research') {
+        if (!message) {
+            setStatus("Deep Research mode requires a text query.", true);
+            return;
+        }
+        // In deep research mode, we don't send files, context, or web search flags
+        // as the backend ignores them. This simplifies the payload.
+        // However, the backend is written to ignore them if mode is 'deep_research',
+        // so sending them is harmless, just slightly less efficient.
+        // Let's keep sending them for now as the backend handles the ignore logic.
+    } else { // 'chat' mode
+        if (!message && filesToAttach.length === 0 && !sessionFileToSend && !calendarContextToSend && !webSearchEnabledToSend) {
+            setStatus("Cannot send: Empty message and no context/files attached.", true);
+            return;
+        }
     }
+    // --- End Validation ---
+
 
    // Clear input in DOM immediately
    if (elements.messageInput) {
@@ -987,7 +1009,7 @@ export async function sendMessage() {
    // UI will react to this state change to display the message
     state.addMessageToHistory({ role: 'user', content: message }); // Assuming addMessageToHistory in state.js
 
-    setLoading(true, "Sending");
+    setLoading(true, mode === 'deep_research' ? "Performing Deep Research..." : "Sending"); // Update loading message based on mode
 
     const payload = {
         chat_id: state.currentChatId,
@@ -998,10 +1020,13 @@ export async function sendMessage() {
         session_files: sessionFileToSend ? [{ filename: sessionFileToSend.filename, content: sessionFileToSend.content, mimetype: sessionFileToSend.mimetype }] : [],
         calendar_context: calendarContextToSend,
         enable_web_search: webSearchEnabledToSend,
-        enable_streaming: state.isStreamingEnabled,
+        enable_streaming: state.isStreamingEnabled, // Streaming is only relevant for 'chat' mode
         enable_files_plugin: state.isFilePluginEnabled,
         enable_calendar_plugin: state.isCalendarPluginEnabled,
-        enable_web_search_plugin: state.isWebSearchPluginEnabled
+        enable_web_search_plugin: state.isWebSearchPluginEnabled,
+        // --- NEW: Include the selected mode ---
+        mode: mode,
+        // -------------------------------------
     };
 
     const sentSessionFile = state.sessionFile; // Store to clear later
@@ -1013,13 +1038,19 @@ export async function sendMessage() {
             body: JSON.stringify(payload)
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(data.error || `HTTP error! status: ${response.status}`);
-        }
+        // --- Handle Response based on Mode and Content-Type ---
+        const contentType = response.headers.get('Content-Type');
 
-        if (state.isStreamingEnabled && response.headers.get('Content-Type')?.includes('text/plain')) {
-            // Handle Streaming Response
+        if (!response.ok) {
+             // Handle HTTP errors (4xx, 5xx)
+             const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+             console.error('API error:', response.status, errorData);
+             const errorMessage = `[Error: ${errorData.error || response.statusText}]`;
+             state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true });
+             setStatus("Error sending message.", true);
+             // No need to throw here, error is added to history and status is set.
+        } else if (mode === 'chat' && state.isStreamingEnabled && contentType?.includes('text/plain')) {
+            // Handle Streaming Chat Response
             // Add an empty assistant message to state immediately for streaming
             state.addMessageToHistory({ role: 'assistant', content: '' }); // Assuming addMessageToHistory handles streaming
 
@@ -1034,15 +1065,42 @@ export async function sendMessage() {
             }
             // Markdown rendering will be handled by the UI when state updates are processed
             setStatus("Assistant replied (streaming finished).");
+
         } else {
-            // Handle Non-Streaming Response
+            // Handle Non-Streaming Chat Response OR Deep Research Report (both are JSON)
             const data = await response.json();
-            // Add the full assistant message to state
-            state.addMessageToHistory({ role: 'assistant', content: data.reply });
-            setStatus("Assistant replied.");
+
+            if (data.report !== undefined) { // Check for deep research report
+                 console.log("Received Deep Research Report:", data.report);
+                 // Add the full report as a single assistant message
+                 // Optionally add a title or special formatting here before adding to state
+                 const reportContent = `# Deep Research Report\n\n${data.report}`; // Example: Add a title
+                 state.addMessageToHistory({ role: 'assistant', content: reportContent });
+                 setStatus("Deep Research complete.");
+
+            } else if (data.reply !== undefined) { // Check for non-streaming chat reply
+                 console.log("Received Non-Streaming Chat Reply:", data.reply);
+                 // Add the full assistant message to state
+                 state.addMessageToHistory({ role: 'assistant', content: data.reply });
+                 setStatus("Assistant replied.");
+
+            } else if (data.error !== undefined) { // Check for backend error message in JSON
+                 console.error("Received backend error in JSON response:", data.error);
+                 const errorMessage = `[Error: ${data.error}]`;
+                 state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true });
+                 setStatus("Error from AI service.", true);
+
+            } else {
+                 // Unexpected JSON response structure
+                 console.error("Received unexpected JSON response structure:", data);
+                 const errorMessage = "[Error: Unexpected response from server]";
+                 state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true });
+                 setStatus("Error processing response.", true);
+            }
         }
 
-        // Reload saved chats list state to update timestamp
+        // Reload saved chats list state to update timestamp (applies to both modes)
+        // This should happen after the response is fully received/processed.
         await loadSavedChats();
 
         // Clear temporary sidebar selection state after successful send
@@ -1050,18 +1108,18 @@ export async function sendMessage() {
 
         // Do NOT clear attachedFiles state here. They persist per chat.
         // Only clear the session file state.
+        if (sentSessionFile && state.sessionFile === sentSessionFile) {
+             state.setSessionFile(null);
+        }
 
     } catch (error) {
-        console.error('Error sending message:', error);
+        // This catch block handles network errors or errors during stream processing/JSON parsing
+        console.error('Network or processing error sending message:', error);
         const errorMessage = `[Error: ${error.message}]`;
         // Add error message to state
         state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true }); // Assuming addMessageToHistory handles errors
         setStatus("Error sending message.", true);
     } finally {
-        // Clear the session file state if it was the one sent
-        if (sentSessionFile && state.sessionFile === sentSessionFile) {
-             state.setSessionFile(null);
-        }
         setLoading(false);
     }
 }
@@ -1489,7 +1547,7 @@ export async function generateNoteDiffSummaryForHistoryItem(noteId, historyId) {
         }
 
     } catch (error) {
-        console.error(`Error generating/saving summary for history ${historyId}:`, error);
+        console.error(`Error generating/saveSummary for history ${historyId}:`, error);
         setStatus(`Error generating summary: ${error.message}`, true);
         // Attempt to reload history even on error to reset UI state if needed
         try {
@@ -1631,7 +1689,7 @@ export async function loadInitialNotesData() {
             const mostRecentNoteId = firstNote.id;
             await loadNote(mostRecentNoteId); // Updates state
         } else {
-            await startNewNote(); // Updates state
+            await startNewNote(); // Creates and loads a new note
         }
     }
 
