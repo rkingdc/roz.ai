@@ -231,28 +231,6 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         )
         logger.info(f"Non-streaming transcription successful. Transcript length: {len(full_transcript)}")
 
-        # --- Set GCS object expiration ---
-        if blob: # Ensure blob object was created
-            try:
-                expiration_date = datetime.utcnow() + timedelta(days=7)
-                blob.time_deleted = expiration_date
-                blob.patch() # Update the blob metadata in GCS
-                logger.info(f"Set GCS object '{gcs_blob_name}' expiration to {expiration_date.isoformat()}Z")
-            except Exception as expire_err:
-                logger.error(f"Failed to set expiration on GCS object {gcs_blob_name}: {expire_err}", exc_info=True)
-        # --- End Set GCS object expiration ---
-
-
-        # --- Optional: Apply LLM cleanup ---
-        # logger.info("Attempting to clean up the non-streaming transcript...")
-        # cleaned_transcript = clean_up_transcript(full_transcript.strip())
-        # if cleaned_transcript == full_transcript.strip():
-        #     logger.warning("Non-streaming transcript cleanup failed or returned original. Using raw transcript.")
-        # else:
-        #     logger.info(f"Cleaned non-streaming transcript: '{cleaned_transcript[:50]}...'")
-        # return cleaned_transcript
-        # --- End Optional Cleanup ---
-
         # Return raw transcript for now
         return full_transcript.strip()
 
