@@ -3,13 +3,17 @@ import logging
 import re
 from typing import List, Tuple, Any, Dict
 
+import tempfile # For potential future use if needed directly here
+import os # For potential future use if needed directly here
+from flask import current_app # To access config for model names if needed
+
 # Assuming ai_services.py and web_search.py are in the same directory
 # or accessible via the Python path.
 # Use appropriate import style for your project structure (e.g., relative imports if part of a package)
-from .ai_services import generate_text  # For LLM interactions
+from .ai_services import generate_text, transcribe_pdf_bytes # Import the new function
 from .plugins.web_search import (
     perform_web_search,
-    # fetch_web_content, # fetch_web_content is now called internally by perform_web_search
+    # fetch_web_content is now called internally by perform_web_search
 )  # For web searching and scraping
 
 
