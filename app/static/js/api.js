@@ -130,6 +130,7 @@ function initializeSocketListeners() {
     });
 
     // --- Chat/Task Listeners (Permanent) ---
+    socket.on('prompt_improved', handlePromptImproved); // Add listener for improved prompt
     socket.on('task_started', (data) => {
         console.log("Backend task started:", data.message);
         // Loading state is usually set when the task is initiated by the client
@@ -267,6 +268,49 @@ function initializeSocketListeners() {
 
 
     permanentListenersAttached = true; // Set flag
+}
+
+
+/**
+ * Handles the 'prompt_improved' event from the server.
+ * Updates the last user message in the chat history with the improved content.
+ * @param {object} data - The event data.
+ * @param {string} data.original - The original user message content.
+ * @param {string} data.improved - The improved message content.
+ */
+function handlePromptImproved({ original, improved }) {
+    console.log(`[DEBUG] Received prompt_improved. Original: "${original.substring(0, 50)}...", Improved: "${improved.substring(0, 50)}..."`);
+    const currentHistory = state.chatHistory;
+    // Find the index of the last message sent by the user
+    let lastUserMessageIndex = -1;
+    for (let i = currentHistory.length - 1; i >= 0; i--) {
+        if (currentHistory[i].role === 'user') {
+            lastUserMessageIndex = i;
+            break;
+        }
+    }
+
+    if (lastUserMessageIndex !== -1) {
+        // Verify the content matches the original prompt (as a safety check)
+        if (currentHistory[lastUserMessageIndex].content === original) {
+            console.log(`[DEBUG] Found matching user message at index ${lastUserMessageIndex}. Updating content.`);
+            // Create a *new* history array with the updated message content
+            // This is crucial for triggering state notifications correctly
+            const newHistory = currentHistory.map((message, index) => {
+                if (index === lastUserMessageIndex) {
+                    // Return a new message object with the updated content
+                    return { ...message, content: improved };
+                }
+                return message; // Return unchanged message object
+            });
+            // Update the state with the new history array
+            state.setChatHistory(newHistory);
+        } else {
+            console.warn(`[DEBUG] Found last user message at index ${lastUserMessageIndex}, but content did not match original prompt. Original in state: "${currentHistory[lastUserMessageIndex].content.substring(0, 50)}..."`);
+        }
+    } else {
+        console.warn("[DEBUG] Could not find the last user message in history to update for 'prompt_improved'.");
+    }
 }
 
 
