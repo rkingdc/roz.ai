@@ -214,6 +214,17 @@ def send_message_route(chat_id):
             response = jsonify(response_data)
             response.status_code = status_code # Set status code
 
+            # --- Save Deep Research Report to DB ---
+            if assistant_response_content: # Ensure there's content to save
+                logger.info(f"Attempting to save deep research report for chat {chat_id} (length: {len(assistant_response_content)}).")
+                save_success = db.add_message_to_db(chat_id, "assistant", assistant_response_content)
+                if save_success:
+                    logger.info(f"Successfully saved deep research report for chat {chat_id}.")
+                else:
+                    logger.error(f"Failed to save deep research report for chat {chat_id}.")
+                    # Note: We still return the report to the user even if DB save fails.
+            # --- End Save Block ---
+
         else: # mode is 'chat' or unknown (default to chat)
             # Call the AI service function to handle the core logic
             # This function is now DESIGNED to return EITHER a generator (if streaming) OR a string (if not streaming)
@@ -387,8 +398,8 @@ def send_message_route(chat_id):
         # This block is now outside the if/else for streaming vs non-streaming,
         # but inside the main try block.
         # The streaming generator saves its content in its finally block.
-        # The non-streaming and deep_research paths save here.
-        if not enable_streaming: # Only save here if not streaming (streaming saves in its generator's finally)
+        # The non-streaming 'chat' mode saves here. Deep research saves earlier.
+        if mode != 'deep_research' and not enable_streaming: # Only save here for non-streaming chat mode
             final_content_to_save = assistant_response_content if assistant_response_content else "[System Note: The AI returned an empty response.]"
             if not final_content_to_save.strip(): # Ensure we don't save empty/whitespace
                  final_content_to_save = "[System Note: The AI returned an empty response.]"
