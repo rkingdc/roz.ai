@@ -1934,6 +1934,14 @@ export function handleStateChange_isDeepResearchEnabled() {
 }
 // -------------------------------------------------------
 
+// --- NEW: State Change Handler for Improve Prompt Toggle ---
+/** Handles state changes for the 'isImprovePromptEnabled' flag. Updates the UI accordingly. */
+export function handleStateChange_isImprovePromptEnabled() {
+    // This function relies on renderChatInputArea to update the toggle's checked state.
+    renderChatInputArea();
+}
+// ---------------------------------------------------------
+
 // --- NEW: State Change Handler for Note History ---
 export function handleStateChange_noteHistory() {
     renderNoteHistory(); // Re-render the history list when history state changes
