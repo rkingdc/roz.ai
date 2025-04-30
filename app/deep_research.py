@@ -875,9 +875,16 @@ def perform_deep_research(query: str) -> str:
     updated_report_plan: List[Tuple[str, str]] = query_and_research_to_updated_plan(
         query, collected_research
     )
+    if not updated_report_plan:
+         # Handle case where updated plan generation fails
+         logger.error("Failed to generate updated report plan. Aborting synthesis.")
+         # Combine collected research into a basic error report
+         error_report_body = "\n\n".join([f"## {step}\n\n" + "\n".join(content) for step, content in collected_research.items()])
+         return f"# Deep Research Error\n\nFailed to generate the report outline after initial research.\n\n## Collected Research Snippets:\n\n{error_report_body}"
 
-    # 4.5 Perform additional research for *new* sections identified in the updated plan.
-    logger.info("--- Checking for and executing additional research based on updated plan (Parallel Threads) ---")
+
+    # 4.5 Perform additional research for *new* sections identified in the updated plan (Sequentially).
+    logger.info("--- Checking for and executing additional research based on updated plan (Sequentially) ---")
     original_step_names = {name for name, desc in research_plan}
     new_sections_to_research = []
 
