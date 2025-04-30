@@ -750,7 +750,14 @@ def _generate_chat_response_non_stream(
     assistant_response_content = None  # To store the final content for DB saving
     try:
         # --- Call Gemini API (Non-Streaming) ---
-        full_conversation = history + [Content(role="user", parts=current_turn_parts)]
+        # Construct conversation history. Only add the final user Content if parts exist.
+        # The user's text message should be the last item in 'history'.
+        full_conversation = history
+        if current_turn_parts:
+            full_conversation.append(Content(role="user", parts=current_turn_parts))
+        else:
+             logger.debug(f"No additional parts for user turn in chat {chat_id} (SID: {sid}). Sending history only.")
+
         logger.info(
             f"Calling model.generate_content (non-streaming) for chat {chat_id} (SID: {sid})"
         )
@@ -952,15 +959,28 @@ def _generate_chat_response_stream(
 
     try:
         # --- Call Gemini API (Streaming) ---
+        # Determine model (ensure 'models/' prefix) - Moved model determination here
         raw_model_name = current_app.config.get(
             "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
         )
+        model_to_use = (
+            f"models/{raw_model_name}"
+            if not raw_model_name.startswith("models/")
+            else raw_model_name
+        )
+        logger.info(f"Using model '{model_to_use}' for streaming chat {chat_id} (SID: {sid}).") # Log the final model name
 
-        if not raw_model_name.startswith("models/"):
-            model_to_use = f"models/{raw_model_name}"
+        # Construct conversation history. Only add the final user Content if parts exist.
+        # The user's text message should be the last item in 'history'.
+        full_conversation = history
+        if current_turn_parts:
+            full_conversation.append(Content(role="user", parts=current_turn_parts))
+        else:
+             logger.debug(f"No additional parts for user turn in chat {chat_id} (SID: {sid}). Sending history only.")
 
-        full_conversation = history + [Content(role="user", parts=current_turn_parts)]
+        # System prompt (currently unsupported by stream API, but keep for future)
         system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
+
         logger.info(
             f"Calling model.generate_content_stream for chat {chat_id} (SID: {sid})"
         )
