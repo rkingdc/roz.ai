@@ -4,6 +4,10 @@ from flask import current_app
 import requests
 import re
 from bs4 import BeautifulSoup
+import os # Import os for path operations
+from urllib.parse import urlparse # To parse URL for filename fallback
+from werkzeug.utils import secure_filename # To sanitize filenames
+import cgi # To parse Content-Disposition header
 
 
 # Configure logging
