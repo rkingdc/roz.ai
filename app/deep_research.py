@@ -817,11 +817,11 @@ Here are the components:
 
 # --- Helper for Parallel Execution ---
 def _execute_research_step(
-    step_name: str, step_description: str
+    app, step_name: str, step_description: str # Add app parameter
 ) -> Tuple[str, List[str], List[Dict]]:
     """
     Executes a single research step: determines queries and performs web search.
-    Designed to be run in parallel using ThreadPoolExecutor (shares app context).
+    Designed to be run in parallel using ThreadPoolExecutor. Requires explicit app object.
     Returns the step name, list of processed content strings, and list of raw result dictionaries.
     """
     logger.info(f"--- Starting Research Step (Thread): {step_name} ---")
@@ -829,8 +829,8 @@ def _execute_research_step(
     all_processed_content_for_step = []
     all_raw_dicts_for_step = []
     try:
-        # Explicitly create an app context for the thread
-        with current_app.app_context():
+        # Explicitly create an app context for the thread using the passed app object
+        with app.app_context():
             # a. Determine Search Queries
             # Now generate_text (called by determine_research_queries) will have app context
             search_queries: List[str] = determine_research_queries(step_description)
@@ -875,6 +875,9 @@ def perform_deep_research(query: str) -> str:
     """
     logger.info(f"--- Starting Deep Research for Query: '{query}' ---")
 
+    # Get the actual Flask app object to pass to threads
+    app = current_app._get_current_object()
+
     # 1. Generate Initial Research Plan
     research_plan: List[Tuple[str, str]] = query_to_research_plan(query)
     if not research_plan:
@@ -899,11 +902,11 @@ def perform_deep_research(query: str) -> str:
     # Use ThreadPoolExecutor for I/O-bound tasks (LLM calls, web requests)
     # Threads share the Flask application context, avoiding the RuntimeError.
     with ThreadPoolExecutor() as executor:
-        # Submit all research steps to the executor
+        # Submit all research steps to the executor, passing the app object
         future_to_step = {
             executor.submit(
-                _execute_research_step, name, desc
-            ): name  # _execute_research_step now returns 3 items
+                _execute_research_step, app, name, desc # Pass app object here
+            ): name
             for name, desc in research_plan
         }
 
