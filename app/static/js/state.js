@@ -29,6 +29,7 @@ export let isCalendarPluginEnabled = true;
 export let isWebSearchPluginEnabled = true;
 export let isWebSearchEnabled = false; // Toggle state for including web search in current message
 export let isDeepResearchEnabled = false; // Toggle state for deep research mode
+export let isImprovePromptEnabled = false; // <<< ADDED: Toggle state for improving the prompt before sending
 
 // Tab and Note Mode states
 export let currentTab = 'chat';
@@ -474,6 +475,15 @@ export function setCurrentChatModel(modelName) {
         notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled }); // Notify combined chat state
     }
 }
+
+// --- NEW: Improve Prompt Setter ---
+export function setImprovePromptEnabled(enabled) {
+    if (isImprovePromptEnabled !== enabled) {
+        isImprovePromptEnabled = enabled;
+        notify('isImprovePromptEnabled', isImprovePromptEnabled);
+    }
+}
+// -----------------------------
 
 // --- NEW: Chat Mode Setter ---
 export function setCurrentChatMode(mode) {
