@@ -5,9 +5,7 @@ from typing import List, Tuple, Any, Dict
 from concurrent.futures import (
     ThreadPoolExecutor,
     as_completed,
-) 
-import tempfile  # For potential future use if needed directly here
-import os  # For potential future use if needed directly here
+)
 from flask import current_app  # To access config for model names if needed
 
 # Assuming ai_services.py and web_search.py are in the same directory
@@ -454,15 +452,6 @@ def synthesize_research_into_report_section(
     """
     logger.info(f"Synthesizing research for section: '{section_name}'")
 
-    if not collected_research_for_step:
-        logger.warning(
-            f"No research provided for section '{section_name}'. Returning empty section."
-        )
-        return (
-            f"## {section_name}\n\nNo research data was found for this section.\n",
-            [],
-        )
-
     # Format research for the prompt using the raw dictionaries
     # Ensure content extraction handles different types (text, transcription, error notes)
     formatted_research_parts = []
@@ -817,7 +806,7 @@ Here are the components:
 
 # --- Helper for Parallel Execution ---
 def _execute_research_step(
-    app, step_name: str, step_description: str # Add app parameter
+    app, step_name: str, step_description: str  # Add app parameter
 ) -> Tuple[str, List[str], List[Dict]]:
     """
     Executes a single research step: determines queries and performs web search.
@@ -891,9 +880,6 @@ def perform_deep_research(query: str) -> str:
     collected_raw_results: Dict[str, List[Dict]] = (
         {}
     )  # Stores raw result dicts per *initial* step name
-    original_step_details: Dict[str, str] = {
-        name: desc for name, desc in research_plan
-    }  # Store descriptions for reference
 
     # 3. Execute Initial Research Steps in Parallel using Threads
     logger.info(
@@ -905,7 +891,7 @@ def perform_deep_research(query: str) -> str:
         # Submit all research steps to the executor, passing the app object
         future_to_step = {
             executor.submit(
-                _execute_research_step, app, name, desc # Pass app object here
+                _execute_research_step, app, name, desc  # Pass app object here
             ): name
             for name, desc in research_plan
         }
@@ -961,11 +947,12 @@ def perform_deep_research(query: str) -> str:
     updated_report_plan: List[Tuple[str, str]] = query_and_research_to_updated_plan(
         query, collected_research
     )
-    if not updated_report_plan:
-        return "[Error: Could not generate updated report plan based on research.]"
-    logger.info(
-        f"Updated Report Plan (Outline):\n{json.dumps(updated_report_plan, indent=2)}"
-    )
+
+    # 4.5 With the updated research report plan/outline, we may need to do more research
+    # so we once again iterate through each stage of the research plan, generateing search queries
+    # for each new stage, pulling in results, and building up our corpus of research.
+    # AI! place the correct code block to do this here.
+    pass
 
     # 5. Synthesize Report Sections based on the *updated* plan
     # This part remains sequential as each section synthesis depends on the overall collected data.
