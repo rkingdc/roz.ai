@@ -1309,25 +1309,72 @@ def _prepare_chat_content(
             logger.info(f"Web search enabled for chat {chat_id}. Generating query...")
             search_query = generate_search_query(user_message)
             if search_query:
-                search_results = perform_web_search(search_query)
-                if search_results:
-                    results_text = "\n".join(search_results)
-                    current_turn_parts.extend(
-                        [
-                            Part(text="--- Start Web Search Results ---"),
-                            Part(text=results_text),
-                            Part(text="--- End Web Search Results ---"),
-                        ]
-                    )
+                logger.info(f"Performing web search for query: '{search_query}'")
+                search_results_list = perform_web_search(search_query) # Returns list of dicts
 
+                if search_results_list:
+                    logger.info(f"Received {len(search_results_list)} search results.")
+                    current_turn_parts.append(Part(text="--- Start Web Search Results ---"))
+
+                    for i, result_item in enumerate(search_results_list):
+                        title = result_item.get('title', 'No Title')
+                        link = result_item.get('link', 'No Link')
+                        snippet = result_item.get('snippet', 'No Snippet')
+                        fetch_result = result_item.get('fetch_result', {})
+                        result_type = fetch_result.get('type', 'error')
+                        result_content = fetch_result.get('content', 'Unknown error')
+
+                        # Add text part describing the result source
+                        current_turn_parts.append(Part(text=f"[{i+1}] Title: {title}\n   Link: {link}\n   Snippet: {snippet}"))
+
+                        # Process based on fetched content type
+                        if result_type == 'html':
+                            if result_content:
+                                current_turn_parts.append(Part(text=f"   Content:\n{result_content}\n---"))
+                            else:
+                                current_turn_parts.append(Part(text="   Content: [Could not extract text content.]\n---"))
+                        elif result_type == 'pdf':
+                            pdf_bytes = result_content
+                            pdf_filename = fetch_result.get('filename', f'search_result_{i+1}.pdf')
+                            logger.info(f"Processing PDF search result: {pdf_filename} ({len(pdf_bytes)} bytes)")
+                            try:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{secure_filename(pdf_filename)}") as temp_file:
+                                    temp_file.write(pdf_bytes)
+                                    temp_filepath = temp_file.name
+                                    temp_files_to_clean.append(temp_filepath) # Schedule for cleanup
+
+                                logger.info(f"Uploading temp PDF '{temp_filepath}' from web search...")
+                                uploaded_file = client.files.upload(
+                                    file=temp_filepath,
+                                    config={"display_name": pdf_filename, "mime_type": "application/pdf"}
+                                )
+                                logger.info(f"PDF '{pdf_filename}' uploaded via File API, URI: {uploaded_file.uri}")
+
+                                # Create a Part referencing the uploaded file URI
+                                file_data_part = Part(file_data=FileData(mime_type="application/pdf", file_uri=uploaded_file.uri))
+
+                                # Add text part indicating PDF attachment
+                                current_turn_parts.append(Part(text=f"   Content: [Attached PDF Document: {pdf_filename}]\n---"))
+                                # Add the actual file data part
+                                current_turn_parts.append(file_data_part)
+
+                            except Exception as upload_err:
+                                logger.error(f"Failed to upload PDF search result '{pdf_filename}': {upload_err}", exc_info=True)
+                                current_turn_parts.append(Part(text=f"   Content: [System: Error processing/uploading PDF '{pdf_filename}'. {type(upload_err).__name__}]\n---"))
+
+                        elif result_type == 'error':
+                            current_turn_parts.append(Part(text=f"   Content: [Error fetching content: {result_content}]\n---"))
+                        else:
+                            logger.warning(f"Unknown fetch result type '{result_type}' for link {link}")
+                            current_turn_parts.append(Part(text=f"   Content: [Unknown content type: {result_type}]\n---"))
+
+                    current_turn_parts.append(Part(text="--- End Web Search Results ---"))
                 else:
-                    current_turn_parts.append(
-                        Part(text="[System Note: Web search performed, no results.]")
-                    )
+                    logger.info("Web search performed, but returned no results.")
+                    current_turn_parts.append(Part(text="[System Note: Web search performed, no results found.]"))
             else:
-                current_turn_parts.append(
-                    Part(text="[System Note: Web search enabled, no query generated.]")
-                )
+                logger.info("Web search was enabled, but no search query was generated.")
+                current_turn_parts.append(Part(text="[System Note: Web search enabled, but failed to generate a query.]"))
 
         # 5. User Message
         if user_message:
@@ -1340,13 +1387,17 @@ def _prepare_chat_content(
             current_turn_parts.extend([
                 Part(text="--- special instructions ---"),
                 Part(
-                    text="""When responding, prioritize using information from the provided web search results to ensure accuracy and up-to-dateness. If information from the web search results is used to answer a question, cite the source using bracketed numerical citations (e.g., [1], [2], [3], etc.) directly after the relevant statement or fact.
+                    text="""When responding, prioritize using information from the provided web search results (both text snippets and attached PDF documents) to ensure accuracy and up-to-dateness.
+
+If information from the web search results is used to answer a question:
+*   For text content: Cite the source using bracketed numerical citations (e.g., [1], [2]) directly after the relevant statement.
+*   For PDF documents: Refer to the attached document explicitly (e.g., "According to the attached PDF document from source [3]..."). Do NOT attempt to summarize the PDF unless specifically asked to.
 
 At the end of your response, include a list of the cited sources, formatted as follows, noting the markdown-style links:
 
 [1] [First Source Title](https://www.the.first.source.com) - "A quote from the source that was used.."
 [2] [Other Source Title](https://www.the.other.source.com) - "A snippet from the source **and a specific important word** from that source"
-[3] [Another Title](https://www.another.example.com) - "More context from this link"
+[3] [PDF Source Title](https://www.pdf.example.com) - [Attached PDF Document]
 """
                 ),
                 Part(text="--- End special instructions ---"),

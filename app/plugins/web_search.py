@@ -36,11 +36,37 @@ def fetch_web_content(url):
 
         # --- PDF Handling ---
         if 'application/pdf' in content_type:
-            logger.info(f"Detected PDF content at {url}")
-            # In a real scenario, you might download response.content here
-            # For now, we just signal that it's a PDF.
-            # pdf_bytes = response.content # Uncomment if you need the bytes later
-            return {'type': 'pdf', 'content': b"PDF content placeholder", 'url': url} # Return placeholder bytes
+            logger.info(f"Detected PDF content at {url}. Downloading...")
+            # Download the full PDF content
+            pdf_bytes = response.content
+            logger.info(f"Downloaded {len(pdf_bytes)} bytes for PDF from {url}")
+
+            # --- Extract Filename ---
+            filename = None
+            # Try Content-Disposition header first
+            content_disposition = response.headers.get('Content-Disposition')
+            if content_disposition:
+                value, params = cgi.parse_header(content_disposition)
+                if 'filename' in params:
+                    filename = params['filename']
+                    logger.info(f"Extracted filename from Content-Disposition: {filename}")
+
+            # Fallback to URL parsing if header doesn't provide filename
+            if not filename:
+                parsed_url = urlparse(url)
+                filename = os.path.basename(parsed_url.path)
+                if not filename: # Handle cases like domain.com/ (no path)
+                    filename = parsed_url.netloc + ".pdf" # Use domain name
+                logger.info(f"Using filename from URL: {filename}")
+
+            # Sanitize filename
+            filename = secure_filename(filename)
+            # Ensure it has a .pdf extension if missing (common issue)
+            if not filename.lower().endswith('.pdf'):
+                filename += ".pdf"
+            logger.info(f"Sanitized PDF filename: {filename}")
+
+            return {'type': 'pdf', 'content': pdf_bytes, 'url': url, 'filename': filename}
 
         # --- HTML Handling ---
         # Proceed only if it's likely HTML (or unspecified, default to HTML attempt)
@@ -136,7 +162,7 @@ def perform_web_search(query, num_results=3):
     # Ensure num_results is within the API limits (1-10)
     num_results = max(1, min(num_results, 10))
 
-    search_snippets = []
+    search_results_processed = [] # Changed variable name
     try:
         # Build the service object
         service = build("customsearch", "v1", developerKey=api_key)
@@ -148,38 +174,29 @@ def perform_web_search(query, num_results=3):
         search_items = result.get("items", [])
         if not search_items:
             logger.info("Web search returned no results.")
-            return []  # Return empty list, not an error message for the AI
+            return [] # Return empty list
 
         for i, item in enumerate(search_items):
             title = item.get("title", "No Title")
             link = item.get("link", "no link")
             snippet = item.get("snippet", "No Snippet Available")
-            # link = item.get('link') # You could include the link if desired
-            formatted_result = f"[Title]\n{title}\n[Snippet]\n{snippet.replace(chr(10), ' ').replace(chr(13), ' ')}\n[Link]\n{link}"
 
             # Fetch content using the unified function
             logger.info(f"Fetching content for result {i+1}: {link}")
-            fetch_result = fetch_web_content(link)
+            fetch_result = fetch_web_content(link) # fetch_result is a dict now
 
-            # Append content based on type
-            if fetch_result['type'] == 'html':
-                if fetch_result['content']:
-                    formatted_result += "\n[Web Content]\n" + fetch_result['content']
-                else:
-                    formatted_result += "\n[Could not extract text content.]"
-            elif fetch_result['type'] == 'pdf':
-                # Indicate PDF was found, but don't include binary content here
-                formatted_result += "\n[PDF Document Found. Content not extracted here.]"
-            elif fetch_result['type'] == 'error':
-                formatted_result += f"\n[Error fetching content: {fetch_result['content']}]"
-            else: # Should not happen, but good to have a fallback
-                 formatted_result += f"\n[Unknown content type encountered: {fetch_result.get('type', 'N/A')}]"
+            # Store result details in a dictionary
+            result_data = {
+                'title': title,
+                'link': link,
+                'snippet': snippet.replace(chr(10), ' ').replace(chr(13), ' '), # Clean snippet here
+                'fetch_result': fetch_result # Contains type, content, url, [filename]
+            }
 
-
-            search_snippets.append(formatted_result)
+            search_results_processed.append(result_data)
             logger.info(f"  - Processed Result {i+1}: {title} ({fetch_result['type']})")
 
-        return search_snippets
+        return search_results_processed # Return list of dictionaries
 
     except HttpError as e:
         logger.error(f"ERROR during Google Custom Search API call: {e}")
