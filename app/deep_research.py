@@ -621,7 +621,7 @@ create_works_cited = llm_factory(
 - [Next reference Title - www.reference2.pdf](https://www.reference2.pdf)
 {works}
 """,
-    params=("works",),
+    params=["works"],
 )
 
 

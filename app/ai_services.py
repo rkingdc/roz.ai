@@ -165,7 +165,7 @@ prompt_improver = llm_factory(
 The user prompt: {prompt}
 
 Your rewritten prompt:""",
-    params=("prompt"),
+    params=["prompt"],
 )
 
 

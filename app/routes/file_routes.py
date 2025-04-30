@@ -203,7 +203,7 @@ def add_file_from_url_route():
              return jsonify({"error": f"Failed to fetch content from URL: {url}"}), 500
 
         # Convert content to bytes (assuming fetch_web_content returns string)
-        content_blob = content.encode('utf-8') # Or detect encoding if possible
+        content_blob = content['content'].encode('utf-8') # Or detect encoding if possible
         filesize = len(content_blob)
         logger.info(f"Fetched {filesize} bytes from URL: {url}")
 
