@@ -1020,10 +1020,10 @@ def _generate_chat_response_stream(
                 # Emit the chunk text if it's not empty
                 if chunk_text:
                     # logger.debug(f"Emitting stream chunk for SID {sid}: {chunk_text[:100]}...") # Verbose
-                    socketio.emit("stream_chunk", {"chunk": chunk_text}, room=sid)
+                    socketio.emit("stream_chunk", {"chunk": chunk_text}, room=sid) # Ensure this line is present and uncommented
                     full_reply_content += chunk_text  # Accumulate for saving
                     chunk_count += 1
-
+ 
             except AttributeError as ae:
                 logger.error(
                     f"AttributeError processing stream chunk for SID {sid}: {ae} - Chunk: {chunk!r}",
@@ -1046,8 +1046,8 @@ def _generate_chat_response_stream(
         )
         # Emit stream end signal if no error occurred during streaming
         if not emitted_error:
-            socketio.emit("stream_end", {"message": "Stream finished."}, room=sid)
-
+            socketio.emit("stream_end", {"message": "Stream finished."}, room=sid) # Ensure this line is present and uncommented
+ 
     # --- Error Handling for Streaming API Call ---
     except InvalidArgument as e:
         logger.error(
