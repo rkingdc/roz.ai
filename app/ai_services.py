@@ -1565,14 +1565,16 @@ def _prepare_chat_content(
                         text="[System Note: Web search enabled, but failed to generate a query.]"
                     )
                 )
-
+ 
         # 5. User Message
-        if user_message:
-            current_turn_parts.append(Part(text=user_message))
-        elif not current_turn_parts:  # Only add placeholder if nothing else was added
+        # The user message text is expected to be the last item in the 'history' list fetched from DB.
+        # We no longer add the 'user_message' variable content here to avoid duplication.
+        # current_turn_parts will now only contain non-message items like files, context, search results, instructions.
+        if not user_message and not current_turn_parts and not history: # Add placeholder only if absolutely nothing else exists for the turn
             current_turn_parts.append(
                 Part(text="[User provided no text, only attachments or context.]")
             )
+        # Ensure special instructions are still added if web search was enabled (handled below)
         if web_search_enabled:
             # Update prompt instructions to reflect attached PDFs
             current_turn_parts.extend(

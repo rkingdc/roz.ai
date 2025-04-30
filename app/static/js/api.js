@@ -164,8 +164,16 @@ function initializeSocketListeners() {
     socket.on('stream_chunk', (data) => {
         // console.debug("Received stream chunk:", data.chunk); // Verbose
         if (data.chunk !== undefined) {
-            // Append chunk to the *last* message in state, assuming it's the assistant's reply
-            state.appendContentToLastMessage(data.chunk);
+            // Check if the last message is from the user or if history is empty
+            const lastMessage = state.chatHistory.length > 0 ? state.chatHistory[state.chatHistory.length - 1] : null;
+            if (!lastMessage || lastMessage.role === 'user') {
+                // If history is empty or last message is user, add a new assistant message first
+                console.log("[DEBUG] stream_chunk: Adding initial assistant message placeholder.");
+                state.addMessageToHistory({ role: 'assistant', content: data.chunk }); // Add new message with the first chunk
+            } else {
+                // Otherwise, append to the existing assistant message
+                state.appendContentToLastMessage(data.chunk); // Append subsequent chunks
+            }
             // Status remains "Waiting for response..." or similar until stream_end
         }
     });
