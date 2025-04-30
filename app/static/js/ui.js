@@ -1770,11 +1770,12 @@ export function handleStateChange_statusMessage() {
     // Note: Modal status updates are handled within renderSummaryModalContent/renderUrlModalContent
     // which are triggered by other state changes (e.g., currentEditingFileId, summaryContent, isLoading)
 }
-
+ 
 export function handleStateChange_savedChats() {
     renderSavedChats();
+    updateChatListProcessingIndicator(); // Update indicators when list re-renders
 }
-
+ 
 export function handleStateChange_currentChat() { // Called when currentChatId, Name, Model change
     renderCurrentChatDetails();
     updateActiveChatListItem(); // Highlight correct chat in sidebar
