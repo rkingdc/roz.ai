@@ -9,9 +9,9 @@ from typing import List, Tuple, Dict, Any
 # Use appropriate import style for your project structure (e.g., relative imports if part of a package)
 from .ai_services import generate_text  # For LLM interactions
 from .plugins.web_search import (
-        perform_web_search,
-        fetch_web_content,
-    )  # For web searching and scraping
+    perform_web_search,
+    fetch_web_content,
+)  # For web searching and scraping
 
 
 import logging
@@ -291,7 +291,8 @@ def query_and_research_to_updated_plan(
         if research_items:
             # Provide first N characters of the 'content' key as a snippet
             snippets = [
-                f"- {item.get('content', '')[:500]}..." for item in research_items[:2] # Show snippets from first 2 results
+                f"- {item.get('content', '')[:500]}..."
+                for item in research_items[:2]  # Show snippets from first 2 results
             ]
             research_summary += "\n".join(snippets)
             if len(research_items) > 2:
@@ -384,43 +385,51 @@ def synthesize_research_into_report_section(
     # Format research for the prompt, accessing the 'content' key
     formatted_research = "\n\n---\n\n".join(
         [
-            f"Source {i+1}:\n{research.get('content', '[Content not available]')}"
+            f"Source {i+1}:\n{research.get('content', '[Content not available]')}\nURL:{research.get('link')}"
             for i, research in enumerate(collected_research_for_step)
         ]
     )
 
     prompt = f"""
-    You are a research assistant writing a section for a report.
-    Your task is to synthesize the provided research findings into a well-structured report section.
+You are a research assistant writing a section for a report.
+Your task is to synthesize the provided research findings into a well-structured report section and include inline citations using a specific Markdown link format.
 
-    Section Name: "{section_name}"
-    Section Description (Key points to cover): "{section_description}"
+Section Name: "{section_name}"
+Section Description (Key points to cover): "{section_description}"
 
-    Provided Research (Multiple sources):
-    --- START RESEARCH ---
-    {formatted_research}
-    --- END RESEARCH ---
+Provided Research (Multiple sources, including URLs):
+--- START RESEARCH ---
+{formatted_research}
+--- END RESEARCH ---
 
-    Instructions:
-    1. Write the report section based *only* on the provided research.
-    2. Structure the section logically using Markdown (headings, paragraphs, lists). Start with a Level 2 Heading (## {section_name}).
-    3. Accurately reflect the information found in the sources.
-    4. **Crucially:** Keep track of which source(s) support each key piece of information. While writing, you don't need explicit inline citations, but be mindful of the origin.
-    5. After writing the section, list the sources (using the "Source N" identifiers from the input) that were *actually used* to construct the section content.
+*Note: The 'Provided Research' is expected to be formatted clearly, e.g., each source begins with "Source N: [Snippet Text] (URL: http://example.com/sourceN)". Ensure your '{formatted_research}' variable is structured this way.*
 
-    Return your response as a JSON object with two keys:
-    - "report_section": A string containing the full Markdown text of the report section.
-    - "references": A JSON list of strings, where each string is the identifier of a source used (e.g., ["Source 1", "Source 3"]).
+Instructions:
+1.  Write the report section based *only* on the information contained within the `Provided Research`. Do not include outside knowledge.
+2.  Structure the section logically using Markdown (headings, paragraphs, lists, bolding). Start with a Level 2 Heading (## {section_name}).
+3.  Accurately and factually reflect the information found in the sources.
+4.  **Crucially: Include inline citations for all factual claims, statistics, and significant information derived from the research.**
+    *   Cite the original source(s) immediately after the sentence, clause, or fact it supports.
+    *   Use the Markdown link format `[[SourceNumber]](URL)`.
+    *   The `SourceNumber` is the number from the 'Source N' identifier (e.g., use `1` for 'Source 1', `2` for 'Source 2').
+    *   The `URL` is the URL provided with that specific source in the `Provided Research` section.
+    *   This format `[[N]](url)` means the rendered text will be `[N]` (including the brackets), and this entire `[N]` will be a clickable link to the URL.
+    *   If a piece of information is supported by multiple sources, include multiple citations sequentially (e.g., `...key finding.[[1]](url1)[[3]](url3)`).
+5.  After writing the section, list the identifiers of the sources (using the "Source N" format, e.g., "Source 1", "Source 3") that were *actually cited* within the section content.
 
-    Example JSON Output:
-    ```json
-    {{
-      "report_section": "## Section Title\\n\\nBased on Source 1, the key finding is... Source 2 further elaborates that...",
-      "references": ["Source 1", "Source 2"]
-    }}
-    ```
+Return your response as a JSON object with two keys:
+-   `report_section`: A string containing the full Markdown text of the report section, including the inline citations formatted as `[[Number]](URL)`.
+-   `references`: A JSON list of strings, where each string is the identifier of a source that was cited in the `report_section` (e.g., `["Source 1", "Source 2"]`).
 
-    JSON Output:
+Example JSON Output:
+```json
+{{
+  "report_section": "## Example Section Title\\n\\nBased on initial findings, the project aims to address key challenges identified in the market [[1]](https://example.com/source1). These challenges include regulatory hurdles [[2]](https://example.com/source2) and funding limitations [[1]](https://example.com/source1). A recent study highlights that similar projects faced significant delays [[3]](https://example.com/source3). The team is exploring alternative strategies [[1]](https://example.com/source1)[[2]](https://example.com/source2).\\n\\nFurthermore, stakeholder feedback emphasized the need for greater transparency [[4]](https://example.com/source4).",
+  "references": ["Source 1", "Source 2", "Source 3", "Source 4"]
+}}
+
+
+JSON Output:
     """
     try:
         llm_response = generate_text(prompt)
@@ -556,7 +565,7 @@ def create_works_cited(
             source_id = f"Source {source_counter}"
             link = item_dict.get("link")
             # We don't have a reliable title field, use link or a placeholder
-            title = f"Source {source_counter}" # Placeholder title
+            title = f"Source {source_counter}"  # Placeholder title
             if link:
                 # Try to create a slightly better title from the link if possible
                 try:
@@ -564,11 +573,11 @@ def create_works_cited(
                     if hostname:
                         title = f"Content from {hostname}"
                 except Exception:
-                    pass # Keep placeholder if regex fails
+                    pass  # Keep placeholder if regex fails
 
             source_details[source_id] = {
                 "link": link,
-                "title": title, # Use generated or placeholder title
+                "title": title,  # Use generated or placeholder title
                 "original_index": source_counter,
             }
             source_counter += 1
@@ -683,7 +692,9 @@ Here are the components:
         ):
             logger.info("Successfully formatted final report using LLM.")
             # Clean up potential markdown code block fences if the LLM adds them
-            formatted_report = re.sub(r"^```markdown\n?", "", formatted_report, flags=re.IGNORECASE)
+            formatted_report = re.sub(
+                r"^```markdown\n?", "", formatted_report, flags=re.IGNORECASE
+            )
             formatted_report = re.sub(r"\n?```$", "", formatted_report)
             return formatted_report.strip()
         else:
@@ -741,7 +752,9 @@ def perform_deep_research(query: str) -> str:
             for result_string in search_results:
                 # Extract/scrape content and link from the result string
                 link, scraped_content = scrape_web(result_string)
-                if scraped_content and not scraped_content.startswith("[Scraping failed"):
+                if scraped_content and not scraped_content.startswith(
+                    "[Scraping failed"
+                ):
                     # Store as dict including the link
                     research_item = {"content": scraped_content, "link": link}
                     collected_research[step_name].append(research_item)
@@ -787,19 +800,40 @@ def perform_deep_research(query: str) -> str:
         # Or, more robustly, the LLM in step 3 should indicate which original research informed each new section.
         # For this example, we'll just pass ALL collected research to each synthesis step.
         # This is inefficient but avoids complex mapping logic for now.
+         # a. Determine Search Queries
+        search_queries: List[str] = determine_research_queries(section_description)
+        if not search_queries:
+            logger.warning(
+                f"No search queries generated for step '{section_name}'. Skipping web search."
+            )
+            continue
+
+        # b. Perform Web Search & Scrape Results
+        for search_query in search_queries:
+            search_results: List[str] = web_search(
+                search_query
+            )  # Gets formatted strings
+            for result_string in search_results:
+                # Extract/scrape content and link from the result string
+                link, scraped_content = scrape_web(result_string)
+                if scraped_content and not scraped_content.startswith(
+                    "[Scraping failed"
+                ):
+                    # Store as dict including the link
+                    research_item = {"content": scraped_content, "link": link}
+                    research_for_synthesis[section_name].append(research_item)
+                else:
+                    logger.debug(
+                        f"No useful content scraped from a result for query '{search_query}'."
+                    )
+        logger.info(
+            f"Collected {len(research_for_synthesis[section_name])} research items for step '{section__name}'."
+        )
+        
         all_research_items = [
             item for sublist in research_for_synthesis.values() for item in sublist
         ]
 
-        if not all_research_items:
-            logger.warning(
-                f"No research available to synthesize section '{section_name}'."
-            )
-            report_sections[section_name] = (
-                f"## {section_name}\n\n[Skipped: No research data available for synthesis.]\n"
-            )
-            report_references[section_name + "_references"] = []
-            continue
 
         # Pass all collected research items to the synthesis function
         report_section_text, section_refs = synthesize_research_into_report_section(
@@ -817,7 +851,7 @@ def perform_deep_research(query: str) -> str:
     executive_summary = create_exec_summary(full_report_body)
     next_steps = create_next_steps(full_report_body)
     # Pass the references collected during synthesis AND the original research data
-    works_cited = create_works_cited(report_references, collected_research)
+    works_cited = create_works_cited(report_references, research_for_synthesis)
 
     # 6. Generate Final Report
     final_report_output = final_report(
@@ -826,88 +860,3 @@ def perform_deep_research(query: str) -> str:
 
     logger.info(f"--- Deep Research Complete for Query: '{query}' ---")
     return final_report_output
-
-
-# --- Example Usage ---
-if __name__ == "__main__":
-    # Ensure you have Flask context or another way to provide API keys
-    # if ai_services relies on current_app.config
-    # This basic example might fail if ai_services needs Flask context.
-    # You might need to wrap this in a Flask route or manually configure the client.
-
-    # Example requires API keys to be configured where ai_services expects them.
-    # If running standalone without Flask, you might need to modify ai_services
-    # or manually initialize the Gemini client here.
-
-    # --- Mocking Flask context for standalone run (IF NEEDED) ---
-    class MockApp:
-        config = {
-            # ADD YOUR API KEYS HERE FOR STANDALONE TESTING
-            # 'API_KEY': 'YOUR_GEMINI_API_KEY',
-            # 'GOOGLE_API_KEY': 'YOUR_GOOGLE_SEARCH_API_KEY',
-            # 'GOOGLE_CSE_ID': 'YOUR_CUSTOM_SEARCH_ENGINE_ID',
-            # 'DEFAULT_MODEL': 'gemini-pro', # Or another suitable model
-            # 'SUMMARY_MODEL': 'gemini-pro',
-            # 'PRIMARY_MODEL': 'gemini-pro',
-        }
-
-    class MockG:
-        def __init__(self):
-            self._context = {}
-
-        def __contains__(self, key):
-            return key in self._context
-
-        def __setitem__(self, key, value):
-            self._context[key] = value
-
-        def __getitem__(self, key):
-            return self._context[key]
-
-    # Manually push context if necessary (use with caution)
-    # from contextlib import contextmanager
-    # @contextmanager
-    # def push_context(app, g_obj):
-    #     global current_app, g
-    #     _original_current_app = current_app
-    #     _original_g = g
-    #     current_app = app
-    #     g = g_obj
-    #     try:
-    #         yield
-    #     finally:
-    #         current_app = _original_current_app
-    #         g = _original_g
-
-    # mock_app = MockApp()
-    # mock_g = MockG()
-
-    # if not mock_app.config.get('API_KEY') or not mock_app.config.get('GOOGLE_API_KEY'):
-    #     print("\nWARNING: API keys not set in MockApp.config. LLM and Search calls will likely fail.")
-    #     # Set dummy keys to avoid immediate crashes but expect dummy output
-    #     mock_app.config['API_KEY'] = 'DUMMY_KEY'
-    #     mock_app.config['GOOGLE_API_KEY'] = 'DUMMY_KEY'
-    #     mock_app.config['GOOGLE_CSE_ID'] = 'DUMMY_ID'
-    #     mock_app.config['DEFAULT_MODEL'] = 'dummy-model'
-    #     mock_app.config['SUMMARY_MODEL'] = 'dummy-model'
-    #     mock_app.config['PRIMARY_MODEL'] = 'dummy-model'
-
-    # --- Run the research ---
-    # with push_context(mock_app, mock_g): # Uncomment if Flask context is needed by imported modules
-    #     test_query = "What are the latest advancements in quantum computing and their potential impact on cryptography?"
-    #     final_report_result = perform_deep_research(test_query)
-
-    #     print("\n\n--- FINAL REPORT ---")
-    #     print(final_report_result)
-    #     print("--- END OF REPORT ---")
-
-    # --- Simpler execution if context isn't strictly needed or handled internally ---
-    test_query = "Explain the main challenges and opportunities in deploying large-scale renewable energy projects."
-    print(f"Running deep research for: {test_query}")
-    # Ensure API keys are available via environment variables or however ai_services/web_search expects them
-    # when run outside Flask. If they rely *only* on Flask context, the above mocking is necessary.
-    final_report_result = perform_deep_research(test_query)
-
-    print("\n\n--- FINAL REPORT ---")
-    print(final_report_result)
-    print("--- END OF REPORT ---")
