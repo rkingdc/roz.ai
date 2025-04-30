@@ -121,12 +121,6 @@ export function setProcessingChatId(id) {
         notify('processingChatId', processingChatId);
     }
 }
-export function setProcessingChatId(id) {
-    if (processingChatId !== id) {
-        processingChatId = id;
-        notify('processingChatId', processingChatId);
-    }
-}
 /**
  * Temporarily disables state change notifications.
  */
