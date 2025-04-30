@@ -857,6 +857,48 @@ def _execute_research_step(
         return step_name, [error_msg], []
 
 
+# --- Helper for Parallel Additional Research ---
+def _execute_additional_research_step(
+    app, section_name: str, section_description: str
+) -> Tuple[str, List[str], List[Dict]]:
+    """
+    Executes the research steps (query generation, web search) for a single *new* section.
+    Designed for parallel execution via ThreadPoolExecutor. Requires explicit app object.
+    Returns section name, processed content list, and raw results list.
+    """
+    logger.info(f"--- Starting Additional Research Step (Thread): {section_name} ---")
+    logger.debug(f"Description: {section_description}")
+    processed_content_for_section = []
+    raw_dicts_for_section = []
+    try:
+        # Explicitly create an app context for the thread
+        with app.app_context():
+            # a. Determine Search Queries for the new section
+            search_queries: List[str] = determine_research_queries(section_description)
+            if not search_queries:
+                logger.warning(f"No search queries generated for new section: {section_name}")
+                return section_name, [], []
+
+            # b. Perform Web Search & Scrape Results for each query
+            for search_query in search_queries:
+                processed_content, raw_dicts = web_search(search_query)
+                if processed_content:
+                    processed_content_for_section.extend(processed_content)
+                if raw_dicts:
+                    raw_dicts_for_section.extend(raw_dicts)
+
+                if not processed_content and not raw_dicts:
+                    logger.debug(f"No results from web_search for query '{search_query}' in new section '{section_name}'")
+
+            logger.info(f"--- Finished Additional Research Step (Thread): {section_name} - Collected {len(processed_content_for_section)} processed, {len(raw_dicts_for_section)} raw items ---")
+            return section_name, processed_content_for_section, raw_dicts_for_section
+
+    except Exception as e:
+        logger.error(f"Error during additional research step for section '{section_name}': {e}", exc_info=True)
+        error_msg = f"[System Error: Failed during additional research for section '{section_name}': {type(e).__name__}]"
+        return section_name, [error_msg], [{"error": error_msg}]
+
+
 # --- Main Deep Research Orchestration ---
 def perform_deep_research(query: str) -> str:
     """
@@ -949,54 +991,66 @@ def perform_deep_research(query: str) -> str:
     )
 
     # 4.5 Perform additional research for *new* sections identified in the updated plan.
-    logger.info("--- Checking for and executing additional research based on updated plan ---")
+    logger.info("--- Checking for and executing additional research based on updated plan (Parallel Threads) ---")
     original_step_names = {name for name, desc in research_plan}
-    new_sections_researched = 0
+    new_sections_to_research = []
 
-    with app.app_context(): # Ensure context for LLM calls and web search
-        for section_name, section_description in updated_report_plan:
-            if section_name not in original_step_names:
-                new_sections_researched += 1
-                logger.info(f"Performing additional research for new section: '{section_name}'")
-                logger.debug(f"Description: {section_description}")
+    # Identify sections needing research
+    for section_name, section_description in updated_report_plan:
+        if section_name not in original_step_names:
+            new_sections_to_research.append((section_name, section_description))
+            # Initialize result lists immediately to avoid key errors later
+            if section_name not in collected_research:
+                collected_research[section_name] = []
+            if section_name not in collected_raw_results:
+                collected_raw_results[section_name] = []
+        else:
+            logger.debug(f"Section '{section_name}' was part of initial research, skipping additional search.")
 
-                # Initialize result lists for this new section if they don't exist
-                if section_name not in collected_research:
-                    collected_research[section_name] = []
-                if section_name not in collected_raw_results:
-                    collected_raw_results[section_name] = []
+    # Execute research for new sections in parallel
+    if new_sections_to_research:
+        logger.info(f"--- Submitting {len(new_sections_to_research)} new sections for parallel research ---")
+        with ThreadPoolExecutor() as executor:
+            # Submit additional research tasks
+            future_to_section = {
+                executor.submit(
+                    _execute_additional_research_step, app, name, desc
+                ): name
+                for name, desc in new_sections_to_research
+            }
 
-                # a. Determine Search Queries for the new section
+            # Process completed futures as they finish
+            for future in as_completed(future_to_section):
+                section_name = future_to_section[future]
                 try:
-                    search_queries: List[str] = determine_research_queries(section_description)
-                    if not search_queries:
-                        logger.warning(f"No search queries generated for new section: {section_name}")
-                        continue # Skip to next section if no queries
+                    # Get results: (name, processed_list, raw_list)
+                    completed_section_name, processed_results, raw_results = future.result()
 
-                    # b. Perform Web Search & Scrape Results for each query
-                    for search_query in search_queries:
-                        processed_content, raw_dicts = web_search(search_query)
-                        if processed_content:
-                            collected_research[section_name].extend(processed_content)
-                        if raw_dicts:
-                            collected_raw_results[section_name].extend(raw_dicts)
+                    if completed_section_name == section_name:
+                        # Append results to the existing lists for this section
+                        collected_research[section_name].extend(processed_results)
+                        collected_raw_results[section_name].extend(raw_results)
+                        logger.info(
+                            f"Successfully collected additional results for section: {section_name} ({len(processed_results)} processed, {len(raw_results)} raw)"
+                        )
+                    else:
+                        logger.error(
+                            f"Mismatch in section name from additional research future: expected {section_name}, got {completed_section_name}"
+                        )
+                        error_msg = f"[System Error: Mismatch in section name processing for additional research '{section_name}']"
+                        collected_research[section_name].append(error_msg)
+                        collected_raw_results[section_name].append({"error": error_msg})
 
-                        if not processed_content and not raw_dicts:
-                            logger.debug(f"No results from web_search for query '{search_query}' in new section '{section_name}'")
-
-                    logger.info(f"Finished additional research for new section: '{section_name}'. Collected {len(collected_research[section_name])} processed, {len(collected_raw_results[section_name])} raw items.")
-
-                except Exception as e:
-                    logger.error(f"Error during additional research for section '{section_name}': {e}", exc_info=True)
-                    # Add error messages to results
-                    error_msg = f"[System Error: Failed during additional research for section '{section_name}': {type(e).__name__}]"
+                except Exception as exc:
+                    logger.error(
+                        f"Additional research section '{section_name}' generated an exception during execution: {exc}",
+                        exc_info=True,
+                    )
+                    error_msg = f"[System Error: Additional research section '{section_name}' failed during execution: {exc}]"
                     collected_research[section_name].append(error_msg)
                     collected_raw_results[section_name].append({"error": error_msg})
-            else:
-                 logger.debug(f"Section '{section_name}' was part of initial research, skipping additional search.")
 
-    if new_sections_researched > 0:
-        logger.info(f"--- Finished additional research for {new_sections_researched} new section(s) ---")
+        logger.info(f"--- Finished parallel execution of additional research for {len(new_sections_to_research)} section(s) ---")
     else:
         logger.info("--- No new sections required additional research ---")
 
