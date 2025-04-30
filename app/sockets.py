@@ -116,6 +116,7 @@ def handle_stop_transcription():
 # Import necessary modules for chat handling
 from . import database as db # Use relative import
 from . import ai_services
+from .ai_services import prompt_improver # Import the specific function
 from . import deep_research
 # from .app import socketio # socketio is already imported at the top
 from flask import current_app # Import current_app
@@ -205,6 +206,7 @@ def handle_send_chat_message(data):
     chat_id = data.get("chat_id")
     user_message = data.get("message", "")
     mode = data.get("mode", "chat")
+    improve_prompt_enabled = data.get("improve_prompt", False) # Get the new flag
     # Get other fields needed for validation/saving
     attached_files = data.get("attached_files", [])
     session_files = data.get("session_files", [])
@@ -254,11 +256,38 @@ def handle_send_chat_message(data):
          emit('task_error', {'error': f"Server error during input validation: {type(validation_err).__name__}"}, room=sid)
          return
 
+    # --- Improve Prompt (Optional) ---
+    original_user_message = user_message # Keep original for logging/comparison
+    if improve_prompt_enabled and user_message and mode == 'chat': # Only improve for chat mode with text
+        logger.info(f"Attempting to improve prompt for chat {chat_id} (SID: {sid}). Original: '{original_user_message[:100]}...'")
+        try:
+            # prompt_improver uses generate_text which needs app context (available here)
+            improved_prompt = ai_services.prompt_improver(prompt=user_message)
+
+            # Check if the improver returned an error or valid text
+            if improved_prompt and not improved_prompt.startswith(("[Error", "[System Note", "[AI Error")):
+                logger.info(f"Prompt improved successfully for chat {chat_id} (SID: {sid}). New: '{improved_prompt[:100]}...'")
+                user_message = improved_prompt # Replace user_message with the improved version
+                # Update the data dictionary so the background task gets the improved message
+                data['message'] = user_message
+            elif improved_prompt and improved_prompt.startswith(("[Error", "[System Note", "[AI Error")):
+                 logger.warning(f"Prompt improvement failed for chat {chat_id} (SID: {sid}): {improved_prompt}. Using original prompt.")
+                 # Keep original user_message
+            else:
+                 logger.warning(f"Prompt improvement returned empty or unexpected result for chat {chat_id} (SID: {sid}). Using original prompt.")
+                 # Keep original user_message
+
+        except Exception as improve_err:
+            logger.error(f"Error calling prompt_improver for chat {chat_id} (SID: {sid}): {improve_err}", exc_info=True)
+            # Fallback to original user_message, do not stop the process
+            logger.warning(f"Proceeding with original prompt for chat {chat_id} (SID: {sid}) after improvement error.")
+
     # --- Save User Message (Synchronously) ---
+    # Use the potentially modified user_message
     logger.debug(f"Input validation passed for SID {sid}. Proceeding to save user message...") # ADDED LOG
     # Save the user message immediately before starting the background task
     user_save_success = False
-    if user_message:
+    if user_message: # Save the potentially improved message
         logger.info(f"Attempting to save user message for chat {chat_id} (SID: {sid}).")
         try:
             user_save_success = db.add_message_to_db(chat_id, "user", user_message)
