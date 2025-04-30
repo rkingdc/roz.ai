@@ -1227,6 +1227,8 @@ export function sendMessage() { // No longer async, just emits
         mode: mode,
         // Include streaming flag for chat mode
         enable_streaming: (mode === 'chat' && state.isStreamingEnabled),
+        // Include improve prompt flag (only relevant for 'chat' mode, backend handles logic)
+        improve_prompt: state.isImprovePromptEnabled, // Read directly from state here
     };
 
     const sentSessionFile = state.sessionFile; // Store to clear later if needed
