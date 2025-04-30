@@ -118,9 +118,10 @@ from . import database as db # Use relative import
 from . import ai_services
 from . import deep_research
 # from .app import socketio # socketio is already imported at the top
+from flask import current_app # Import current_app
 
 
-def _process_chat_message_async(sid, data):
+def _process_chat_message_async(app, sid, data): # Add app argument
     """
     Runs in a background task to process chat messages (AI or Deep Research).
     Emits results back to the client via SocketIO.
@@ -137,12 +138,10 @@ def _process_chat_message_async(sid, data):
 
     logger.info(f"Background task started for SID {sid}, Chat ID {chat_id}, Mode {mode}.")
 
-    # --- Get Flask app context ---
-    # This is necessary because this function runs in a background thread started by SocketIO
-    # and needs access to app.config, g, etc. for the AI/DB calls.
-    from flask import current_app # Import current_app here
-    app = current_app._get_current_object()
+    # --- Create App Context ---
+    # Use the app instance passed from the main thread
     with app.app_context():
+        logger.debug(f"App context created successfully for background task (SID: {sid})")
         try:
             if mode == 'deep_research':
                 logger.info(f"Calling deep_research.perform_deep_research for SID {sid}, Chat {chat_id}")
@@ -278,6 +277,7 @@ def handle_send_chat_message(data):
     # --- Start Background Task ---
     logger.debug(f"User message saved (or skipped). Proceeding to start background task for SID {sid}...") # ADDED LOG
     logger.info(f"Starting background task for SID {sid}, Chat ID {chat_id}, Mode {mode}.")
+    app_instance = current_app._get_current_object() # Get app instance HERE
     try:
         # Optional: Notify client that processing has started
         emit('task_started', {'message': 'Processing your request...'}, room=sid)
@@ -289,6 +289,7 @@ def handle_send_chat_message(data):
     try:
         socketio.start_background_task(
             _process_chat_message_async,
+            app=app_instance, # Pass the app instance
             sid=sid,
             data=data # Pass the full data dictionary received
         )
