@@ -109,3 +109,197 @@ def handle_stop_transcription():
 # Note: Functions to emit transcription results ('transcript_update', 'transcription_error')
 # are called directly from the background listener thread in voice_services.py
 # using the imported `socketio` instance and `room=sid`.
+
+
+# --- Chat Message Handling ---
+
+# Import necessary modules for chat handling
+from . import database as db # Use relative import
+from . import ai_services
+from . import deep_research
+# from .app import socketio # socketio is already imported at the top
+
+
+def _process_chat_message_async(sid, data):
+    """
+    Runs in a background task to process chat messages (AI or Deep Research).
+    Emits results back to the client via SocketIO.
+    Requires an active application context.
+    """
+    chat_id = data.get("chat_id")
+    user_message = data.get("message", "")
+    attached_files = data.get("attached_files", [])
+    session_files = data.get("session_files", [])
+    calendar_context = data.get("calendar_context")
+    enable_web_search = data.get("enable_web_search", False)
+    enable_streaming = data.get("enable_streaming", False)
+    mode = data.get("mode", "chat")
+
+    logger.info(f"Background task started for SID {sid}, Chat ID {chat_id}, Mode {mode}.")
+
+    # --- Get Flask app context ---
+    # This is necessary because this function runs in a background thread started by SocketIO
+    # and needs access to app.config, g, etc. for the AI/DB calls.
+    from flask import current_app # Import current_app here
+    app = current_app._get_current_object()
+    with app.app_context():
+        try:
+            if mode == 'deep_research':
+                logger.info(f"Calling deep_research.perform_deep_research for SID {sid}, Chat {chat_id}")
+                # Pass socketio and sid for emitting results
+                deep_research.perform_deep_research(
+                    query=user_message,
+                    socketio=socketio,
+                    sid=sid,
+                    chat_id=chat_id # Pass chat_id for saving the result
+                )
+                # perform_deep_research now handles emitting 'deep_research_result' or 'task_error'
+                # and saving the result to the database.
+                logger.info(f"Background task completed for deep research (SID {sid}, Chat {chat_id}).")
+
+            else: # mode is 'chat'
+                logger.info(f"Calling ai_services.generate_chat_response for SID {sid}, Chat {chat_id}. Streaming: {enable_streaming}")
+                # Pass socketio and sid for emitting results
+                # generate_chat_response will handle streaming/non-streaming emits and saving the result
+                ai_services.generate_chat_response(
+                    chat_id=chat_id,
+                    user_message=user_message,
+                    attached_files=attached_files,
+                    session_files=session_files,
+                    calendar_context=calendar_context,
+                    web_search_enabled=enable_web_search,
+                    streaming_enabled=enable_streaming,
+                    socketio=socketio, # Pass socketio instance
+                    sid=sid           # Pass client's session ID
+                )
+                # generate_chat_response now handles emitting 'chat_response', 'stream_chunk', 'stream_end', or 'task_error'
+                # and saving the result to the database.
+                logger.info(f"Background task completed for chat (SID {sid}, Chat {chat_id}). Streaming: {enable_streaming}")
+
+        except Exception as e:
+            # Catch-all for unexpected errors during the background task execution
+            logger.error(f"Unexpected error in background task for SID {sid}, Chat {chat_id}: {e}", exc_info=True)
+            try:
+                # Emit an error message back to the specific client
+                error_msg = f"[Unexpected Server Error in background task: {type(e).__name__}]"
+                socketio.emit('task_error', {'error': error_msg}, room=sid)
+
+                # Attempt to save the error message to the chat history as well
+                logger.info(f"Attempting to save background task error message for chat {chat_id}.")
+                db.add_message_to_db(chat_id, "assistant", error_msg) # Role is assistant for system errors
+            except Exception as emit_save_err:
+                logger.error(f"CRITICAL: Failed to emit or save background task error for SID {sid}, Chat {chat_id}: {emit_save_err}", exc_info=True)
+
+
+@socketio.on('send_chat_message')
+def handle_send_chat_message(data):
+    """
+    Handles incoming chat messages from the client via SocketIO.
+    Saves the user message and starts a background task for processing.
+    """
+    sid = request.sid
+    logger.info(f"****** Received 'send_chat_message' event from SID: {sid} ******") # ADDED LOG
+    logger.debug(f"Raw data received for 'send_chat_message': {data}") # ADDED LOG
+
+    chat_id = data.get("chat_id")
+    user_message = data.get("message", "")
+    mode = data.get("mode", "chat")
+    # Get other fields needed for validation/saving
+    attached_files = data.get("attached_files", [])
+    session_files = data.get("session_files", [])
+    calendar_context = data.get("calendar_context")
+    enable_web_search = data.get("enable_web_search", False)
+
+    logger.info(f"Processing 'send_chat_message' from SID {sid} for Chat ID {chat_id}. Mode: {mode}") # Modified log
+
+    # --- Input Validation (similar to old HTTP route) ---
+    logger.debug(f"Starting input validation for SID {sid}...") # ADDED LOG
+    is_valid_input = False
+    try:
+        if mode == 'deep_research':
+            if user_message and not user_message.isspace():
+                is_valid_input = True
+            else:
+                error_msg = "Deep Research mode requires a text query."
+                logger.warning(f"Invalid input for SID {sid}, Chat {chat_id}: {error_msg}")
+                emit('task_error', {'error': error_msg}, room=sid)
+                return # Stop processing
+        else: # mode is 'chat'
+            # Check if any relevant input exists for chat mode
+            # Use state values passed from client payload
+            files_plugin_enabled = data.get("enable_files_plugin", False)
+            calendar_plugin_enabled = data.get("enable_calendar_plugin", False)
+            web_search_plugin_enabled = data.get("enable_web_search_plugin", False)
+
+            has_file_input = files_plugin_enabled and (attached_files or session_files)
+            has_calendar_input = calendar_plugin_enabled and calendar_context
+            has_web_search_input = web_search_plugin_enabled and enable_web_search
+
+            if user_message or has_file_input or has_calendar_input or has_web_search_input:
+                is_valid_input = True
+            else:
+                error_msg = "No message, files, context, or search request provided."
+                logger.warning(f"Invalid input for SID {sid}, Chat {chat_id}: {error_msg}")
+                emit('task_error', {'error': error_msg}, room=sid)
+                return # Stop processing
+
+        if not is_valid_input: # Should not be reached if logic above is correct, but defensive check
+            logger.error(f"Input validation failed unexpectedly for SID {sid}, Chat {chat_id}.")
+            emit('task_error', {'error': "Invalid input provided."}, room=sid)
+            return
+
+    except Exception as validation_err:
+         logger.error(f"Error during input validation for SID {sid}, Chat {chat_id}: {validation_err}", exc_info=True)
+         emit('task_error', {'error': f"Server error during input validation: {type(validation_err).__name__}"}, room=sid)
+         return
+
+    # --- Save User Message (Synchronously) ---
+    logger.debug(f"Input validation passed for SID {sid}. Proceeding to save user message...") # ADDED LOG
+    # Save the user message immediately before starting the background task
+    user_save_success = False
+    if user_message:
+        logger.info(f"Attempting to save user message for chat {chat_id} (SID: {sid}).")
+        try:
+            user_save_success = db.add_message_to_db(chat_id, "user", user_message)
+            if user_save_success:
+                logger.info(f"Successfully saved user message for chat {chat_id} (SID: {sid}).")
+                # Optional: Notify client that message was saved
+                # emit('message_saved', {'role': 'user'}, room=sid)
+            else:
+                # Log the error, but proceed with the background task anyway.
+                # The AI might still work, but history will be incomplete.
+                logger.error(f"Failed to save user message for chat {chat_id} (SID: {sid}) to database.")
+        except Exception as db_err:
+             logger.error(f"Database error saving user message for chat {chat_id} (SID: {sid}): {db_err}", exc_info=True)
+             # Emit error back to client and stop processing
+             emit('task_error', {'error': f"Database error saving your message: {type(db_err).__name__}"}, room=sid)
+             return # Stop here if user message save fails
+
+    # --- Start Background Task ---
+    logger.debug(f"User message saved (or skipped). Proceeding to start background task for SID {sid}...") # ADDED LOG
+    logger.info(f"Starting background task for SID {sid}, Chat ID {chat_id}, Mode {mode}.")
+    try:
+        # Optional: Notify client that processing has started
+        emit('task_started', {'message': 'Processing your request...'}, room=sid)
+    except Exception as emit_err:
+         # Handle potential error during emit itself (less likely)
+         logger.error(f"Error emitting 'task_started' for SID {sid}: {emit_err}", exc_info=True)
+         # Don't stop the whole process, but log it.
+
+    try:
+        socketio.start_background_task(
+            _process_chat_message_async,
+            sid=sid,
+            data=data # Pass the full data dictionary received
+        )
+    except Exception as task_start_err:
+        logger.error(f"Failed to start background task for SID {sid}, Chat {chat_id}: {task_start_err}", exc_info=True)
+        emit('task_error', {'error': f"Server error: Failed to start processing task ({type(task_start_err).__name__})."}, room=sid)
+        # Attempt to save an error message to DB as well
+        try:
+            db.add_message_to_db(chat_id, "assistant", f"[Server Error: Failed to start background task: {type(task_start_err).__name__}]")
+        except Exception as db_save_err:
+            logger.error(f"Failed to save task start error to DB for chat {chat_id}: {db_save_err}", exc_info=True)
+
+    # The handler returns immediately, letting the background task run.
+    logger.debug(f"Exiting 'send_chat_message' handler for SID {sid}.")
