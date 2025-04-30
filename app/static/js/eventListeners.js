@@ -196,14 +196,16 @@ export function setupEventListeners() {
 
 
     // --- Chat Input & Sending ---
-    elements.sendButton?.addEventListener('click', async () => {
-        await api.sendMessage(); // Updates state (chatHistory, isLoading, statusMessage, sessionFile)
+    elements.sendButton?.addEventListener('click', () => { // Removed async as api.sendMessage is no longer async
+        console.log("[DEBUG] Send button clicked. Calling api.sendMessage()..."); // ADDED LOG
+        api.sendMessage(); // Updates state (chatHistory, isLoading, statusMessage, sessionFile)
         // UI updates are triggered by state notifications within api.sendMessage
     });
-    elements.messageInput?.addEventListener('keypress', async (e) => {
+    elements.messageInput?.addEventListener('keypress', (e) => { // Removed async
         if (e.key === 'Enter' && !e.shiftKey) {
+            console.log("[DEBUG] Enter key pressed in message input. Triggering send button click..."); // ADDED LOG
             e.preventDefault();
-            await elements.sendButton?.click(); // Trigger send button click
+            elements.sendButton?.click(); // Trigger send button click
         }
     });
   // --- UPDATED: Auto-resize textarea on input ---
