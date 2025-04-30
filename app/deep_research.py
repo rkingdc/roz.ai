@@ -2,10 +2,7 @@ import json
 import logging
 import re
 from typing import List, Tuple, Any, Dict
-from concurrent.futures import (
-    ThreadPoolExecutor,
-    as_completed,
-)
+# Removed ThreadPoolExecutor and as_completed imports
 from flask import current_app  # To access config for model names if needed
 
 # Assuming ai_services.py and web_search.py are in the same directory
@@ -792,130 +789,8 @@ Here are the components:
         return f"{executive_summary}\n\n---\n\n{report_body}\n\n---\n\n{next_steps}\n\n---\n\n{works_cited}".strip()
 
 
-# --- Helper for Parallel Execution ---
-def _execute_research_step(
-    app, step_name: str, step_description: str  # Add app parameter
-) -> Tuple[str, List[str], List[Dict]]:
-    """
-    Executes a single research step: determines queries and performs web search.
-    Designed to be run in parallel using ThreadPoolExecutor. Requires explicit app object.
-    Returns the step name, list of processed content strings, and list of raw result dictionaries.
-    """
-    logger.info(f"--- Starting Research Step (Thread): {step_name} ---")
-    logger.debug(f"Description: {step_description}")
-    all_processed_content_for_step = []
-    all_raw_dicts_for_step = []
-    try:
-        # Explicitly create an app context for the thread using the passed app object
-        with app.app_context():
-            # a. Determine Search Queries
-            # Now generate_text (called by determine_research_queries) will have app context
-            search_queries: List[str] = determine_research_queries(step_description)
-            if not search_queries:
-                logger.warning(f"No search queries generated for step: {step_name}")
-                # Still return outside the context block
-                return step_name, [], []
-
-            # b. Perform Web Search & Scrape Results for each query
-            for search_query in search_queries:
-                # web_search calls transcribe_pdf_bytes which calls generate_text,
-                # so it also needs the app context.
-                processed_content, raw_dicts = web_search(search_query)
-                if processed_content:
-                    all_processed_content_for_step.extend(processed_content)
-                if raw_dicts:
-                    all_raw_dicts_for_step.extend(raw_dicts)
-
-                if not processed_content and not raw_dicts:
-                    logger.debug(
-                        f"No results from web_search for query '{search_query}' in step '{step_name}'"
-                    )
-
-            logger.info(
-                f"--- Finished Research Step (Thread): {step_name} - Collected {len(all_processed_content_for_step)} processed items, {len(all_raw_dicts_for_step)} raw items ---"
-            )
-            # Return results outside the context block but before the except block
-            return step_name, all_processed_content_for_step, all_raw_dicts_for_step
-
-    except Exception as e:
-        # Log the error outside the app context if it happens during context setup/teardown or general execution
-        logger.error(f"Error executing research step '{step_name}': {e}", exc_info=True)
-        # Return step name and error messages/empty lists outside the context
-        error_msg = f"[System Error: Failed to execute research step '{step_name}' due to {type(e).__name__}]"
-        return step_name, [error_msg], []
-
-
-# --- Helper for Parallel Additional Research ---
-def _execute_additional_research_step(
-    app, section_name: str, section_description: str
-) -> Tuple[str, List[str], List[Dict]]:
-    """
-    Executes the research steps (query generation, web search) for a single *new* section.
-    Designed for parallel execution via ThreadPoolExecutor. Requires explicit app object.
-    Returns section name, processed content list, and raw results list.
-    """
-    logger.info(f"--- Starting Additional Research Step (Thread): {section_name} ---")
-    logger.debug(f"Description: {section_description}")
-    processed_content_for_section = []
-    raw_dicts_for_section = []
-    try:
-        # Explicitly create an app context for the thread
-        with app.app_context():
-            # a. Determine Search Queries for the new section
-            search_queries: List[str] = determine_research_queries(section_description)
-            if not search_queries:
-                logger.warning(f"No search queries generated for new section: {section_name}")
-                return section_name, [], []
-
-            # b. Perform Web Search & Scrape Results for each query
-            for search_query in search_queries:
-                processed_content, raw_dicts = web_search(search_query)
-                if processed_content:
-                    processed_content_for_section.extend(processed_content)
-                if raw_dicts:
-                    raw_dicts_for_section.extend(raw_dicts)
-
-                if not processed_content and not raw_dicts:
-                    logger.debug(f"No results from web_search for query '{search_query}' in new section '{section_name}'")
-
-            logger.info(f"--- Finished Additional Research Step (Thread): {section_name} - Collected {len(processed_content_for_section)} processed, {len(raw_dicts_for_section)} raw items ---")
-            return section_name, processed_content_for_section, raw_dicts_for_section
-
-    except Exception as e:
-        logger.error(f"Error during additional research step for section '{section_name}': {e}", exc_info=True)
-        error_msg = f"[System Error: Failed during additional research for section '{section_name}': {type(e).__name__}]"
-        return section_name, [error_msg], [{"error": error_msg}]
-
-
-# --- Helper for Parallel Section Synthesis ---
-def _synthesize_section_parallel(
-    app, section_name: str, section_description: str, all_raw_research_items: List[Dict]
-) -> Tuple[str, str, List[str]]:
-    """
-    Synthesizes a single report section in parallel using ThreadPoolExecutor.
-    Requires explicit app object.
-    Returns section name, section text, and list of references used.
-    """
-    logger.info(f"--- Starting Section Synthesis (Thread): {section_name} ---")
-    try:
-        # Explicitly create an app context for the thread
-        with app.app_context():
-            # Call the original synthesis function
-            report_section_text, section_refs = synthesize_research_into_report_section(
-                section_name,
-                section_description,
-                all_raw_research_items,
-            )
-            logger.info(f"--- Finished Section Synthesis (Thread): {section_name} ---")
-            return section_name, report_section_text, section_refs
-    except Exception as e:
-        logger.error(f"Error during synthesis step for section '{section_name}': {e}", exc_info=True)
-        error_msg = f"## {section_name}\n\n[System Error: Failed during synthesis for section '{section_name}': {type(e).__name__}]\n"
-        # Return error message as section text and empty refs
-        return section_name, error_msg, []
-
-
 # --- Main Deep Research Orchestration ---
+# Removed parallel helper functions: _execute_research_step, _execute_additional_research_step, _synthesize_section_parallel
 def perform_deep_research(query: str) -> str:
     """
     Orchestrates the deep research process from query to final report.
@@ -939,58 +814,53 @@ def perform_deep_research(query: str) -> str:
         {}
     )  # Stores raw result dicts per *initial* step name
 
-    # 3. Execute Initial Research Steps in Parallel using Threads
+    # 3. Execute Initial Research Steps Sequentially
     logger.info(
-        f"--- Executing {len(research_plan)} Initial Research Steps in Parallel (Threads) ---"
+        f"--- Executing {len(research_plan)} Initial Research Steps Sequentially ---"
     )
-    # Use ThreadPoolExecutor for I/O-bound tasks (LLM calls, web requests)
-    # Threads share the Flask application context, avoiding the RuntimeError.
-    with ThreadPoolExecutor() as executor:
-        # Submit all research steps to the executor, passing the app object
-        future_to_step = {
-            executor.submit(
-                _execute_research_step, app, name, desc  # Pass app object here
-            ): name
-            for name, desc in research_plan
-        }
+    for step_name, step_description in research_plan:
+        logger.info(f"--- Starting Research Step: {step_name} ---")
+        logger.debug(f"Description: {step_description}")
+        all_processed_content_for_step = []
+        all_raw_dicts_for_step = []
+        try:
+            # a. Determine Search Queries
+            # Assumes this function is called within a request context or has access to app context
+            search_queries: List[str] = determine_research_queries(step_description)
+            if not search_queries:
+                logger.warning(f"No search queries generated for step: {step_name}")
+                collected_research[step_name] = []
+                collected_raw_results[step_name] = []
+                continue # Move to the next step
 
-        # Process completed futures as they finish
-        for future in as_completed(future_to_step):
-            step_name = future_to_step[future]
-            try:
-                # Get the result tuple (step_name, processed_strings, raw_dicts)
-                completed_step_name, processed_results, raw_results = future.result()
+            # b. Perform Web Search & Scrape Results for each query
+            for search_query in search_queries:
+                # web_search also needs app context implicitly
+                processed_content, raw_dicts = web_search(search_query)
+                if processed_content:
+                    all_processed_content_for_step.extend(processed_content)
+                if raw_dicts:
+                    all_raw_dicts_for_step.extend(raw_dicts)
 
-                # Ensure the returned name matches (sanity check)
-                if completed_step_name == step_name:
-                    collected_research[step_name] = processed_results
-                    collected_raw_results[step_name] = raw_results
-                    logger.info(
-                        f"Successfully collected results for step: {step_name} ({len(processed_results)} processed, {len(raw_results)} raw)"
+                if not processed_content and not raw_dicts:
+                    logger.debug(
+                        f"No results from web_search for query '{search_query}' in step '{step_name}'"
                     )
-                else:
-                    logger.error(
-                        f"Mismatch in step name from future: expected {step_name}, got {completed_step_name}"
-                    )
-                    # Store error messages in both dicts for consistency
-                    error_msg = f"[System Error: Mismatch in step name processing for '{step_name}']"
-                    collected_research[step_name] = [error_msg]
-                    collected_raw_results[step_name] = [{"error": error_msg}]
 
-            except Exception as exc:
-                logger.error(
-                    f"Step '{step_name}' generated an exception during execution: {exc}",
-                    exc_info=True,
-                )
-                # Store error messages in both dicts
-                error_msg = (
-                    f"[System Error: Step '{step_name}' failed during execution: {exc}]"
-                )
-                collected_research[step_name] = [error_msg]
-                collected_raw_results[step_name] = [{"error": error_msg}]
+            collected_research[step_name] = all_processed_content_for_step
+            collected_raw_results[step_name] = all_raw_dicts_for_step
+            logger.info(
+                f"--- Finished Research Step: {step_name} - Collected {len(all_processed_content_for_step)} processed items, {len(all_raw_dicts_for_step)} raw items ---"
+            )
+
+        except Exception as e:
+            logger.error(f"Error executing research step '{step_name}': {e}", exc_info=True)
+            error_msg = f"[System Error: Failed to execute research step '{step_name}' due to {type(e).__name__}]"
+            collected_research[step_name] = [error_msg]
+            collected_raw_results[step_name] = [{"error": error_msg}]
 
     logger.info(
-        "--- Finished Parallel Execution of Initial Research Steps (Threads) ---"
+        "--- Finished Sequential Execution of Initial Research Steps ---"
     )
     # Log collected research summary
     for step, items in collected_research.items():
@@ -1023,58 +893,54 @@ def perform_deep_research(query: str) -> str:
         else:
             logger.debug(f"Section '{section_name}' was part of initial research, skipping additional search.")
 
-    # Execute research for new sections in parallel
+    # Execute research for new sections sequentially
     if new_sections_to_research:
-        logger.info(f"--- Submitting {len(new_sections_to_research)} new sections for parallel research ---")
-        with ThreadPoolExecutor() as executor:
-            # Submit additional research tasks
-            future_to_section = {
-                executor.submit(
-                    _execute_additional_research_step, app, name, desc
-                ): name
-                for name, desc in new_sections_to_research
-            }
+        logger.info(f"--- Executing additional research for {len(new_sections_to_research)} new sections sequentially ---")
+        for section_name, section_description in new_sections_to_research:
+            logger.info(f"--- Starting Additional Research Step: {section_name} ---")
+            logger.debug(f"Description: {section_description}")
+            processed_content_for_section = []
+            raw_dicts_for_section = []
+            try:
+                # a. Determine Search Queries for the new section
+                search_queries: List[str] = determine_research_queries(section_description)
+                if not search_queries:
+                    logger.warning(f"No search queries generated for new section: {section_name}")
+                    # collected_research/raw_results already initialized, just continue
+                    continue
 
-            # Process completed futures as they finish
-            for future in as_completed(future_to_section):
-                section_name = future_to_section[future]
-                try:
-                    # Get results: (name, processed_list, raw_list)
-                    completed_section_name, processed_results, raw_results = future.result()
+                # b. Perform Web Search & Scrape Results for each query
+                for search_query in search_queries:
+                    processed_content, raw_dicts = web_search(search_query)
+                    if processed_content:
+                        processed_content_for_section.extend(processed_content)
+                    if raw_dicts:
+                        raw_dicts_for_section.extend(raw_dicts)
 
-                    if completed_section_name == section_name:
-                        # Append results to the existing lists for this section
-                        collected_research[section_name].extend(processed_results)
-                        collected_raw_results[section_name].extend(raw_results)
-                        logger.info(
-                            f"Successfully collected additional results for section: {section_name} ({len(processed_results)} processed, {len(raw_results)} raw)"
-                        )
-                    else:
-                        logger.error(
-                            f"Mismatch in section name from additional research future: expected {section_name}, got {completed_section_name}"
-                        )
-                        error_msg = f"[System Error: Mismatch in section name processing for additional research '{section_name}']"
-                        collected_research[section_name].append(error_msg)
-                        collected_raw_results[section_name].append({"error": error_msg})
+                    if not processed_content and not raw_dicts:
+                        logger.debug(f"No results from web_search for query '{search_query}' in new section '{section_name}'")
 
-                except Exception as exc:
-                    logger.error(
-                        f"Additional research section '{section_name}' generated an exception during execution: {exc}",
-                        exc_info=True,
-                    )
-                    error_msg = f"[System Error: Additional research section '{section_name}' failed during execution: {exc}]"
-                    collected_research[section_name].append(error_msg)
-                    collected_raw_results[section_name].append({"error": error_msg})
+                # Append results to the existing lists for this section
+                collected_research[section_name].extend(processed_content_for_section)
+                collected_raw_results[section_name].extend(raw_dicts_for_section)
+                logger.info(f"--- Finished Additional Research Step: {section_name} - Collected {len(processed_content_for_section)} processed, {len(raw_dicts_for_section)} raw items ---")
 
-        logger.info(f"--- Finished parallel execution of additional research for {len(new_sections_to_research)} section(s) ---")
+            except Exception as e:
+                logger.error(f"Error during additional research step for section '{section_name}': {e}", exc_info=True)
+                error_msg = f"[System Error: Failed during additional research for section '{section_name}': {type(e).__name__}]"
+                # Append error message to existing lists
+                collected_research[section_name].append(error_msg)
+                collected_raw_results[section_name].append({"error": error_msg})
+
+        logger.info(f"--- Finished sequential execution of additional research for {len(new_sections_to_research)} section(s) ---")
     else:
         logger.info("--- No new sections required additional research ---")
 
 
-    # 5. Synthesize Report Sections based on the *updated* plan (Parallel Threads)
-    logger.info(f"--- Synthesizing {len(updated_report_plan)} Report Sections in Parallel (Threads) ---")
-    report_sections_results: Dict[str, str] = {} # Temporary storage for results
-    report_references_results: Dict[str, List[str]] = {} # Temporary storage for results
+    # 5. Synthesize Report Sections based on the *updated* plan (Sequentially)
+    logger.info(f"--- Synthesizing {len(updated_report_plan)} Report Sections Sequentially ---")
+    report_sections_results: Dict[str, str] = {} # Stores generated section text
+    report_references_results: Dict[str, List[str]] = {} # Stores references used per section
 
     # Consolidate *all* raw research items collected across *all* steps (initial + additional).
     # This needs to be done *before* submitting synthesis tasks.
@@ -1091,54 +957,33 @@ def perform_deep_research(query: str) -> str:
         # Handle this case gracefully, maybe generate placeholder sections?
         # For now, we'll let the synthesis function handle empty input if it can.
 
-    with ThreadPoolExecutor() as executor:
-        # Submit synthesis tasks
-        future_to_section = {
-            executor.submit(
-                _synthesize_section_parallel,
-                app,
-                name,
-                desc,
-                all_raw_research_items # Pass the consolidated list
-            ): name
-            for name, desc in updated_report_plan
-        }
+    # Execute synthesis sequentially
+    for section_name, section_description in updated_report_plan:
+        logger.info(f"--- Starting Section Synthesis: {section_name} ---")
+        try:
+            # Call the synthesis function directly
+            report_section_text, section_refs = synthesize_research_into_report_section(
+                section_name,
+                section_description,
+                all_raw_research_items, # Pass the consolidated list
+            )
+            report_sections_results[section_name] = report_section_text
+            # Store references under the specific key format
+            report_references_results[section_name + "_references"] = section_refs
+            logger.info(
+                f"--- Finished Section Synthesis: {section_name} (Length: {len(report_section_text)}, Refs: {len(section_refs)}) ---"
+            )
+        except Exception as e:
+            logger.error(f"Error during synthesis step for section '{section_name}': {e}", exc_info=True)
+            error_msg = f"## {section_name}\n\n[System Error: Failed during synthesis for section '{section_name}': {type(e).__name__}]\n"
+            # Store error message as section text and empty refs
+            report_sections_results[section_name] = error_msg
+            report_references_results[section_name + "_references"] = []
 
-        # Process completed futures as they finish
-        for future in as_completed(future_to_section):
-            section_name = future_to_section[future]
-            try:
-                # Get results: (name, section_text, refs_list)
-                completed_section_name, section_text, section_refs = future.result()
-
-                if completed_section_name == section_name:
-                    report_sections_results[section_name] = section_text
-                    # Store references under the specific key format
-                    report_references_results[section_name + "_references"] = section_refs
-                    logger.info(
-                        f"Successfully synthesized section: {section_name} (Length: {len(section_text)}, Refs: {len(section_refs)})"
-                    )
-                else:
-                    logger.error(
-                        f"Mismatch in section name from synthesis future: expected {section_name}, got {completed_section_name}"
-                    )
-                    error_msg = f"## {section_name}\n\n[System Error: Mismatch in section name processing during synthesis for '{section_name}']\n"
-                    report_sections_results[section_name] = error_msg
-                    report_references_results[section_name + "_references"] = []
-
-            except Exception as exc:
-                logger.error(
-                    f"Synthesis section '{section_name}' generated an exception during execution: {exc}",
-                    exc_info=True,
-                )
-                error_msg = f"## {section_name}\n\n[System Error: Synthesis section '{section_name}' failed during execution: {exc}]\n"
-                report_sections_results[section_name] = error_msg
-                report_references_results[section_name + "_references"] = []
-
-    logger.info("--- Finished Parallel Execution of Section Synthesis ---")
+    logger.info("--- Finished Sequential Execution of Section Synthesis ---")
 
     # Ensure sections are assembled in the order defined by updated_report_plan
-    ordered_section_texts = [report_sections_results.get(name, f"## {name}\n\n[Error: Section not generated.]") for name, desc in updated_report_plan]
+    ordered_section_texts = [report_sections_results.get(name, f"## {name}\n\n[Error: Section not generated.]\n") for name, desc in updated_report_plan]
     full_report_body = "\n\n".join(ordered_section_texts)
 
     # The report_references dictionary is already populated correctly by the parallel step
