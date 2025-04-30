@@ -818,32 +818,37 @@ def _execute_research_step(step_name: str, step_description: str) -> Tuple[str, 
     all_processed_content_for_step = []
     all_raw_dicts_for_step = []
     try:
-        # a. Determine Search Queries
-        # Ensure generate_text has app context (ThreadPoolExecutor helps)
-        search_queries: List[str] = determine_research_queries(step_description)
-        if not search_queries:
-            logger.warning(f"No search queries generated for step: {step_name}")
-            return step_name, [], []
+        # Explicitly create an app context for the thread
+        with current_app.app_context():
+            # a. Determine Search Queries
+            # Now generate_text (called by determine_research_queries) will have app context
+            search_queries: List[str] = determine_research_queries(step_description)
+            if not search_queries:
+                logger.warning(f"No search queries generated for step: {step_name}")
+                # Still return outside the context block
+                return step_name, [], []
 
-        # b. Perform Web Search & Scrape Results for each query
-        for search_query in search_queries:
-            # web_search returns (processed_content_list, raw_results_dicts)
-            # Collect both for synthesis and works cited later.
-            processed_content, raw_dicts = web_search(search_query)
-            if processed_content:
-                all_processed_content_for_step.extend(processed_content)
-            if raw_dicts:
-                all_raw_dicts_for_step.extend(raw_dicts)
+            # b. Perform Web Search & Scrape Results for each query
+            for search_query in search_queries:
+                # web_search calls transcribe_pdf_bytes which calls generate_text,
+                # so it also needs the app context.
+                processed_content, raw_dicts = web_search(search_query)
+                if processed_content:
+                    all_processed_content_for_step.extend(processed_content)
+                if raw_dicts:
+                    all_raw_dicts_for_step.extend(raw_dicts)
 
-            if not processed_content and not raw_dicts:
-                 logger.debug(f"No results from web_search for query '{search_query}' in step '{step_name}'")
+                if not processed_content and not raw_dicts:
+                     logger.debug(f"No results from web_search for query '{search_query}' in step '{step_name}'")
 
-        logger.info(f"--- Finished Research Step (Thread): {step_name} - Collected {len(all_processed_content_for_step)} processed items, {len(all_raw_dicts_for_step)} raw items ---")
-        return step_name, all_processed_content_for_step, all_raw_dicts_for_step
+            logger.info(f"--- Finished Research Step (Thread): {step_name} - Collected {len(all_processed_content_for_step)} processed items, {len(all_raw_dicts_for_step)} raw items ---")
+            # Return results outside the context block but before the except block
+            return step_name, all_processed_content_for_step, all_raw_dicts_for_step
 
     except Exception as e:
+        # Log the error outside the app context if it happens during context setup/teardown or general execution
         logger.error(f"Error executing research step '{step_name}': {e}", exc_info=True)
-        # Return step name and error messages/empty lists
+        # Return step name and error messages/empty lists outside the context
         error_msg = f"[System Error: Failed to execute research step '{step_name}' due to {type(e).__name__}]"
         return step_name, [error_msg], []
 
