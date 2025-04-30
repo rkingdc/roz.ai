@@ -1043,10 +1043,19 @@ function resetChatContext() {
 /**
  * Sends the user message and context to the backend.
  * Determines the mode ('chat' or 'deep_research') based on state.
+ * Sends the message via SocketIO.
  */
-export async function sendMessage() {
+export function sendMessage() { // No longer async, just emits
     if (state.isLoading || !state.currentChatId || state.currentTab !== 'chat') {
         setStatus("Cannot send: No active chat, busy, or not on Chat tab.", true);
+        return;
+    }
+
+    // Ensure socket connection exists
+    if (!socket || !socket.connected) {
+        setStatus("Cannot send: Not connected to the server.", true);
+        // Optionally try to reconnect here?
+        // connectTranscriptionSocket(); // Example, might need adjustments
         return;
     }
 
@@ -1083,23 +1092,29 @@ export async function sendMessage() {
     }
     // --- End Validation ---
 
+    // Clear input in DOM immediately
+    if (elements.messageInput) {
+        elements.messageInput.value = '';
+        ui.autoResizeTextarea(elements.messageInput);
+    }
 
-   // Clear input in DOM immediately
-   if (elements.messageInput) {
-       elements.messageInput.value = '';
-       // --- NEW: Resize textarea back to default after clearing ---
-       ui.autoResizeTextarea(elements.messageInput);
-       // ---------------------------------------------------------
-   }
+    // Add user message to state immediately
+    // UI will react to this state change to display the message
+    if (message) { // Only add if there was a message
+        state.addMessageToHistory({ role: 'user', content: message });
+    } else if (mode === 'chat' && (filesToAttach.length > 0 || sessionFileToSend || calendarContextToSend || webSearchEnabledToSend)) {
+        // Add a placeholder if only context/files were sent in chat mode
+        state.addMessageToHistory({ role: 'user', content: '[Context/Files Sent]' });
+    }
+    // No user message added for deep research if only query was sent (handled by backend)
 
-   // Add user message to state immediately
-   // UI will react to this state change to display the message
-    state.addMessageToHistory({ role: 'user', content: message }); // Assuming addMessageToHistory in state.js
 
-    setLoading(true, mode === 'deep_research' ? "Performing Deep Research..." : "Sending"); // Update loading message based on determined mode
+    // Set loading state (backend will emit results/errors)
+    setLoading(true, mode === 'deep_research' ? "Performing Deep Research..." : "Waiting for response...");
 
+    // Prepare payload for SocketIO emit
     const payload = {
-        chat_id: state.currentChatId,
+        chat_id: state.currentChatId, // Still needed for backend context
         message: message,
         // Send attached files (full/summary)
         attached_files: filesToAttach.map(f => ({ id: f.id, type: f.type })), // Send only id and type for attached files
@@ -1113,101 +1128,29 @@ export async function sendMessage() {
         enable_web_search_plugin: state.isWebSearchPluginEnabled,
         // Include the determined mode
         mode: mode,
+        // Include streaming flag for chat mode
+        enable_streaming: (mode === 'chat' && state.isStreamingEnabled),
     };
 
-    const sentSessionFile = state.sessionFile; // Store to clear later
+    const sentSessionFile = state.sessionFile; // Store to clear later if needed
 
-    try {
-        const response = await fetch(`/api/chat/${state.currentChatId}/message`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+    // Emit the message via SocketIO
+    console.log(`[DEBUG] Emitting 'send_chat_message' with payload:`, payload);
+    socket.emit('send_chat_message', payload);
 
-        // --- Handle Response based on Mode and Content-Type ---
-        const contentType = response.headers.get('Content-Type');
+    // --- Response handling is now done by socket.on listeners ---
+    // Remove the try/catch block that handled the fetch response.
 
-        if (!response.ok) {
-             // Handle HTTP errors (4xx, 5xx)
-             const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
-             console.error('API error:', response.status, errorData);
-             const errorMessage = `[Error: ${errorData.error || response.statusText}]`;
-             state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true });
-             setStatus("Error sending message.", true);
-             // No need to throw here, error is added to history and status is set.
-        } else if (mode === 'chat' && state.isStreamingEnabled && contentType?.includes('text/plain')) {
-            // Handle Streaming Chat Response
-            // Add an empty assistant message to state immediately for streaming
-            state.addMessageToHistory({ role: 'assistant', content: '' }); // Assuming addMessageToHistory handles streaming
+    // Clear temporary sidebar selection state immediately after sending
+    state.clearSidebarSelectedFiles();
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                const chunk = decoder.decode(value, { stream: true });
-                // Append chunk to the last message in state
-                state.appendContentToLastMessage(chunk); // Assuming appendContentToLastMessage in state.js
-            }
-            // Markdown rendering will be handled by the UI when state updates are processed
-            setStatus("Assistant replied (streaming finished).");
-
-        } else {
-            // Handle Non-Streaming Chat Response OR Deep Research Report (both are JSON)
-            const data = await response.json();
-
-            if (data.report !== undefined) { // Check for deep research report
-                 console.log("Received Deep Research Report:", data.report);
-                 // Add the full report as a single assistant message
-                 // Optionally add a title or special formatting here before adding to state
-                 const reportContent = `# Deep Research Report\n\n${data.report}`; // Example: Add a title
-                 state.addMessageToHistory({ role: 'assistant', content: reportContent });
-                 setStatus("Deep Research complete.");
-
-            } else if (data.reply !== undefined) { // Check for non-streaming chat reply
-                 console.log("Received Non-Streaming Chat Reply:", data.reply);
-                 // Add the full assistant message to state
-                 state.addMessageToHistory({ role: 'assistant', content: data.reply });
-                 setStatus("Assistant replied.");
-
-            } else if (data.error !== undefined) { // Check for backend error message in JSON
-                 console.error("Received backend error in JSON response:", data.error);
-                 const errorMessage = `[Error: ${data.error}]`;
-                 state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true });
-                 setStatus("Error from AI service.", true);
-
-            } else {
-                 // Unexpected JSON response structure
-                 console.error("Received unexpected JSON response structure:", data);
-                 const errorMessage = "[Error: Unexpected response from server]";
-                 state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true });
-                 setStatus("Error processing response.", true);
-            }
-        }
-
-        // Reload saved chats list state to update timestamp (applies to both modes)
-        // This should happen after the response is fully received/processed.
-        await loadSavedChats();
-
-        // Clear temporary sidebar selection state after successful send
-        state.clearSidebarSelectedFiles();
-
-        // Do NOT clear attachedFiles state here. They persist per chat.
-        // Only clear the session file state.
-        if (sentSessionFile && state.sessionFile === sentSessionFile) {
-             state.setSessionFile(null);
-        }
-
-    } catch (error) {
-        // This catch block handles network errors or errors during stream processing/JSON parsing
-        console.error('Network or processing error sending message:', error);
-        const errorMessage = `[Error: ${error.message}]`;
-        // Add error message to state
-        state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true }); // Assuming addMessageToHistory handles errors
-        setStatus("Error sending message.", true);
-    } finally {
-        setLoading(false);
+    // Clear the session file state immediately after sending
+    if (sentSessionFile && state.sessionFile === sentSessionFile) {
+         state.setSessionFile(null);
     }
+
+    // Note: setLoading(false) will be called by the event listeners
+    // when the final response or an error is received.
 }
 
 
