@@ -948,11 +948,58 @@ def perform_deep_research(query: str) -> str:
         query, collected_research
     )
 
-    # 4.5 With the updated research report plan/outline, we may need to do more research
-    # so we once again iterate through each stage of the research plan, generateing search queries
-    # for each new stage, pulling in results, and building up our corpus of research.
-    # AI! place the correct code block to do this here.
-    pass
+    # 4.5 Perform additional research for *new* sections identified in the updated plan.
+    logger.info("--- Checking for and executing additional research based on updated plan ---")
+    original_step_names = {name for name, desc in research_plan}
+    new_sections_researched = 0
+
+    with app.app_context(): # Ensure context for LLM calls and web search
+        for section_name, section_description in updated_report_plan:
+            if section_name not in original_step_names:
+                new_sections_researched += 1
+                logger.info(f"Performing additional research for new section: '{section_name}'")
+                logger.debug(f"Description: {section_description}")
+
+                # Initialize result lists for this new section if they don't exist
+                if section_name not in collected_research:
+                    collected_research[section_name] = []
+                if section_name not in collected_raw_results:
+                    collected_raw_results[section_name] = []
+
+                # a. Determine Search Queries for the new section
+                try:
+                    search_queries: List[str] = determine_research_queries(section_description)
+                    if not search_queries:
+                        logger.warning(f"No search queries generated for new section: {section_name}")
+                        continue # Skip to next section if no queries
+
+                    # b. Perform Web Search & Scrape Results for each query
+                    for search_query in search_queries:
+                        processed_content, raw_dicts = web_search(search_query)
+                        if processed_content:
+                            collected_research[section_name].extend(processed_content)
+                        if raw_dicts:
+                            collected_raw_results[section_name].extend(raw_dicts)
+
+                        if not processed_content and not raw_dicts:
+                            logger.debug(f"No results from web_search for query '{search_query}' in new section '{section_name}'")
+
+                    logger.info(f"Finished additional research for new section: '{section_name}'. Collected {len(collected_research[section_name])} processed, {len(collected_raw_results[section_name])} raw items.")
+
+                except Exception as e:
+                    logger.error(f"Error during additional research for section '{section_name}': {e}", exc_info=True)
+                    # Add error messages to results
+                    error_msg = f"[System Error: Failed during additional research for section '{section_name}': {type(e).__name__}]"
+                    collected_research[section_name].append(error_msg)
+                    collected_raw_results[section_name].append({"error": error_msg})
+            else:
+                 logger.debug(f"Section '{section_name}' was part of initial research, skipping additional search.")
+
+    if new_sections_researched > 0:
+        logger.info(f"--- Finished additional research for {new_sections_researched} new section(s) ---")
+    else:
+        logger.info("--- No new sections required additional research ---")
+
 
     # 5. Synthesize Report Sections based on the *updated* plan
     # This part remains sequential as each section synthesis depends on the overall collected data.
