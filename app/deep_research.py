@@ -741,7 +741,7 @@ def final_report(
 
     prompt = f"""
 You are tasked with assembling and formatting a final research report from its constituent parts using Markdown.
-Ensure the report flows logically, uses appropriate headings (e.g., #, ##), and applies selective bolding for emphasis on key terms or findings.
+Ensure the report flows logically, uses appropriate headings (e.g., #, ##), and applies selective bolding for emphasis on key terms or findings. Make sure to add a sensible title.
 
 **Crucially, you must convert simple source references within the report body into proper Markdown links.**
 The 'Works Cited' section provided below contains the mapping between source numbers and their details (including URLs if available).
@@ -1072,6 +1072,7 @@ def perform_deep_research(query: str) -> str:
         f"Total raw research items available for synthesis: {len(all_raw_research_items)}"
     )
 
+    # AI! Use threadpoolexecutor to run this in parallel
     for section_name, section_description in updated_report_plan:
         logger.info(f"\n--- Synthesizing Report Section: {section_name} ---")
 
