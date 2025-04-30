@@ -1278,7 +1278,8 @@ function subscribeStateChangeListeners() {
     state.subscribe('isCalendarContextActive', ui.handleStateChange_isCalendarContextActive);
     state.subscribe('isWebSearchEnabled', ui.handleStateChange_isWebSearchEnabled);
     state.subscribe('isDeepResearchEnabled', ui.handleStateChange_isDeepResearchEnabled); // Subscribe deep research handler
-
+    state.subscribe('isImprovePromptEnabled', ui.handleStateChange_isImprovePromptEnabled); // Subscribe improve prompt handler
+ 
     // Generic plugin enabled state change handler
     state.subscribe('pluginEnabled', ui.handleStateChange_pluginEnabled);
 

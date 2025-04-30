@@ -15,6 +15,8 @@ export const elements = {
     modelSelectorContainer: null,
     webSearchToggle: null,
     webSearchToggleLabel: null,
+    improvePromptToggle: null, // Added improve prompt toggle reference
+    improvePromptToggleLabel: null, // Added improve prompt toggle label reference
     deepResearchToggle: null, // Added deep research toggle reference
     deepResearchToggleLabel: null, // Added deep research toggle label reference
     calendarToggle: null,
@@ -174,6 +176,8 @@ export function populateElements() {
     elements.calendarModalContent = document.getElementById('calendar-modal-content');
     elements.webSearchToggle = document.getElementById('web-search-toggle');
     elements.webSearchToggleLabel = document.getElementById('web-search-toggle-label');
+    elements.improvePromptToggle = document.getElementById('improve-prompt-toggle'); // Added improve prompt toggle
+    elements.improvePromptToggleLabel = document.getElementById('improve-prompt-toggle-label'); // Added improve prompt toggle label
     elements.deepResearchToggle = document.getElementById('deep-research-toggle'); // Added deep research toggle
     elements.deepResearchToggleLabel = document.getElementById('deep-research-toggle-label'); // Added deep research toggle label
     elements.urlModal = document.getElementById('url-modal');

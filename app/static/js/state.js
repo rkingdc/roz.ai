@@ -158,6 +158,7 @@ export function notifyAll() {
     notify('isWebSearchPluginEnabled', isWebSearchPluginEnabled);
     notify('isWebSearchEnabled', isWebSearchEnabled);
     notify('isDeepResearchEnabled', isDeepResearchEnabled); // Notify deep research state
+    notify('isImprovePromptEnabled', isImprovePromptEnabled); // Notify improve prompt state
     notify('currentTab', currentTab);
     notify('currentNoteMode', currentNoteMode);
     notify('savedChats', savedChats);
