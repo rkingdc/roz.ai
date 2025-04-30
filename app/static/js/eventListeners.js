@@ -957,6 +957,14 @@ export function setupEventListeners() {
         // No functional effect yet, just updates state and UI
         console.log(`Deep Research Toggled: ${e.target.checked}`);
     });
+    // Add listener for the Improve Prompt toggle
+    elements.improvePromptToggle?.addEventListener('change', (e) => {
+        const isEnabled = e.target.checked;
+        state.setImprovePromptEnabled(isEnabled); // Update state (notifies isImprovePromptEnabled)
+        localStorage.setItem(config.IMPROVE_PROMPT_ENABLED_KEY, isEnabled); // Persist
+        // UI update is triggered by isImprovePromptEnabled notification
+        console.log(`Improve Prompt Toggled: ${isEnabled}`);
+    });
 
 
     // --- Tab Navigation ---
