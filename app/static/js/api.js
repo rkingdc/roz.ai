@@ -158,7 +158,15 @@ function initializeSocketListeners() {
             state.addMessageToHistory({ role: 'assistant', content: "[Error: Received empty response from server]", isError: true });
             setStatus("Received empty response.", true);
         }
-        setLoading(false); // Turn off loading indicator
+        // Clear processing state if this response corresponds to the chat being processed
+        // Assuming the backend includes chat_id in the response or we infer it
+        // For now, assume any non-streaming response clears the processing state if one exists
+        if (state.processingChatId !== null) { // Check if any chat is processing
+             // TODO: Ideally, check if data contains the chat_id and matches state.processingChatId
+             console.log(`[DEBUG] chat_response received. Clearing processingChatId: ${state.processingChatId}`);
+             state.setProcessingChatId(null);
+        }
+        // setLoading(false); // Don't use global loading for chat processing
     });
 
     socket.on('stream_chunk', (data) => {
@@ -181,7 +189,15 @@ function initializeSocketListeners() {
     socket.on('stream_end', (data) => {
         console.log("Received stream end signal:", data.message);
         setStatus("Assistant finished streaming.");
-        setLoading(false); // Turn off loading indicator
+        // Clear processing state if this response corresponds to the chat being processed
+        // Assuming the backend includes chat_id in the response or we infer it
+        // For now, assume any stream_end clears the processing state if one exists
+        if (state.processingChatId !== null) { // Check if any chat is processing
+             // TODO: Ideally, check if data contains the chat_id and matches state.processingChatId
+             console.log(`[DEBUG] stream_end received. Clearing processingChatId: ${state.processingChatId}`);
+             state.setProcessingChatId(null);
+        }
+        // setLoading(false); // Don't use global loading for chat processing
         loadSavedChats(); // Reload chat list to update timestamp
     });
 
@@ -197,7 +213,15 @@ function initializeSocketListeners() {
             state.addMessageToHistory({ role: 'assistant', content: "[Error: Received empty report from server]", isError: true });
             setStatus("Received empty report.", true);
         }
-        setLoading(false); // Turn off loading indicator
+        // Clear processing state if this response corresponds to the chat being processed
+        // Assuming the backend includes chat_id in the response or we infer it
+        // For now, assume any deep_research_result clears the processing state if one exists
+        if (state.processingChatId !== null) { // Check if any chat is processing
+             // TODO: Ideally, check if data contains the chat_id and matches state.processingChatId
+             console.log(`[DEBUG] deep_research_result received. Clearing processingChatId: ${state.processingChatId}`);
+             state.setProcessingChatId(null);
+        }
+        // setLoading(false); // Don't use global loading for chat processing
     });
 
     socket.on('task_error', (data) => {
@@ -206,7 +230,15 @@ function initializeSocketListeners() {
         // Add error message to chat history
         state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true });
         setStatus("Error processing request.", true);
-        setLoading(false); // Turn off loading indicator
+        // Clear processing state if this error corresponds to the chat being processed
+        // Assuming the backend includes chat_id in the error response or we infer it
+        // For now, assume any task_error clears the processing state if one exists
+        if (state.processingChatId !== null) { // Check if any chat is processing
+             // TODO: Ideally, check if data contains the chat_id and matches state.processingChatId
+             console.log(`[DEBUG] task_error received. Clearing processingChatId: ${state.processingChatId}`);
+             state.setProcessingChatId(null);
+        }
+        // setLoading(false); // Don't use global loading for chat processing
     });
 
     // --- Other Permanent Listeners (e.g., for transcription confirmation/errors) ---
@@ -1126,10 +1158,12 @@ export function sendMessage() { // No longer async, just emits
         state.addMessageToHistory({ role: 'user', content: '[Context/Files Sent]' });
     }
     // No user message added for deep research if only query was sent (handled by backend)
-
-
+ 
+ 
     // Set loading state (backend will emit results/errors)
-    setLoading(true, mode === 'deep_research' ? "Performing Deep Research..." : "Waiting for response...");
+    // setLoading(true, mode === 'deep_research' ? "Performing Deep Research..." : "Waiting for response..."); // Use chat-specific processing state instead
+    state.setProcessingChatId(state.currentChatId); // Set the ID of the chat being processed
+    setStatus(mode === 'deep_research' ? "Performing Deep Research..." : "Waiting for response..."); // Update status message
 
     // Prepare payload for SocketIO emit
     const payload = {

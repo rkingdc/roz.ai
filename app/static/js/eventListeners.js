@@ -1247,12 +1247,13 @@ export function setupEventListeners() {
  */
 function subscribeStateChangeListeners() {
     // Subscribe UI functions to state changes they should react to
-    state.subscribe('isLoading', ui.handleStateChange_isLoading);
+    state.subscribe('isLoading', ui.handleStateChange_isLoading); // Global loading
     state.subscribe('statusMessage', ui.handleStateChange_statusMessage);
-
+ 
     state.subscribe('savedChats', ui.handleStateChange_savedChats);
     state.subscribe('currentChat', ui.handleStateChange_currentChat); // Combined chat details
     state.subscribe('chatHistory', ui.handleStateChange_chatHistory);
+    state.subscribe('processingChatId', ui.handleStateChange_processingChatId); // Chat processing state
     state.subscribe('isRecording', ui.handleStateChange_isRecording); // Subscribe mic button UI to recording state
 
     state.subscribe('savedNotes', ui.handleStateChange_savedNotes);

@@ -145,51 +145,59 @@ export function renderStatus() {
 }
 
 /**
- * Updates the loading state of the UI elements.
- * Disables input, shows a loading indicator/message.
+ * Updates the loading state of UI elements.
+ * Disables global actions based on `state.isLoading`.
+ * Disables chat-specific inputs based on `state.processingChatId`.
  */
 export function updateLoadingState() {
-    const isLoading = state.isLoading;
-
-    // Add null checks for elements before accessing properties
-    if (elements.messageInput) elements.messageInput.disabled = isLoading;
-    if (elements.sendButton) elements.sendButton.disabled = isLoading;
-    if (elements.newChatButton) elements.newChatButton.disabled = isLoading;
-    // Corrected: Use the correct element reference for the chat save button
-    if (elements.saveChatNameButton) elements.saveChatNameButton.disabled = isLoading;
-    if (elements.currentChatNameInput) elements.currentChatNameInput.disabled = isLoading;
-    if (elements.newNoteButton) elements.newNoteButton.disabled = isLoading;
-    if (elements.saveNoteNameButton) elements.saveNoteNameButton.disabled = isLoading;
-    if (elements.currentNoteNameInput) elements.currentNoteNameInput.disabled = isLoading;
-    if (elements.loadCalendarButton) elements.loadCalendarButton.disabled = isLoading;
-    if (elements.manageFilesButton) elements.manageFilesButton.disabled = isLoading;
-    // Enable/disable Attach buttons based on sidebar selection state, not just overall loading
-    // if (elements.attachFullButton) elements.attachFullButton.disabled = isLoading;
-    // if (elements.attachSummaryButton) elements.attachSummaryButton.disabled = isLoading;
-    if (elements.fetchUrlButton) elements.fetchUrlButton.disabled = isLoading;
-    if (elements.saveSummaryButton) elements.saveSummaryButton.disabled = isLoading;
-    if (elements.settingsButton) elements.settingsButton.disabled = isLoading;
-    if (elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = isLoading;
-    if (elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.toggle('disabled', isLoading);
-    if (elements.addUrlModalButton) elements.addUrlModalButton.disabled = isLoading;
-    if (elements.editNoteButton) elements.editNoteButton.disabled = isLoading;
-    if (elements.viewNoteButton) elements.viewNoteButton.disabled = isLoading;
-    if (elements.markdownTipsButton) elements.markdownTipsButton.disabled = isLoading;
-    if (elements.micButton) elements.micButton.disabled = isLoading; // Disable mic button when loading
-    if (elements.micButtonNotes) elements.micButtonNotes.disabled = isLoading; // Disable notes mic button when loading
-
-
-    // Disable/enable list items for chats/notes/files
-    // File list items now also use the .list-item class
+    const isGloballyLoading = state.isLoading; // For non-chat operations
+    const isCurrentChatProcessing = state.currentChatId !== null && state.currentChatId === state.processingChatId;
+ 
+    // --- Disable Chat-Specific Inputs if *Current Chat* is Processing ---
+    if (elements.messageInput) elements.messageInput.disabled = isCurrentChatProcessing;
+    if (elements.sendButton) elements.sendButton.disabled = isCurrentChatProcessing;
+    if (elements.modelSelector) elements.modelSelector.disabled = isCurrentChatProcessing; // Disable model selector too
+    if (elements.micButton) elements.micButton.disabled = isCurrentChatProcessing || isGloballyLoading; // Disable if processing OR globally loading
+    if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = isCurrentChatProcessing || isGloballyLoading; // Disable if processing OR globally loading
+    // Also consider disabling file attachment buttons if current chat is processing?
+    if (elements.fileUploadSessionLabel) elements.fileUploadSessionLabel.classList.toggle('disabled', isCurrentChatProcessing);
+    // Attach buttons state is handled by updateAttachButtonState, which now checks processingChatId
+ 
+    // --- Disable Global Actions if *Any* Global Operation is Loading ---
+    // (New Chat, Save Name, Delete Chat, Load Calendar, Manage Files, Modals, Notes, Settings etc.)
+    if (elements.newChatButton) elements.newChatButton.disabled = isGloballyLoading;
+    if (elements.saveChatNameButton) elements.saveChatNameButton.disabled = isGloballyLoading; // Saving name is global
+    if (elements.currentChatNameInput) elements.currentChatNameInput.disabled = isGloballyLoading; // Saving name is global
+    if (elements.newNoteButton) elements.newNoteButton.disabled = isGloballyLoading;
+    if (elements.saveNoteNameButton) elements.saveNoteNameButton.disabled = isGloballyLoading;
+    if (elements.currentNoteNameInput) elements.currentNoteNameInput.disabled = isGloballyLoading;
+    if (elements.loadCalendarButton) elements.loadCalendarButton.disabled = isGloballyLoading;
+    if (elements.manageFilesButton) elements.manageFilesButton.disabled = isGloballyLoading;
+    if (elements.fetchUrlButton) elements.fetchUrlButton.disabled = isGloballyLoading;
+    if (elements.saveSummaryButton) elements.saveSummaryButton.disabled = isGloballyLoading;
+    if (elements.settingsButton) elements.settingsButton.disabled = isGloballyLoading;
+    if (elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = isGloballyLoading;
+    if (elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.toggle('disabled', isGloballyLoading);
+    if (elements.addUrlModalButton) elements.addUrlModalButton.disabled = isGloballyLoading;
+    if (elements.editNoteButton) elements.editNoteButton.disabled = isGloballyLoading; // Mode switching is global
+    if (elements.viewNoteButton) elements.viewNoteButton.disabled = isGloballyLoading; // Mode switching is global
+    if (elements.markdownTipsButton) elements.markdownTipsButton.disabled = isGloballyLoading;
+    if (elements.micButtonNotes) elements.micButtonNotes.disabled = isGloballyLoading; // Notes mic is global op
+    if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = isGloballyLoading; // Notes cleanup is global op
+    if (elements.longRecButtonNotes) elements.longRecButtonNotes.disabled = isGloballyLoading; // Long recording is global op
+ 
+    // Disable list items (chats, notes, files) based on global loading state
+    // This allows switching chats/notes even if one chat is processing in the background.
     document.querySelectorAll('.list-item').forEach(item => {
-        if (isLoading) {
+        if (isGloballyLoading) {
             item.classList.add('pointer-events-none', 'opacity-50');
         } else {
             item.classList.remove('pointer-events-none', 'opacity-50');
         }
     });
-
-    elements.bodyElement?.classList.toggle('loading', isLoading); // Add a class to body for global loading styles
+ 
+    // Add global loading class to body only for global operations
+    elements.bodyElement?.classList.toggle('loading', isGloballyLoading);
 
     // Update attach button state after loading state changes
     updateAttachButtonState();
@@ -1751,6 +1759,8 @@ export function handleStateChange_isLoading() {
     renderMicButtonState(); // Loading/recording state affects mic button disabled state
     updateNotesCleanupButtonState(); // Loading state affects notes button enabled state
     updateChatCleanupButtonState(); // Loading state affects chat button enabled state
+    // Update chat list processing indicator when global loading changes (e.g., initial load)
+    updateChatListProcessingIndicator();
 }
 
 export function handleStateChange_statusMessage() {

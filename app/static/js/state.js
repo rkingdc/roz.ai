@@ -43,6 +43,7 @@ export let uploadedFiles = []; // Array of { id, filename, mimetype, filesize, h
 export let currentChatName = '';
 export let currentChatModel = '';
 export let chatHistory = []; // Array of { role, content, isError }
+export let processingChatId = null; // ID of the chat currently waiting for backend response, or null
 // --- NEW: Chat Mode State ---
 export let currentChatMode = 'chat'; // 'chat' or 'deep_research'
 // ----------------------------
@@ -114,6 +115,12 @@ function notify(eventType, data) {
     }
 }
 
+export function setProcessingChatId(id) {
+    if (processingChatId !== id) {
+        processingChatId = id;
+        notify('processingChatId', processingChatId);
+    }
+}
 /**
  * Temporarily disables state change notifications.
  */
@@ -159,6 +166,7 @@ export function notifyAll() {
     notify('currentChatName', currentChatName);
     notify('currentChatModel', currentChatModel);
     notify('chatHistory', chatHistory);
+    notify('processingChatId', processingChatId); // Notify processing chat ID
     // --- NEW: Notify Chat Mode State ---
     notify('currentChatMode', currentChatMode);
     // ----------------------------------
