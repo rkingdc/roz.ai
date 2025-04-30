@@ -288,97 +288,32 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
         };
         // -----------------------------------------------------------------
 
-        // --- Logic to Connect or Use Existing Socket ---
-        // Ensure connection exists before proceeding
-        initializeWebSocketConnection(); // Ensure socket is initialized and connecting/connected
+        // --- Logic ---
+        initializeWebSocketConnection(); // Ensure connection attempt is active or connection exists
 
-        // Check connection status *after* attempting initialization
-        if (!socket || !socket.connected) {
-             // If initialization failed or is still in progress, reject
-             const errorMsg = socket ? "WebSocket is connecting, please wait." : "WebSocket connection failed to initialize.";
-             console.warn(`connectTranscriptionSocket: ${errorMsg}`);
-             setStatus(errorMsg, true);
-             return rejectOnce(new Error(errorMsg)); // Reject the promise
-        }
+        // Check current status *after* initiating connection attempt
+        if (socket && socket.connected) {
+            // --- Socket is already connected ---
+            console.log("[DEBUG] connectTranscriptionSocket: Socket already connected. Proceeding.");
+            setStatus("Initializing transcription stream...");
 
-        // If connected, proceed with transcription start
-        setStatus("Initializing transcription stream...");
-
-        // Add temporary listeners *only* for this specific start request's promise
-            socket.once('transcription_started', handleStarted);
-            socket.once('transcription_error', handleError);
-            socket.once('disconnect', handleDisconnectError); // Handle disconnect *while waiting*
-
-            // Emit start_transcription on the existing, connected socket
-            console.log("[DEBUG] Emitting start_transcription on existing socket.");
-            socket.emit('start_transcription', { languageCode, audioFormat });
-            // The promise resolves/rejects based on the temporary handlers above.
-            return; // Don't create a new socket.
-        // <<< REMOVE incorrect closing brace from here
-
-        // --- If socket wasn't connected initially ---
-        // The initializeWebSocketConnection call above started the connection attempt.
-        // We need to wait for the 'connect' event before emitting 'start_transcription'.
-
-        console.log("[DEBUG] connectTranscriptionSocket: Waiting for existing connection attempt to complete...");
-
-        // Add temporary listeners for connection success/failure *for this specific call*
-        socket.once('connect', () => {
-            // Connection successful, now wait for transcription_started
-            // Status/state updated by permanent 'connect' listener in initializeSocketListeners
-            console.log("[DEBUG] Socket connected. Waiting for transcription_started...");
-
-            // Add temporary listeners *for this specific start request*
-            socket.once('transcription_started', handleStarted);
-            socket.once('transcription_error', handleError);
-            socket.once('disconnect', handleDisconnectError); // Handle disconnect *while waiting*
-
-            // Emit start_transcription now that we are connected
-            console.log("[DEBUG] Emitting start_transcription after connect.");
-            socket.emit('start_transcription', { languageCode, audioFormat });
-        });
-
-        // Use temporary listener for connection error *for this specific call*
-        socket.once('connect_error', (error) => {
-            // Connection failed, reject the promise
-            // Status/state updated by permanent 'connect_error' listener in initializeSocketListeners
-            console.error("[DEBUG] connectTranscriptionSocket: Connection failed during wait.", error);
-            rejectOnce(error); // Reject the promise for this specific call
-        });
-
-        // Optional: Add a timeout for waiting for connection
-        const connectTimeout = setTimeout(() => {
-             console.error("[DEBUG] connectTranscriptionSocket: Timeout waiting for connection.");
-             rejectOnce(new Error("Timeout waiting for WebSocket connection."));
-        }, 5000); // 5 second timeout
-
-        // Clear timeout listeners when connect/error happens
-        const clearConnectTimeoutListeners = () => {
-            clearTimeout(connectTimeout);
-            socket.off('connect', handleConnectSuccess);
-            socket.off('connect_error', handleConnectErrorForTimeout);
-        };
-        const handleConnectSuccess = () => {
-            clearConnectTimeoutListeners();
-            // Now connected, proceed with the original logic inside the 'connect' handler
-            console.log("[DEBUG] connectTranscriptionSocket: Connection established. Waiting for transcription_started...");
+            // Add temporary listeners for this specific start request
             socket.once('transcription_started', handleStarted);
             socket.once('transcription_error', handleError);
             socket.once('disconnect', handleDisconnectError);
-            console.log("[DEBUG] Emitting start_transcription after waiting for connect.");
-            socket.emit('start_transcription', { languageCode, audioFormat });
-        };
-        const handleConnectErrorForTimeout = (error) => {
-             clearConnectTimeoutListeners();
-             // Error handled by the main connect_error listener, just log here
-             console.error("[DEBUG] connectTranscriptionSocket: connect_error received while waiting.");
-             // rejectOnce(error); // Rejection is handled by the other connect_error listener
-        };
 
-        socket.once('connect', handleConnectSuccess);
-        // Note: We don't add another connect_error listener here as the one above handles rejection.
-        // We just need one to clear the timeout.
-        socket.once('connect_error', handleConnectErrorForTimeout);
+            // Emit start_transcription
+            console.log("[DEBUG] Emitting start_transcription on existing socket.");
+            socket.emit('start_transcription', { languageCode, audioFormat });
+            // Promise resolves/rejects based on temporary listeners
+
+        } else {
+            // --- Socket is NOT connected (null, connecting, or disconnected) ---
+            const errorMsg = socket ? "WebSocket is still connecting, please try again shortly." : "WebSocket connection failed to initialize.";
+            console.warn(`connectTranscriptionSocket: Cannot start transcription - ${errorMsg}`);
+            setStatus(errorMsg, true);
+            rejectOnce(new Error(errorMsg)); // Reject immediately
+        }
 
     }); //End of promise constructor
 }
