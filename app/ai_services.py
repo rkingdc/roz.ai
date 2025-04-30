@@ -18,7 +18,7 @@ import os
 import re
 import base64
 from . import database
-from .plugins.web_search import perform_web_search
+from .plugins.web_search import perform_web_search, fetch_web_content # Import fetch_web_content
 from google.api_core.exceptions import (
     GoogleAPIError,
     DeadlineExceeded,
@@ -1332,26 +1332,52 @@ def _prepare_chat_content(
                             else:
                                 current_turn_parts.append(Part(text="   Content: [Could not extract text content.]\n---"))
                         elif result_type == 'pdf':
-                            pdf_bytes = result_content
-                            pdf_bytes = result_content
-                            pdf_filename = fetch_result.get('filename', f'search_result_{i+1}.pdf')
-                            logger.info(f"Attempting to transcribe PDF search result: {pdf_filename}")
+                            # The initial fetch_result might just indicate it's a PDF link.
+                            # We need to fetch the actual content bytes here using the link.
+                            pdf_link = link # Use the link obtained earlier for this result item
+                            pdf_filename_hint = fetch_result.get('filename', f'search_result_{i+1}.pdf') # Use original filename hint if available
+                            logger.info(f"Identified PDF link from search result: {pdf_link}. Attempting to fetch and transcribe.")
 
-                            # Call the transcription function
-                            transcription_result = transcribe_pdf_bytes(pdf_bytes, pdf_filename)
+                            pdf_bytes = None
+                            actual_pdf_filename = pdf_filename_hint # Start with the hint
 
-                            # Check if transcription was successful or returned an error string
-                            if transcription_result.startswith(("[Error", "[System Note", "[AI Error")):
-                                logger.warning(f"PDF transcription failed for web search result {pdf_filename}: {transcription_result}")
-                                # Append error/note about transcription failure
-                                current_turn_parts.append(Part(text=f"   Content: [Transcription Failed for PDF '{pdf_filename}': {transcription_result}]\n---"))
-                            else:
-                                logger.info(f"Successfully transcribed PDF from web search: {pdf_filename}")
-                                # Append transcribed text
-                                current_turn_parts.append(Part(text=f"   Content (Transcribed from PDF '{pdf_filename}'):\n{transcription_result.strip()}\n---"))
+                            try:
+                                # Fetch the actual PDF content using the link
+                                pdf_fetch_result = fetch_web_content(pdf_link)
+                                if pdf_fetch_result.get('type') == 'pdf' and isinstance(pdf_fetch_result.get('content'), bytes):
+                                    pdf_bytes = pdf_fetch_result['content']
+                                    actual_pdf_filename = pdf_fetch_result.get('filename', pdf_filename_hint) # Update filename if fetch provided a better one
+                                    logger.info(f"Successfully fetched PDF content ({len(pdf_bytes)} bytes) for {actual_pdf_filename} from {pdf_link}")
+                                elif pdf_fetch_result.get('type') == 'error':
+                                     logger.error(f"Error fetching PDF content from {pdf_link}: {pdf_fetch_result.get('content')}")
+                                     current_turn_parts.append(Part(text=f"   Content: [Error fetching PDF content from link: {pdf_fetch_result.get('content')}]\n---"))
+                                else:
+                                     logger.error(f"Fetching link {pdf_link} did not return PDF bytes as expected. Type: {pdf_fetch_result.get('type')}")
+                                     current_turn_parts.append(Part(text=f"   Content: [Failed to retrieve PDF content from link.]\n---"))
+
+                            except Exception as fetch_err:
+                                logger.error(f"Exception fetching PDF content from {pdf_link}: {fetch_err}", exc_info=True)
+                                current_turn_parts.append(Part(text=f"   Content: [System error fetching PDF content from link.]\n---"))
+
+                            # Proceed with transcription only if we got the bytes
+                            if pdf_bytes:
+                                transcription_result = transcribe_pdf_bytes(pdf_bytes, actual_pdf_filename)
+
+                                # Check if transcription was successful or returned an error string
+                                if transcription_result.startswith(("[Error", "[System Note", "[AI Error")):
+                                    logger.warning(f"PDF transcription failed for web search result {actual_pdf_filename}: {transcription_result}")
+                                    # Append error/note about transcription failure
+                                    current_turn_parts.append(Part(text=f"   Content: [Transcription Failed for PDF '{actual_pdf_filename}': {transcription_result}]\n---"))
+                                else:
+                                    logger.info(f"Successfully transcribed PDF from web search: {actual_pdf_filename}")
+                                    # Append transcribed text
+                                    current_turn_parts.append(Part(text=f"   Content (Transcribed from PDF '{actual_pdf_filename}'):\n{transcription_result.strip()}\n---"))
+                            # else: pdf_bytes was None, error part already added above
 
                         elif result_type == 'error':
-                            current_turn_parts.append(Part(text=f"   Content: [Error fetching content: {result_content}]\n---"))
+                            # This handles errors reported by the initial perform_web_search call
+                            # (e.g., Google API errors), not errors fetching content via link.
+                            current_turn_parts.append(Part(text=f"   Content: [Error reported by initial search: {result_content}]\n---"))
                         else: # Handle other unexpected types
                             logger.warning(f"Unknown fetch result type '{result_type}' for link {link}")
                             current_turn_parts.append(Part(text=f"   Content: [Unknown content type: {result_type}]\n---"))
