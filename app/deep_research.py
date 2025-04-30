@@ -716,19 +716,6 @@ def create_works_cited(
             "[Note: No specific sources were cited or citation data was missing.]\n"
         )
 
-    # Optional: Ask LLM to format the list nicely (might be overkill)
-    # prompt = f"""
-    # Please format the following list of cited sources into a clean "Works Cited" section using Markdown.
-    # Ensure each item is on a new line, potentially using numbered or bulleted lists.
-
-    # Cited Sources List:
-    # {works_cited_content}
-
-    # Formatted Works Cited Section (Markdown):
-    # """
-    # formatted_list = generate_text(prompt)
-    # return formatted_list
-
     logger.info("Successfully generated works cited section.")
     return works_cited_content
 
@@ -772,9 +759,10 @@ Here are the components:
 **Instructions:**
 1. Combine these sections into a single, coherent Markdown document.
 2. Use appropriate Markdown heading levels (e.g., `# Executive Summary`, `## Section Title`, `# Next Steps / Further Research`, `# Works Cited`).
-3. Apply selective **bolding** to highlight important terms, concepts, or conclusions within the text.
+3. Conservatively apply selective **bolding** to highlight important terms, concepts, or conclusions within the text.
 4. **Convert references:** Find patterns like '[Source N]' in the 'Report Body' and replace them with Markdown links `[N](URL)` using the corresponding URL from the 'Works Cited' section. If a source number in 'Works Cited' does not have a URL, use `[N]`. Match the number 'N' to the number at the start of the entry in 'Works Cited'.
-5. Ensure the final 'Works Cited' section is included at the end, formatted clearly (e.g., as a numbered list).
+5. Ensure the final 'Works Cited' section is included at the end, formatted clearly. Example
+    1. [**Title of Entry** - https://url.of.entry](https://url.of.entry.com)
 6. Do not add any commentary outside the report content itself.
 
 **Final Formatted Report (Markdown):**
