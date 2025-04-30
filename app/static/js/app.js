@@ -5,7 +5,7 @@
 import { elements, populateElements } from './dom.js';
 import * as state from './state.js';
 import * as ui from './ui.js';
-import * as api from './api.js';
+import * as api from './api.js'; // Import the whole api module
 import * as config from './config.js'; // Import config
 import { setupEventListeners } from './eventListeners.js';
 // --- RE-ADDED: Toast Initializer Import ---
@@ -179,6 +179,9 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners(); // Now called AFTER toast initialization
 
 
-    // 4. Initialize the application state and load initial data
+    // 4. Initialize WebSocket Connection
+    api.initializeWebSocketConnection(); // Establish connection early
+
+    // 5. Initialize the application state and load initial data
     initializeApp(); // initializeApp no longer needs to call initializeToastContainer
 });

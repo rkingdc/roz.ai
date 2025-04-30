@@ -20,6 +20,48 @@ import { MIME_TYPE } from './voice.js'; // Import MIME_TYPE constant
 let socket = null; // Holds the socket connection
 let permanentListenersAttached = false; // Flag to ensure permanent listeners are added only once
 
+
+// --- SocketIO Initialization and Connection ---
+
+/**
+ * Initializes the WebSocket connection if it doesn't exist or is disconnected.
+ * Attaches permanent listeners exactly once per connection lifecycle.
+ * Safe to call multiple times.
+ */
+export function initializeWebSocketConnection() {
+    // Only proceed if socket doesn't exist or is disconnected
+    if (socket && socket.connected) {
+        console.log("[DEBUG] WebSocket connection already active.");
+        return; // Already connected
+    }
+    if (socket && socket.connecting) {
+        console.log("[DEBUG] WebSocket connection attempt already in progress.");
+        return; // Connection attempt in progress
+    }
+
+    if (typeof io === 'undefined') {
+        console.error("Socket.IO client library not found. Make sure it's included.");
+        setStatus("Error: Missing Socket.IO library.", true);
+        return; // Cannot proceed
+    }
+
+    console.log("[DEBUG] Initializing WebSocket connection...");
+    setStatus("Connecting to server...");
+    state.setIsSocketConnected(false); // Assume disconnected until 'connect' event
+    permanentListenersAttached = false; // Reset listener flag for new connection attempt
+
+    // Create the single socket instance (or recreate if disconnected)
+    socket = io({
+        // Optional: Add reconnection options if needed
+        // reconnectionAttempts: 5,
+        // reconnectionDelay: 1000,
+    });
+
+    // Attach permanent listeners (will only run if not already attached)
+    initializeSocketListeners();
+}
+
+
 // --- Helper to update loading and status state ---
 function setLoading(isLoading, message = "Busy...") {
     state.setIsLoading(isLoading);
@@ -247,10 +289,22 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
         // -----------------------------------------------------------------
 
         // --- Logic to Connect or Use Existing Socket ---
-        if (socket && socket.connected) {
-            setStatus("Initializing transcription stream...");
+        // Ensure connection exists before proceeding
+        initializeWebSocketConnection(); // Ensure socket is initialized and connecting/connected
 
-            // Add temporary listeners *only* for this specific start request's promise
+        // Check connection status *after* attempting initialization
+        if (!socket || !socket.connected) {
+             // If initialization failed or is still in progress, reject
+             const errorMsg = socket ? "WebSocket is connecting, please wait." : "WebSocket connection failed to initialize.";
+             console.warn(`connectTranscriptionSocket: ${errorMsg}`);
+             setStatus(errorMsg, true);
+             return rejectOnce(new Error(errorMsg)); // Reject the promise
+        }
+
+        // If connected, proceed with transcription start
+        setStatus("Initializing transcription stream...");
+
+        // Add temporary listeners *only* for this specific start request's promise
             socket.once('transcription_started', handleStarted);
             socket.once('transcription_error', handleError);
             socket.once('disconnect', handleDisconnectError); // Handle disconnect *while waiting*
@@ -259,30 +313,16 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
             console.log("[DEBUG] Emitting start_transcription on existing socket.");
             socket.emit('start_transcription', { languageCode, audioFormat });
             // The promise resolves/rejects based on the temporary handlers above.
-            return; // Don't create a new socket or add permanent listeners again.
+            return; // Don't create a new socket.
         }
 
-        // --- Create New Socket Connection ---
-        console.log("[DEBUG] No existing connected socket found. Creating new connection...");
-        if (typeof io === 'undefined') {
-            console.error("Socket.IO client library not found. Make sure it's included.");
-            setStatus("Error: Missing Socket.IO library.", true);
-            rejectOnce(new Error("Socket.IO client library not found.")); // Reject the promise
-            return rejectOnce(new Error("Socket.IO client library not found."));
-        }
+        // --- If socket wasn't connected initially ---
+        // The initializeWebSocketConnection call above started the connection attempt.
+        // We need to wait for the 'connect' event before emitting 'start_transcription'.
 
-        setStatus("Connecting to server...");
-        state.setIsSocketConnected(false); // Assume disconnected until 'connect' event
+        console.log("[DEBUG] connectTranscriptionSocket: Waiting for existing connection attempt to complete...");
 
-        // Create the single socket instance
-        socket = io({ /* options */ });
-
-        // --- Attach Permanent Listeners ONCE ---
-        // This needs to happen *before* the connect event might fire
-        initializeSocketListeners(); // Adds all permanent handlers
-
-        // --- Handle Connection for *this specific call's* promise ---
-        // Use temporary listeners for the initial connection and start attempt
+        // Add temporary listeners for connection success/failure *for this specific call*
         socket.once('connect', () => {
             // Connection successful, now wait for transcription_started
             // Status/state updated by permanent 'connect' listener in initializeSocketListeners
@@ -298,12 +338,48 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
             socket.emit('start_transcription', { languageCode, audioFormat });
         });
 
-        // Use temporary listener for connection error for this promise
+        // Use temporary listener for connection error *for this specific call*
         socket.once('connect_error', (error) => {
             // Connection failed, reject the promise
-            // Status/state updated by permanent 'connect_error' listener
-            rejectOnce(error);
+            // Status/state updated by permanent 'connect_error' listener in initializeSocketListeners
+            console.error("[DEBUG] connectTranscriptionSocket: Connection failed during wait.", error);
+            rejectOnce(error); // Reject the promise for this specific call
         });
+
+        // Optional: Add a timeout for waiting for connection
+        const connectTimeout = setTimeout(() => {
+             console.error("[DEBUG] connectTranscriptionSocket: Timeout waiting for connection.");
+             rejectOnce(new Error("Timeout waiting for WebSocket connection."));
+        }, 5000); // 5 second timeout
+
+        // Clear timeout listeners when connect/error happens
+        const clearConnectTimeoutListeners = () => {
+            clearTimeout(connectTimeout);
+            socket.off('connect', handleConnectSuccess);
+            socket.off('connect_error', handleConnectErrorForTimeout);
+        };
+        const handleConnectSuccess = () => {
+            clearConnectTimeoutListeners();
+            // Now connected, proceed with the original logic inside the 'connect' handler
+            console.log("[DEBUG] connectTranscriptionSocket: Connection established. Waiting for transcription_started...");
+            socket.once('transcription_started', handleStarted);
+            socket.once('transcription_error', handleError);
+            socket.once('disconnect', handleDisconnectError);
+            console.log("[DEBUG] Emitting start_transcription after waiting for connect.");
+            socket.emit('start_transcription', { languageCode, audioFormat });
+        };
+        const handleConnectErrorForTimeout = (error) => {
+             clearConnectTimeoutListeners();
+             // Error handled by the main connect_error listener, just log here
+             console.error("[DEBUG] connectTranscriptionSocket: connect_error received while waiting.");
+             // rejectOnce(error); // Rejection is handled by the other connect_error listener
+        };
+
+        socket.once('connect', handleConnectSuccess);
+        // Note: We don't add another connect_error listener here as the one above handles rejection.
+        // We just need one to clear the timeout.
+        socket.once('connect_error', handleConnectErrorForTimeout);
+
     }); //End of promise constructor
 }
 
