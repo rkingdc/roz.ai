@@ -2,8 +2,10 @@ import json
 import logging
 import re
 from typing import List, Tuple, Any, Dict
-from concurrent.futures import ThreadPoolExecutor, as_completed # Changed ProcessPoolExecutor to ThreadPoolExecutor
-
+from concurrent.futures import (
+    ThreadPoolExecutor,
+    as_completed,
+) 
 import tempfile  # For potential future use if needed directly here
 import os  # For potential future use if needed directly here
 from flask import current_app  # To access config for model names if needed
@@ -468,7 +470,7 @@ def synthesize_research_into_report_section(
         source_id = f"Source {i+1}"
         link = research_dict.get("link", "No Link Provided")
         title = research_dict.get("title", "No Title")
-        snippet = research_dict.get("snippet", "") # Include snippet if available
+        snippet = research_dict.get("snippet", "")  # Include snippet if available
         fetch_result = research_dict.get("fetch_result", {})
         content_type = fetch_result.get("type", "unknown")
         content = fetch_result.get("content", "[Content not available]")
@@ -477,24 +479,23 @@ def synthesize_research_into_report_section(
         if content_type == "html" and isinstance(content, str):
             content_str = content.strip()
         elif content_type == "pdf" and isinstance(content, bytes):
-             # This shouldn't happen if web_search transcribed it, but handle defensively
-             content_str = f"[Note: PDF content bytes received, transcription expected upstream. Filename: {fetch_result.get('filename', 'N/A')}]"
+            # This shouldn't happen if web_search transcribed it, but handle defensively
+            content_str = f"[Note: PDF content bytes received, transcription expected upstream. Filename: {fetch_result.get('filename', 'N/A')}]"
         elif content_type == "pdf_transcribed" and isinstance(content, str):
-             # Assuming web_search adds this type after successful transcription
-             content_str = f"Transcribed text from PDF '{fetch_result.get('filename', 'N/A')}':\n{content.strip()}"
+            # Assuming web_search adds this type after successful transcription
+            content_str = f"Transcribed text from PDF '{fetch_result.get('filename', 'N/A')}':\n{content.strip()}"
         elif content_type == "error" and isinstance(content, str):
-             content_str = f"[Error fetching content: {content}]"
-        elif isinstance(content, str): # Fallback for other string content
-             content_str = content.strip()
+            content_str = f"[Error fetching content: {content}]"
+        elif isinstance(content, str):  # Fallback for other string content
+            content_str = content.strip()
         else:
-             content_str = f"[Content not available or unexpected type: {content_type}]"
+            content_str = f"[Content not available or unexpected type: {content_type}]"
 
         formatted_research_parts.append(
             f"{source_id}:\nTitle: {title}\nLink: {link}\nSnippet: {snippet}\nContent:\n{content_str}"
         )
 
     formatted_research = "\n\n---\n\n".join(formatted_research_parts)
-
 
     prompt = f"""
 You are a research assistant writing a section for a report.
@@ -662,13 +663,15 @@ def create_works_cited(
     logger.info("Generating works cited section.")
 
     cited_items_formatted = []
-    source_details_map = {} # Map "Source N" identifier to its details
+    source_details_map = {}  # Map "Source N" identifier to its details
 
     # Build a map from "Source N" to the details needed for citation
     for i, item_dict in enumerate(all_raw_research_items):
         source_id = f"Source {i+1}"
         link = item_dict.get("link")
-        title = item_dict.get("title", f"Source {i+1}") # Use title if available, else placeholder
+        title = item_dict.get(
+            "title", f"Source {i+1}"
+        )  # Use title if available, else placeholder
         # Add filename for PDFs if available
         filename = item_dict.get("fetch_result", {}).get("filename")
         if filename:
@@ -677,7 +680,7 @@ def create_works_cited(
         source_details_map[source_id] = {
             "link": link,
             "title": title,
-            "original_index": i + 1, # Store the 1-based index
+            "original_index": i + 1,  # Store the 1-based index
         }
 
     # Collect all unique source identifiers ("Source 1", "Source 2", etc.) mentioned across report sections
@@ -686,23 +689,29 @@ def create_works_cited(
         if section_name.endswith(
             "_references"
         ):  # Ensure we only look at reference lists
-            unique_cited_source_ids.update(refs) # refs contains ["Source 1", "Source 3", ...]
+            unique_cited_source_ids.update(
+                refs
+            )  # refs contains ["Source 1", "Source 3", ...]
 
     # Build the formatted works cited list, sorted by original index
     for source_id in sorted(
         list(unique_cited_source_ids),
         # Sort using the original_index stored in the map
-        key=lambda sid: source_details_map.get(sid, {}).get("original_index", float('inf')),
+        key=lambda sid: source_details_map.get(sid, {}).get(
+            "original_index", float("inf")
+        ),
     ):
         details = source_details_map.get(source_id)
         if details:
-            entry = f"{details['original_index']}. " # Start with original index number
-            entry += f"*{details.get('title', 'Untitled Source')}*" # Use title from map
+            entry = f"{details['original_index']}. "  # Start with original index number
+            entry += (
+                f"*{details.get('title', 'Untitled Source')}*"  # Use title from map
+            )
 
             link = details.get("link")
             # Check for valid link before adding
             if link and link != "No Link Provided" and link.startswith("http"):
-                entry += f" - Available at: <{link}>" # Use angle brackets for URL
+                entry += f" - Available at: <{link}>"  # Use angle brackets for URL
             else:
                 entry += " (Link not available or invalid)"
             cited_items_formatted.append(entry)
@@ -807,7 +816,9 @@ Here are the components:
 
 
 # --- Helper for Parallel Execution ---
-def _execute_research_step(step_name: str, step_description: str) -> Tuple[str, List[str], List[Dict]]:
+def _execute_research_step(
+    step_name: str, step_description: str
+) -> Tuple[str, List[str], List[Dict]]:
     """
     Executes a single research step: determines queries and performs web search.
     Designed to be run in parallel using ThreadPoolExecutor (shares app context).
@@ -839,9 +850,13 @@ def _execute_research_step(step_name: str, step_description: str) -> Tuple[str, 
                     all_raw_dicts_for_step.extend(raw_dicts)
 
                 if not processed_content and not raw_dicts:
-                     logger.debug(f"No results from web_search for query '{search_query}' in step '{step_name}'")
+                    logger.debug(
+                        f"No results from web_search for query '{search_query}' in step '{step_name}'"
+                    )
 
-            logger.info(f"--- Finished Research Step (Thread): {step_name} - Collected {len(all_processed_content_for_step)} processed items, {len(all_raw_dicts_for_step)} raw items ---")
+            logger.info(
+                f"--- Finished Research Step (Thread): {step_name} - Collected {len(all_processed_content_for_step)} processed items, {len(all_raw_dicts_for_step)} raw items ---"
+            )
             # Return results outside the context block but before the except block
             return step_name, all_processed_content_for_step, all_raw_dicts_for_step
 
@@ -867,20 +882,28 @@ def perform_deep_research(query: str) -> str:
     logger.info(f"Initial Research Plan:\n{json.dumps(research_plan, indent=2)}")
 
     # 2. Prepare for Research Execution
-    collected_research: Dict[str, List[str]] = {}  # Stores processed content strings per *initial* step name
-    collected_raw_results: Dict[str, List[Dict]] = {} # Stores raw result dicts per *initial* step name
+    collected_research: Dict[str, List[str]] = (
+        {}
+    )  # Stores processed content strings per *initial* step name
+    collected_raw_results: Dict[str, List[Dict]] = (
+        {}
+    )  # Stores raw result dicts per *initial* step name
     original_step_details: Dict[str, str] = {
         name: desc for name, desc in research_plan
-    } # Store descriptions for reference
+    }  # Store descriptions for reference
 
     # 3. Execute Initial Research Steps in Parallel using Threads
-    logger.info(f"--- Executing {len(research_plan)} Initial Research Steps in Parallel (Threads) ---")
+    logger.info(
+        f"--- Executing {len(research_plan)} Initial Research Steps in Parallel (Threads) ---"
+    )
     # Use ThreadPoolExecutor for I/O-bound tasks (LLM calls, web requests)
     # Threads share the Flask application context, avoiding the RuntimeError.
     with ThreadPoolExecutor() as executor:
         # Submit all research steps to the executor
         future_to_step = {
-            executor.submit(_execute_research_step, name, desc): name # _execute_research_step now returns 3 items
+            executor.submit(
+                _execute_research_step, name, desc
+            ): name  # _execute_research_step now returns 3 items
             for name, desc in research_plan
         }
 
@@ -895,27 +918,39 @@ def perform_deep_research(query: str) -> str:
                 if completed_step_name == step_name:
                     collected_research[step_name] = processed_results
                     collected_raw_results[step_name] = raw_results
-                    logger.info(f"Successfully collected results for step: {step_name} ({len(processed_results)} processed, {len(raw_results)} raw)")
+                    logger.info(
+                        f"Successfully collected results for step: {step_name} ({len(processed_results)} processed, {len(raw_results)} raw)"
+                    )
                 else:
-                     logger.error(f"Mismatch in step name from future: expected {step_name}, got {completed_step_name}")
-                     # Store error messages in both dicts for consistency
-                     error_msg = f"[System Error: Mismatch in step name processing for '{step_name}']"
-                     collected_research[step_name] = [error_msg]
-                     collected_raw_results[step_name] = [{"error": error_msg}]
+                    logger.error(
+                        f"Mismatch in step name from future: expected {step_name}, got {completed_step_name}"
+                    )
+                    # Store error messages in both dicts for consistency
+                    error_msg = f"[System Error: Mismatch in step name processing for '{step_name}']"
+                    collected_research[step_name] = [error_msg]
+                    collected_raw_results[step_name] = [{"error": error_msg}]
 
             except Exception as exc:
-                logger.error(f"Step '{step_name}' generated an exception during execution: {exc}", exc_info=True)
+                logger.error(
+                    f"Step '{step_name}' generated an exception during execution: {exc}",
+                    exc_info=True,
+                )
                 # Store error messages in both dicts
-                error_msg = f"[System Error: Step '{step_name}' failed during execution: {exc}]"
+                error_msg = (
+                    f"[System Error: Step '{step_name}' failed during execution: {exc}]"
+                )
                 collected_research[step_name] = [error_msg]
                 collected_raw_results[step_name] = [{"error": error_msg}]
 
-    logger.info("--- Finished Parallel Execution of Initial Research Steps (Threads) ---")
+    logger.info(
+        "--- Finished Parallel Execution of Initial Research Steps (Threads) ---"
+    )
     # Log collected research summary
     for step, items in collected_research.items():
         raw_count = len(collected_raw_results.get(step, []))
-        logger.debug(f"Step '{step}': Collected {len(items)} processed items, {raw_count} raw items.")
-
+        logger.debug(
+            f"Step '{step}': Collected {len(items)} processed items, {raw_count} raw items."
+        )
 
     # 4. Generate Updated Report Plan (Outline) based on initial findings
     # Note: query_and_research_to_updated_plan expects Dict[str, List[str]]
@@ -924,7 +959,7 @@ def perform_deep_research(query: str) -> str:
         query, collected_research
     )
     if not updated_report_plan:
-         return "[Error: Could not generate updated report plan based on research.]"
+        return "[Error: Could not generate updated report plan based on research.]"
     logger.info(
         f"Updated Report Plan (Outline):\n{json.dumps(updated_report_plan, indent=2)}"
     )
@@ -932,7 +967,9 @@ def perform_deep_research(query: str) -> str:
     # 5. Synthesize Report Sections based on the *updated* plan
     # This part remains sequential as each section synthesis depends on the overall collected data.
     report_sections: Dict[str, str] = {}
-    report_references: Dict[str, List[str]] = {} # Stores references cited per section (e.g., "Source 1", "Source 3")
+    report_references: Dict[str, List[str]] = (
+        {}
+    )  # Stores references cited per section (e.g., "Source 1", "Source 3")
 
     # Consolidate *all* raw research items collected across *all* initial steps.
     # The synthesis function needs access to all potential sources for citation.
@@ -940,7 +977,9 @@ def perform_deep_research(query: str) -> str:
     for step_name in collected_raw_results:
         all_raw_research_items.extend(collected_raw_results[step_name])
 
-    logger.info(f"Total raw research items available for synthesis: {len(all_raw_research_items)}")
+    logger.info(
+        f"Total raw research items available for synthesis: {len(all_raw_research_items)}"
+    )
 
     for section_name, section_description in updated_report_plan:
         logger.info(f"\n--- Synthesizing Report Section: {section_name} ---")
@@ -950,12 +989,11 @@ def perform_deep_research(query: str) -> str:
         report_section_text, section_refs = synthesize_research_into_report_section(
             section_name,
             section_description,
-            all_raw_research_items, # Pass the list of raw dictionaries
+            all_raw_research_items,  # Pass the list of raw dictionaries
         )
         report_sections[section_name] = report_section_text
         # Store the list of cited source identifiers (e.g., ["Source 1", "Source 3"])
         report_references[section_name + "_references"] = section_refs
-
 
     # 6. Assemble Final Report Components
     full_report_body = "\n\n".join(report_sections.values())
@@ -966,7 +1004,6 @@ def perform_deep_research(query: str) -> str:
     # Create Works Cited using the collected references and the raw results dicts
     # Pass the consolidated raw results dict list here
     works_cited = create_works_cited(report_references, all_raw_research_items)
-
 
     # 7. Generate Final Report using LLM for formatting and citation linking
     final_report_output = final_report(
