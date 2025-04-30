@@ -3,15 +3,12 @@ import google.genai as genai  # Use the new SDK
 
 # Import necessary types, including the one for FileDataPart
 from google.genai.types import (
-    GenerationConfig,
     Part,
     Content,
-    GenerateContentResponse,
     Blob,  # Import Blob for inline data
-    Candidate,  # Import Candidate for error response structure
     FileData,  # Import FileData for referencing uploaded files
 )
-import binascii  # Import binascii for the correct exception type
+
 from flask import current_app, g  # Import g for request context caching
 import tempfile
 import os
@@ -27,10 +24,11 @@ from google.api_core.exceptions import (
     InvalidArgument,  # Import InvalidArgument for malformed content errors
 )
 from pydantic_core import ValidationError
-import grpc
+
 import logging
 import time  # Add time import
 import random  # Add random import
+from typing import Tuple, Callable, Any
 
 # from functools import wraps # Remove this import
 from werkzeug.utils import secure_filename
@@ -38,14 +36,137 @@ from werkzeug.utils import secure_filename
 # Configure logging - Removed basicConfig and setLevel here
 logger = logging.getLogger(__name__)
 
-# --- Configuration Check ---
-# Remove gemini_api_key_present global and configure_gemini function
 
-# --- Helper Functions for Client Instantiation ---
-# Remove _get_api_key and get_gemini_client functions
+def llm_factory(prompt_template: str, params: Tuple[str] = ()) -> Callable[..., str]:
+    """
+    Creates a function that formats a prompt template and sends it to the LLM.
 
-# --- Decorator for AI Readiness Check ---
-# Remove the entire decorator function
+    Args:
+        prompt_template: The base prompt string with placeholders in the format {param_name}.
+        params: A sequence (tuple or list) of parameter names expected by the template.
+
+    Returns:
+        A function that takes keyword arguments corresponding to the `params`
+        and returns the LLM's response string.
+
+    Raises:
+        ValueError: If the returned function is called with missing parameters.
+        KeyError: If the prompt_template contains placeholders not listed in params,
+                  or if formatting fails for other reasons related to placeholders.
+
+    Important Note:
+        The returned function relies on `ai_services.generate_text`, which expects
+        to be run within an active Flask request context to access configuration
+        (API key) and the Gemini client via Flask's `g` object. Calling the
+        returned function outside of a Flask request context will likely result
+        in errors within `generate_text`.
+    """
+    required_params = set(params)
+
+    # Validate that all placeholders in the template are covered by params
+    # This uses string.Formatter to parse the template
+    from string import Formatter
+
+    try:
+        template_placeholders = {
+            field_name
+            for _, field_name, _, _ in Formatter().parse(prompt_template)
+            if field_name is not None
+        }
+        missing_in_params = template_placeholders - required_params
+        if missing_in_params:
+            logger.warning(
+                f"Factory Warning: Placeholders {missing_in_params} exist in template but not in provided 'params'. Formatting will fail if these are required."
+            )
+        # It's okay if params contains names not in the template, they'll be ignored during format if not needed.
+    except Exception as e:
+        logger.error(
+            f"Error parsing prompt template during factory creation: {e}", exc_info=True
+        )
+        # Decide if this should be a hard error or just a warning
+        # raise ValueError("Invalid prompt template provided to factory.") from e
+
+    def llm_caller(**kwargs: Any) -> str:
+        """
+        Formats the prompt with provided arguments and calls the LLM.
+
+        Args:
+            **kwargs: Keyword arguments corresponding to the `params` defined
+                      in the factory.
+
+        Returns:
+            The response string from the LLM via ai_services.generate_text.
+
+        Raises:
+            ValueError: If any required parameters (defined in factory `params`)
+                        are missing in kwargs.
+            KeyError: If the prompt_template formatting fails (e.g., placeholder mismatch).
+        """
+        provided_params = set(kwargs.keys())
+
+        # Check for missing parameters based on the `params` list provided to the factory
+        missing_params = required_params - provided_params
+        if missing_params:
+            raise ValueError(
+                f"Missing required parameters: {', '.join(missing_params)}"
+            )
+
+        # Check for extra parameters (optional, could just ignore them)
+        extra_params = provided_params - required_params
+        if extra_params:
+            logger.warning(
+                f"Ignoring extra parameters provided to caller: {', '.join(extra_params)}"
+            )
+            # Filter kwargs to only include required params for formatting
+            # This ensures .format() doesn't fail if the template doesn't use all required_params
+            filtered_kwargs = {k: v for k, v in kwargs.items() if k in required_params}
+        else:
+            filtered_kwargs = kwargs
+
+        try:
+            # Format the prompt template using only the necessary parameters
+            formatted_prompt = prompt_template.format(**filtered_kwargs)
+            logger.info(f"Formatted prompt: {formatted_prompt[:200]}...")  # Log snippet
+        except KeyError as e:
+            # This should ideally be caught during factory creation if validation is strict,
+            # but can also happen if a param was listed but not actually in the template string correctly.
+            logger.error(
+                f"Error formatting prompt template. Placeholder {e} likely missing or misspelled in the template string itself."
+            )
+            raise KeyError(
+                f"Prompt template formatting error: Placeholder {e} not found in template string or mismatch."
+            ) from e
+        except Exception as e:
+            logger.error(
+                f"An unexpected error occurred during prompt formatting: {e}",
+                exc_info=True,
+            )
+            raise  # Re-raise unexpected errors
+
+        # Call the actual LLM service function
+        # Note: This function needs to run within a Flask request context
+        # because generate_text relies on current_app and g
+        try:
+            # generate_text uses the default model if model_name is None
+            response = generate_text(prompt=formatted_prompt)
+            return response
+        except Exception as e:
+            # Catch potential errors from generate_text if it fails even with its own handling
+            logger.error(f"Error calling ai_services.generate_text: {e}", exc_info=True)
+            # Return an error string, consistent with generate_text's error returns
+            return f"[Error calling LLM service: {type(e).__name__}]"
+
+    return llm_caller
+
+
+prompt_improver = llm_factory(
+    prompt_template="""You are an expert in LLM prompt engineering. You will receive user chats, extract the user intent, and rewrite the user's prompt to better elicit the information they need from the LLM. You will respond only with the re-written prompt. 
+
+The user prompt: {prompt}
+
+Your rewritten prompt:""",
+    params=("prompt"),
+)
 
 
 # --- Summary Generation ---
@@ -756,7 +877,9 @@ def _generate_chat_response_non_stream(
         if current_turn_parts:
             full_conversation.append(Content(role="user", parts=current_turn_parts))
         else:
-             logger.debug(f"No additional parts for user turn in chat {chat_id} (SID: {sid}). Sending history only.")
+            logger.debug(
+                f"No additional parts for user turn in chat {chat_id} (SID: {sid}). Sending history only."
+            )
 
         logger.info(
             f"Calling model.generate_content (non-streaming) for chat {chat_id} (SID: {sid})"
@@ -968,7 +1091,9 @@ def _generate_chat_response_stream(
             if not raw_model_name.startswith("models/")
             else raw_model_name
         )
-        logger.info(f"Using model '{model_to_use}' for streaming chat {chat_id} (SID: {sid}).") # Log the final model name
+        logger.info(
+            f"Using model '{model_to_use}' for streaming chat {chat_id} (SID: {sid})."
+        )  # Log the final model name
 
         # Construct conversation history. Only add the final user Content if parts exist.
         # The user's text message should be the last item in 'history'.
@@ -976,7 +1101,9 @@ def _generate_chat_response_stream(
         if current_turn_parts:
             full_conversation.append(Content(role="user", parts=current_turn_parts))
         else:
-             logger.debug(f"No additional parts for user turn in chat {chat_id} (SID: {sid}). Sending history only.")
+            logger.debug(
+                f"No additional parts for user turn in chat {chat_id} (SID: {sid}). Sending history only."
+            )
 
         # System prompt (currently unsupported by stream API, but keep for future)
         system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
@@ -1040,10 +1167,12 @@ def _generate_chat_response_stream(
                 # Emit the chunk text if it's not empty
                 if chunk_text:
                     # logger.debug(f"Emitting stream chunk for SID {sid}: {chunk_text[:100]}...") # Verbose
-                    socketio.emit("stream_chunk", {"chunk": chunk_text}, room=sid) # Ensure this line is present and uncommented
+                    socketio.emit(
+                        "stream_chunk", {"chunk": chunk_text}, room=sid
+                    )  # Ensure this line is present and uncommented
                     full_reply_content += chunk_text  # Accumulate for saving
                     chunk_count += 1
- 
+
             except AttributeError as ae:
                 logger.error(
                     f"AttributeError processing stream chunk for SID {sid}: {ae} - Chunk: {chunk!r}",
@@ -1066,8 +1195,10 @@ def _generate_chat_response_stream(
         )
         # Emit stream end signal if no error occurred during streaming
         if not emitted_error:
-            socketio.emit("stream_end", {"message": "Stream finished."}, room=sid) # Ensure this line is present and uncommented
- 
+            socketio.emit(
+                "stream_end", {"message": "Stream finished."}, room=sid
+            )  # Ensure this line is present and uncommented
+
     # --- Error Handling for Streaming API Call ---
     except InvalidArgument as e:
         logger.error(
@@ -1585,12 +1716,14 @@ def _prepare_chat_content(
                         text="[System Note: Web search enabled, but failed to generate a query.]"
                     )
                 )
- 
+
         # 5. User Message
         # The user message text is expected to be the last item in the 'history' list fetched from DB.
         # We no longer add the 'user_message' variable content here to avoid duplication.
         # current_turn_parts will now only contain non-message items like files, context, search results, instructions.
-        if not user_message and not current_turn_parts and not history: # Add placeholder only if absolutely nothing else exists for the turn
+        if (
+            not user_message and not current_turn_parts and not history
+        ):  # Add placeholder only if absolutely nothing else exists for the turn
             current_turn_parts.append(
                 Part(text="[User provided no text, only attachments or context.]")
             )

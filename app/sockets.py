@@ -143,7 +143,7 @@ def _process_chat_message_async(app, sid, data): # Ensure app argument is presen
     with app.app_context(): # Ensure this wraps the entire function body
         logger.debug(f"App context created successfully for background task (SID: {sid})")
         # REMOVE the line below if it exists, as it causes the error in the background thread
-        # app = current_app._get_current_object() # REMOVE THIS LINE
+        # app = current_app._get_current_object() # REMOVED THIS LINE
         try:
             if mode == 'deep_research':
                 logger.info(f"Calling deep_research.perform_deep_research for SID {sid}, Chat {chat_id}")
