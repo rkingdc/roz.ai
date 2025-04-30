@@ -1146,8 +1146,10 @@ export function sendMessage() { // No longer async, just emits
     const sentSessionFile = state.sessionFile; // Store to clear later if needed
 
     // Emit the message via SocketIO
+    console.log(`[DEBUG] >>>>> Preparing to emit 'send_chat_message'. Socket state: connected=${socket?.connected}, id=${socket?.id}`); // ADDED LOG
     console.log(`[DEBUG] Emitting 'send_chat_message' with payload:`, payload);
     socket.emit('send_chat_message', payload);
+    console.log(`[DEBUG] <<<<< Finished emitting 'send_chat_message'.`); // ADDED LOG
 
     // --- Response handling is now done by socket.on listeners ---
     // Remove the try/catch block that handled the fetch response.

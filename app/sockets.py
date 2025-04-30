@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__) # Use the standard logger name
 def handle_connect():
     """Handles new client connections."""
     sid = request.sid
-    logger.info(f"WebSocket client connected: {sid}")
+    logger.info(f"****** WebSocket client connected: SID={sid} ******") # MODIFIED LOG
     # Join a room specific to the session ID so we can emit directly to this client
     join_room(sid)
     logger.info(f"Client {sid} joined its room.")

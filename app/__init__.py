@@ -63,6 +63,7 @@ def create_app(test_config=None):
     db.init_app(app)
     migrate.init_app(app, db)
     socketio.init_app(app) # Initialize SocketIO with the app
+    logger.info("SocketIO initialized with Flask app.") # ADDED LOG
 
     # --- Import Models ---
     # Import models AFTER db is initialized and associated with the app
