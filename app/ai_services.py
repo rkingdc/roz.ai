@@ -297,7 +297,7 @@ def generate_summary(file_id):
                 f"Quota/Rate limit hit during summary generation for {filename}."
             )
             return "[Error: API quota or rate limit exceeded. Please try again later.]"
-        return f"[Error generating summary via API: {type(e).__name__}]"
+        return f"[Error generating summary via API: {type(e).__name__}]"  # Generic API error
     except Exception as e:
         logger.error(
             f"Unexpected error during summary generation for '{filename}': {e}",
@@ -581,7 +581,7 @@ def _yield_streaming_error(error_msg: str):
     logger.debug(f"Yielding streaming error: {error_msg}")
     # Create a valid structure: Response -> Candidates -> Candidate -> Content -> Parts -> Part
     error_part = Part(text=error_msg)
-    error_content = Content(parts=[error_part], role="model")  # Assign role for Content
+    error_content = Content(role="model", parts=[error_part])  # Assign role for Content
     error_candidate = Candidate(
         content=error_content, finish_reason="ERROR"
     )  # Use ERROR finish reason
@@ -941,9 +941,6 @@ def _generate_chat_response_stream(
         full_conversation = history + [Content(role="user", parts=current_turn_parts)]
 
         system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
-
-        logger.info(f"Calling model.generate_content (streaming) for chat {chat_id}")
-        # system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read.""" # Defined but not used here
 
         logger.info(f"Calling model.generate_content (streaming) for chat {chat_id}")
         # NOTE: system_instruction is NOT supported directly in generate_content_stream in this SDK version.
@@ -1325,6 +1322,7 @@ def _prepare_chat_content(
                         result_content = fetch_result.get('content', 'Unknown error')
 
                         # Add text part describing the result source
+                        # This text part serves as the citation reference point for the AI
                         current_turn_parts.append(Part(text=f"[{i+1}] Title: {title}\n   Link: {link}\n   Snippet: {snippet}"))
 
                         # Process based on fetched content type
@@ -1353,7 +1351,7 @@ def _prepare_chat_content(
                                 # Create a Part referencing the uploaded file URI
                                 file_data_part = Part(file_data=FileData(mime_type="application/pdf", file_uri=uploaded_file.uri))
 
-                                # Add text part indicating PDF attachment
+                                # Add text part indicating PDF attachment (appears before the file part)
                                 current_turn_parts.append(Part(text=f"   Content: [Attached PDF Document: {pdf_filename}]\n---"))
                                 # Add the actual file data part
                                 current_turn_parts.append(file_data_part)
@@ -1384,6 +1382,7 @@ def _prepare_chat_content(
                 Part(text="[User provided no text, only attachments or context.]")
             )
         if web_search_enabled:
+            # Update prompt instructions to reflect attached PDFs
             current_turn_parts.extend([
                 Part(text="--- special instructions ---"),
                 Part(
@@ -1568,7 +1567,7 @@ Here is the transcribed speech:
         Exception,
     ) as e:
         logger.error(f"Error during transcript cleanup API call: {e}", exc_info=True)
-        return raw_transcript  # Fallback on any API error
+        return raw_transcript  # Fallback
 
 
 # --- Note Diff Summary Generation ---
