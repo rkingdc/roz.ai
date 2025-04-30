@@ -1887,9 +1887,14 @@ def transcribe_pdf_bytes(pdf_bytes: bytes, filename: str) -> str:
 
 # --- Standalone Text Generation (Example) ---
 # Remove the decorator
-def generate_text(prompt: str, model_name: str = None) -> str:
-    """Generates text using a specified model or the default."""
-    logger.info("Entering generate_text.")
+def generate_text(
+    prompt: str, model_name: str = None, max_retries=3, initial_backoff=1.0
+) -> str:
+    """
+    Generates text using a specified model or the default.
+    Includes exponential backoff with jitter for 429 errors.
+    """
+    logger.info(f"Entering generate_text. Max retries: {max_retries}")
 
     # --- AI Readiness Check (Moved from Decorator) ---
     try:
@@ -1952,16 +1957,211 @@ def generate_text(prompt: str, model_name: str = None) -> str:
         )
 
     logger.info(f"Generating text with model '{model_to_use}'...")
-    response = None  # Initialize
+    response = None
+    retries = 0
+    current_backoff = initial_backoff
+
+    while retries <= max_retries:
+        try:
+            # Use the client.models attribute for simple generation
+            # Standalone text generation is NOT streamed
+            logger.info(
+                f"Attempting generate_content (Attempt {retries + 1}/{max_retries + 1})"
+            )
+            response = client.models.generate_content(
+                model=model_to_use,
+                contents=prompt,
+            )
+
+            # --- Successful Response Processing ---
+            if response.prompt_feedback and response.prompt_feedback.block_reason:
+                reason = response.prompt_feedback.block_reason.name
+                logger.warning(
+                    f"Text generation blocked by safety settings. Reason: {reason}"
+                )
+                return f"[Error: Text generation blocked due to safety settings (Reason: {reason})]" # No retry for safety block
+
+            if (
+                response.candidates
+                and hasattr(response.candidates[0], "content")
+                and hasattr(response.candidates[0].content, "parts")
+                and response.candidates[0].content.parts
+            ):
+                text_reply = "".join(
+                    part.text
+                    for part in response.candidates[0].content.parts
+                    if hasattr(part, "text")
+                )
+                if text_reply.strip():
+                    logger.info(f"Text generation successful on attempt {retries + 1}.")
+                    return text_reply # Success!
+                else:
+                    logger.warning("Text generation resulted in empty text content.")
+                    return "[System Note: AI generated empty text.]" # No retry for empty content
+            else:
+                logger.warning(
+                    f"Text generation did not produce usable content. Response: {response!r}"
+                )
+                finish_reason = "UNKNOWN"
+                if response.candidates and hasattr(response.candidates[0], "finish_reason"):
+                    finish_reason = response.candidates[0].finish_reason.name
+                # No retry if no usable content and not a retryable error
+                return f"[Error: AI did not generate text content (Finish Reason: {finish_reason})]"
+
+        # --- Error Handling with Retries ---
+        except InvalidArgument as e:
+            logger.error(
+                f"InvalidArgument error during text generation: {e}.", exc_info=True
+            )
+            return f"[AI Error: Invalid argument ({type(e).__name__}).]" # No retry
+        except NotFound:
+            logger.error(f"Model '{model_to_use}' not found.")
+            return f"[Error: Model '{model_to_use}' not found]" # No retry
+        except GoogleAPIError as e:
+            # Check specifically for 429 Resource Exhausted / Rate Limit
+            is_rate_limit_error = False
+            if hasattr(e, "status_code") and e.status_code == 429:
+                 is_rate_limit_error = True
+            elif "resource_exhausted" in str(e).lower() or "429" in str(e):
+                 is_rate_limit_error = True
+
+            if is_rate_limit_error and retries < max_retries:
+                retries += 1
+                # Exponential backoff with jitter
+                sleep_time = current_backoff + random.uniform(0, current_backoff * 0.1)
+                logger.warning(
+                    f"Rate limit hit (429). Retrying in {sleep_time:.2f} seconds... (Attempt {retries}/{max_retries})"
+                )
+                time.sleep(sleep_time)
+                current_backoff *= 2 # Increase backoff for next potential retry
+                continue # Go to next iteration of the while loop
+            else:
+                # Handle non-retryable API errors or max retries reached for 429
+                logger.error(f"API error during text generation (final attempt or non-retryable): {e}")
+                err_str = str(e).lower()
+                if "api key not valid" in err_str:
+                    return "[Error: Invalid Gemini API Key]"
+                if is_rate_limit_error: # Max retries reached
+                     return f"[AI Error: API rate limit exceeded after {max_retries} retries.]"
+                # Add other common checks if needed (quota, etc.)
+                return f"[AI API Error: {type(e).__name__}]" # Generic API error
+        except Exception as e:
+            logger.error(f"Unexpected error during text generation: {e}", exc_info=True)
+            # Decide if unexpected errors should be retried? For now, no.
+            return f"[Unexpected AI Error: {type(e).__name__}]"
+
+    # If loop finishes without returning, it means max retries were hit for 429
+    logger.error(f"Text generation failed after {max_retries} retries due to rate limiting.")
+    return "[AI Error: API rate limit exceeded after maximum retries.]"
+
+
+# --- Helper Function to Clean Up Temporary Files ---
+def _cleanup_temp_files(temp_files: list, context_msg: str):
+    """Safely removes a list of temporary files."""
+    if temp_files:
+        logger.info(
+            f"Cleaning up {len(temp_files)} temporary files for {context_msg}..."
+        )
+        for temp_path in temp_files:
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    logger.debug(f"Removed temp file: {temp_path}")
+                else:
+                    logger.debug(f"Temp file not found, already removed? {temp_path}")
+            except OSError as e:
+                logger.warning(f"Error removing temp file {temp_path}: {e}")
+        logger.info(f"Finished cleaning temp files for {context_msg}.")
+
+
+# --- Transcript Cleaning ---
+def clean_up_transcript(raw_transcript: str) -> str:
+    """
+    Uses an LLM to clean up a raw transcript, removing filler words, etc.
+    Falls back to the original transcript if cleaning fails.
+    """
+    logger.info("Entering clean_up_transcript.")
+
+    if not raw_transcript or raw_transcript.isspace():
+        logger.warning("clean_up_transcript received empty input.")
+        return ""  # Return empty if input is empty
+
+    # --- AI Readiness Check ---
     try:
-        # Use the client.models attribute for simple generation
-        # Standalone text generation is NOT streamed
+        try:
+            _ = current_app.config
+            logger.debug("clean_up_transcript: Flask request context is active.")
+        except RuntimeError:
+            logger.error(
+                "clean_up_transcript called outside active Flask context.",
+                exc_info=True,
+            )
+            return raw_transcript  # Fallback
+
+        api_key = current_app.config.get("API_KEY")
+        if not api_key:
+            logger.error("API_KEY missing for clean_up_transcript.")
+            return raw_transcript  # Fallback
+
+        try:
+            if "genai_client" not in g:
+                logger.info("Creating new genai.Client for clean_up_transcript.")
+                g.genai_client = genai.Client(api_key=api_key)
+            else:
+                logger.debug("Using cached genai.Client for clean_up_transcript.")
+            client = g.genai_client
+        except (GoogleAPIError, ClientError, ValueError, Exception) as e:
+            logger.error(f"Failed to get genai.Client for cleanup: {e}", exc_info=True)
+            return raw_transcript  # Fallback
+
+    except Exception as e:
+        logger.error(
+            f"Unexpected error during readiness check for cleanup: {e}", exc_info=True
+        )
+        return raw_transcript  # Fallback
+    # --- End AI Readiness Check ---
+
+    # Determine model (use default or a specific one for cleaning if configured)
+    raw_model_name = current_app.config.get(
+        "SUMMARY_MODEL", current_app.config["DEFAULT_MODEL"]
+    )
+    model_to_use = (
+        f"models/{raw_model_name}"
+        if not raw_model_name.startswith("models/")
+        else raw_model_name
+    )
+
+    prompt = f"""
+    You are a skilled technical writer whose role is to format audio transcriptions into well-structured Markdown documents while preserving *as much detail as possible*. Your focus is on formatting, *not summarizing unless absolutely necessary*.
+
+*   **Headings:** Identify all distinct topics and subtopics in the transcript and create corresponding headings and subheadings (using #, ##, ###, etc.). Headings should be descriptive but concise.
+
+*   **Bullet Points (Detailed):** Extract key points, examples, arguments, and supporting details and represent them as bullet points (* or -). *Each bullet point should contain enough information to be understood independently.* Avoid overly concise summaries that lose important nuances.
+
+*   **Numbered Lists:** Accurately format all numbered lists, steps, or sequences from the transcript as numbered lists (1., 2., 3., etc.). Do not omit steps or details.
+
+*   **Order Preservation:** Maintain the original order of topics, bullet points, and numbered list items as closely as possible. Only reorder if the original order is demonstrably illogical.
+
+*   **Limited Filler Removal:** Remove filler words (um, uh, okay, you know, etc.) *only if their removal does not alter the meaning or clarity of the sentence*. In some cases, these words may convey emphasis or tone, which should be preserved.
+
+*   **Verbatim Phrases (When Appropriate):** If a particular phrase or sentence is especially well-articulated or insightful, consider including it verbatim (within quotation marks) as a bullet point or within the text.
+
+*   **Markdown Output Only:** Provide the complete Markdown document as the sole output.
+
+Here is the transcribed speech:
+    {raw_transcript}
+    """
+
+    logger.info(f"Attempting transcript cleanup using model '{model_to_use}'...")
+    response = None
+    try:
+        # Use non-streaming generation for cleanup
         response = client.models.generate_content(
             model=model_to_use,
             contents=prompt,
         )
 
-        # Process response similar to non-streaming chat
+        # Process response
         if response.prompt_feedback and response.prompt_feedback.block_reason:
             reason = response.prompt_feedback.block_reason.name
             logger.warning(
