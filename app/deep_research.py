@@ -899,6 +899,34 @@ def _execute_additional_research_step(
         return section_name, [error_msg], [{"error": error_msg}]
 
 
+# --- Helper for Parallel Section Synthesis ---
+def _synthesize_section_parallel(
+    app, section_name: str, section_description: str, all_raw_research_items: List[Dict]
+) -> Tuple[str, str, List[str]]:
+    """
+    Synthesizes a single report section in parallel using ThreadPoolExecutor.
+    Requires explicit app object.
+    Returns section name, section text, and list of references used.
+    """
+    logger.info(f"--- Starting Section Synthesis (Thread): {section_name} ---")
+    try:
+        # Explicitly create an app context for the thread
+        with app.app_context():
+            # Call the original synthesis function
+            report_section_text, section_refs = synthesize_research_into_report_section(
+                section_name,
+                section_description,
+                all_raw_research_items,
+            )
+            logger.info(f"--- Finished Section Synthesis (Thread): {section_name} ---")
+            return section_name, report_section_text, section_refs
+    except Exception as e:
+        logger.error(f"Error during synthesis step for section '{section_name}': {e}", exc_info=True)
+        error_msg = f"## {section_name}\n\n[System Error: Failed during synthesis for section '{section_name}': {type(e).__name__}]\n"
+        # Return error message as section text and empty refs
+        return section_name, error_msg, []
+
+
 # --- Main Deep Research Orchestration ---
 def perform_deep_research(query: str) -> str:
     """
@@ -1055,40 +1083,82 @@ def perform_deep_research(query: str) -> str:
         logger.info("--- No new sections required additional research ---")
 
 
-    # 5. Synthesize Report Sections based on the *updated* plan
-    # This part remains sequential as each section synthesis depends on the overall collected data.
-    report_sections: Dict[str, str] = {}
-    report_references: Dict[str, List[str]] = (
-        {}
-    )  # Stores references cited per section (e.g., "Source 1", "Source 3")
+    # 5. Synthesize Report Sections based on the *updated* plan (Parallel Threads)
+    logger.info(f"--- Synthesizing {len(updated_report_plan)} Report Sections in Parallel (Threads) ---")
+    report_sections_results: Dict[str, str] = {} # Temporary storage for results
+    report_references_results: Dict[str, List[str]] = {} # Temporary storage for results
 
-    # Consolidate *all* raw research items collected across *all* initial steps.
-    # The synthesis function needs access to all potential sources for citation.
+    # Consolidate *all* raw research items collected across *all* steps (initial + additional).
+    # This needs to be done *before* submitting synthesis tasks.
     all_raw_research_items = []
-    for step_name in collected_raw_results:
+    for step_name in collected_raw_results: # collected_raw_results now contains initial + additional
         all_raw_research_items.extend(collected_raw_results[step_name])
 
     logger.info(
         f"Total raw research items available for synthesis: {len(all_raw_research_items)}"
     )
 
-    # AI! Use threadpoolexecutor to run this in parallel
-    for section_name, section_description in updated_report_plan:
-        logger.info(f"\n--- Synthesizing Report Section: {section_name} ---")
+    if not all_raw_research_items:
+        logger.warning("No raw research items available for synthesis. Report sections might be empty or based only on descriptions.")
+        # Handle this case gracefully, maybe generate placeholder sections?
+        # For now, we'll let the synthesis function handle empty input if it can.
 
-        # Pass the consolidated list of raw result dictionaries to the synthesis function.
-        # The function's prompt expects this format to extract URLs for citations.
-        report_section_text, section_refs = synthesize_research_into_report_section(
-            section_name,
-            section_description,
-            all_raw_research_items,  # Pass the list of raw dictionaries
-        )
-        report_sections[section_name] = report_section_text
-        # Store the list of cited source identifiers (e.g., ["Source 1", "Source 3"])
-        report_references[section_name + "_references"] = section_refs
+    with ThreadPoolExecutor() as executor:
+        # Submit synthesis tasks
+        future_to_section = {
+            executor.submit(
+                _synthesize_section_parallel,
+                app,
+                name,
+                desc,
+                all_raw_research_items # Pass the consolidated list
+            ): name
+            for name, desc in updated_report_plan
+        }
+
+        # Process completed futures as they finish
+        for future in as_completed(future_to_section):
+            section_name = future_to_section[future]
+            try:
+                # Get results: (name, section_text, refs_list)
+                completed_section_name, section_text, section_refs = future.result()
+
+                if completed_section_name == section_name:
+                    report_sections_results[section_name] = section_text
+                    # Store references under the specific key format
+                    report_references_results[section_name + "_references"] = section_refs
+                    logger.info(
+                        f"Successfully synthesized section: {section_name} (Length: {len(section_text)}, Refs: {len(section_refs)})"
+                    )
+                else:
+                    logger.error(
+                        f"Mismatch in section name from synthesis future: expected {section_name}, got {completed_section_name}"
+                    )
+                    error_msg = f"## {section_name}\n\n[System Error: Mismatch in section name processing during synthesis for '{section_name}']\n"
+                    report_sections_results[section_name] = error_msg
+                    report_references_results[section_name + "_references"] = []
+
+            except Exception as exc:
+                logger.error(
+                    f"Synthesis section '{section_name}' generated an exception during execution: {exc}",
+                    exc_info=True,
+                )
+                error_msg = f"## {section_name}\n\n[System Error: Synthesis section '{section_name}' failed during execution: {exc}]\n"
+                report_sections_results[section_name] = error_msg
+                report_references_results[section_name + "_references"] = []
+
+    logger.info("--- Finished Parallel Execution of Section Synthesis ---")
+
+    # Ensure sections are assembled in the order defined by updated_report_plan
+    ordered_section_texts = [report_sections_results.get(name, f"## {name}\n\n[Error: Section not generated.]") for name, desc in updated_report_plan]
+    full_report_body = "\n\n".join(ordered_section_texts)
+
+    # The report_references dictionary is already populated correctly by the parallel step
+    report_references = report_references_results
+
 
     # 6. Assemble Final Report Components
-    full_report_body = "\n\n".join(report_sections.values())
+    # full_report_body is now assembled above
 
     executive_summary = create_exec_summary(full_report_body)
     next_steps = create_next_steps(full_report_body)
