@@ -152,7 +152,7 @@ export function renderStatus() {
 export function updateLoadingState() {
     const isGloballyLoading = state.isLoading; // For non-chat operations
     const isCurrentChatProcessing = state.currentChatId !== null && state.currentChatId === state.processingChatId;
- 
+
     // --- Disable Chat-Specific Inputs if *Current Chat* is Processing ---
     if (elements.messageInput) elements.messageInput.disabled = isCurrentChatProcessing;
     if (elements.sendButton) elements.sendButton.disabled = isCurrentChatProcessing;
