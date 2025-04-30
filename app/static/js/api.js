@@ -314,7 +314,7 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
             socket.emit('start_transcription', { languageCode, audioFormat });
             // The promise resolves/rejects based on the temporary handlers above.
             return; // Don't create a new socket.
-        }
+        } // <<< Add missing closing brace here
 
         // --- If socket wasn't connected initially ---
         // The initializeWebSocketConnection call above started the connection attempt.
