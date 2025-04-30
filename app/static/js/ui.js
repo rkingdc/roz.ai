@@ -525,6 +525,40 @@ export function renderCurrentChatDetails() {
     if (modelSelector) modelSelector.value = state.currentChatModel || modelSelector.options[0]?.value || ''; // Read from state
 }
 
+/** Adds/Removes a processing indicator (e.g., spinner) to chat list items. */
+export function updateChatListProcessingIndicator() {
+    const { savedChatsList } = elements;
+    if (!savedChatsList) return;
+
+    savedChatsList.querySelectorAll('.chat-list-item').forEach(item => {
+        const chatId = parseInt(item.dataset.chatId);
+        const nameContainer = item.querySelector('.name-container'); // Find the container for name/delete
+        let spinner = item.querySelector('.processing-spinner'); // Check if spinner exists
+
+        if (chatId === state.processingChatId) {
+            // Add spinner if it doesn't exist
+            if (!spinner && nameContainer) {
+                spinner = document.createElement('span');
+                spinner.classList.add('processing-spinner', 'ml-2'); // Add margin-left
+                spinner.innerHTML = '<i class="fas fa-spinner fa-spin fa-xs text-rz-sidebar-text"></i>'; // Spinner icon
+                // Insert spinner after the name span within the name container
+                const nameSpan = nameContainer.querySelector('.filename');
+                if (nameSpan) {
+                    nameSpan.insertAdjacentElement('afterend', spinner);
+                } else {
+                    nameContainer.appendChild(spinner); // Fallback append
+                }
+            }
+            item.classList.add('processing'); // Add class for potential styling
+        } else {
+            // Remove spinner if it exists
+            if (spinner) {
+                spinner.remove();
+            }
+            item.classList.remove('processing'); // Remove class
+        }
+    });
+}
 
 /**
  * Renders the list of saved notes from the state in the sidebar.
@@ -1880,6 +1914,13 @@ export function handleStateChange_currentTab() {
     // No, this handler *is* needed because state.notifyAll() will trigger it initially.
     // Let's call switchTab from here.
     switchTab(state.currentTab);
+}
+
+export function handleStateChange_processingChatId() {
+    // When the processing chat ID changes, update the loading state of UI elements
+    // and the visual indicator in the chat list.
+    updateLoadingState();
+    updateChatListProcessingIndicator();
 }
 
 export function handleStateChange_currentNoteMode() {
