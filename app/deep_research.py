@@ -2,7 +2,7 @@ import json
 import logging
 import re
 from typing import List, Tuple, Any, Dict
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor as Pool, as_completed
 
 import tempfile  # For potential future use if needed directly here
 import os  # For potential future use if needed directly here
@@ -847,7 +847,7 @@ def perform_deep_research(query: str) -> str:
     logger.info(f"--- Executing {len(research_plan)} Initial Research Steps in Parallel ---")
     # Use ProcessPoolExecutor for CPU-bound tasks (like potential PDF processing in web_search)
     # or I/O-bound tasks if they release the GIL effectively.
-    with ProcessPoolExecutor() as executor:
+    with Pool() as executor:
         # Submit all research steps to the executor
         future_to_step = {
             executor.submit(_execute_research_step, name, desc): name
