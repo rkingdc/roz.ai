@@ -179,20 +179,30 @@ def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List
                 processed_content_list.append(header + "Content:\n" + result_content.strip())
                 logger.debug(f"Added HTML content for result {i+1}")
             elif result_type == 'pdf' and isinstance(result_content, bytes):
-                # For PDFs, deep research doesn't process the bytes directly.
-                # Add a note indicating a PDF was found, including filename if available.
-                pdf_filename_note = f"PDF Document: {fetched_filename}" if fetched_filename else "PDF Document"
-                note = f"[Note: This source is a {pdf_filename_note}. Content not included directly for text processing.]"
-                processed_content_list.append(header + note)
-                logger.debug(f"Added PDF note for result {i+1}")
+                pdf_bytes = result_content
+                pdf_filename = fetched_filename if fetched_filename else f"search_result_{i+1}.pdf"
+                logger.info(f"Attempting to transcribe PDF: {pdf_filename}")
+                # Call the new transcription function from ai_services
+                transcription_result = transcribe_pdf_bytes(pdf_bytes, pdf_filename)
+
+                # Check if transcription was successful or returned an error string
+                if transcription_result.startswith(("[Error", "[System Note", "[AI Error")):
+                    logger.warning(f"PDF transcription failed for {pdf_filename}: {transcription_result}")
+                    # Append header + error/note about transcription failure
+                    processed_content_list.append(header + f"Content: [Transcription Failed for PDF '{pdf_filename}': {transcription_result}]\n---")
+                else:
+                    logger.info(f"Successfully transcribed PDF: {pdf_filename}")
+                    # Append header + transcribed text
+                    processed_content_list.append(header + f"Content (Transcribed from PDF '{pdf_filename}'):\n{transcription_result.strip()}\n---")
+
             elif result_type == 'error':
                  error_msg = result_content if isinstance(result_content, str) else 'Unknown error'
-                 note = f"[Error fetching content for this source: {error_msg}]"
-                 processed_content_list.append(header + note)
+                 note = f"[Error fetching content for this source: {error_msg}]\n---" # Added separator
+                 processed_content_list.append(header + note) # Note already includes separator
                  logger.warning(f"Error fetching content for result {i+1}: {error_msg}")
             else:
                 # Handle cases like empty content for HTML, or unexpected types/content
-                note = f"[Could not process content for this source (Type: {result_type}).]"
+                note = f"[Could not process content for this source (Type: {result_type}).]\n---" # Added separator
                 processed_content_list.append(header + note)
                 logger.warning(f"Could not process content for result {i+1} (Type: {result_type}, Content type: {type(result_content)}).")
 
