@@ -1333,36 +1333,26 @@ def _prepare_chat_content(
                                 current_turn_parts.append(Part(text="   Content: [Could not extract text content.]\n---"))
                         elif result_type == 'pdf':
                             pdf_bytes = result_content
+                            pdf_bytes = result_content
                             pdf_filename = fetch_result.get('filename', f'search_result_{i+1}.pdf')
-                            logger.info(f"Processing PDF search result: {pdf_filename} ({len(pdf_bytes)} bytes)")
-                            try:
-                                with tempfile.NamedTemporaryFile(delete=False, suffix=f"_{secure_filename(pdf_filename)}") as temp_file:
-                                    temp_file.write(pdf_bytes)
-                                    temp_filepath = temp_file.name
-                                    temp_files_to_clean.append(temp_filepath) # Schedule for cleanup
+                            logger.info(f"Attempting to transcribe PDF search result: {pdf_filename}")
 
-                                logger.info(f"Uploading temp PDF '{temp_filepath}' from web search...")
-                                uploaded_file = client.files.upload(
-                                    file=temp_filepath,
-                                    config={"display_name": pdf_filename, "mime_type": "application/pdf"}
-                                )
-                                logger.info(f"PDF '{pdf_filename}' uploaded via File API, URI: {uploaded_file.uri}")
+                            # Call the transcription function
+                            transcription_result = transcribe_pdf_bytes(pdf_bytes, pdf_filename)
 
-                                # Create a Part referencing the uploaded file URI
-                                file_data_part = Part(file_data=FileData(mime_type="application/pdf", file_uri=uploaded_file.uri))
-
-                                # Add text part indicating PDF attachment (appears before the file part)
-                                current_turn_parts.append(Part(text=f"   Content: [Attached PDF Document: {pdf_filename}]\n---"))
-                                # Add the actual file data part
-                                current_turn_parts.append(file_data_part)
-
-                            except Exception as upload_err:
-                                logger.error(f"Failed to upload PDF search result '{pdf_filename}': {upload_err}", exc_info=True)
-                                current_turn_parts.append(Part(text=f"   Content: [System: Error processing/uploading PDF '{pdf_filename}'. {type(upload_err).__name__}]\n---"))
+                            # Check if transcription was successful or returned an error string
+                            if transcription_result.startswith(("[Error", "[System Note", "[AI Error")):
+                                logger.warning(f"PDF transcription failed for web search result {pdf_filename}: {transcription_result}")
+                                # Append error/note about transcription failure
+                                current_turn_parts.append(Part(text=f"   Content: [Transcription Failed for PDF '{pdf_filename}': {transcription_result}]\n---"))
+                            else:
+                                logger.info(f"Successfully transcribed PDF from web search: {pdf_filename}")
+                                # Append transcribed text
+                                current_turn_parts.append(Part(text=f"   Content (Transcribed from PDF '{pdf_filename}'):\n{transcription_result.strip()}\n---"))
 
                         elif result_type == 'error':
                             current_turn_parts.append(Part(text=f"   Content: [Error fetching content: {result_content}]\n---"))
-                        else:
+                        else: # Handle other unexpected types
                             logger.warning(f"Unknown fetch result type '{result_type}' for link {link}")
                             current_turn_parts.append(Part(text=f"   Content: [Unknown content type: {result_type}]\n---"))
 
