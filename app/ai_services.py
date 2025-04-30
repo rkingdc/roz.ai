@@ -18,7 +18,7 @@ import os
 import re
 import base64
 from . import database
-from .plugins.web_search import perform_web_search # Remove fetch_web_content import
+from .plugins.web_search import perform_web_search  # Remove fetch_web_content import
 from google.api_core.exceptions import (
     GoogleAPIError,
     DeadlineExceeded,
@@ -30,7 +30,7 @@ from pydantic_core import ValidationError
 import grpc
 import logging
 import time  # Add time import
-import random # Add random import
+import random  # Add random import
 
 # from functools import wraps # Remove this import
 from werkzeug.utils import secure_filename
@@ -591,8 +591,8 @@ def generate_chat_response(
     calendar_context=None,
     web_search_enabled=False,
     streaming_enabled=False,
-    socketio=None, # Add socketio instance
-    sid=None       # Add client session ID
+    socketio=None,  # Add socketio instance
+    sid=None,  # Add client session ID
 ):
     """
     Generates a chat response using the Gemini API via the client.
@@ -605,10 +605,14 @@ def generate_chat_response(
         socketio: The Flask-SocketIO instance.
         sid: The session ID of the client to emit results to.
     """
-    logger.info(f"Entering generate_chat_response for chat {chat_id} (SID: {sid}). Streaming: {streaming_enabled}")
+    logger.info(
+        f"Entering generate_chat_response for chat {chat_id} (SID: {sid}). Streaming: {streaming_enabled}"
+    )
 
     if not socketio or not sid:
-        logger.error(f"generate_chat_response called without socketio or sid for chat {chat_id}.")
+        logger.error(
+            f"generate_chat_response called without socketio or sid for chat {chat_id}."
+        )
         # Cannot emit error back without socketio/sid, just log and exit.
         return
 
@@ -624,15 +628,15 @@ def generate_chat_response(
                 exc_info=True,
             )
             error_msg = "[Error: AI Service called outside request context]"
-            socketio.emit('task_error', {'error': error_msg}, room=sid)
-            return # Stop execution
+            socketio.emit("task_error", {"error": error_msg}, room=sid)
+            return  # Stop execution
 
         api_key = current_app.config.get("API_KEY")
         if not api_key:
             logger.error("API_KEY is missing from current_app.config.")
             error_msg = "[Error: AI Service API Key not configured]"
-            socketio.emit('task_error', {'error': error_msg}, room=sid)
-            return # Stop execution
+            socketio.emit("task_error", {"error": error_msg}, room=sid)
+            return  # Stop execution
 
         try:
             # Ensure genai client is initialized (using 'g' is fine here as this runs within app context)
@@ -650,8 +654,8 @@ def generate_chat_response(
             error_msg = "[Error: Failed to initialize AI client]"
             if "api key not valid" in str(e).lower():
                 error_msg = "[Error: Invalid Gemini API Key]"
-            socketio.emit('task_error', {'error': error_msg}, room=sid)
-            return # Stop execution
+            socketio.emit("task_error", {"error": error_msg}, room=sid)
+            return  # Stop execution
 
     except Exception as e:
         logger.error(
@@ -659,8 +663,8 @@ def generate_chat_response(
             exc_info=True,
         )
         error_msg = f"[CRITICAL Unexpected Error during AI Service readiness check: {type(e).__name__}]"
-        socketio.emit('task_error', {'error': error_msg}, room=sid)
-        return # Stop execution
+        socketio.emit("task_error", {"error": error_msg}, room=sid)
+        return  # Stop execution
     # --- End AI Readiness Check ---
 
     # --- Main Logic ---
@@ -677,53 +681,55 @@ def generate_chat_response(
         session_files=session_files,
         calendar_context=calendar_context,
         web_search_enabled=web_search_enabled,
-        socketio=socketio, # Pass socketio
-        sid=sid            # Pass sid
+        socketio=socketio,  # Pass socketio
+        sid=sid,  # Pass sid
     )
 
     # Check if preparation failed (it emits the error, returns None on failure)
     if preparation_result is None:
-        logger.error(f"Content preparation failed for chat {chat_id} (SID: {sid}). Error already emitted.")
-        return # Stop execution
+        logger.error(
+            f"Content preparation failed for chat {chat_id} (SID: {sid}). Error already emitted."
+        )
+        return  # Stop execution
 
     # Unpack results if preparation succeeded
     history, current_turn_parts, temp_files_to_clean = preparation_result
 
     # --- Determine Model ---
     # (This part remains the same)
-        raw_model_name = current_app.config.get(
-            "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
-        )
-        model_to_use = (
-            f"models/{raw_model_name}"
-            if not raw_model_name.startswith("models/")
-            else raw_model_name
-        )
-        logger.info(f"Model for chat {chat_id} (SID: {sid}): '{model_to_use}'.")
+    raw_model_name = current_app.config.get(
+        "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
+    )
+    model_to_use = (
+        f"models/{raw_model_name}"
+        if not raw_model_name.startswith("models/")
+        else raw_model_name
+    )
+    logger.info(f"Model for chat {chat_id} (SID: {sid}): '{model_to_use}'.")
 
-        # --- Call Appropriate Helper ---
-        if streaming_enabled:
-            _generate_chat_response_stream(
-                client=client,
-                chat_id=chat_id,
-                model_to_use=model_to_use,
-                history=history,
-                current_turn_parts=current_turn_parts,
-                temp_files_to_clean=temp_files_to_clean,
-                socketio=socketio,
-                sid=sid,
-            )
-        else:
-            _generate_chat_response_non_stream(
-                client=client,
-                chat_id=chat_id,
-                model_to_use=model_to_use,
-                history=history,
-                current_turn_parts=current_turn_parts,
-                temp_files_to_clean=temp_files_to_clean,
-                socketio=socketio,
-                sid=sid,
-            )
+    # --- Call Appropriate Helper ---
+    if streaming_enabled:
+        _generate_chat_response_stream(
+            client=client,
+            chat_id=chat_id,
+            model_to_use=model_to_use,
+            history=history,
+            current_turn_parts=current_turn_parts,
+            temp_files_to_clean=temp_files_to_clean,
+            socketio=socketio,
+            sid=sid,
+        )
+    else:
+        _generate_chat_response_non_stream(
+            client=client,
+            chat_id=chat_id,
+            model_to_use=model_to_use,
+            history=history,
+            current_turn_parts=current_turn_parts,
+            temp_files_to_clean=temp_files_to_clean,
+            socketio=socketio,
+            sid=sid,
+        )
 
 
 # --- Helper Function for NON-STREAMING Response ---
@@ -738,19 +744,25 @@ def _generate_chat_response_non_stream(
     sid,
 ):
     """Internal helper to generate a full chat response and emit it via SocketIO."""
-    logger.info(f"_generate_chat_response_non_stream called for chat {chat_id} (SID: {sid})")
-    assistant_response_content = None # To store the final content for DB saving
+    logger.info(
+        f"_generate_chat_response_non_stream called for chat {chat_id} (SID: {sid})"
+    )
+    assistant_response_content = None  # To store the final content for DB saving
     try:
         # --- Call Gemini API (Non-Streaming) ---
         full_conversation = history + [Content(role="user", parts=current_turn_parts)]
-        logger.info(f"Calling model.generate_content (non-streaming) for chat {chat_id} (SID: {sid})")
+        logger.info(
+            f"Calling model.generate_content (non-streaming) for chat {chat_id} (SID: {sid})"
+        )
         system_prompt = f"""You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
         response = client.models.generate_content(
             model=model_to_use,
             contents=full_conversation,
             system_instruction=system_prompt,
         )
-        logger.info(f"Non-streaming generate_content call returned for chat {chat_id} (SID: {sid}).")
+        logger.info(
+            f"Non-streaming generate_content call returned for chat {chat_id} (SID: {sid})."
+        )
 
         # --- Process Non-Streaming Response ---
         logger.debug(f"Non-streaming raw response object (SID: {sid}): {response!r}")
@@ -758,9 +770,11 @@ def _generate_chat_response_non_stream(
         # Check for safety issues first
         if response.prompt_feedback and response.prompt_feedback.block_reason:
             reason = response.prompt_feedback.block_reason.name
-            logger.warning(f"Non-streaming response blocked by safety settings for chat {chat_id} (SID: {sid}). Reason: {reason}")
+            logger.warning(
+                f"Non-streaming response blocked by safety settings for chat {chat_id} (SID: {sid}). Reason: {reason}"
+            )
             assistant_response_content = f"[AI Safety Error: Request blocked due to safety settings (Reason: {reason})]"
-            socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
+            socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
         # Check candidates and extract text
         elif (
             response.candidates
@@ -774,15 +788,27 @@ def _generate_chat_response_non_stream(
                 if hasattr(part, "text")
             )
             if assistant_reply.strip():
-                logger.info(f"Successfully received full response text (length {len(assistant_reply)}) for chat {chat_id} (SID: {sid}).")
+                logger.info(
+                    f"Successfully received full response text (length {len(assistant_reply)}) for chat {chat_id} (SID: {sid})."
+                )
                 assistant_response_content = assistant_reply
-                socketio.emit('chat_response', {'reply': assistant_response_content}, room=sid)
+                socketio.emit(
+                    "chat_response", {"reply": assistant_response_content}, room=sid
+                )
             else:
-                logger.warning(f"Non-streaming response for chat {chat_id} (SID: {sid}) was empty or whitespace.")
-                assistant_response_content = "[System Note: The AI returned an empty response.]"
-                socketio.emit('chat_response', {'reply': assistant_response_content}, room=sid) # Emit the note
+                logger.warning(
+                    f"Non-streaming response for chat {chat_id} (SID: {sid}) was empty or whitespace."
+                )
+                assistant_response_content = (
+                    "[System Note: The AI returned an empty response.]"
+                )
+                socketio.emit(
+                    "chat_response", {"reply": assistant_response_content}, room=sid
+                )  # Emit the note
         else:
-            logger.warning(f"Non-streaming response for chat {chat_id} (SID: {sid}) did not produce usable content. Response: {response!r}")
+            logger.warning(
+                f"Non-streaming response for chat {chat_id} (SID: {sid}) did not produce usable content. Response: {response!r}"
+            )
             finish_reason = "UNKNOWN"
             if response.candidates and hasattr(response.candidates[0], "finish_reason"):
                 finish_reason = response.candidates[0].finish_reason.name
@@ -792,61 +818,111 @@ def _generate_chat_response_non_stream(
                 assistant_response_content = f"[AI Safety Error: Request blocked (Reason: {reason}, Finish Reason: {finish_reason})]"
             else:
                 assistant_response_content = f"[AI Error: The AI did not return any content (Finish Reason: {finish_reason})]"
-            socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
+            socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
 
     # --- Error Handling for Non-Streaming API Call ---
     except InvalidArgument as e:
-        logger.error(f"InvalidArgument error during non-streaming chat {chat_id} (SID: {sid}): {e}.", exc_info=True)
+        logger.error(
+            f"InvalidArgument error during non-streaming chat {chat_id} (SID: {sid}): {e}.",
+            exc_info=True,
+        )
         assistant_response_content = f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
-        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
+        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
     except ValidationError as e:
-        logger.error(f"Data validation error calling non-streaming Gemini API for chat {chat_id} (SID: {sid}): {e}", exc_info=True)
-        try: error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
-        except Exception: error_details = "Check logs."
-        assistant_response_content = f"[AI Error: Internal data format error. {error_details}]"
-        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
+        logger.error(
+            f"Data validation error calling non-streaming Gemini API for chat {chat_id} (SID: {sid}): {e}",
+            exc_info=True,
+        )
+        try:
+            error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
+        except Exception:
+            error_details = "Check logs."
+        assistant_response_content = (
+            f"[AI Error: Internal data format error. {error_details}]"
+        )
+        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
     except DeadlineExceeded:
-        logger.error(f"Non-streaming Gemini API call timed out for chat {chat_id} (SID: {sid}).")
-        assistant_response_content = "[AI Error: The request timed out. Please try again.]"
-        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
+        logger.error(
+            f"Non-streaming Gemini API call timed out for chat {chat_id} (SID: {sid})."
+        )
+        assistant_response_content = (
+            "[AI Error: The request timed out. Please try again.]"
+        )
+        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
     except NotFound as e:
-        logger.error(f"Model for non-streaming chat {chat_id} (SID: {sid}) not found: {e}")
-        assistant_response_content = f"[AI Error: Model '{model_to_use}' not found or access denied.]" # Use model_to_use here
-        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
+        logger.error(
+            f"Model for non-streaming chat {chat_id} (SID: {sid}) not found: {e}"
+        )
+        assistant_response_content = f"[AI Error: Model '{model_to_use}' not found or access denied.]"  # Use model_to_use here
+        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
     except GoogleAPIError as e:
-        logger.error(f"Google API error for non-streaming chat {chat_id} (SID: {sid}): {e}", exc_info=False)
+        logger.error(
+            f"Google API error for non-streaming chat {chat_id} (SID: {sid}): {e}",
+            exc_info=False,
+        )
         err_str = str(e).lower()
-        if "api key not valid" in err_str: assistant_response_content = "[Error: Invalid Gemini API Key]"
-        elif "permission denied" in err_str: assistant_response_content = f"[AI Error: Permission denied for model. Check API key permissions.]"
+        if "api key not valid" in err_str:
+            assistant_response_content = "[Error: Invalid Gemini API Key]"
+        elif "permission denied" in err_str:
+            assistant_response_content = (
+                f"[AI Error: Permission denied for model. Check API key permissions.]"
+            )
         elif "resource has been exhausted" in err_str or "429" in str(e):
-            logger.warning(f"Quota/Rate limit hit for non-streaming chat {chat_id} (SID: {sid}).")
-            assistant_response_content = "[AI Error: API quota or rate limit exceeded. Please try again later.]"
+            logger.warning(
+                f"Quota/Rate limit hit for non-streaming chat {chat_id} (SID: {sid})."
+            )
+            assistant_response_content = (
+                "[AI Error: API quota or rate limit exceeded. Please try again later.]"
+            )
         elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
-            logger.warning(f"API error indicates safety block for non-streaming chat {chat_id} (SID: {sid}): {e}")
+            logger.warning(
+                f"API error indicates safety block for non-streaming chat {chat_id} (SID: {sid}): {e}"
+            )
             assistant_response_content = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: SAFETY)]"
         elif "internal error" in err_str or "500" in str(e):
-            logger.error(f"Internal server error from Gemini API for non-streaming chat {chat_id} (SID: {sid}): {e}")
-            assistant_response_content = "[AI Error: The AI service encountered an internal error.]"
-        else: assistant_response_content = f"[AI API Error: {type(e).__name__}]"
-        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
+            logger.error(
+                f"Internal server error from Gemini API for non-streaming chat {chat_id} (SID: {sid}): {e}"
+            )
+            assistant_response_content = (
+                "[AI Error: The AI service encountered an internal error.]"
+            )
+        else:
+            assistant_response_content = f"[AI API Error: {type(e).__name__}]"
+        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
     except Exception as e:
-        logger.error(f"Unexpected error during non-streaming Gemini API interaction for chat {chat_id} (SID: {sid}): {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error during non-streaming Gemini API interaction for chat {chat_id} (SID: {sid}): {e}",
+            exc_info=True,
+        )
         assistant_response_content = f"[Unexpected AI Error: {type(e).__name__}]"
-        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
+        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
     finally:
         # --- Save Assistant Response to DB ---
-        if assistant_response_content: # Ensure there's content (even error messages)
-            logger.info(f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid}).")
+        if assistant_response_content:  # Ensure there's content (even error messages)
+            logger.info(
+                f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
+            )
             try:
-                save_success = database.add_message_to_db(chat_id, "assistant", assistant_response_content)
+                save_success = database.add_message_to_db(
+                    chat_id, "assistant", assistant_response_content
+                )
                 if not save_success:
-                    logger.error(f"Failed to save non-streaming assistant message for chat {chat_id} (SID: {sid}).")
+                    logger.error(
+                        f"Failed to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
+                    )
             except Exception as db_err:
-                logger.error(f"DB error saving non-streaming assistant message for chat {chat_id} (SID: {sid}): {db_err}", exc_info=True)
+                logger.error(
+                    f"DB error saving non-streaming assistant message for chat {chat_id} (SID: {sid}): {db_err}",
+                    exc_info=True,
+                )
         else:
-             logger.warning(f"No assistant content generated to save for non-streaming chat {chat_id} (SID: {sid}).")
+            logger.warning(
+                f"No assistant content generated to save for non-streaming chat {chat_id} (SID: {sid})."
+            )
 
-        _cleanup_temp_files(temp_files_to_clean, f"non-streaming chat {chat_id} (SID: {sid})")
+        _cleanup_temp_files(
+            temp_files_to_clean, f"non-streaming chat {chat_id} (SID: {sid})"
+        )
 
 
 # --- Helper Function for STREAMING Response ---
@@ -861,15 +937,17 @@ def _generate_chat_response_stream(
     sid,
 ):
     """Internal helper that generates and emits chat response chunks via SocketIO."""
-    logger.info(f"_generate_chat_response_stream called for chat {chat_id} (SID: {sid})")
+    logger.info(
+        f"_generate_chat_response_stream called for chat {chat_id} (SID: {sid})"
+    )
     response_iterator = None
-    full_reply_content = "" # Accumulate full reply for saving
-    emitted_error = False # Flag to track if an error was already emitted
+    full_reply_content = ""  # Accumulate full reply for saving
+    emitted_error = False  # Flag to track if an error was already emitted
 
     def emit_error_once(error_msg):
         nonlocal emitted_error
         if not emitted_error:
-            socketio.emit('task_error', {'error': error_msg}, room=sid)
+            socketio.emit("task_error", {"error": error_msg}, room=sid)
             emitted_error = True
 
     try:
@@ -877,18 +955,23 @@ def _generate_chat_response_stream(
         raw_model_name = current_app.config.get(
             "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
         )
-        model_to_use = (
-            f"models/{raw_model_name}"
-            if not raw_model_name.startswith("models/")
+
+        if not raw_model_name.startswith("models/"):
+            model_to_use = f"models/{raw_model_name}"
+
         full_conversation = history + [Content(role="user", parts=current_turn_parts)]
         system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
-        logger.info(f"Calling model.generate_content_stream for chat {chat_id} (SID: {sid})")
+        logger.info(
+            f"Calling model.generate_content_stream for chat {chat_id} (SID: {sid})"
+        )
         response_iterator = client.models.generate_content_stream(
             model=model_to_use,
             contents=full_conversation,
             # system_instruction=system_prompt, # Still unsupported
         )
-        logger.info(f"Streaming generate_content call returned iterator for chat {chat_id} (SID: {sid}).")
+        logger.info(
+            f"Streaming generate_content call returned iterator for chat {chat_id} (SID: {sid})."
+        )
 
         # --- Process Chunks from Iterator ---
         chunk_count = 0
@@ -896,105 +979,188 @@ def _generate_chat_response_stream(
             chunk_text = ""
             try:
                 # Extract text content if available
-                if hasattr(chunk, 'text') and chunk.text:
+                if hasattr(chunk, "text") and chunk.text:
                     chunk_text = chunk.text
                 # Check for safety blocking (prompt feedback)
-                elif hasattr(chunk, 'prompt_feedback') and chunk.prompt_feedback and chunk.prompt_feedback.block_reason:
+                elif (
+                    hasattr(chunk, "prompt_feedback")
+                    and chunk.prompt_feedback
+                    and chunk.prompt_feedback.block_reason
+                ):
                     reason = chunk.prompt_feedback.block_reason.name
-                    logger.warning(f"Stream chunk blocked by safety settings for chat {chat_id} (SID: {sid}). Reason: {reason}")
+                    logger.warning(
+                        f"Stream chunk blocked by safety settings for chat {chat_id} (SID: {sid}). Reason: {reason}"
+                    )
                     chunk_text = f"\n[AI Safety Error: Request or response blocked due to safety settings (Reason: {reason})]"
-                    emit_error_once(chunk_text) # Emit as error
+                    emit_error_once(chunk_text)  # Emit as error
                 # Check for safety blocking (finish reason)
-                elif hasattr(chunk, 'candidates') and chunk.candidates and hasattr(chunk.candidates[0], 'finish_reason') and chunk.candidates[0].finish_reason == 3: # SAFETY
+                elif (
+                    hasattr(chunk, "candidates")
+                    and chunk.candidates
+                    and hasattr(chunk.candidates[0], "finish_reason")
+                    and chunk.candidates[0].finish_reason == 3
+                ):  # SAFETY
                     safety_reason = "SAFETY"
                     try:
                         if chunk.candidates[0].safety_ratings:
-                            safety_reason = "; ".join([f"{r.category.name}: {r.probability.name}" for r in chunk.candidates[0].safety_ratings])
-                    except Exception: pass
-                    logger.warning(f"Stream chunk finished due to SAFETY for chat {chat_id} (SID: {sid}). Ratings: {safety_reason}")
+                            safety_reason = "; ".join(
+                                [
+                                    f"{r.category.name}: {r.probability.name}"
+                                    for r in chunk.candidates[0].safety_ratings
+                                ]
+                            )
+                    except Exception:
+                        pass
+                    logger.warning(
+                        f"Stream chunk finished due to SAFETY for chat {chat_id} (SID: {sid}). Ratings: {safety_reason}"
+                    )
                     chunk_text = f"\n[AI Safety Error: Response blocked due to safety settings (Reason: {safety_reason})]"
-                    emit_error_once(chunk_text) # Emit as error
+                    emit_error_once(chunk_text)  # Emit as error
 
                 # Emit the chunk text if it's not empty
                 if chunk_text:
                     # logger.debug(f"Emitting stream chunk for SID {sid}: {chunk_text[:100]}...") # Verbose
-                    socketio.emit('stream_chunk', {'chunk': chunk_text}, room=sid)
-                    full_reply_content += chunk_text # Accumulate for saving
+                    socketio.emit("stream_chunk", {"chunk": chunk_text}, room=sid)
+                    full_reply_content += chunk_text  # Accumulate for saving
                     chunk_count += 1
 
             except AttributeError as ae:
-                 logger.error(f"AttributeError processing stream chunk for SID {sid}: {ae} - Chunk: {chunk!r}", exc_info=True)
-                 emit_error_once(f"[System Error: Problem processing AI response chunk ({type(ae).__name__})]")
+                logger.error(
+                    f"AttributeError processing stream chunk for SID {sid}: {ae} - Chunk: {chunk!r}",
+                    exc_info=True,
+                )
+                emit_error_once(
+                    f"[System Error: Problem processing AI response chunk ({type(ae).__name__})]"
+                )
             except Exception as e:
-                 logger.error(f"Unexpected error processing stream chunk for SID {sid}: {e} - Chunk: {chunk!r}", exc_info=True)
-                 emit_error_once(f"[System Error: Problem processing AI response chunk ({type(e).__name__})]")
+                logger.error(
+                    f"Unexpected error processing stream chunk for SID {sid}: {e} - Chunk: {chunk!r}",
+                    exc_info=True,
+                )
+                emit_error_once(
+                    f"[System Error: Problem processing AI response chunk ({type(e).__name__})]"
+                )
 
-        logger.info(f"Finished processing {chunk_count} chunks for chat {chat_id} (SID: {sid}).")
+        logger.info(
+            f"Finished processing {chunk_count} chunks for chat {chat_id} (SID: {sid})."
+        )
         # Emit stream end signal if no error occurred during streaming
         if not emitted_error:
-            socketio.emit('stream_end', {'message': 'Stream finished.'}, room=sid)
+            socketio.emit("stream_end", {"message": "Stream finished."}, room=sid)
 
     # --- Error Handling for Streaming API Call ---
     except InvalidArgument as e:
-        logger.error(f"InvalidArgument error during streaming chat {chat_id} (SID: {sid}): {e}.", exc_info=True)
+        logger.error(
+            f"InvalidArgument error during streaming chat {chat_id} (SID: {sid}): {e}.",
+            exc_info=True,
+        )
         full_reply_content = f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
         emit_error_once(full_reply_content)
     except ValidationError as e:
-        logger.error(f"Data validation error calling streaming Gemini API for chat {chat_id} (SID: {sid}): {e}", exc_info=True)
-        try: error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
-        except Exception: error_details = "Check logs."
+        logger.error(
+            f"Data validation error calling streaming Gemini API for chat {chat_id} (SID: {sid}): {e}",
+            exc_info=True,
+        )
+        try:
+            error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
+        except Exception:
+            error_details = "Check logs."
         full_reply_content = f"[AI Error: Internal data format error. {error_details}]"
         emit_error_once(full_reply_content)
     except DeadlineExceeded:
-        logger.error(f"Streaming Gemini API call timed out for chat {chat_id} (SID: {sid}).")
+        logger.error(
+            f"Streaming Gemini API call timed out for chat {chat_id} (SID: {sid})."
+        )
         full_reply_content = "[AI Error: The request timed out. Please try again.]"
         emit_error_once(full_reply_content)
     except NotFound as e:
         logger.error(f"Model for streaming chat {chat_id} (SID: {sid}) not found: {e}")
-        full_reply_content = f"[AI Error: Model '{model_to_use}' not found or access denied.]"
+        full_reply_content = (
+            f"[AI Error: Model '{model_to_use}' not found or access denied.]"
+        )
         emit_error_once(full_reply_content)
     except GoogleAPIError as e:
-        logger.error(f"Google API error for streaming chat {chat_id} (SID: {sid}): {e}", exc_info=False)
+        logger.error(
+            f"Google API error for streaming chat {chat_id} (SID: {sid}): {e}",
+            exc_info=False,
+        )
         err_str = str(e).lower()
-        if "api key not valid" in err_str: full_reply_content = "[Error: Invalid Gemini API Key]"
-        elif "permission denied" in err_str: full_reply_content = f"[AI Error: Permission denied for model. Check API key permissions.]"
+        if "api key not valid" in err_str:
+            full_reply_content = "[Error: Invalid Gemini API Key]"
+        elif "permission denied" in err_str:
+            full_reply_content = (
+                f"[AI Error: Permission denied for model. Check API key permissions.]"
+            )
         elif "resource has been exhausted" in err_str or "429" in str(e):
-            logger.warning(f"Quota/Rate limit hit for streaming chat {chat_id} (SID: {sid}).")
-            full_reply_content = "[AI Error: API quota or rate limit exceeded. Please try again later.]"
+            logger.warning(
+                f"Quota/Rate limit hit for streaming chat {chat_id} (SID: {sid})."
+            )
+            full_reply_content = (
+                "[AI Error: API quota or rate limit exceeded. Please try again later.]"
+            )
         elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
-            logger.warning(f"API error indicates safety block for streaming chat {chat_id} (SID: {sid}): {e}")
+            logger.warning(
+                f"API error indicates safety block for streaming chat {chat_id} (SID: {sid}): {e}"
+            )
             full_reply_content = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: SAFETY)]"
         elif "internal error" in err_str or "500" in str(e):
-            logger.error(f"Internal server error from Gemini API for streaming chat {chat_id} (SID: {sid}): {e}")
-            full_reply_content = "[AI Error: The AI service encountered an internal error.]"
-        else: full_reply_content = f"[AI API Error: {type(e).__name__}]"
+            logger.error(
+                f"Internal server error from Gemini API for streaming chat {chat_id} (SID: {sid}): {e}"
+            )
+            full_reply_content = (
+                "[AI Error: The AI service encountered an internal error.]"
+            )
+        else:
+            full_reply_content = f"[AI API Error: {type(e).__name__}]"
         emit_error_once(full_reply_content)
     except Exception as e:
-        logger.error(f"Unexpected error during streaming Gemini API interaction for chat {chat_id} (SID: {sid}): {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error during streaming Gemini API interaction for chat {chat_id} (SID: {sid}): {e}",
+            exc_info=True,
+        )
         full_reply_content = f"[Unexpected AI Error: {type(e).__name__}]"
         emit_error_once(full_reply_content)
     finally:
         # --- Save Full Accumulated Reply to DB ---
         # Ensure we save something, even if it's just an error message or placeholder
         if not full_reply_content.strip():
-            if not emitted_error: # If no specific error was emitted, save a generic note
-                 full_reply_content = "[System Note: The AI did not return any content.]"
-                 logger.warning(f"Streaming for chat {chat_id} (SID: {sid}) yielded no content. Saving placeholder.")
+            if (
+                not emitted_error
+            ):  # If no specific error was emitted, save a generic note
+                full_reply_content = "[System Note: The AI did not return any content.]"
+                logger.warning(
+                    f"Streaming for chat {chat_id} (SID: {sid}) yielded no content. Saving placeholder."
+                )
             else:
-                 # If an error was emitted, full_reply_content might still be empty if the error happened early.
-                 # We rely on the emitted error message for the user, and save a generic note here.
-                 full_reply_content = "[System Note: An error occurred during streaming.]"
-                 logger.warning(f"Saving placeholder for chat {chat_id} (SID: {sid}) after streaming error.")
+                # If an error was emitted, full_reply_content might still be empty if the error happened early.
+                # We rely on the emitted error message for the user, and save a generic note here.
+                full_reply_content = (
+                    "[System Note: An error occurred during streaming.]"
+                )
+                logger.warning(
+                    f"Saving placeholder for chat {chat_id} (SID: {sid}) after streaming error."
+                )
 
-        logger.info(f"Attempting to save final streamed assistant message for chat {chat_id} (SID: {sid}). Length: {len(full_reply_content)}")
+        logger.info(
+            f"Attempting to save final streamed assistant message for chat {chat_id} (SID: {sid}). Length: {len(full_reply_content)}"
+        )
         try:
-            save_success = database.add_message_to_db(chat_id, "assistant", full_reply_content)
+            save_success = database.add_message_to_db(
+                chat_id, "assistant", full_reply_content
+            )
             if not save_success:
-                logger.error(f"Failed to save final streamed assistant message for chat {chat_id} (SID: {sid}).")
+                logger.error(
+                    f"Failed to save final streamed assistant message for chat {chat_id} (SID: {sid})."
+                )
         except Exception as db_err:
-            logger.error(f"DB error saving final streamed assistant message for chat {chat_id} (SID: {sid}): {db_err}", exc_info=True)
+            logger.error(
+                f"DB error saving final streamed assistant message for chat {chat_id} (SID: {sid}): {db_err}",
+                exc_info=True,
+            )
 
-        _cleanup_temp_files(temp_files_to_clean, f"streaming chat {chat_id} (SID: {sid})")
+        _cleanup_temp_files(
+            temp_files_to_clean, f"streaming chat {chat_id} (SID: {sid})"
+        )
 
 
 # --- Helper Function to Prepare History and Content Parts ---
@@ -1006,8 +1172,8 @@ def _prepare_chat_content(
     session_files,
     calendar_context,
     web_search_enabled,
-    socketio=None, # Add socketio
-    sid=None       # Add sid
+    socketio=None,  # Add socketio
+    sid=None,  # Add sid
 ):
     """
     Prepares history list and current turn parts list.
@@ -1022,8 +1188,8 @@ def _prepare_chat_content(
     def emit_prep_error(error_msg):
         logger.error(f"Preparation error for chat {chat_id} (SID: {sid}): {error_msg}")
         if socketio and sid:
-            socketio.emit('task_error', {'error': error_msg}, room=sid)
-        return None # Signal failure
+            socketio.emit("task_error", {"error": error_msg}, room=sid)
+        return None  # Signal failure
 
     # --- Fetch History ---
     try:
@@ -1049,7 +1215,8 @@ def _prepare_chat_content(
 
     except Exception as e:
         logger.error(
-            f"Failed to fetch/prepare history for chat {chat_id} (SID: {sid}): {e}", exc_info=True
+            f"Failed to fetch/prepare history for chat {chat_id} (SID: {sid}): {e}",
+            exc_info=True,
         )
         return emit_prep_error("[Error: Could not load or prepare chat history]")
 
@@ -1274,68 +1441,130 @@ def _prepare_chat_content(
             search_query = generate_search_query(user_message)
             if search_query:
                 logger.info(f"Performing web search for query: '{search_query}'")
-                search_results_list = perform_web_search(search_query) # Returns list of dicts
+                search_results_list = perform_web_search(
+                    search_query
+                )  # Returns list of dicts
 
                 if search_results_list:
                     logger.info(f"Received {len(search_results_list)} search results.")
-                    current_turn_parts.append(Part(text="--- Start Web Search Results ---"))
+                    current_turn_parts.append(
+                        Part(text="--- Start Web Search Results ---")
+                    )
 
                     for i, result_item in enumerate(search_results_list):
-                        title = result_item.get('title', 'No Title')
-                        link = result_item.get('link', 'No Link')
-                        snippet = result_item.get('snippet', 'No Snippet')
-                        fetch_result = result_item.get('fetch_result', {})
-                        result_type = fetch_result.get('type', 'error')
-                        result_content = fetch_result.get('content', 'Unknown error')
+                        title = result_item.get("title", "No Title")
+                        link = result_item.get("link", "No Link")
+                        snippet = result_item.get("snippet", "No Snippet")
+                        fetch_result = result_item.get("fetch_result", {})
+                        result_type = fetch_result.get("type", "error")
+                        result_content = fetch_result.get("content", "Unknown error")
 
                         # Add text part describing the result source
                         # This text part serves as the citation reference point for the AI
-                        current_turn_parts.append(Part(text=f"[{i+1}] Title: {title}\n   Link: {link}\n   Snippet: {snippet}"))
+                        current_turn_parts.append(
+                            Part(
+                                text=f"[{i+1}] Title: {title}\n   Link: {link}\n   Snippet: {snippet}"
+                            )
+                        )
 
                         # Process based on fetched content type
-                        if result_type == 'html':
+                        if result_type == "html":
                             if result_content:
-                                current_turn_parts.append(Part(text=f"   Content:\n{result_content}\n---"))
+                                current_turn_parts.append(
+                                    Part(text=f"   Content:\n{result_content}\n---")
+                                )
                             else:
-                                current_turn_parts.append(Part(text="   Content: [Could not extract text content.]\n---"))
-                        elif result_type == 'pdf':
+                                current_turn_parts.append(
+                                    Part(
+                                        text="   Content: [Could not extract text content.]\n---"
+                                    )
+                                )
+                        elif result_type == "pdf":
                             # perform_web_search already called fetch_web_content,
                             # so result_content should contain the PDF bytes.
                             if isinstance(result_content, bytes):
                                 pdf_bytes = result_content
-                                pdf_filename = fetch_result.get('filename', f'search_result_{i+1}.pdf')
-                                logger.info(f"Attempting to transcribe PDF search result: {pdf_filename} ({len(pdf_bytes)} bytes)")
+                                pdf_filename = fetch_result.get(
+                                    "filename", f"search_result_{i+1}.pdf"
+                                )
+                                logger.info(
+                                    f"Attempting to transcribe PDF search result: {pdf_filename} ({len(pdf_bytes)} bytes)"
+                                )
 
                                 # Call the transcription function
-                                transcription_result = transcribe_pdf_bytes(pdf_bytes, pdf_filename)
+                                transcription_result = transcribe_pdf_bytes(
+                                    pdf_bytes, pdf_filename
+                                )
 
                                 # Check if transcription was successful or returned an error string
-                                if transcription_result.startswith(("[Error", "[System Note", "[AI Error")):
-                                    logger.warning(f"PDF transcription failed for web search result {pdf_filename}: {transcription_result}")
+                                if transcription_result.startswith(
+                                    ("[Error", "[System Note", "[AI Error")
+                                ):
+                                    logger.warning(
+                                        f"PDF transcription failed for web search result {pdf_filename}: {transcription_result}"
+                                    )
                                     # Append error/note about transcription failure
-                                    current_turn_parts.append(Part(text=f"   Content: [Transcription Failed for PDF '{pdf_filename}': {transcription_result}]\n---"))
+                                    current_turn_parts.append(
+                                        Part(
+                                            text=f"   Content: [Transcription Failed for PDF '{pdf_filename}': {transcription_result}]\n---"
+                                        )
+                                    )
                                 else:
-                                    logger.info(f"Successfully transcribed PDF from web search: {pdf_filename}")
+                                    logger.info(
+                                        f"Successfully transcribed PDF from web search: {pdf_filename}"
+                                    )
                                     # Append transcribed text
-                                    current_turn_parts.append(Part(text=f"   Content (Transcribed from PDF '{pdf_filename}'):\n{transcription_result.strip()}\n---"))
+                                    current_turn_parts.append(
+                                        Part(
+                                            text=f"   Content (Transcribed from PDF '{pdf_filename}'):\n{transcription_result.strip()}\n---"
+                                        )
+                                    )
                             else:
-                                logger.error(f"Expected bytes for PDF content from web search result {i+1}, but got {type(result_content)}. Link: {link}")
-                                current_turn_parts.append(Part(text=f"   Content: [System Error: Expected PDF bytes but received different type for link {link}]\n---"))
+                                logger.error(
+                                    f"Expected bytes for PDF content from web search result {i+1}, but got {type(result_content)}. Link: {link}"
+                                )
+                                current_turn_parts.append(
+                                    Part(
+                                        text=f"   Content: [System Error: Expected PDF bytes but received different type for link {link}]\n---"
+                                    )
+                                )
 
-                        elif result_type == 'error':
+                        elif result_type == "error":
                             # This handles errors reported by fetch_web_content within perform_web_search
-                            current_turn_parts.append(Part(text=f"   Content: [Error fetching content: {result_content}]\n---"))
-                        else: # Handle other unexpected types
-                            logger.warning(f"Unknown fetch result type '{result_type}' for link {link}")
-                            current_turn_parts.append(Part(text=f"   Content: [Unknown content type: {result_type}]\n---"))
+                            current_turn_parts.append(
+                                Part(
+                                    text=f"   Content: [Error fetching content: {result_content}]\n---"
+                                )
+                            )
+                        else:  # Handle other unexpected types
+                            logger.warning(
+                                f"Unknown fetch result type '{result_type}' for link {link}"
+                            )
+                            current_turn_parts.append(
+                                Part(
+                                    text=f"   Content: [Unknown content type: {result_type}]\n---"
+                                )
+                            )
 
-                    current_turn_parts.append(Part(text="--- End Web Search Results ---"))
+                    current_turn_parts.append(
+                        Part(text="--- End Web Search Results ---")
+                    )
                 else:
                     logger.info("Web search performed, but returned no results.")
-                    current_turn_parts.append(Part(text="[System Note: Web search performed, no results found.]"))
+                    current_turn_parts.append(
+                        Part(
+                            text="[System Note: Web search performed, no results found.]"
+                        )
+                    )
             else:
-                logger.info("Web search was enabled, but no search query was generated.")
-                current_turn_parts.append(Part(text="[System Note: Web search enabled, but failed to generate a query.]"))
+                logger.info(
+                    "Web search was enabled, but no search query was generated."
+                )
+                current_turn_parts.append(
+                    Part(
+                        text="[System Note: Web search enabled, but failed to generate a query.]"
+                    )
+                )
 
         # 5. User Message
         if user_message:
@@ -1346,10 +1575,11 @@ def _prepare_chat_content(
             )
         if web_search_enabled:
             # Update prompt instructions to reflect attached PDFs
-            current_turn_parts.extend([
-                Part(text="--- special instructions ---"),
-                Part(
-                    text="""When responding, prioritize using information from the provided web search results (both text snippets and attached PDF documents) to ensure accuracy and up-to-dateness.
+            current_turn_parts.extend(
+                [
+                    Part(text="--- special instructions ---"),
+                    Part(
+                        text="""When responding, prioritize using information from the provided web search results (both text snippets and attached PDF documents) to ensure accuracy and up-to-dateness.
 
 If information from the web search results is used to answer a question:
 *   For text content: Cite the source using bracketed numerical citations (e.g., [1], [2]) directly after the relevant statement.
@@ -1361,9 +1591,10 @@ At the end of your response, include a list of the cited sources, formatted as f
 [2] [Other Source Title](https://www.the.other.source.com) - "A snippet from the source **and a specific important word** from that source"
 [3] [PDF Source Title](https://www.pdf.example.com) - [Attached PDF Document]
 """
-                ),
-                Part(text="--- End special instructions ---"),
-           ] )
+                    ),
+                    Part(text="--- End special instructions ---"),
+                ]
+            )
 
         logger.info(
             f"Prepared {len(current_turn_parts)} current turn parts for chat {chat_id}."
@@ -1375,10 +1606,14 @@ At the end of your response, include a list of the cited sources, formatted as f
             f"Unexpected error preparing content parts for chat {chat_id} (SID: {sid}): {prep_err}",
             exc_info=True,
         )
-        return emit_prep_error(f"[Error: Failed to prepare content for AI ({type(prep_err).__name__})]")
+        return emit_prep_error(
+            f"[Error: Failed to prepare content for AI ({type(prep_err).__name__})]"
+        )
 
     # --- Return successful preparation results ---
-    logger.info(f"Successfully prepared {len(current_turn_parts)} current turn parts for chat {chat_id} (SID: {sid}).")
+    logger.info(
+        f"Successfully prepared {len(current_turn_parts)} current turn parts for chat {chat_id} (SID: {sid})."
+    )
     return history, current_turn_parts, temp_files_to_clean
 
 
@@ -1823,9 +2058,7 @@ def transcribe_pdf_bytes(pdf_bytes: bytes, filename: str) -> str:
         logger.error(f"Model '{model_to_use}' not found or inaccessible: {e}")
         return f"[Error: AI Model '{raw_model_name}' not found or access denied.]"
     except GoogleAPIError as e:
-        logger.error(
-            f"Google API error during PDF transcription for '{filename}': {e}"
-        )
+        logger.error(f"Google API error during PDF transcription for '{filename}': {e}")
         err_str = str(e).lower()
         if "api key not valid" in err_str:
             return "[Error: Invalid Gemini API Key]"
@@ -1846,7 +2079,9 @@ def transcribe_pdf_bytes(pdf_bytes: bytes, filename: str) -> str:
             try:
                 if os.path.exists(temp_file_to_clean):
                     os.remove(temp_file_to_clean)
-                    logger.info(f"Cleaned up temp transcription file: {temp_file_to_clean}")
+                    logger.info(
+                        f"Cleaned up temp transcription file: {temp_file_to_clean}"
+                    )
             except OSError as e:
                 logger.warning(
                     f"Error removing temp transcription file {temp_file_to_clean}: {e}"
@@ -1947,7 +2182,7 @@ def generate_text(
                 logger.warning(
                     f"Text generation blocked by safety settings. Reason: {reason}"
                 )
-                return f"[Error: Text generation blocked due to safety settings (Reason: {reason})]" # No retry for safety block
+                return f"[Error: Text generation blocked due to safety settings (Reason: {reason})]"  # No retry for safety block
 
             if (
                 response.candidates
@@ -1962,16 +2197,18 @@ def generate_text(
                 )
                 if text_reply.strip():
                     logger.info(f"Text generation successful on attempt {retries + 1}.")
-                    return text_reply # Success!
+                    return text_reply  # Success!
                 else:
                     logger.warning("Text generation resulted in empty text content.")
-                    return "[System Note: AI generated empty text.]" # No retry for empty content
+                    return "[System Note: AI generated empty text.]"  # No retry for empty content
             else:
                 logger.warning(
                     f"Text generation did not produce usable content. Response: {response!r}"
                 )
                 finish_reason = "UNKNOWN"
-                if response.candidates and hasattr(response.candidates[0], "finish_reason"):
+                if response.candidates and hasattr(
+                    response.candidates[0], "finish_reason"
+                ):
                     finish_reason = response.candidates[0].finish_reason.name
                 # No retry if no usable content and not a retryable error
                 return f"[Error: AI did not generate text content (Finish Reason: {finish_reason})]"
@@ -1981,17 +2218,17 @@ def generate_text(
             logger.error(
                 f"InvalidArgument error during text generation: {e}.", exc_info=True
             )
-            return f"[AI Error: Invalid argument ({type(e).__name__}).]" # No retry
+            return f"[AI Error: Invalid argument ({type(e).__name__}).]"  # No retry
         except NotFound:
             logger.error(f"Model '{model_to_use}' not found.")
-            return f"[Error: Model '{model_to_use}' not found]" # No retry
+            return f"[Error: Model '{model_to_use}' not found]"  # No retry
         except GoogleAPIError as e:
             # Check specifically for 429 Resource Exhausted / Rate Limit
             is_rate_limit_error = False
             if hasattr(e, "status_code") and e.status_code == 429:
-                 is_rate_limit_error = True
+                is_rate_limit_error = True
             elif "resource_exhausted" in str(e).lower() or "429" in str(e):
-                 is_rate_limit_error = True
+                is_rate_limit_error = True
 
             if is_rate_limit_error and retries < max_retries:
                 retries += 1
@@ -2001,25 +2238,29 @@ def generate_text(
                     f"Rate limit hit (429). Retrying in {sleep_time:.2f} seconds... (Attempt {retries}/{max_retries})"
                 )
                 time.sleep(sleep_time)
-                current_backoff *= 2 # Increase backoff for next potential retry
-                continue # Go to next iteration of the while loop
+                current_backoff *= 2  # Increase backoff for next potential retry
+                continue  # Go to next iteration of the while loop
             else:
                 # Handle non-retryable API errors or max retries reached for 429
-                logger.error(f"API error during text generation (final attempt or non-retryable): {e}")
+                logger.error(
+                    f"API error during text generation (final attempt or non-retryable): {e}"
+                )
                 err_str = str(e).lower()
                 if "api key not valid" in err_str:
                     return "[Error: Invalid Gemini API Key]"
-                if is_rate_limit_error: # Max retries reached
-                     return f"[AI Error: API rate limit exceeded after {max_retries} retries.]"
+                if is_rate_limit_error:  # Max retries reached
+                    return f"[AI Error: API rate limit exceeded after {max_retries} retries.]"
                 # Add other common checks if needed (quota, etc.)
-                return f"[AI API Error: {type(e).__name__}]" # Generic API error
+                return f"[AI API Error: {type(e).__name__}]"  # Generic API error
         except Exception as e:
             logger.error(f"Unexpected error during text generation: {e}", exc_info=True)
             # Decide if unexpected errors should be retried? For now, no.
             return f"[Unexpected AI Error: {type(e).__name__}]"
 
     # If loop finishes without returning, it means max retries were hit for 429
-    logger.error(f"Text generation failed after {max_retries} retries due to rate limiting.")
+    logger.error(
+        f"Text generation failed after {max_retries} retries due to rate limiting."
+    )
     return "[AI Error: API rate limit exceeded after maximum retries.]"
 
 
