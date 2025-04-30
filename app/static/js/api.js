@@ -35,11 +35,164 @@ function setStatus(message, isError = false) {
     state.setStatusMessage(message, isError);
 }
 
+// --- SocketIO Initialization and Listeners ---
+
+/**
+ * Attaches permanent SocketIO event listeners.
+ */
+function initializeSocketListeners() {
+    if (!socket || permanentListenersAttached) {
+        return; // Don't attach if no socket or already attached
+    }
+
+    console.log("[DEBUG] Initializing permanent SocketIO listeners.");
+
+    // --- Connection Handling ---
+    socket.on('connect', () => {
+        console.log("Socket connected:", socket.id);
+        setStatus("Connected to server."); // General status
+        state.setIsSocketConnected(true);
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error("WebSocket connection error:", error);
+        setStatus(`Server connection failed: ${error.message}`, true);
+        state.setIsSocketConnected(false);
+        socket = null; // Nullify on connection error
+        permanentListenersAttached = false; // Reset flag
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log("WebSocket disconnected:", reason);
+        if (!state.isErrorStatus) { // Don't overwrite specific errors
+            setStatus("Disconnected from server.");
+        }
+        state.setIsSocketConnected(false);
+        state.setIsRecording(false); // Stop recording state if disconnected
+        // state.setStreamingTranscript(""); // Clear transcript state if needed
+        socket = null; // Nullify on disconnect
+        permanentListenersAttached = false; // Reset flag
+    });
+
+    // --- Transcription Listeners (Permanent) ---
+    socket.on('transcript_update', (data) => {
+        if (data && data.transcript !== undefined) {
+            const newSegment = data.transcript.trim();
+            if (data.is_final && newSegment) {
+                state.appendFinalizedTranscript(newSegment);
+                state.setCurrentInterimTranscript("");
+            } else if (!data.is_final) {
+                state.setCurrentInterimTranscript(newSegment);
+            }
+        }
+    });
+
+    // --- Chat/Task Listeners (Permanent) ---
+    socket.on('task_started', (data) => {
+        console.log("Backend task started:", data.message);
+        // Loading state is usually set when the task is initiated by the client
+        // We might update the status message here if provided
+        if (data.message) {
+            setStatus(data.message); // Update status without setting loading=true
+        }
+    });
+
+    socket.on('status_update', (data) => {
+        console.log("Backend status update:", data.message);
+        // Update status message, keep loading=true
+        if (data.message) {
+            setStatus(data.message);
+        }
+    });
+
+    socket.on('chat_response', (data) => {
+        console.log("Received non-streaming chat response:", data.reply);
+        if (data.reply !== undefined) {
+            state.addMessageToHistory({ role: 'assistant', content: data.reply });
+            setStatus("Assistant replied.");
+            loadSavedChats(); // Reload chat list to update timestamp
+        } else {
+            console.warn("Received 'chat_response' event with missing 'reply'.", data);
+            state.addMessageToHistory({ role: 'assistant', content: "[Error: Received empty response from server]", isError: true });
+            setStatus("Received empty response.", true);
+        }
+        setLoading(false); // Turn off loading indicator
+    });
+
+    socket.on('stream_chunk', (data) => {
+        // console.debug("Received stream chunk:", data.chunk); // Verbose
+        if (data.chunk !== undefined) {
+            // Append chunk to the *last* message in state, assuming it's the assistant's reply
+            state.appendContentToLastMessage(data.chunk);
+            // Status remains "Waiting for response..." or similar until stream_end
+        }
+    });
+
+    socket.on('stream_end', (data) => {
+        console.log("Received stream end signal:", data.message);
+        setStatus("Assistant finished streaming.");
+        setLoading(false); // Turn off loading indicator
+        loadSavedChats(); // Reload chat list to update timestamp
+    });
+
+    socket.on('deep_research_result', (data) => {
+        console.log("Received deep research result.");
+        if (data.report !== undefined) {
+            const reportContent = `# Deep Research Report\n\n${data.report}`;
+            state.addMessageToHistory({ role: 'assistant', content: reportContent });
+            setStatus("Deep Research complete.");
+            loadSavedChats(); // Reload chat list to update timestamp
+        } else {
+            console.warn("Received 'deep_research_result' event with missing 'report'.", data);
+            state.addMessageToHistory({ role: 'assistant', content: "[Error: Received empty report from server]", isError: true });
+            setStatus("Received empty report.", true);
+        }
+        setLoading(false); // Turn off loading indicator
+    });
+
+    socket.on('task_error', (data) => {
+        console.error("Received task error from backend:", data.error);
+        const errorMessage = `[Error: ${data.error || 'Unknown error from server'}]`;
+        // Add error message to chat history
+        state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true });
+        setStatus("Error processing request.", true);
+        setLoading(false); // Turn off loading indicator
+    });
+
+    // --- Other Permanent Listeners (e.g., for transcription confirmation/errors) ---
+    // These might be less critical now if promise handles initial start, but keep for logging/robustness
+    socket.on('transcription_started', (data) => {
+        // Usually handled by the promise in connectTranscriptionSocket for the *initial* start
+        console.log("Backend confirmed transcription started (permanent listener).");
+    });
+
+    socket.on('transcription_error', (data) => {
+        // Catches errors *after* initial start, or general broadcast errors
+        console.error("Transcription error from backend (permanent listener):", data.error);
+        setStatus(`Transcription Error: ${data.error}`, true);
+        // Don't disconnect automatically
+    });
+
+    socket.on('transcription_complete', (data) => {
+        // Usually handled by the promise in stopAudioStream
+        console.log("Backend confirmed transcription complete (permanent listener).");
+    });
+
+    socket.on('transcription_stop_acknowledged', (data) => {
+        // Usually handled by the promise in stopAudioStream
+        console.log("Backend acknowledged stop signal (permanent listener).");
+    });
+
+
+    permanentListenersAttached = true; // Set flag
+}
+
 
 // --- Voice Transcription API (WebSocket) ---
 
 /**
- * Connects to the WebSocket server for transcription.
+ * Connects to the WebSocket server if not already connected,
+ * then starts a transcription stream.
  * @param {string} languageCode - e.g., 'en-US'
  * @param {string} audioFormat - e.g., 'WEBM_OPUS' (must match frontend recording)
  * @returns {Promise<void>} A promise that resolves when the backend confirms *this specific* transcription started, or rejects on error.
