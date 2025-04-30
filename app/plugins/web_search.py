@@ -13,88 +13,98 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def fetch_web_content(url, selectors_to_try=None):
+def fetch_web_content(url):
     """
-    Fetches and extracts text content from a webpage using specified CSS selectors.
+    Fetches content from a URL, attempting to extract text from HTML or identifying PDFs.
 
     Args:
-        url (str): The URL of the webpage to scrape.
-        selectors_to_try (list): A list of CSS selectors to try for finding the main content.
-                                  If None, it will try a few common selectors.
-                                  Each item in the list should be a dictionary with 'tag' (e.g., 'div', 'article') and
-                                  optional 'attrs' (a dictionary of attributes like {'id': 'content', 'class': 'main'}).
+        url (str): The URL of the webpage or resource.
 
     Returns:
-        str: The extracted text content, or None if extraction fails.
+        dict: A dictionary containing:
+              - 'type': 'html', 'pdf', or 'error'
+              - 'content': Extracted text (for html), raw bytes (for pdf, currently unused downstream), or error message.
+              - 'url': The original URL.
     """
     try:
-        response = requests.get(url, timeout=10)  # Added a timeout to prevent hanging
+        # Use stream=True to check headers before downloading the whole body
+        response = requests.get(url, timeout=15, stream=True, headers={'User-Agent': 'MyWebApp/1.0'})
         response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-        soup = BeautifulSoup(response.content, "html.parser")
 
-        body = soup.find('body')  # Start from the body
-        if not body:
-            logger.warning(f"Could not find <body> tag in Wikipedia article: {url}")
-            return None
+        content_type = response.headers.get('Content-Type', '').lower()
+        logger.info(f"Fetching URL: {url}, Content-Type: {content_type}")
 
-        all_text = body.find_all(string=True) # Get all text nodes
+        # --- PDF Handling ---
+        if 'application/pdf' in content_type:
+            logger.info(f"Detected PDF content at {url}")
+            # In a real scenario, you might download response.content here
+            # For now, we just signal that it's a PDF.
+            # pdf_bytes = response.content # Uncomment if you need the bytes later
+            return {'type': 'pdf', 'content': b"PDF content placeholder", 'url': url} # Return placeholder bytes
 
-        # Filter out script, style, and other unwanted tags
-        visible_texts = [t for t in all_text if t.parent.name not in ['script', 'style', 'head', 'title', 'meta', '[document]']]
+        # --- HTML Handling ---
+        # Proceed only if it's likely HTML (or unspecified, default to HTML attempt)
+        if 'text/html' in content_type or not content_type:
+            # Download the full content now
+            html_content = response.content
+            soup = BeautifulSoup(html_content, "html.parser")
+            text = None
 
-        # Join the visible texts and clean up whitespace
-        text = "\n".join(visible_texts)
-        text = re.sub(r"\[.*?\]", "", text)  # Remove citation-like markers
-        text = text.replace(chr(10), " ").replace(chr(13), " ")  # Clean newlines
-        text = '\n'.join(line.strip() for line in text.splitlines())  # Remove empty lines
-        text = text.strip()
+            # --- Wikipedia Specific Logic ---
+            if "wikipedia.org" in url:
+                content_div = soup.find("div", {"id": "mw-content-text"})
+                if content_div:
+                    paragraphs = content_div.find_all("p")
+                    text = "\n".join([p.get_text() for p in paragraphs])
+                    logger.info(f"Extracted Wikipedia content from {url}")
+                else:
+                    logger.warning(f"Could not find 'mw-content-text' div in Wikipedia article: {url}")
+                    # Fallback to generic extraction if specific div not found
+                    body = soup.find('body')
+                    if body:
+                        all_text_nodes = body.find_all(string=True)
+                        visible_texts = [t for t in all_text_nodes if t.parent.name not in ['script', 'style', 'head', 'title', 'meta', '[document]']]
+                        text = "\n".join(visible_texts)
+                        logger.info(f"Used fallback generic extraction for Wikipedia page: {url}")
 
-        return text
+            # --- Generic HTML Logic ---
+            else:
+                body = soup.find('body')
+                if body:
+                    all_text_nodes = body.find_all(string=True)
+                    # Filter out script, style, and other unwanted tags
+                    visible_texts = [t for t in all_text_nodes if t.parent.name not in ['script', 'style', 'head', 'title', 'meta', '[document]']]
+                    text = "\n".join(visible_texts)
+                    logger.info(f"Extracted generic HTML content from {url}")
+                else:
+                    logger.warning(f"Could not find <body> tag in HTML page: {url}")
 
+            # --- Text Cleaning (Common for both Wikipedia and Generic) ---
+            if text:
+                text = re.sub(r"\[.*?\]", "", text)  # Remove citation-like markers [1], [edit], etc.
+                text = text.replace(chr(10), " ").replace(chr(13), " ") # Replace newlines within paragraphs with spaces
+                text = '\n'.join(line.strip() for line in text.splitlines() if line.strip()) # Remove leading/trailing whitespace from lines and remove empty lines
+                text = text.strip()
+                return {'type': 'html', 'content': text, 'url': url}
+            else:
+                 # If no text could be extracted even if HTML structure was found
+                 return {'type': 'error', 'content': "Could not extract text content from HTML.", 'url': url}
+
+        # --- Handle other content types ---
+        else:
+            logger.warning(f"Unsupported Content-Type '{content_type}' at {url}. Skipping content extraction.")
+            return {'type': 'error', 'content': f"Unsupported content type: {content_type}", 'url': url}
+
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout error fetching content from {url}")
+        return {'type': 'error', 'content': "Request timed out.", 'url': url}
     except requests.exceptions.RequestException as e:
         logger.error(f"Error fetching content from {url}: {e}")
-        return None
+        return {'type': 'error', 'content': f"Network or HTTP error: {e}", 'url': url}
     except Exception as e:
-        logger.error(
-            f"An unexpected error occurred while processing content from {url}: {e}"
-        )
-        return None
-
-
-def fetch_wikipedia_content(url):
-    """Fetches the text content from a Wikipedia article."""
-    try:
-        response = requests.get(url)
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-
-        soup = BeautifulSoup(response.content, "html.parser")
-        content_div = soup.find("div", {"id": "mw-content-text"})
-        if not content_div:
-            logger.warning(
-                f"Could not find 'mw-content-text' div in Wikipedia article: {url}"
-            )
-            return None
-
-        paragraphs = content_div.find_all(
-            "p"
-        )  # or other relevant tags like 'li' for lists, 'h2' for headers
-
-        # Extract text from all paragraph elements within the content div.
-        text = "\n".join(
-            [p.get_text() for p in paragraphs]
-        )  # Concatenate all paragraphs.  Consider other tags too (h2, h3, etc)
-        text = re.sub(r"\[.*?\]", "", text)  # Remove citation links
-        text = text.replace(chr(10), " ").replace(chr(13), " ")  # Clean newlines
-        return text.strip()  # Remove leading/trailing whitespace
-
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching Wikipedia content from {url}: {e}")
-        return None
-    except Exception as e:
-        logger.error(
-            f"An unexpected error occurred while processing Wikipedia content from {url}: {e}"
-        )
-        return None
+        # Catch potential BeautifulSoup errors or others
+        logger.error(f"An unexpected error occurred while processing content from {url}: {e}", exc_info=True)
+        return {'type': 'error', 'content': f"An unexpected error occurred: {e}", 'url': url}
 
 
 def perform_web_search(query, num_results=3):
@@ -145,23 +155,29 @@ def perform_web_search(query, num_results=3):
             link = item.get("link", "no link")
             snippet = item.get("snippet", "No Snippet Available")
             # link = item.get('link') # You could include the link if desired
-            formatted_result = f"[Title]\n{title}\n[Snippet]\n{snippet.replace(chr(10), ' ').replace(chr(13), ' ')}\n[Link]\n{link}"  # Remove newlines from snippet
+            formatted_result = f"[Title]\n{title}\n[Snippet]\n{snippet.replace(chr(10), ' ').replace(chr(13), ' ')}\n[Link]\n{link}"
 
-            
-            # Check if the URL is a Wikipedia article
-            logger.info(formatted_result)
-            if "wikipedia.org" in link:
-                content = fetch_wikipedia_content(link)
-            else:
-                content = fetch_web_content(link)
-            if content:
-                formatted_result += "\n[Web Content]\n" + content
-            else:
-                formatted_result += "\n[Failed to retrieve full website content.]"
+            # Fetch content using the unified function
+            logger.info(f"Fetching content for result {i+1}: {link}")
+            fetch_result = fetch_web_content(link)
+
+            # Append content based on type
+            if fetch_result['type'] == 'html':
+                if fetch_result['content']:
+                    formatted_result += "\n[Web Content]\n" + fetch_result['content']
+                else:
+                    formatted_result += "\n[Could not extract text content.]"
+            elif fetch_result['type'] == 'pdf':
+                # Indicate PDF was found, but don't include binary content here
+                formatted_result += "\n[PDF Document Found. Content not extracted here.]"
+            elif fetch_result['type'] == 'error':
+                formatted_result += f"\n[Error fetching content: {fetch_result['content']}]"
+            else: # Should not happen, but good to have a fallback
+                 formatted_result += f"\n[Unknown content type encountered: {fetch_result.get('type', 'N/A')}]"
+
 
             search_snippets.append(formatted_result)
-
-            logger.info(f"  - Result {i+1}: {title}")
+            logger.info(f"  - Processed Result {i+1}: {title} ({fetch_result['type']})")
 
         return search_snippets
 
