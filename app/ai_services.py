@@ -577,21 +577,12 @@ Search Query:"""
     return None
 
 
-# --- Internal Helper for Streaming Error Handling ---
-def _yield_streaming_error(error_msg: str):
-    """Helper to yield an error message in a valid GenerateContentResponse structure for streaming."""
-    logger.debug(f"Yielding streaming error: {error_msg}")
-    # Create a valid structure: Response -> Candidates -> Candidate -> Content -> Parts -> Part
-    error_part = Part(text=error_msg)
-    error_content = Content(role="model", parts=[error_part])  # Assign role for Content
-    error_candidate = Candidate(
-        content=error_content, finish_reason="ERROR"
-    )  # Use ERROR finish reason
-    yield GenerateContentResponse(candidates=[error_candidate])
+# Removed _yield_streaming_error helper function
 
 
 # --- Chat Response Generation ---
-# This function is now DESIGNED to return EITHER a generator (if streaming) OR a string (if not streaming)
+# This function now starts the process and uses helpers that emit results via SocketIO.
+# It no longer returns a generator or a string directly.
 def generate_chat_response(
     chat_id,
     user_message,
@@ -599,27 +590,30 @@ def generate_chat_response(
     session_files=None,
     calendar_context=None,
     web_search_enabled=False,
-    streaming_enabled=False,  # This flag determines the *return type*
+    streaming_enabled=False,
+    socketio=None, # Add socketio instance
+    sid=None       # Add client session ID
 ):
     """
     Generates a chat response using the Gemini API via the client.
     Handles history, context, files, web search. Handles errors gracefully.
+    Emits results back to the client via SocketIO.
 
     Args:
         ... (standard args) ...
-        streaming_enabled (bool): If True, returns a generator yielding response chunks.
-                                  If False, returns a string with the full response or error message.
-
-    Returns:
-        - Generator[GenerateContentResponse, None, None]: If streaming_enabled is True.
-        - str: If streaming_enabled is False.
+        streaming_enabled (bool): Determines if the response should be streamed.
+        socketio: The Flask-SocketIO instance.
+        sid: The session ID of the client to emit results to.
     """
-    logger.info(
-        f"Entering generate_chat_response for chat {chat_id}. Streaming: {streaming_enabled}"
-    )
+    logger.info(f"Entering generate_chat_response for chat {chat_id} (SID: {sid}). Streaming: {streaming_enabled}")
+
+    if not socketio or not sid:
+        logger.error(f"generate_chat_response called without socketio or sid for chat {chat_id}.")
+        # Cannot emit error back without socketio/sid, just log and exit.
+        return
 
     # --- AI Readiness Check ---
-    # This check needs to return/yield correctly based on streaming_enabled
+    # This check now emits errors via SocketIO if it fails
     try:
         try:
             _ = current_app.config
@@ -630,22 +624,18 @@ def generate_chat_response(
                 exc_info=True,
             )
             error_msg = "[Error: AI Service called outside request context]"
-            if streaming_enabled:
-                # Must return a generator immediately, even for errors
-                return _yield_streaming_error(error_msg)
-            else:
-                return error_msg  # Return string directly
+            socketio.emit('task_error', {'error': error_msg}, room=sid)
+            return # Stop execution
 
         api_key = current_app.config.get("API_KEY")
         if not api_key:
             logger.error("API_KEY is missing from current_app.config.")
             error_msg = "[Error: AI Service API Key not configured]"
-            if streaming_enabled:
-                return _yield_streaming_error(error_msg)
-            else:
-                return error_msg
+            socketio.emit('task_error', {'error': error_msg}, room=sid)
+            return # Stop execution
 
         try:
+            # Ensure genai client is initialized (using 'g' is fine here as this runs within app context)
             if "genai_client" not in g:
                 logger.info("Creating new genai.Client and caching in 'g'.")
                 g.genai_client = genai.Client(api_key=api_key)
@@ -660,10 +650,8 @@ def generate_chat_response(
             error_msg = "[Error: Failed to initialize AI client]"
             if "api key not valid" in str(e).lower():
                 error_msg = "[Error: Invalid Gemini API Key]"
-            if streaming_enabled:
-                return _yield_streaming_error(error_msg)
-            else:
-                return error_msg
+            socketio.emit('task_error', {'error': error_msg}, room=sid)
+            return # Stop execution
 
     except Exception as e:
         logger.error(
@@ -671,84 +659,38 @@ def generate_chat_response(
             exc_info=True,
         )
         error_msg = f"[CRITICAL Unexpected Error during AI Service readiness check: {type(e).__name__}]"
-        if streaming_enabled:
-            return _yield_streaming_error(error_msg)
-        else:
-            return error_msg
+        socketio.emit('task_error', {'error': error_msg}, room=sid)
+        return # Stop execution
     # --- End AI Readiness Check ---
 
     # --- Main Logic ---
     # This part needs to be structured differently depending on streaming
-    # We can use a helper function for the core API call and processing
-    # to avoid code duplication and keep the main function clean.
+    # We use helper functions that now emit results via SocketIO.
 
-    if streaming_enabled:
-        # If streaming, call a helper that IS a generator
-        return _generate_chat_response_stream(
-            client=client,  # Pass the initialized client
-            chat_id=chat_id,
-            user_message=user_message,
-            attached_files=attached_files,
-            session_files=session_files,
-            calendar_context=calendar_context,
-            web_search_enabled=web_search_enabled,
-        )
-    else:
-        # If not streaming, call a helper that returns a string
-        return _generate_chat_response_non_stream(
-            client=client,  # Pass the initialized client
-            chat_id=chat_id,
-            user_message=user_message,
-            attached_files=attached_files,
-            session_files=session_files,
-            calendar_context=calendar_context,
-            web_search_enabled=web_search_enabled,
-        )
+    # --- Prepare History and Parts (Common Logic) ---
+    # This helper now needs socketio and sid to emit errors during preparation
+    preparation_result = _prepare_chat_content(
+        client=client,
+        chat_id=chat_id,
+        user_message=user_message,
+        attached_files=attached_files,
+        session_files=session_files,
+        calendar_context=calendar_context,
+        web_search_enabled=web_search_enabled,
+        socketio=socketio, # Pass socketio
+        sid=sid            # Pass sid
+    )
 
+    # Check if preparation failed (it emits the error, returns None on failure)
+    if preparation_result is None:
+        logger.error(f"Content preparation failed for chat {chat_id} (SID: {sid}). Error already emitted.")
+        return # Stop execution
 
-# --- Helper Function for NON-STREAMING Response ---
-def _generate_chat_response_non_stream(
-    client,
-    chat_id,
-    user_message,
-    attached_files,
-    session_files,
-    calendar_context,
-    web_search_enabled,
-) -> str:
-    """Internal helper to generate a full chat response string."""
-    logger.info(f"_generate_chat_response_non_stream called for chat {chat_id}")
-    temp_files_to_clean = []
-    try:
-        # --- Prepare History and Parts (Common Logic) ---
-        history, current_turn_parts, temp_files_to_clean = _prepare_chat_content(
-            client,
-            chat_id,
-            user_message,
-            attached_files,
-            session_files,
-            calendar_context,
-            web_search_enabled,
-        )
+    # Unpack results if preparation succeeded
+    history, current_turn_parts, temp_files_to_clean = preparation_result
 
-        # Check if preparation returned an error message (string)
-        if isinstance(
-            history, str
-        ):  # Using history variable to signal error from preparation
-            logger.error(
-                f"Error preparing content for non-streaming chat {chat_id}: {history}"
-            )
-            return history  # Return the error string
-
-        if not current_turn_parts:
-            logger.error(
-                f"Chat {chat_id}: No parts generated for the current turn (non-streaming)."
-            )
-            return (
-                "[Error: No content (message, files, context) provided for this turn.]"
-            )
-
-        # --- Determine Model ---
+    # --- Determine Model ---
+    # (This part remains the same)
         raw_model_name = current_app.config.get(
             "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
         )
@@ -757,37 +699,70 @@ def _generate_chat_response_non_stream(
             if not raw_model_name.startswith("models/")
             else raw_model_name
         )
-        logger.info(f"Non-streaming model for chat {chat_id}: '{model_to_use}'.")
+        logger.info(f"Model for chat {chat_id} (SID: {sid}): '{model_to_use}'.")
 
+        # --- Call Appropriate Helper ---
+        if streaming_enabled:
+            _generate_chat_response_stream(
+                client=client,
+                chat_id=chat_id,
+                model_to_use=model_to_use,
+                history=history,
+                current_turn_parts=current_turn_parts,
+                temp_files_to_clean=temp_files_to_clean,
+                socketio=socketio,
+                sid=sid,
+            )
+        else:
+            _generate_chat_response_non_stream(
+                client=client,
+                chat_id=chat_id,
+                model_to_use=model_to_use,
+                history=history,
+                current_turn_parts=current_turn_parts,
+                temp_files_to_clean=temp_files_to_clean,
+                socketio=socketio,
+                sid=sid,
+            )
+
+
+# --- Helper Function for NON-STREAMING Response ---
+def _generate_chat_response_non_stream(
+    client,
+    chat_id,
+    model_to_use,
+    history,
+    current_turn_parts,
+    temp_files_to_clean,
+    socketio,
+    sid,
+):
+    """Internal helper to generate a full chat response and emit it via SocketIO."""
+    logger.info(f"_generate_chat_response_non_stream called for chat {chat_id} (SID: {sid})")
+    assistant_response_content = None # To store the final content for DB saving
+    try:
         # --- Call Gemini API (Non-Streaming) ---
         full_conversation = history + [Content(role="user", parts=current_turn_parts)]
-
-        logger.info(
-            f"Calling model.generate_content (non-streaming) for chat {chat_id}"
-        )
-
+        logger.info(f"Calling model.generate_content (non-streaming) for chat {chat_id} (SID: {sid})")
         system_prompt = f"""You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
-
         response = client.models.generate_content(
             model=model_to_use,
             contents=full_conversation,
-            system_instruction=system_prompt,  # Add system instruction
+            system_instruction=system_prompt,
         )
-        logger.info(f"Non-streaming generate_content call returned for chat {chat_id}.")
+        logger.info(f"Non-streaming generate_content call returned for chat {chat_id} (SID: {sid}).")
 
         # --- Process Non-Streaming Response ---
-        logger.debug(f"Non-streaming raw response object: {response!r}")
+        logger.debug(f"Non-streaming raw response object (SID: {sid}): {response!r}")
 
         # Check for safety issues first
         if response.prompt_feedback and response.prompt_feedback.block_reason:
             reason = response.prompt_feedback.block_reason.name
-            logger.warning(
-                f"Non-streaming response blocked by safety settings for chat {chat_id}. Reason: {reason}"
-            )
-            return f"[AI Safety Error: Request blocked due to safety settings (Reason: {reason})]"
-
+            logger.warning(f"Non-streaming response blocked by safety settings for chat {chat_id} (SID: {sid}). Reason: {reason}")
+            assistant_response_content = f"[AI Safety Error: Request blocked due to safety settings (Reason: {reason})]"
+            socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
         # Check candidates and extract text
-        if (
+        elif (
             response.candidates
             and hasattr(response.candidates[0], "content")
             and hasattr(response.candidates[0].content, "parts")
@@ -799,245 +774,227 @@ def _generate_chat_response_non_stream(
                 if hasattr(part, "text")
             )
             if assistant_reply.strip():
-                logger.info(
-                    f"Successfully received full response text (length {len(assistant_reply)}) for chat {chat_id}."
-                )
-                return assistant_reply
+                logger.info(f"Successfully received full response text (length {len(assistant_reply)}) for chat {chat_id} (SID: {sid}).")
+                assistant_response_content = assistant_reply
+                socketio.emit('chat_response', {'reply': assistant_response_content}, room=sid)
             else:
-                logger.warning(
-                    f"Non-streaming response for chat {chat_id} was empty or whitespace."
-                )
-                return "[System Note: The AI returned an empty response.]"
+                logger.warning(f"Non-streaming response for chat {chat_id} (SID: {sid}) was empty or whitespace.")
+                assistant_response_content = "[System Note: The AI returned an empty response.]"
+                socketio.emit('chat_response', {'reply': assistant_response_content}, room=sid) # Emit the note
         else:
-            logger.warning(
-                f"Non-streaming response for chat {chat_id} did not produce usable content. Response: {response!r}"
-            )
+            logger.warning(f"Non-streaming response for chat {chat_id} (SID: {sid}) did not produce usable content. Response: {response!r}")
             finish_reason = "UNKNOWN"
             if response.candidates and hasattr(response.candidates[0], "finish_reason"):
                 finish_reason = response.candidates[0].finish_reason.name
             # Check prompt feedback again
             if response.prompt_feedback and response.prompt_feedback.block_reason:
                 reason = response.prompt_feedback.block_reason.name
-                return f"[AI Safety Error: Request blocked (Reason: {reason}, Finish Reason: {finish_reason})]"
+                assistant_response_content = f"[AI Safety Error: Request blocked (Reason: {reason}, Finish Reason: {finish_reason})]"
             else:
-                return f"[AI Error: The AI did not return any content (Finish Reason: {finish_reason})]"
+                assistant_response_content = f"[AI Error: The AI did not return any content (Finish Reason: {finish_reason})]"
+            socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
 
     # --- Error Handling for Non-Streaming API Call ---
     except InvalidArgument as e:
-        logger.error(
-            f"InvalidArgument error during non-streaming chat {chat_id}: {e}.",
-            exc_info=True,
-        )
-        return f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
+        logger.error(f"InvalidArgument error during non-streaming chat {chat_id} (SID: {sid}): {e}.", exc_info=True)
+        assistant_response_content = f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
+        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
     except ValidationError as e:
-        logger.error(
-            f"Data validation error calling non-streaming Gemini API for chat {chat_id}: {e}",
-            exc_info=True,
-        )
-        try:
-            error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
-        except Exception:
-            error_details = "Check logs."
-        return f"[AI Error: Internal data format error. {error_details}]"
+        logger.error(f"Data validation error calling non-streaming Gemini API for chat {chat_id} (SID: {sid}): {e}", exc_info=True)
+        try: error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
+        except Exception: error_details = "Check logs."
+        assistant_response_content = f"[AI Error: Internal data format error. {error_details}]"
+        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
     except DeadlineExceeded:
-        logger.error(f"Non-streaming Gemini API call timed out for chat {chat_id}.")
-        return "[AI Error: The request timed out. Please try again.]"
+        logger.error(f"Non-streaming Gemini API call timed out for chat {chat_id} (SID: {sid}).")
+        assistant_response_content = "[AI Error: The request timed out. Please try again.]"
+        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
     except NotFound as e:
-        raw_model_name = current_app.config.get(
-            "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
-        )  # Get model name again for error msg
-        logger.error(f"Model for non-streaming chat {chat_id} not found: {e}")
-        return f"[AI Error: Model '{raw_model_name}' not found or access denied.]"
+        logger.error(f"Model for non-streaming chat {chat_id} (SID: {sid}) not found: {e}")
+        assistant_response_content = f"[AI Error: Model '{model_to_use}' not found or access denied.]" # Use model_to_use here
+        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
     except GoogleAPIError as e:
-        logger.error(
-            f"Google API error for non-streaming chat {chat_id}: {e}", exc_info=False
-        )
+        logger.error(f"Google API error for non-streaming chat {chat_id} (SID: {sid}): {e}", exc_info=False)
         err_str = str(e).lower()
-        if "api key not valid" in err_str:
-            return "[Error: Invalid Gemini API Key]"
-        if "permission denied" in err_str:
-            return (
-                f"[AI Error: Permission denied for model. Check API key permissions.]"
-            )
-        if "resource has been exhausted" in err_str or "429" in str(e):
-            logger.warning(f"Quota/Rate limit hit for non-streaming chat {chat_id}.")
-            return (
-                "[AI Error: API quota or rate limit exceeded. Please try again later.]"
-            )
-        if "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
-            logger.warning(
-                f"API error indicates safety block for non-streaming chat {chat_id}: {e}"
-            )
-            return f"[AI Safety Error: Request or response blocked due to safety settings (Reason: SAFETY)]"
-        if "internal error" in err_str or "500" in str(e):
-            logger.error(
-                f"Internal server error from Gemini API for non-streaming chat {chat_id}: {e}"
-            )
-            return "[AI Error: The AI service encountered an internal error.]"
-        return f"[AI API Error: {type(e).__name__}]"  # Generic API error
+        if "api key not valid" in err_str: assistant_response_content = "[Error: Invalid Gemini API Key]"
+        elif "permission denied" in err_str: assistant_response_content = f"[AI Error: Permission denied for model. Check API key permissions.]"
+        elif "resource has been exhausted" in err_str or "429" in str(e):
+            logger.warning(f"Quota/Rate limit hit for non-streaming chat {chat_id} (SID: {sid}).")
+            assistant_response_content = "[AI Error: API quota or rate limit exceeded. Please try again later.]"
+        elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
+            logger.warning(f"API error indicates safety block for non-streaming chat {chat_id} (SID: {sid}): {e}")
+            assistant_response_content = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: SAFETY)]"
+        elif "internal error" in err_str or "500" in str(e):
+            logger.error(f"Internal server error from Gemini API for non-streaming chat {chat_id} (SID: {sid}): {e}")
+            assistant_response_content = "[AI Error: The AI service encountered an internal error.]"
+        else: assistant_response_content = f"[AI API Error: {type(e).__name__}]"
+        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
     except Exception as e:
-        logger.error(
-            f"Unexpected error during non-streaming Gemini API interaction for chat {chat_id}: {e}",
-            exc_info=True,
-        )
-        return f"[Unexpected AI Error: {type(e).__name__}]"
+        logger.error(f"Unexpected error during non-streaming Gemini API interaction for chat {chat_id} (SID: {sid}): {e}", exc_info=True)
+        assistant_response_content = f"[Unexpected AI Error: {type(e).__name__}]"
+        socketio.emit('task_error', {'error': assistant_response_content}, room=sid)
     finally:
-        _cleanup_temp_files(temp_files_to_clean, f"non-streaming chat {chat_id}")
+        # --- Save Assistant Response to DB ---
+        if assistant_response_content: # Ensure there's content (even error messages)
+            logger.info(f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid}).")
+            try:
+                save_success = database.add_message_to_db(chat_id, "assistant", assistant_response_content)
+                if not save_success:
+                    logger.error(f"Failed to save non-streaming assistant message for chat {chat_id} (SID: {sid}).")
+            except Exception as db_err:
+                logger.error(f"DB error saving non-streaming assistant message for chat {chat_id} (SID: {sid}): {db_err}", exc_info=True)
+        else:
+             logger.warning(f"No assistant content generated to save for non-streaming chat {chat_id} (SID: {sid}).")
+
+        _cleanup_temp_files(temp_files_to_clean, f"non-streaming chat {chat_id} (SID: {sid})")
 
 
 # --- Helper Function for STREAMING Response ---
 def _generate_chat_response_stream(
     client,
     chat_id,
-    user_message,
-    attached_files,
-    session_files,
-    calendar_context,
-    web_search_enabled,
-):  # -> Generator[GenerateContentResponse, None, None] implicitly
-    """Internal helper that IS a generator yielding chat response chunks."""
-    logger.info(f"_generate_chat_response_stream called for chat {chat_id}")
-    temp_files_to_clean = []
-    response_iterator = None  # Initialize
+    model_to_use,
+    history,
+    current_turn_parts,
+    temp_files_to_clean,
+    socketio,
+    sid,
+):
+    """Internal helper that generates and emits chat response chunks via SocketIO."""
+    logger.info(f"_generate_chat_response_stream called for chat {chat_id} (SID: {sid})")
+    response_iterator = None
+    full_reply_content = "" # Accumulate full reply for saving
+    emitted_error = False # Flag to track if an error was already emitted
+
+    def emit_error_once(error_msg):
+        nonlocal emitted_error
+        if not emitted_error:
+            socketio.emit('task_error', {'error': error_msg}, room=sid)
+            emitted_error = True
+
     try:
-        # --- Prepare History and Parts (Common Logic) ---
-        history, current_turn_parts, temp_files_to_clean = _prepare_chat_content(
-            client,
-            chat_id,
-            user_message,
-            attached_files,
-            session_files,
-            calendar_context,
-            web_search_enabled,
-        )
-
-        # Check if preparation returned an error message (string)
-        if isinstance(history, str):  # Using history variable to signal error
-            logger.error(
-                f"Error preparing content for streaming chat {chat_id}: {history}"
-            )
-            yield from _yield_streaming_error(history)  # Yield the error and stop
-            return
-
-        if not current_turn_parts:
-            logger.error(
-                f"Chat {chat_id}: No parts generated for the current turn (streaming)."
-            )
-            yield from _yield_streaming_error(
-                "[Error: No content (message, files, context) provided for this turn.]"
-            )
-            return
-
-        # --- Determine Model ---
+        # --- Call Gemini API (Streaming) ---
         raw_model_name = current_app.config.get(
             "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
         )
         model_to_use = (
             f"models/{raw_model_name}"
             if not raw_model_name.startswith("models/")
-            else raw_model_name
-        )
-        logger.info(f"Streaming model for chat {chat_id}: '{model_to_use}'.")
-
-        # --- Call Gemini API (Streaming) ---
         full_conversation = history + [Content(role="user", parts=current_turn_parts)]
-
         system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
-
-        logger.info(f"Calling model.generate_content (streaming) for chat {chat_id}")
-        # NOTE: system_instruction is NOT supported directly in generate_content_stream in this SDK version.
-        # It might need to be prepended to 'contents' if the model supports it that way,
-        # but removing the unsupported keyword argument is the immediate fix for the TypeError.
+        logger.info(f"Calling model.generate_content_stream for chat {chat_id} (SID: {sid})")
         response_iterator = client.models.generate_content_stream(
             model=model_to_use,
             contents=full_conversation,
-            # system_instruction=system_prompt, # REMOVED: Unsupported keyword argument
+            # system_instruction=system_prompt, # Still unsupported
         )
-        logger.info(
-            f"Streaming generate_content call returned iterator for chat {chat_id}."
-        )
+        logger.info(f"Streaming generate_content call returned iterator for chat {chat_id} (SID: {sid}).")
 
-        # --- Yield Chunks from Iterator ---
+        # --- Process Chunks from Iterator ---
         chunk_count = 0
         for chunk in response_iterator:
-            # logger.debug(f"Yielding chunk {chunk_count} for chat {chat_id}: {chunk!r}") # Very verbose
-            yield chunk
-            chunk_count += 1
-        logger.info(f"Finished yielding {chunk_count} chunks for chat {chat_id}.")
+            chunk_text = ""
+            try:
+                # Extract text content if available
+                if hasattr(chunk, 'text') and chunk.text:
+                    chunk_text = chunk.text
+                # Check for safety blocking (prompt feedback)
+                elif hasattr(chunk, 'prompt_feedback') and chunk.prompt_feedback and chunk.prompt_feedback.block_reason:
+                    reason = chunk.prompt_feedback.block_reason.name
+                    logger.warning(f"Stream chunk blocked by safety settings for chat {chat_id} (SID: {sid}). Reason: {reason}")
+                    chunk_text = f"\n[AI Safety Error: Request or response blocked due to safety settings (Reason: {reason})]"
+                    emit_error_once(chunk_text) # Emit as error
+                # Check for safety blocking (finish reason)
+                elif hasattr(chunk, 'candidates') and chunk.candidates and hasattr(chunk.candidates[0], 'finish_reason') and chunk.candidates[0].finish_reason == 3: # SAFETY
+                    safety_reason = "SAFETY"
+                    try:
+                        if chunk.candidates[0].safety_ratings:
+                            safety_reason = "; ".join([f"{r.category.name}: {r.probability.name}" for r in chunk.candidates[0].safety_ratings])
+                    except Exception: pass
+                    logger.warning(f"Stream chunk finished due to SAFETY for chat {chat_id} (SID: {sid}). Ratings: {safety_reason}")
+                    chunk_text = f"\n[AI Safety Error: Response blocked due to safety settings (Reason: {safety_reason})]"
+                    emit_error_once(chunk_text) # Emit as error
+
+                # Emit the chunk text if it's not empty
+                if chunk_text:
+                    # logger.debug(f"Emitting stream chunk for SID {sid}: {chunk_text[:100]}...") # Verbose
+                    socketio.emit('stream_chunk', {'chunk': chunk_text}, room=sid)
+                    full_reply_content += chunk_text # Accumulate for saving
+                    chunk_count += 1
+
+            except AttributeError as ae:
+                 logger.error(f"AttributeError processing stream chunk for SID {sid}: {ae} - Chunk: {chunk!r}", exc_info=True)
+                 emit_error_once(f"[System Error: Problem processing AI response chunk ({type(ae).__name__})]")
+            except Exception as e:
+                 logger.error(f"Unexpected error processing stream chunk for SID {sid}: {e} - Chunk: {chunk!r}", exc_info=True)
+                 emit_error_once(f"[System Error: Problem processing AI response chunk ({type(e).__name__})]")
+
+        logger.info(f"Finished processing {chunk_count} chunks for chat {chat_id} (SID: {sid}).")
+        # Emit stream end signal if no error occurred during streaming
+        if not emitted_error:
+            socketio.emit('stream_end', {'message': 'Stream finished.'}, room=sid)
 
     # --- Error Handling for Streaming API Call ---
-    # Handle errors that might occur during iteration or the initial call
     except InvalidArgument as e:
-        logger.error(
-            f"InvalidArgument error during streaming chat {chat_id}: {e}.",
-            exc_info=True,
-        )
-        yield from _yield_streaming_error(
-            f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
-        )
+        logger.error(f"InvalidArgument error during streaming chat {chat_id} (SID: {sid}): {e}.", exc_info=True)
+        full_reply_content = f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
+        emit_error_once(full_reply_content)
     except ValidationError as e:
-        logger.error(
-            f"Data validation error calling streaming Gemini API for chat {chat_id}: {e}",
-            exc_info=True,
-        )
-        try:
-            error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
-        except Exception:
-            error_details = "Check logs."
-        yield from _yield_streaming_error(
-            f"[AI Error: Internal data format error. {error_details}]"
-        )
+        logger.error(f"Data validation error calling streaming Gemini API for chat {chat_id} (SID: {sid}): {e}", exc_info=True)
+        try: error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
+        except Exception: error_details = "Check logs."
+        full_reply_content = f"[AI Error: Internal data format error. {error_details}]"
+        emit_error_once(full_reply_content)
     except DeadlineExceeded:
-        logger.error(f"Streaming Gemini API call timed out for chat {chat_id}.")
-        yield from _yield_streaming_error(
-            "[AI Error: The request timed out. Please try again.]"
-        )
+        logger.error(f"Streaming Gemini API call timed out for chat {chat_id} (SID: {sid}).")
+        full_reply_content = "[AI Error: The request timed out. Please try again.]"
+        emit_error_once(full_reply_content)
     except NotFound as e:
-        raw_model_name = current_app.config.get(
-            "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
-        )
-        logger.error(f"Model for streaming chat {chat_id} not found: {e}")
-        yield from _yield_streaming_error(
-            f"[AI Error: Model '{raw_model_name}' not found or access denied.]"
-        )
+        logger.error(f"Model for streaming chat {chat_id} (SID: {sid}) not found: {e}")
+        full_reply_content = f"[AI Error: Model '{model_to_use}' not found or access denied.]"
+        emit_error_once(full_reply_content)
     except GoogleAPIError as e:
-        logger.error(
-            f"Google API error for streaming chat {chat_id}: {e}", exc_info=False
-        )
+        logger.error(f"Google API error for streaming chat {chat_id} (SID: {sid}): {e}", exc_info=False)
         err_str = str(e).lower()
-        error_message = f"[AI API Error: {type(e).__name__}]"  # Default
-        if "api key not valid" in err_str:
-            error_message = "[Error: Invalid Gemini API Key]"
-        elif "permission denied" in err_str:
-            error_message = (
-                f"[AI Error: Permission denied for model. Check API key permissions.]"
-            )
+        if "api key not valid" in err_str: full_reply_content = "[Error: Invalid Gemini API Key]"
+        elif "permission denied" in err_str: full_reply_content = f"[AI Error: Permission denied for model. Check API key permissions.]"
         elif "resource has been exhausted" in err_str or "429" in str(e):
-            logger.warning(f"Quota/Rate limit hit for streaming chat {chat_id}.")
-            error_message = (
-                "[AI Error: API quota or rate limit exceeded. Please try again later.]"
-            )
+            logger.warning(f"Quota/Rate limit hit for streaming chat {chat_id} (SID: {sid}).")
+            full_reply_content = "[AI Error: API quota or rate limit exceeded. Please try again later.]"
         elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
-            logger.warning(
-                f"API error indicates safety block for streaming chat {chat_id}: {e}"
-            )
-            error_message = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: SAFETY)]"
+            logger.warning(f"API error indicates safety block for streaming chat {chat_id} (SID: {sid}): {e}")
+            full_reply_content = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: SAFETY)]"
         elif "internal error" in err_str or "500" in str(e):
-            logger.error(
-                f"Internal server error from Gemini API for streaming chat {chat_id}: {e}"
-            )
-            error_message = "[AI Error: The AI service encountered an internal error.]"
-        yield from _yield_streaming_error(error_message)
+            logger.error(f"Internal server error from Gemini API for streaming chat {chat_id} (SID: {sid}): {e}")
+            full_reply_content = "[AI Error: The AI service encountered an internal error.]"
+        else: full_reply_content = f"[AI API Error: {type(e).__name__}]"
+        emit_error_once(full_reply_content)
     except Exception as e:
-        # This catches errors during the iteration over `response_iterator` as well
-        logger.error(
-            f"Unexpected error during streaming Gemini API interaction for chat {chat_id}: {e}",
-            exc_info=True,
-        )
-        yield from _yield_streaming_error(f"[Unexpected AI Error: {type(e).__name__}]")
+        logger.error(f"Unexpected error during streaming Gemini API interaction for chat {chat_id} (SID: {sid}): {e}", exc_info=True)
+        full_reply_content = f"[Unexpected AI Error: {type(e).__name__}]"
+        emit_error_once(full_reply_content)
     finally:
-        # Ensure cleanup happens even if the generator isn't fully consumed
-        _cleanup_temp_files(temp_files_to_clean, f"streaming chat {chat_id}")
+        # --- Save Full Accumulated Reply to DB ---
+        # Ensure we save something, even if it's just an error message or placeholder
+        if not full_reply_content.strip():
+            if not emitted_error: # If no specific error was emitted, save a generic note
+                 full_reply_content = "[System Note: The AI did not return any content.]"
+                 logger.warning(f"Streaming for chat {chat_id} (SID: {sid}) yielded no content. Saving placeholder.")
+            else:
+                 # If an error was emitted, full_reply_content might still be empty if the error happened early.
+                 # We rely on the emitted error message for the user, and save a generic note here.
+                 full_reply_content = "[System Note: An error occurred during streaming.]"
+                 logger.warning(f"Saving placeholder for chat {chat_id} (SID: {sid}) after streaming error.")
+
+        logger.info(f"Attempting to save final streamed assistant message for chat {chat_id} (SID: {sid}). Length: {len(full_reply_content)}")
+        try:
+            save_success = database.add_message_to_db(chat_id, "assistant", full_reply_content)
+            if not save_success:
+                logger.error(f"Failed to save final streamed assistant message for chat {chat_id} (SID: {sid}).")
+        except Exception as db_err:
+            logger.error(f"DB error saving final streamed assistant message for chat {chat_id} (SID: {sid}): {db_err}", exc_info=True)
+
+        _cleanup_temp_files(temp_files_to_clean, f"streaming chat {chat_id} (SID: {sid})")
 
 
 # --- Helper Function to Prepare History and Content Parts ---
@@ -1049,12 +1006,24 @@ def _prepare_chat_content(
     session_files,
     calendar_context,
     web_search_enabled,
+    socketio=None, # Add socketio
+    sid=None       # Add sid
 ):
-    """Prepares history list and current turn parts list. Returns (history, parts, temp_files) or (error_string, None, None)."""
-    logger.info(f"Preparing content for chat {chat_id}")
+    """
+    Prepares history list and current turn parts list.
+    Returns (history, parts, temp_files) on success.
+    Emits 'task_error' via SocketIO and returns None on failure.
+    """
+    logger.info(f"Preparing content for chat {chat_id} (SID: {sid})")
     history = []
     current_turn_parts = []
     temp_files_to_clean = []
+
+    def emit_prep_error(error_msg):
+        logger.error(f"Preparation error for chat {chat_id} (SID: {sid}): {error_msg}")
+        if socketio and sid:
+            socketio.emit('task_error', {'error': error_msg}, room=sid)
+        return None # Signal failure
 
     # --- Fetch History ---
     try:
@@ -1080,16 +1049,12 @@ def _prepare_chat_content(
 
     except Exception as e:
         logger.error(
-            f"Failed to fetch/prepare history for chat {chat_id}: {e}", exc_info=True
+            f"Failed to fetch/prepare history for chat {chat_id} (SID: {sid}): {e}", exc_info=True
         )
-        return (
-            "[Error: Could not load or prepare chat history]",
-            None,
-            None,
-        )  # Return error string
+        return emit_prep_error("[Error: Could not load or prepare chat history]")
 
     # --- Prepare Current Turn Parts ---
-    # Wrap the rest in try/except to catch errors during part preparation
+    # Wrap the rest in try/except to catch errors during part preparation and emit them
     try:
         # 1. Calendar Context
         if calendar_context:
@@ -1407,17 +1372,18 @@ At the end of your response, include a list of the cited sources, formatted as f
 
     except Exception as prep_err:
         logger.error(
-            f"Unexpected error preparing content parts for chat {chat_id}: {prep_err}",
+            f"Unexpected error preparing content parts for chat {chat_id} (SID: {sid}): {prep_err}",
             exc_info=True,
         )
-        return (
-            f"[Error: Failed to prepare content for AI ({type(prep_err).__name__})]",
-            None,
-            None,
-        )
+        return emit_prep_error(f"[Error: Failed to prepare content for AI ({type(prep_err).__name__})]")
+
+    # --- Return successful preparation results ---
+    logger.info(f"Successfully prepared {len(current_turn_parts)} current turn parts for chat {chat_id} (SID: {sid}).")
+    return history, current_turn_parts, temp_files_to_clean
 
 
 # --- Helper Function to Clean Up Temporary Files ---
+# (No changes needed in _cleanup_temp_files)
 def _cleanup_temp_files(temp_files: list, context_msg: str):
     """Safely removes a list of temporary files."""
     if temp_files:

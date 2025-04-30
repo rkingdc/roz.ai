@@ -790,23 +790,58 @@ Here are the components:
 
 
 # --- Main Deep Research Orchestration ---
-# Removed parallel helper functions: _execute_research_step, _execute_additional_research_step, _synthesize_section_parallel
-def perform_deep_research(query: str) -> str:
+def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> None:
     """
     Orchestrates the deep research process from query to final report.
+    Emits results ('deep_research_result') or errors ('task_error') via SocketIO.
+    Saves the final report/error to the database.
     """
-    logger.info(f"--- Starting Deep Research for Query: '{query}' ---")
+    logger.info(f"--- Starting Deep Research for Query: '{query}' (SID: {sid}, ChatID: {chat_id}) ---")
 
-    # Get the actual Flask app object to pass to threads
+    final_report_content = None # To store the final report or error for DB saving
+
+    def emit_status(message):
+        if socketio and sid:
+            logger.info(f"Status Update (SID: {sid}): {message}")
+            socketio.emit('status_update', {'message': message}, room=sid)
+
+    def emit_error(error_msg, save_to_db=True):
+        nonlocal final_report_content
+        logger.error(f"Deep Research Error (SID: {sid}, ChatID: {chat_id}): {error_msg}")
+        final_report_content = error_msg # Store error for DB saving
+        if socketio and sid:
+            socketio.emit('task_error', {'error': error_msg}, room=sid)
+        # Save error to DB if requested
+        if save_to_db and chat_id is not None:
+            try:
+                logger.info(f"Attempting to save deep research error message for chat {chat_id}.")
+                from . import database as db # Local import to avoid circular dependency issues at top level
+                db.add_message_to_db(chat_id, "assistant", final_report_content)
+            except Exception as db_err:
+                 logger.error(f"Failed to save deep research error to DB for chat {chat_id}: {db_err}", exc_info=True)
+        return None # Indicate failure
+
+    # --- Check for socketio/sid ---
+    if not socketio or not sid:
+        logger.error("perform_deep_research called without socketio or sid.")
+        # Cannot emit error, just log and return
+        return
+
+    # --- Get Flask app context ---
+    # This is necessary because this function runs in a background thread started by SocketIO
+    # and needs access to app.config, g, etc. for the AI/DB calls.
     app = current_app._get_current_object()
+    with app.app_context():
+        # --- Start Actual Research Process ---
+        emit_status("Generating initial research plan...")
+        # 1. Generate Initial Research Plan
+        research_plan: List[Tuple[str, str]] = query_to_research_plan(query)
+        if not research_plan:
+            return emit_error("[Error: Could not generate initial research plan.]") # Use emit_error
+        logger.info(f"Initial Research Plan (SID: {sid}):\n{json.dumps(research_plan, indent=2)}")
+        emit_status(f"Generated {len(research_plan)} initial research steps.")
 
-    # 1. Generate Initial Research Plan
-    research_plan: List[Tuple[str, str]] = query_to_research_plan(query)
-    if not research_plan:
-        return "[Error: Could not generate initial research plan.]"
-    logger.info(f"Initial Research Plan:\n{json.dumps(research_plan, indent=2)}")
-
-    # 2. Prepare for Research Execution
+        # 2. Prepare for Research Execution
     collected_research: Dict[str, List[str]] = (
         {}
     )  # Stores processed content strings per *initial* step name
@@ -814,13 +849,15 @@ def perform_deep_research(query: str) -> str:
         {}
     )  # Stores raw result dicts per *initial* step name
 
-    # 3. Execute Initial Research Steps Sequentially
-    logger.info(
-        f"--- Executing {len(research_plan)} Initial Research Steps Sequentially ---"
-    )
-    for step_name, step_description in research_plan:
-        logger.info(f"--- Starting Research Step: {step_name} ---")
-        logger.debug(f"Description: {step_description}")
+        # 3. Execute Initial Research Steps Sequentially
+        logger.info(f"--- Executing {len(research_plan)} Initial Research Steps Sequentially (SID: {sid}) ---")
+        emit_status("Performing initial research...")
+        step_counter = 0
+        for step_name, step_description in research_plan:
+            step_counter += 1
+            emit_status(f"Research Step {step_counter}/{len(research_plan)}: {step_name}...")
+            logger.info(f"--- Starting Research Step: {step_name} (SID: {sid}) ---")
+            logger.debug(f"Description: {step_description}")
         all_processed_content_for_step = []
         all_raw_dicts_for_step = []
         try:
@@ -854,15 +891,15 @@ def perform_deep_research(query: str) -> str:
             )
 
         except Exception as e:
-            logger.error(f"Error executing research step '{step_name}': {e}", exc_info=True)
+            logger.error(f"Error executing research step '{step_name}' (SID: {sid}): {e}", exc_info=True)
             error_msg = f"[System Error: Failed to execute research step '{step_name}' due to {type(e).__name__}]"
             collected_research[step_name] = [error_msg]
             collected_raw_results[step_name] = [{"error": error_msg}]
+            # Optionally emit a non-fatal warning? For now, just log.
 
-    logger.info(
-        "--- Finished Sequential Execution of Initial Research Steps ---"
-    )
-    # Log collected research summary
+        logger.info(f"--- Finished Sequential Execution of Initial Research Steps (SID: {sid}) ---")
+        emit_status("Initial research complete. Refining report plan...")
+        # Log collected research summary
     for step, items in collected_research.items():
         raw_count = len(collected_raw_results.get(step, []))
         logger.debug(
@@ -877,16 +914,19 @@ def perform_deep_research(query: str) -> str:
     )
     if not updated_report_plan:
          # Handle case where updated plan generation fails
-         logger.error("Failed to generate updated report plan. Aborting synthesis.")
+         logger.error(f"Failed to generate updated report plan (SID: {sid}). Aborting synthesis.")
          # Combine collected research into a basic error report
          error_report_body = "\n\n".join([f"## {step}\n\n" + "\n".join(content) for step, content in collected_research.items()])
-         return f"# Deep Research Error\n\nFailed to generate the report outline after initial research.\n\n## Collected Research Snippets:\n\n{error_report_body}"
+         error_msg = f"# Deep Research Error\n\nFailed to generate the report outline after initial research.\n\n## Collected Research Snippets:\n\n{error_report_body}"
+         return emit_error(error_msg) # Use emit_error
 
+        logger.info(f"Updated Report Plan (SID: {sid}):\n{json.dumps(updated_report_plan, indent=2)}")
+        emit_status(f"Refined report plan with {len(updated_report_plan)} sections.")
 
-    # 4.5 Perform additional research for *new* sections identified in the updated plan (Sequentially).
-    logger.info("--- Checking for and executing additional research based on updated plan (Sequentially) ---")
-    original_step_names = {name for name, desc in research_plan}
-    new_sections_to_research = []
+        # 4.5 Perform additional research for *new* sections identified in the updated plan (Sequentially).
+        logger.info(f"--- Checking for and executing additional research based on updated plan (Sequentially) (SID: {sid}) ---")
+        original_step_names = {name for name, desc in research_plan}
+        new_sections_to_research = []
 
     # Identify sections needing research
     for section_name, section_description in updated_report_plan:
@@ -900,12 +940,16 @@ def perform_deep_research(query: str) -> str:
         else:
             logger.debug(f"Section '{section_name}' was part of initial research, skipping additional search.")
 
-    # Execute research for new sections sequentially
-    if new_sections_to_research:
-        logger.info(f"--- Executing additional research for {len(new_sections_to_research)} new sections sequentially ---")
-        for section_name, section_description in new_sections_to_research:
-            logger.info(f"--- Starting Additional Research Step: {section_name} ---")
-            logger.debug(f"Description: {section_description}")
+        # Execute research for new sections sequentially
+        if new_sections_to_research:
+            logger.info(f"--- Executing additional research for {len(new_sections_to_research)} new sections sequentially (SID: {sid}) ---")
+            emit_status(f"Performing additional research for {len(new_sections_to_research)} new section(s)...")
+            step_counter = 0
+            for section_name, section_description in new_sections_to_research:
+                step_counter += 1
+                emit_status(f"Additional Research {step_counter}/{len(new_sections_to_research)}: {section_name}...")
+                logger.info(f"--- Starting Additional Research Step: {section_name} (SID: {sid}) ---")
+                logger.debug(f"Description: {section_description}")
             processed_content_for_section = []
             raw_dicts_for_section = []
             try:
@@ -938,16 +982,20 @@ def perform_deep_research(query: str) -> str:
                 # Append error message to existing lists
                 collected_research[section_name].append(error_msg)
                 collected_raw_results[section_name].append({"error": error_msg})
+                # Optionally emit non-fatal warning
 
-        logger.info(f"--- Finished sequential execution of additional research for {len(new_sections_to_research)} section(s) ---")
-    else:
-        logger.info("--- No new sections required additional research ---")
+            logger.info(f"--- Finished sequential execution of additional research for {len(new_sections_to_research)} section(s) (SID: {sid}) ---")
+            emit_status("Additional research complete.")
+        else:
+            logger.info(f"--- No new sections required additional research (SID: {sid}) ---")
+            emit_status("No additional research needed.")
 
 
-    # 5. Synthesize Report Sections based on the *updated* plan (Sequentially)
-    logger.info(f"--- Synthesizing {len(updated_report_plan)} Report Sections Sequentially ---")
-    report_sections_results: Dict[str, str] = {} # Stores generated section text
-    report_references_results: Dict[str, List[str]] = {} # Stores references used per section
+        # 5. Synthesize Report Sections based on the *updated* plan (Sequentially)
+        logger.info(f"--- Synthesizing {len(updated_report_plan)} Report Sections Sequentially (SID: {sid}) ---")
+        emit_status("Synthesizing report sections...")
+        report_sections_results: Dict[str, str] = {} # Stores generated section text
+        report_references_results: Dict[str, List[str]] = {} # Stores references used per section
 
     # Consolidate *all* raw research items collected across *all* steps (initial + additional).
     # This needs to be done *before* submitting synthesis tasks.
@@ -964,11 +1012,14 @@ def perform_deep_research(query: str) -> str:
         # Handle this case gracefully, maybe generate placeholder sections?
         # For now, we'll let the synthesis function handle empty input if it can.
 
-    # Execute synthesis sequentially
-    for section_name, section_description in updated_report_plan:
-        logger.info(f"--- Starting Section Synthesis: {section_name} ---")
-        try:
-            # Call the synthesis function directly
+        # Execute synthesis sequentially
+        step_counter = 0
+        for section_name, section_description in updated_report_plan:
+            step_counter += 1
+            emit_status(f"Synthesizing Section {step_counter}/{len(updated_report_plan)}: {section_name}...")
+            logger.info(f"--- Starting Section Synthesis: {section_name} (SID: {sid}) ---")
+            try:
+                # Call the synthesis function directly
             report_section_text, section_refs = synthesize_research_into_report_section(
                 section_name,
                 section_description,
@@ -986,11 +1037,13 @@ def perform_deep_research(query: str) -> str:
             # Store error message as section text and empty refs
             report_sections_results[section_name] = error_msg
             report_references_results[section_name + "_references"] = []
+            # Optionally emit non-fatal warning
 
-    logger.info("--- Finished Sequential Execution of Section Synthesis ---")
+        logger.info(f"--- Finished Sequential Execution of Section Synthesis (SID: {sid}) ---")
+        emit_status("Section synthesis complete. Assembling final report...")
 
-    # Ensure sections are assembled in the order defined by updated_report_plan
-    ordered_section_texts = [report_sections_results.get(name, f"## {name}\n\n[Error: Section not generated.]\n") for name, desc in updated_report_plan]
+        # Ensure sections are assembled in the order defined by updated_report_plan
+        ordered_section_texts = [report_sections_results.get(name, f"## {name}\n\n[Error: Section not generated.]\n") for name, desc in updated_report_plan]
     full_report_body = "\n\n".join(ordered_section_texts)
 
     # The report_references dictionary is already populated correctly by the parallel step
@@ -1004,13 +1057,37 @@ def perform_deep_research(query: str) -> str:
     next_steps = create_next_steps(full_report_body)
 
     # Create Works Cited using the collected references and the raw results dicts
-    # Pass the consolidated raw results dict list here
-    works_cited = create_works_cited(report_references, all_raw_research_items)
+        # Pass the consolidated raw results dict list here
+        works_cited = create_works_cited(report_references, all_raw_research_items)
 
-    # 7. Generate Final Report using LLM for formatting and citation linking
-    final_report_output = final_report(
-        executive_summary, full_report_body, next_steps, works_cited
-    )
+        # 7. Generate Final Report using LLM for formatting and citation linking
+        emit_status("Formatting final report...")
+        final_report_output = final_report(
+            executive_summary, full_report_body, next_steps, works_cited
+        )
 
-    logger.info(f"--- Deep Research Complete for Query: '{query}' ---")
-    return final_report_output
+        # Check if final formatting failed (returned fallback content)
+        if "[Error:" in final_report_output and "Failed to generate" in final_report_output:
+             logger.error(f"Final report formatting failed for SID {sid}. Using concatenated content.")
+             # Use the concatenated version as the final content
+             final_report_content = f"{executive_summary}\n\n---\n\n{full_report_body}\n\n---\n\n{next_steps}\n\n---\n\n{works_cited}".strip()
+             emit_status("Final formatting failed, using raw assembly.")
+        else:
+             final_report_content = final_report_output # Store the successfully formatted report
+             emit_status("Final report formatting complete.")
+
+        # --- Emit Final Result ---
+        logger.info(f"--- Deep Research Complete for Query: '{query}' (SID: {sid}) ---")
+        socketio.emit('deep_research_result', {'report': final_report_content}, room=sid)
+
+        # --- Save Final Result to DB ---
+        if chat_id is not None:
+            try:
+                logger.info(f"Attempting to save final deep research report for chat {chat_id}.")
+                from . import database as db # Local import
+                db.add_message_to_db(chat_id, "assistant", final_report_content)
+            except Exception as db_err:
+                 logger.error(f"Failed to save final deep research report to DB for chat {chat_id}: {db_err}", exc_info=True)
+                 # Optionally emit another error? For now, just log.
+
+        # No return value needed as results are emitted
