@@ -121,7 +121,7 @@ from . import deep_research
 from flask import current_app # Import current_app
 
 
-def _process_chat_message_async(app, sid, data): # Add app argument
+def _process_chat_message_async(app, sid, data): # Ensure app argument is present
     """
     Runs in a background task to process chat messages (AI or Deep Research).
     Emits results back to the client via SocketIO.
@@ -140,8 +140,10 @@ def _process_chat_message_async(app, sid, data): # Add app argument
 
     # --- Create App Context ---
     # Use the app instance passed from the main thread
-    with app.app_context():
+    with app.app_context(): # Ensure this wraps the entire function body
         logger.debug(f"App context created successfully for background task (SID: {sid})")
+        # REMOVE the line below if it exists, as it causes the error in the background thread
+        # app = current_app._get_current_object() # REMOVE THIS LINE
         try:
             if mode == 'deep_research':
                 logger.info(f"Calling deep_research.perform_deep_research for SID {sid}, Chat {chat_id}")
@@ -277,7 +279,7 @@ def handle_send_chat_message(data):
     # --- Start Background Task ---
     logger.debug(f"User message saved (or skipped). Proceeding to start background task for SID {sid}...") # ADDED LOG
     logger.info(f"Starting background task for SID {sid}, Chat ID {chat_id}, Mode {mode}.")
-    app_instance = current_app._get_current_object() # Get app instance HERE
+    app_instance = current_app._get_current_object() # Ensure app instance is retrieved HERE
     try:
         # Optional: Notify client that processing has started
         emit('task_started', {'message': 'Processing your request...'}, room=sid)
@@ -289,7 +291,7 @@ def handle_send_chat_message(data):
     try:
         socketio.start_background_task(
             _process_chat_message_async,
-            app=app_instance, # Pass the app instance
+            app=app_instance, # Ensure app instance is passed
             sid=sid,
             data=data # Pass the full data dictionary received
         )
