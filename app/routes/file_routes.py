@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 import os
 from datetime import datetime
-from .. import database as db # Use relative import for database module
+from .. import database as database_module # Use alias to avoid conflict with SQLAlchemy db instance
 from .. import ai_services # Use relative import for ai services
 from .. import file_utils # Use relative import for file utils
 from ..plugins import web_search
@@ -25,7 +25,7 @@ def get_files():
     """API endpoint to get the list of uploaded files (metadata only)."""
     logger.info("Received GET request for /api/files")
     try:
-        files = db.get_uploaded_files_from_db()
+        files = database_module.get_uploaded_files_from_db()
         logger.info(f"Successfully retrieved {len(files)} files.")
         return jsonify(files)
     except Exception as e:
@@ -109,8 +109,8 @@ def upload_file_route():
         logger.info(f"Finished processing files loop. {len(files_added_to_session)} files added to session.")
         logger.info(f"Attempting to commit database session.")
         # --- Commit the transaction after processing all files ---
-        # Corrected: Access session via db.db.session
-        db.db.session.commit()
+        # Use the imported SQLAlchemy db instance directly
+        db.session.commit()
         logger.info(f"Database session committed. {len(files_added_to_session)} file objects were in the list before commit.")
 
         # --- Collect data for successfully uploaded files AFTER commit ---
@@ -160,15 +160,15 @@ def upload_file_route():
              return jsonify({"error": "No valid files processed or an internal issue occurred."}), 400
 
     except SQLAlchemyError as e:
-        # Corrected: Access session via db.db.session
-        db.db.session.rollback() # Rollback the entire transaction on DB error
+        # Use the imported SQLAlchemy db instance directly
+        db.session.rollback() # Rollback the entire transaction on DB error
         logger.error(f"Database error during file upload transaction: {e}", exc_info=True)
         errors.append(f"Database error during upload: {e}")
         return jsonify({"error": "; ".join(errors)}), 500
     except Exception as e:
         # Catch any other unexpected errors during the request processing
-        # Corrected: Access session via db.db.session
-        db.db.session.rollback() # Ensure rollback even on non-DB errors if session was modified
+        # Use the imported SQLAlchemy db instance directly
+        db.session.rollback() # Ensure rollback even on non-DB errors if session was modified
         logger.error(f"Unexpected error during file upload route processing: {e}", exc_info=True)
         errors.append(f"An unexpected error occurred: {e}")
         return jsonify({"error": "; ".join(errors)}), 500
@@ -235,8 +235,8 @@ def add_file_from_url_route():
         mimetype = 'text/plain' # Or 'text/html' if you want to preserve HTML structure
 
         # Save record and blob to DB - Commit immediately for single file from URL
-        logger.debug(f"Calling db.save_file_record_to_db for URL '{filename}' with commit=True.")
-        file_id = db.save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=True) # Ensure commit=True here
+        logger.debug(f"Calling database_module.save_file_record_to_db for URL '{filename}' with commit=True.")
+        file_id = database_module.save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=True) # Ensure commit=True here
 
         if file_id:
             logger.info(f"Successfully saved file from URL {url} with ID: {file_id}.")
@@ -256,14 +256,14 @@ def add_file_from_url_route():
                  logger.error(f"Failed to retrieve newly saved file object with ID {file_id} from URL '{url}'.")
                  return jsonify({"error": f"Failed to retrieve details for saved file from URL '{url}'."}), 500
         else:
-            # DB function already logs error
-            logger.error(f"db.save_file_record_to_db returned None for URL '{url}'.")
+            # database_module function already logs error
+            logger.error(f"database_module.save_file_record_to_db returned None for URL '{url}'.")
             return jsonify({"error": f"Failed to save content from URL '{url}' to database."}), 500
 
     except Exception as e:
         # Ensure rollback in case of error before commit
-        # Corrected: Access session via db.db.session
-        db.db.session.rollback()
+        # Use the imported SQLAlchemy db instance directly
+        db.session.rollback()
         logger.error(f"Unexpected error adding file from URL '{url}': {e}", exc_info=True)
         return jsonify({"error": f"An unexpected error occurred while processing the URL: {e}"}), 500
 
@@ -297,11 +297,11 @@ def update_summary_route(file_id):
         logger.warning(f"No summary content provided for file {file_id} update.")
         return jsonify({"error": "Summary content not provided"}), 400
 
-    if db.save_summary_in_db(file_id, new_summary):
+    if database_module.save_summary_in_db(file_id, new_summary):
         logger.info(f"Successfully updated summary for file {file_id}.")
         return jsonify({"message": "Summary updated successfully."})
     else:
-        # DB function already logs error
+        # database_module function already logs error
         logger.error(f"Failed to update summary for file {file_id}.")
         return jsonify({"error": "Failed to update summary"}), 500
 
@@ -312,7 +312,7 @@ def delete_file_route(file_id):
     # Optional: Add authentication/authorization checks here
 
     # Attempt to delete the file record from the database
-    deleted = db.delete_file_record_from_db(file_id)
+    deleted = database_module.delete_file_record_from_db(file_id)
 
     if deleted:
         logger.info(f"Successfully deleted file ID {file_id}.")
@@ -321,7 +321,7 @@ def delete_file_route(file_id):
         # Check if the file simply wasn't found or if another DB error occurred
         # For simplicity, returning 404 if delete function indicated not found (returned False)
         # A more robust check might involve querying first before deleting
-        details = db.get_file_details_from_db(file_id) # Check if it existed
+        details = database_module.get_file_details_from_db(file_id) # Check if it existed
         if not details:
              logger.warning(f"Attempted to delete file ID {file_id}, but it was not found.")
              return jsonify({"error": f"File ID {file_id} not found."}), 404
