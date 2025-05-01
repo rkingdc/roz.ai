@@ -615,18 +615,11 @@ def create_next_steps(report_content: str) -> str:
         return f"# Next Steps / Further Research\n\n[Error: Exception during next steps generation - {e}]\n"
 
 
-create_works_cited = llm_factory(
-    prompt_template="""You are an expert in creating and formatting works cited lists. You will receive a large dump of research items used in a research repport and you will output a list in the format:
-- [Reference Title - www.referenceurl.com](https://www.referenceurl.com)
-- [Next reference Title - www.reference2.pdf](https://www.reference2.pdf)
-{works}
-""",
-    params=["works"],
-)
+
 
 
 def final_report(
-    executive_summary: str, report_body: str, next_steps: str, works_cited: str
+    executive_summary: str, report_body: str, next_steps: str,
 ) -> str:
     """Uses an LLM to assemble and format the final report from its components."""
     logger.info("Formatting final report using LLM.")
@@ -652,14 +645,10 @@ Here are the components:
 {next_steps}
 --- END ---
 
-**4. Works Cited (use this to create Markdown links in the body):**
---- START ---
-{works_cited}
---- END ---
 
 **Instructions:**
 1. Combine these sections into a single, coherent Markdown document.
-2. Use appropriate Markdown heading levels (e.g., `# Executive Summary`, `## Section Title`, `# Next Steps / Further Research`, `# Works Cited`).
+2. Use appropriate Markdown heading levels (e.g., `# Executive Summary`, `## Section Title`, `# Next Steps / Further Research`).
 3. Conservatively apply selective **bolding** to highlight important terms, concepts, or conclusions within the text.
 4. Do not add any commentary outside the report content itself.
 
@@ -683,11 +672,11 @@ Here are the components:
         else:
             logger.error(f"LLM failed to format the final report: {formatted_report}")
             # Fallback to basic concatenation if LLM fails
-            return f"{executive_summary}\n\n---\n\n{report_body}\n\n---\n\n{next_steps}\n\n---\n\n{works_cited}".strip()
+            return f"{executive_summary}\n\n---\n\n{report_body}\n\n---\n\n{next_steps}\n\n---".strip()
     except Exception as e:
         logger.error(f"Error during final report formatting: {e}", exc_info=True)
         # Fallback to basic concatenation on exception
-        return f"{executive_summary}\n\n---\n\n{report_body}\n\n---\n\n{next_steps}\n\n---\n\n{works_cited}".strip()
+        return f"{executive_summary}\n\n---\n\n{report_body}\n\n---\n\n{next_steps}\n\n---".strip()
 
 
 # --- Main Deep Research Orchestration ---
@@ -1004,14 +993,11 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
     executive_summary = create_exec_summary(full_report_body)
     next_steps = create_next_steps(full_report_body)
 
-    # Create Works Cited using the collected references and the raw results dicts
-    # Pass the consolidated raw results dict list here
-    works_cited = create_works_cited(works=str(collected_research))
 
     # 7. Generate Final Report using LLM for formatting and citation linking
     emit_status("Formatting final report...")
     final_report_output = final_report(
-        executive_summary, full_report_body, next_steps, works_cited
+        executive_summary, full_report_body, next_steps, 
     )
 
     # Check if final formatting failed (returned fallback content)
@@ -1020,7 +1006,7 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
             f"Final report formatting failed for SID {sid}. Using concatenated content."
         )
         # Use the concatenated version as the final content
-        final_report_content = f"{executive_summary}\n\n---\n\n{full_report_body}\n\n---\n\n{next_steps}\n\n---\n\n{works_cited}".strip()
+        final_report_content = f"{executive_summary}\n\n---\n\n{full_report_body}\n\n---\n\n{next_steps}\n\n---".strip()
         emit_status("Final formatting failed, using raw assembly.")
     else:
         final_report_content = (

@@ -185,7 +185,6 @@ The application uses an SQLite database with the following tables:
 
 *   **Improved Google Calendar Integration:**  Provide a more feature-rich calendar integration.
 *   **Better File Handing:** Improve interface for loading and managing files
-*   **Drawio Diagram Rendering:** Render Drawio diagrams directly in the application.
 *   **Plugin Architecture:**  Develop a plugin architecture to easily extend the functionality of the tool.
 *   **RAG Plugin:** All chats, notes, and documents and indexed and searchable
 *   **Agentic Workflows:** Add agents that can complete tasks
@@ -193,7 +192,7 @@ The application uses an SQLite database with the following tables:
 
 ## Contributing
 
-Let's be honest. No one is going to conmtribute to this. Or see it. 
+Let's be honest. No one is going to contribute to this. Or see it. 
 
 ## License
 
