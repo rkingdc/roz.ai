@@ -66,7 +66,7 @@ class Config:
         "mp3",
         "md",
     }
-    MAX_FILE_SIZE_MB = 2
+    MAX_FILE_SIZE_MB = 20 # Increased from 2MB
     MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
     # Flask's MAX_CONTENT_LENGTH for request size limit (includes overhead)
