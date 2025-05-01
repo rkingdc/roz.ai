@@ -1310,18 +1310,16 @@ export function updatePluginUI() {
         return;
     }
 
-    const isFileEnabled = state.isFilePluginEnabled;
-    const isCalendarEnabled = state.isCalendarPluginEnabled;
-    const isWebSearchPluginEnabled = state.isWebSearchPluginEnabled; // Use plugin enabled state for visibility
+    // Plugins are always enabled now, visibility depends only on the active tab
     const activeTab = state.currentTab; // Read active tab from state
 
-    // Toggle visibility of entire plugin sections based on enabled state AND active tab
-    // File plugin is only visible in Chat tab if enabled
-    const showFilesPlugin = isFileEnabled && activeTab === 'chat';
+    // Toggle visibility of entire plugin sections based on active tab
+    // File plugin is only visible in Chat tab
+    const showFilesPlugin = activeTab === 'chat';
     elements.filePluginSection.classList.toggle('hidden', !showFilesPlugin);
 
-    // Calendar plugin is only visible in Chat tab if enabled
-    const showCalendarPlugin = isCalendarEnabled && activeTab === 'chat';
+    // Calendar plugin is only visible in Chat tab
+    const showCalendarPlugin = activeTab === 'chat';
     elements.calendarPluginSection.classList.toggle('hidden', !showCalendarPlugin);
 
     // History plugin is only visible in Notes tab
@@ -1331,27 +1329,27 @@ export function updatePluginUI() {
 
     // Update elements within the file plugin section (only relevant when visible)
     if (showFilesPlugin) { // Use the calculated visibility flag
-        renderUploadedFiles(); // Ensure file list is rendered if plugin is enabled and tab is chat
+        renderUploadedFiles(); // Ensure file list is rendered if tab is chat
     } else {
-         // Clear file list if plugin is disabled or tab is not chat
-         if (elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">${isFileEnabled ? 'Switch to Chat tab to use Files plugin.' : 'Files plugin disabled.'}</p>`;
-         if (elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
+         // Clear file list if tab is not chat
+         if (elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Switch to Chat tab to use Files plugin.</p>`;
+         if (elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`; // Keep this message for modal
          renderAttachedAndSessionFiles(); // Clear attached/session file display
          updateAttachButtonState(); // Disable attach buttons
     }
 
     // Update elements within the calendar plugin section (only relevant when visible)
      if (showCalendarPlugin) { // Use the calculated visibility flag
-        updateCalendarStatus(); // Ensure calendar status is updated if plugin is enabled and tab is chat
+        updateCalendarStatus(); // Ensure calendar status is updated if tab is chat
      } else {
-         // Clear calendar status if plugin is disabled or tab is not chat
-         if (elements.calendarStatus) elements.calendarStatus.textContent = `Status: ${isCalendarEnabled ? 'Switch to Chat tab to use Calendar plugin.' : 'Plugin disabled'}`;
+         // Clear calendar status if tab is not chat
+         if (elements.calendarStatus) elements.calendarStatus.textContent = `Status: Switch to Chat tab to use Calendar plugin.`;
          if (elements.viewCalendarButton) elements.viewCalendarButton.classList.add('hidden');
          if (elements.calendarToggle) elements.calendarToggle.checked = false;
      }
 
     // Web Search plugin has no section in the sidebar, its toggle is in the input area.
-    // Its visibility is controlled by renderChatInputArea based on isWebSearchPluginEnabled.
+    // Its visibility is controlled by renderChatInputArea.
 
     // Update elements within the history plugin section (only relevant when visible)
     if (showHistoryPlugin) { // Use the calculated visibility flag
@@ -1388,15 +1386,8 @@ export function updateCalendarStatus() {
     const context = state.calendarContext; // Read from state
     const isActive = state.isCalendarContextActive; // Read from state
 
-    if (!state.isCalendarPluginEnabled) { // Read from state
-         calendarStatus.textContent = "Status: Plugin disabled";
-         viewCalendarButton.classList.add('hidden');
-         calendarToggle.checked = false;
-         calendarToggle.disabled = true;
-         return;
-    }
-
-    calendarToggle.disabled = false; // Enable toggle if plugin is enabled
+    // Calendar plugin is always enabled now
+    calendarToggle.disabled = false; // Enable toggle
 
     if (context) {
         const eventCount = context.events ? context.events.length : 0;
@@ -1423,21 +1414,18 @@ export function renderChatInputArea() {
 
     // Add null checks for individual elements
     if (fileUploadSessionLabel) {
-        fileUploadSessionLabel.classList.toggle('hidden', !state.isFilePluginEnabled); // Read from state
+        fileUploadSessionLabel.classList.toggle('hidden', false); // Files always available
     }
     // Visibility of selectedFilesContainer is handled by renderAttachedAndSessionFiles
 
-    // Calendar toggle is now part of the plugin section, not input area
-    // if (calendarToggleInputArea) { // Add null check
-    //     calendarToggleInputArea.classList.toggle('hidden', !state.isCalendarPluginEnabled); // Read from state
-    // }
+    // Calendar toggle is part of the plugin section, update its state
     if (calendarToggle) { // Add null check
         calendarToggle.checked = state.isCalendarContextActive; // Read from state
     }
 
+    // Web search toggle label is always visible now
     if (webSearchToggleLabel) { // Add null check
-        // Web search toggle label visibility is controlled by the plugin enabled state
-        webSearchToggleLabel.classList.toggle('hidden', !state.isWebSearchPluginEnabled); // Read from state
+        webSearchToggleLabel.classList.toggle('hidden', false);
     }
     if (webSearchToggle) { // Add null check
         webSearchToggle.checked = state.isWebSearchEnabled; // Read from state

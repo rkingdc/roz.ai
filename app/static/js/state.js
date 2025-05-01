@@ -24,9 +24,9 @@ export let isCalendarContextActive = false; // Toggle state for including calend
 
 // Plugin enabled states (from settings)
 // export let isStreamingEnabled = true; // REMOVED - Always stream
-export let isFilePluginEnabled = true;
-export let isCalendarPluginEnabled = true;
-export let isWebSearchPluginEnabled = true;
+// export let isFilePluginEnabled = true; // REMOVED - Always available
+// export let isCalendarPluginEnabled = true; // REMOVED - Always available
+// export let isWebSearchPluginEnabled = true; // REMOVED - Always available
 export let isWebSearchEnabled = false; // Toggle state for including web search in current message
 export let isDeepResearchEnabled = false; // Toggle state for deep research mode
 export let isImprovePromptEnabled = false; // <<< ADDED: Toggle state for improving the prompt before sending
@@ -154,9 +154,9 @@ export function notifyAll() {
     notify('calendarContext', calendarContext);
     notify('isCalendarContextActive', isCalendarContextActive);
     // notify('isStreamingEnabled', isStreamingEnabled); // REMOVED
-    notify('isFilePluginEnabled', isFilePluginEnabled);
-    notify('isCalendarPluginEnabled', isCalendarPluginEnabled);
-    notify('isWebSearchPluginEnabled', isWebSearchPluginEnabled);
+    // notify('isFilePluginEnabled', isFilePluginEnabled); // REMOVED
+    // notify('isCalendarPluginEnabled', isCalendarPluginEnabled); // REMOVED
+    // notify('isWebSearchPluginEnabled', isWebSearchPluginEnabled); // REMOVED
     notify('isWebSearchEnabled', isWebSearchEnabled);
     notify('isDeepResearchEnabled', isDeepResearchEnabled); // Notify deep research state
     notify('isImprovePromptEnabled', isImprovePromptEnabled); // Notify improve prompt state
@@ -355,22 +355,8 @@ export function setCalendarContextActive(active) {
 }
 
 // REMOVED setStreamingEnabled function
-
-export function setFilePluginEnabled(enabled) {
-    if (isFilePluginEnabled !== enabled) {
-        isFilePluginEnabled = enabled;
-        notify('isFilePluginEnabled', isFilePluginEnabled);
-        notify('pluginEnabled', 'files'); // Notify generic plugin change
-    }
-}
-
-export function setCalendarPluginEnabled(enabled) {
-    if (isCalendarPluginEnabled !== enabled) {
-        isCalendarPluginEnabled = enabled;
-        notify('isCalendarPluginEnabled', isCalendarPluginEnabled);
-        notify('pluginEnabled', 'calendar'); // Notify generic plugin change
-    }
-}
+// REMOVED setFilePluginEnabled function
+// REMOVED setCalendarPluginEnabled function
 
 export function setWebSearchEnabled(enabled) {
     if (isWebSearchEnabled !== enabled) {

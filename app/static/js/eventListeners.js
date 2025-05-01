@@ -943,9 +943,9 @@ export function setupEventListeners() {
         if (event.target === elements.settingsModal) ui.closeModal(elements.settingsModal); // UI-only modal close
     });
     // elements.streamingToggle?.addEventListener('change', handleStreamingToggleChange); // REMOVED Listener
-    elements.filesPluginToggle?.addEventListener('change', handleFilesPluginToggleChange); // Handler updates state and triggers UI
-    elements.calendarPluginToggle?.addEventListener('change', handleCalendarPluginToggleChange); // Handler updates state and triggers UI
-    elements.webSearchPluginToggle?.addEventListener('change', handleWebSearchPluginToggleChange); // Handler updates state and triggers UI
+    // elements.filesPluginToggle?.addEventListener('change', handleFilesPluginToggleChange); // REMOVED Listener
+    // elements.calendarPluginToggle?.addEventListener('change', handleCalendarPluginToggleChange); // REMOVED Listener
+    // elements.webSearchPluginToggle?.addEventListener('change', handleWebSearchPluginToggleChange); // REMOVED Listener
     elements.webSearchToggle?.addEventListener('change', (e) => {
         state.setWebSearchEnabled(e.target.checked); // Update state (notifies isWebSearchEnabled)
         // UI update is triggered by isWebSearchEnabled notification
@@ -1288,9 +1288,12 @@ function subscribeStateChangeListeners() {
     state.subscribe('isDeepResearchEnabled', ui.handleStateChange_isDeepResearchEnabled); // Subscribe deep research handler
     state.subscribe('isImprovePromptEnabled', ui.handleStateChange_isImprovePromptEnabled); // Subscribe improve prompt handler
     // state.subscribe('isStreamingEnabled', ui.handleStateChange_isStreamingEnabled); // REMOVED Subscription
+    // state.subscribe('isFilePluginEnabled', ui.handleStateChange_pluginEnabled); // REMOVED Subscription
+    // state.subscribe('isCalendarPluginEnabled', ui.handleStateChange_pluginEnabled); // REMOVED Subscription
+    // state.subscribe('isWebSearchPluginEnabled', ui.handleStateChange_pluginEnabled); // REMOVED Subscription
 
     // Generic plugin enabled state change handler
-    state.subscribe('pluginEnabled', ui.handleStateChange_pluginEnabled);
+    // state.subscribe('pluginEnabled', ui.handleStateChange_pluginEnabled); // REMOVED Subscription (no longer needed)
 
     // Subscribe the UI handler to the currentTab state change
     state.subscribe('currentTab', ui.handleStateChange_currentTab); // Corrected event name
@@ -1424,61 +1427,6 @@ function handleCalendarToggleChange() {
 }
 
 // REMOVED handleStreamingToggleChange function
-
-/** Handles changes to the Files plugin toggle switch. */
-async function handleFilesPluginToggleChange() {
-    const isEnabled = elements.filesPluginToggle?.checked ?? true;
-    state.setFilePluginEnabled(isEnabled); // Update state (notifies isFilePluginEnabled, pluginEnabled)
-    localStorage.setItem('filesPluginEnabled', isEnabled); // Persist
-    state.setStatusMessage(`Files plugin ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state (notifies statusMessage)
-
-    // UI updates are triggered by state notifications (isFilePluginEnabled, statusMessage)
-
-    // If disabling, clear related state
-    if (!isEnabled) {
-        state.clearSidebarSelectedFiles(); // Update state (notifies sidebarSelectedFiles)
-        state.clearAttachedFiles(); // Update state (notifies attachedFiles)
-        state.setSessionFile(null); // Update state (notifies sessionFile)
-        if(elements.fileUploadSessionInput) elements.fileUploadSessionInput.value = ''; // Reset input
-    } else {
-        // If enabling, reload the file lists
-        await api.loadUploadedFiles(); // Updates state.uploadedFiles, isLoading, statusMessage
-        // UI updates are triggered by state notifications.
-    }
-}
-
-/** Handles changes to the Calendar plugin toggle switch. */
-async function handleCalendarPluginToggleChange() {
-    const isEnabled = elements.calendarPluginToggle?.checked ?? true;
-    state.setCalendarPluginEnabled(isEnabled); // Update state (notifies isCalendarPluginEnabled, pluginEnabled)
-    localStorage.setItem('calendarPluginEnabled', isEnabled); // Persist
-    state.setStatusMessage(`Calendar plugin ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state (notifies statusMessage)
-
-    // UI updates are triggered by state notifications (isCalendarPluginEnabled, statusMessage)
-
-    // If disabling, clear calendar context state
-    if (!isEnabled) {
-        state.setCalendarContext(null); // Update state (notifies calendarContext)
-        state.setCalendarContextActive(false); // Update state (notifies isCalendarContextActive)
-        if(elements.calendarToggle) elements.calendarToggle.checked = false; // Update DOM directly for immediate feedback
-    }
-    // No need to reload anything when enabling, just allows usage.
-}
-
-/** Handles changes to the Web Search plugin toggle switch. */
-async function handleWebSearchPluginToggleChange() {
-    const isEnabled = elements.webSearchPluginToggle?.checked ?? true;
-    state.setWebSearchPluginEnabled(isEnabled); // Update state (notifies isWebSearchPluginEnabled, pluginEnabled)
-    localStorage.setItem('webSearchPluginEnabled', isEnabled); // Persist
-    state.setStatusMessage(`Web Search plugin ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state (notifies statusMessage)
-
-    // UI updates are triggered by state notifications (isWebSearchPluginEnabled, statusMessage)
-
-    // If disabling, ensure the input area toggle state is also off
-    if (!isEnabled) {
-        state.setWebSearchEnabled(false); // Update state (notifies isWebSearchEnabled)
-        if (elements.webSearchToggle) {
-            elements.webSearchToggle.checked = false; // Update DOM directly for immediate feedback
-        }
-    }
-}
+// REMOVED handleFilesPluginToggleChange function
+// REMOVED handleCalendarPluginToggleChange function
+// REMOVED handleWebSearchPluginToggleChange function

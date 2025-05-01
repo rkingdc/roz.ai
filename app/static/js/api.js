@@ -613,12 +613,7 @@ export async function deleteFile(fileId) {
 
 /** Loads uploaded files from the backend and updates the state. */
 export async function loadUploadedFiles() {
-    // Only load if Files plugin is enabled
-    if (!state.isFilePluginEnabled) {
-        state.setUploadedFiles([]); // Clear list if plugin disabled
-        // Status will be updated by updatePluginUI based on state.isFilePluginEnabled
-        return;
-    }
+    // Files plugin is always enabled now
 
     // Set loading state only if not already loading (might be called during init)
     const wasLoading = state.isLoading;
@@ -650,8 +645,9 @@ export async function loadUploadedFiles() {
 
 /** Handles file upload triggered from the modal. */
 export async function handleFileUpload(event) {
-    if (!state.isFilePluginEnabled || state.currentTab !== 'chat') {
-        setStatus("File uploads only allowed when Files plugin is enabled and on Chat tab.", true);
+    // Files plugin is always enabled now
+    if (state.currentTab !== 'chat') {
+        setStatus("File uploads only allowed on Chat tab.", true);
         if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = '';
         return;
     }
@@ -729,7 +725,8 @@ export async function handleFileUpload(event) {
 /** Adds a file by fetching content from a URL. */
 export async function addFileFromUrl(url) {
      if (state.isLoading) return;
-     if (!state.isFilePluginEnabled || state.currentTab !== 'chat') {
+     // Files plugin is always enabled now
+     if (state.currentTab !== 'chat') {
          // Status update for URL modal handled by event listener
          return;
      }
@@ -771,8 +768,9 @@ export async function addFileFromUrl(url) {
 /** Fetches/Generates summary and updates state. */
 export async function fetchSummary(fileId) {
     if (state.isLoading) return;
-    if (!state.isFilePluginEnabled || state.currentTab !== 'chat') {
-         setStatus("Fetching summaries requires Files plugin enabled on Chat tab.", true);
+    // Files plugin is always enabled now
+    if (state.currentTab !== 'chat') {
+         setStatus("Fetching summaries only allowed on Chat tab.", true);
          return;
     }
 
@@ -811,8 +809,9 @@ export async function fetchSummary(fileId) {
 /** Saves the edited summary. */
 export async function saveSummary() {
     if (!state.currentEditingFileId || state.isLoading) return;
-    if (!state.isFilePluginEnabled || state.currentTab !== 'chat') {
-         setStatus("Saving summaries requires Files plugin enabled on Chat tab.", true);
+    // Files plugin is always enabled now
+    if (state.currentTab !== 'chat') {
+         setStatus("Saving summaries only allowed on Chat tab.", true);
          return;
     }
 
@@ -851,8 +850,9 @@ export async function saveSummary() {
  * Updates state.attachedFiles and clears state.sidebarSelectedFiles.
  */
 export function attachSelectedFilesFull() {
-    if (!state.isFilePluginEnabled || state.currentTab !== 'chat' || state.isLoading) {
-        setStatus("Cannot attach files: Files plugin disabled, not on Chat tab, or busy.", true);
+    // Files plugin is always enabled now
+    if (state.currentTab !== 'chat' || state.isLoading) {
+        setStatus("Cannot attach files: Not on Chat tab or busy.", true);
         return;
     }
     if (state.sidebarSelectedFiles.length === 0) {
@@ -881,8 +881,9 @@ export function attachSelectedFilesFull() {
  * Generates summaries if they don't exist.
  */
 export async function attachSelectedFilesSummary() {
-    if (!state.isFilePluginEnabled || state.currentTab !== 'chat' || state.isLoading) {
-        setStatus("Cannot attach files: Files plugin disabled, not on Chat tab, or busy.", true);
+    // Files plugin is always enabled now
+    if (state.currentTab !== 'chat' || state.isLoading) {
+        setStatus("Cannot attach files: Not on Chat tab or busy.", true);
         return;
     }
     const selectedFiles = [...state.sidebarSelectedFiles]; // Copy selection
@@ -974,8 +975,9 @@ export async function attachSelectedFilesSummary() {
 /** Fetches calendar events and updates state. */
 export async function loadCalendarEvents() {
     if (state.isLoading) return;
-    if (!state.isCalendarPluginEnabled || state.currentTab !== 'chat') {
-        setStatus("Loading calendar events requires Calendar plugin enabled on Chat tab.", true);
+    // Calendar plugin is always enabled now
+    if (state.currentTab !== 'chat') {
+        setStatus("Loading calendar events only allowed on Chat tab.", true);
         return;
     }
 
@@ -1159,10 +1161,10 @@ export function sendMessage() { // No longer async, just emits
 
     // Files to send are the permanently attached files PLUS the session file
     // Note: Files/context are ignored in 'deep_research' mode on the backend, but we still send them.
-    const filesToAttach = state.isFilePluginEnabled ? state.attachedFiles : [];
-    const sessionFileToSend = state.isFilePluginEnabled ? state.sessionFile : null;
-    const calendarContextToSend = (state.isCalendarPluginEnabled && state.isCalendarContextActive && state.calendarContext) ? state.calendarContext : null;
-    const webSearchEnabledToSend = state.isWebSearchPluginEnabled && state.isWebSearchEnabled; // Read web search state
+    const filesToAttach = state.attachedFiles; // Files always available
+    const sessionFileToSend = state.sessionFile; // Session file always available
+    const calendarContextToSend = (state.isCalendarContextActive && state.calendarContext) ? state.calendarContext : null; // Calendar always available, check active toggle
+    const webSearchEnabledToSend = state.isWebSearchEnabled; // Web search always available, check active toggle
     const deepResearchEnabled = state.isDeepResearchEnabled; // Read deep research state
 
     // Determine the mode based on the toggle state
@@ -1219,10 +1221,10 @@ export function sendMessage() { // No longer async, just emits
         session_files: sessionFileToSend ? [{ filename: sessionFileToSend.filename, content: sessionFileToSend.content, mimetype: sessionFileToSend.mimetype }] : [],
         calendar_context: calendarContextToSend,
         enable_web_search: webSearchEnabledToSend,
-        enable_streaming: state.isStreamingEnabled, // Streaming is only relevant for 'chat' mode
-        enable_files_plugin: state.isFilePluginEnabled,
-        enable_calendar_plugin: state.isCalendarPluginEnabled,
-        enable_web_search_plugin: state.isWebSearchPluginEnabled,
+        // enable_streaming: state.isStreamingEnabled, // REMOVED - Always stream
+        // enable_files_plugin: state.isFilePluginEnabled, // REMOVED - Always available
+        // enable_calendar_plugin: state.isCalendarPluginEnabled, // REMOVED - Always available
+        // enable_web_search_plugin: state.isWebSearchPluginEnabled, // REMOVED - Always available
         // Include the determined mode
         mode: mode,
         // Always enable streaming for chat mode
