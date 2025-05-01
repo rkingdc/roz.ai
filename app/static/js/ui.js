@@ -1333,7 +1333,7 @@ export function updatePluginUI() {
     } else {
          // Clear file list if tab is not chat
          if (elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Switch to Chat tab to use Files plugin.</p>`;
-         if (elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`; // Keep this message for modal
+         if (elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Switch to Chat tab to use Files plugin.</p>`; // Keep this message for modal
          renderAttachedAndSessionFiles(); // Clear attached/session file display
          updateAttachButtonState(); // Disable attach buttons
     }
