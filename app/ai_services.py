@@ -1385,19 +1385,7 @@ def _generate_chat_response_stream(
                 f"No content (not even error/cancel) to save for chat {chat_id} (SID: {sid})."
             )
 
-        try:
-            save_success = database.add_message_to_db(
-                chat_id, "assistant", full_reply_content
-            )
-            if not save_success:
-                logger.error(
-                    f"Failed to save final streamed assistant message for chat {chat_id} (SID: {sid})."
-                )
-        except Exception as db_err:
-            logger.error(
-                f"DB error saving final streamed assistant message for chat {chat_id} (SID: {sid}): {db_err}",
-                exc_info=True,
-            )
+        # --- DUPLICATE SAVE BLOCK REMOVED ---
 
         _cleanup_temp_files(
             temp_files_to_clean, f"streaming chat {chat_id} (SID: {sid})"
