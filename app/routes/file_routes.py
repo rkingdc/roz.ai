@@ -202,10 +202,21 @@ def add_file_from_url_route():
              logger.error(f"Failed to fetch content from URL: {url}")
              return jsonify({"error": f"Failed to fetch content from URL: {url}"}), 500
 
-        # Convert content to bytes (assuming fetch_web_content returns string)
-        content_blob = content['content'].encode('utf-8') # Or detect encoding if possible
+        # Get content - it might be bytes (for PDFs) or string (for HTML)
+        fetched_content = content['content']
+        if isinstance(fetched_content, str):
+            # If it's a string, encode it
+            content_blob = fetched_content.encode('utf-8')
+        elif isinstance(fetched_content, bytes):
+            # If it's already bytes, use it directly
+            content_blob = fetched_content
+        else:
+            # Handle unexpected type
+            logger.error(f"Unexpected content type fetched from URL {url}: {type(fetched_content)}")
+            return jsonify({"error": "Unexpected content type received from URL."}), 500
+
         filesize = len(content_blob)
-        logger.info(f"Fetched {filesize} bytes from URL: {url}")
+        logger.info(f"Processed {filesize} bytes from URL: {url}")
 
         # Check size after fetching
         if filesize > max_size:
