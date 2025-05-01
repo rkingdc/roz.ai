@@ -18,6 +18,13 @@ from app.voice_services import (
 
 logger = logging.getLogger(__name__)  # Use the standard logger name
 
+# --- Global State for Cancellation ---
+# Stores SIDs that have requested cancellation for ongoing tasks
+# NOTE: Assumes gevent/eventlet concurrency model handles basic set operations safely.
+# If using threading backend or experiencing issues, consider using threading.Lock.
+_cancelled_sids = set()
+# ------------------------------------
+
 # No need for queue management here, it's in voice_services
 
 
@@ -36,13 +43,19 @@ def handle_disconnect():
     """Handles client disconnections."""
     sid = request.sid
     logger.info(f"WebSocket client disconnected: {sid}")
-    # Signal the end of the stream if the client disconnects abruptly
+    # Signal cancellation and end of stream if the client disconnects abruptly
+    logger.warning(f"Client {sid} disconnected abruptly. Requesting cancellation.")
+    _cancelled_sids.add(sid)  # Mark as cancelled
     # The listener thread in voice_services will handle queue cleanup.
     logger.info(f"Signaling end of stream due to disconnect for SID: {sid}")
-    signal_end_of_stream(sid)
+    signal_end_of_stream(sid) # This should trigger cleanup in voice_services if active
     # Leave the room associated with the session
     leave_room(sid)
     logger.info(f"Client {sid} left its room.")
+    # Clean up cancellation flag if the background task didn't get to it
+    if sid in _cancelled_sids:
+        logger.debug(f"Removing {sid} from cancellation set during disconnect.")
+        _cancelled_sids.discard(sid)
 
 
 @socketio.on("start_transcription")
@@ -143,6 +156,20 @@ def handle_stop_transcription():
 # using the imported `socketio` instance and `room=sid`.
 
 
+# --- Cancellation Handling ---
+
+@socketio.on("cancel_generation")
+def handle_cancel_generation(data):
+    """Handles request from client to cancel ongoing generation."""
+    sid = request.sid
+    chat_id = data.get("chat_id", "Unknown") # Get chat_id for logging
+    logger.info(f"Received 'cancel_generation' request from SID: {sid} for Chat ID: {chat_id}")
+    _cancelled_sids.add(sid)
+    # Optional: Acknowledge receipt
+    emit("cancel_request_received", {"message": "Cancellation request received."}, room=sid)
+    # The actual stopping happens within the generation loop checking _cancelled_sids
+
+
 # --- Chat Message Handling ---
 
 # Import necessary modules for chat handling
@@ -174,15 +201,30 @@ def _process_chat_message_async(app, sid, data):  # Ensure app argument is prese
         f"Background task started for SID {sid}, Chat ID {chat_id}, Mode {mode}."
     )
 
+    # --- Check for Pre-Cancellation ---
+    # Handle race condition where cancel is clicked *just* before task starts processing
+    if sid in _cancelled_sids:
+        logger.warning(f"Task for SID {sid} cancelled before execution started.")
+        _cancelled_sids.discard(sid) # Clean up the flag
+        # Optionally emit a specific message? Or just let the UI handle timeout/lack of response.
+        return # Exit the background task
+
     # --- Create App Context ---
     # Use the app instance passed from the main thread
-    with app.app_context():  # Ensure this wraps the entire function body
+    with app.app_context():
         logger.debug(
             f"App context created successfully for background task (SID: {sid})"
         )
-        # REMOVE the line below if it exists, as it causes the error in the background thread
-        # app = current_app._get_current_object() # REMOVED THIS LINE
         try:
+            # --- Define Cancellation Check Function ---
+            # This function will be passed down to the services to check the global set
+            def is_cancelled():
+                cancelled = sid in _cancelled_sids
+                if cancelled:
+                    logger.debug(f"Cancellation check positive for SID: {sid}")
+                return cancelled
+
+            # --- Execute Task ---
             if mode == "deep_research":
                 logger.info(
                     f"Calling deep_research.perform_deep_research for SID {sid}, Chat {chat_id}"
@@ -192,10 +234,10 @@ def _process_chat_message_async(app, sid, data):  # Ensure app argument is prese
                     query=user_message,
                     socketio=socketio,
                     sid=sid,
-                    chat_id=chat_id,  # Pass chat_id for saving the result
+                    chat_id=chat_id,
+                    is_cancelled_callback=is_cancelled # Pass the check function
                 )
-                # perform_deep_research now handles emitting 'deep_research_result' or 'task_error'
-                # and saving the result to the database.
+                # perform_deep_research needs to be updated to accept and use is_cancelled_callback
                 logger.info(
                     f"Background task completed for deep research (SID {sid}, Chat {chat_id})."
                 )
@@ -214,11 +256,11 @@ def _process_chat_message_async(app, sid, data):  # Ensure app argument is prese
                     calendar_context=calendar_context,
                     web_search_enabled=enable_web_search,
                     streaming_enabled=enable_streaming,
-                    socketio=socketio,  # Pass socketio instance
-                    sid=sid,  # Pass client's session ID
+                    socketio=socketio,
+                    sid=sid,
+                    is_cancelled_callback=is_cancelled # Pass the check function
                 )
-                # generate_chat_response now handles emitting 'chat_response', 'stream_chunk', 'stream_end', or 'task_error'
-                # and saving the result to the database.
+                # generate_chat_response needs to be updated to accept and use is_cancelled_callback
                 logger.info(
                     f"Background task completed for chat (SID {sid}, Chat {chat_id}). Streaming: {enable_streaming}"
                 )
@@ -248,6 +290,12 @@ def _process_chat_message_async(app, sid, data):  # Ensure app argument is prese
                     f"CRITICAL: Failed to emit or save background task error for SID {sid}, Chat {chat_id}: {emit_save_err}",
                     exc_info=True,
                 )
+        finally:
+            # --- Cleanup Cancellation Flag ---
+            # Ensure the flag is removed whether the task succeeded, failed, or was cancelled
+            if sid in _cancelled_sids:
+                logger.info(f"Removing SID {sid} from cancellation set after task completion/error.")
+                _cancelled_sids.discard(sid)
 
 
 @socketio.on("send_chat_message")
