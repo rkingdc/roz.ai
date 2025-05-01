@@ -1101,8 +1101,19 @@ def _generate_chat_response_stream(
         if not emitted_error:
             socketio.emit("task_error", {"error": error_msg}, room=sid)
             emitted_error = True
+        cancelled_during_streaming = False # Flag specific to cancellation within the loop
 
     try:
+        # --- Cancellation Check ---
+        if is_cancelled_callback():
+            logger.info(f"Streaming generation cancelled before API call for chat {chat_id} (SID: {sid}).")
+            full_reply_content = "[AI Info: Generation cancelled by user before starting.]"
+            emit_error_once(full_reply_content) # Emit as error for consistency
+            # Emit cancellation confirmation
+            socketio.emit("generation_cancelled", {"message": "Cancelled by user.", "chat_id": chat_id}, room=sid)
+            # Save cancellation message and cleanup (handled in finally block)
+            return # Exit early
+
         # --- Call Gemini API (Streaming) ---
         # Determine model (ensure 'models/' prefix) - Moved model determination here
         raw_model_name = current_app.config.get(
