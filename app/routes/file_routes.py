@@ -9,6 +9,8 @@ from .. import file_utils # Use relative import for file utils
 from ..plugins import web_search
 import validators # Import validators library for URL validation
 from sqlalchemy.exc import SQLAlchemyError # Import SQLAlchemyError
+from .. import db # Import the db instance
+from ..models import File # Import the File model
 
 # Configure logging
 import logging
@@ -238,21 +240,20 @@ def add_file_from_url_route():
 
         if file_id:
             logger.info(f"Successfully saved file from URL {url} with ID: {file_id}.")
-            # Retrieve the saved file details to return in the response
-            # This ensures we get the correct uploaded_at timestamp from the DB
-            saved_file_details = db.get_file_details_from_db(file_id)
-            if saved_file_details:
+            # Retrieve the newly created File object directly to get all attributes
+            saved_file = File.query.get(file_id)
+            if saved_file:
                  return jsonify({
-                     "id": saved_file_details['id'],
-                     "filename": saved_file_details['filename'],
-                     "mimetype": saved_file_details['mimetype'],
-                     "filesize": saved_file_details['filesize'],
-                     "uploaded_at": saved_file_details['uploaded_at'].isoformat(), # Use the timestamp from the DB object
-                     "has_summary": saved_file_details['has_summary']
+                     "id": saved_file.id,
+                     "filename": saved_file.filename,
+                     "mimetype": saved_file.mimetype,
+                     "filesize": saved_file.filesize,
+                     "uploaded_at": saved_file.uploaded_at.isoformat(), # Access attribute directly
+                     "has_summary": saved_file.summary is not None
                  }), 201 # Return 201 Created
             else:
-                 # Should not happen if save_file_record_to_db returned an ID
-                 logger.error(f"Failed to retrieve details for saved file ID {file_id} from URL '{url}'.")
+                 # This case is less likely now, but handle it just in case
+                 logger.error(f"Failed to retrieve newly saved file object with ID {file_id} from URL '{url}'.")
                  return jsonify({"error": f"Failed to retrieve details for saved file from URL '{url}'."}), 500
         else:
             # DB function already logs error
