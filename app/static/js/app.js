@@ -91,7 +91,7 @@ async function initializeApp() {
 function loadPersistedStates() {
     // Load simple boolean/string states
     state.setCalendarContextActive(localStorage.getItem('calendarContextActive') === 'true');
-    state.setStreamingEnabled(localStorage.getItem(config.STREAMING_ENABLED_KEY) === null ? true : localStorage.getItem(config.STREAMING_ENABLED_KEY) === 'true');
+    // state.setStreamingEnabled(localStorage.getItem(config.STREAMING_ENABLED_KEY) === null ? true : localStorage.getItem(config.STREAMING_ENABLED_KEY) === 'true'); // REMOVED
     state.setFilePluginEnabled(localStorage.getItem(config.FILES_PLUGIN_ENABLED_KEY) === null ? true : localStorage.getItem(config.FILES_PLUGIN_ENABLED_KEY) === 'true');
     // --- CHANGE DEFAULT FOR CALENDAR PLUGIN FROM FALSE TO TRUE ---
     state.setCalendarPluginEnabled(localStorage.getItem(config.CALENDAR_PLUGIN_ENABLED_KEY) === null ? true : localStorage.getItem(config.CALENDAR_PLUGIN_ENABLED_KEY) === 'true');

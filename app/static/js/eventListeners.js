@@ -942,7 +942,7 @@ export function setupEventListeners() {
     elements.settingsModal?.addEventListener('click', (event) => {
         if (event.target === elements.settingsModal) ui.closeModal(elements.settingsModal); // UI-only modal close
     });
-    elements.streamingToggle?.addEventListener('change', handleStreamingToggleChange); // Handler updates state and triggers UI
+    // elements.streamingToggle?.addEventListener('change', handleStreamingToggleChange); // REMOVED Listener
     elements.filesPluginToggle?.addEventListener('change', handleFilesPluginToggleChange); // Handler updates state and triggers UI
     elements.calendarPluginToggle?.addEventListener('change', handleCalendarPluginToggleChange); // Handler updates state and triggers UI
     elements.webSearchPluginToggle?.addEventListener('change', handleWebSearchPluginToggleChange); // Handler updates state and triggers UI
@@ -1287,7 +1287,8 @@ function subscribeStateChangeListeners() {
     state.subscribe('isWebSearchEnabled', ui.handleStateChange_isWebSearchEnabled);
     state.subscribe('isDeepResearchEnabled', ui.handleStateChange_isDeepResearchEnabled); // Subscribe deep research handler
     state.subscribe('isImprovePromptEnabled', ui.handleStateChange_isImprovePromptEnabled); // Subscribe improve prompt handler
- 
+    // state.subscribe('isStreamingEnabled', ui.handleStateChange_isStreamingEnabled); // REMOVED Subscription
+
     // Generic plugin enabled state change handler
     state.subscribe('pluginEnabled', ui.handleStateChange_pluginEnabled);
 
@@ -1422,14 +1423,7 @@ function handleCalendarToggleChange() {
     // UI update is triggered by isCalendarContextActive notification
 }
 
-/** Handles changes to the streaming toggle switch. */
-function handleStreamingToggleChange() {
-    const isEnabled = elements.streamingToggle?.checked ?? true;
-    state.setStreamingEnabled(isEnabled); // Update state (notifies isStreamingEnabled, pluginEnabled)
-    localStorage.setItem('streamingEnabled', isEnabled); // Persist
-    state.setStatusMessage(`Streaming responses ${isEnabled ? 'enabled' : 'disabled'}.`); // Update state (notifies statusMessage)
-    // UI updates are triggered by state notifications
-}
+// REMOVED handleStreamingToggleChange function
 
 /** Handles changes to the Files plugin toggle switch. */
 async function handleFilesPluginToggleChange() {

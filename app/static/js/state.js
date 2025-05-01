@@ -23,7 +23,7 @@ export let calendarContext = null; // Loaded calendar events object { events: []
 export let isCalendarContextActive = false; // Toggle state for including calendar context
 
 // Plugin enabled states (from settings)
-export let isStreamingEnabled = true;
+// export let isStreamingEnabled = true; // REMOVED - Always stream
 export let isFilePluginEnabled = true;
 export let isCalendarPluginEnabled = true;
 export let isWebSearchPluginEnabled = true;
@@ -153,7 +153,7 @@ export function notifyAll() {
     notify('summaryContent', summaryContent);
     notify('calendarContext', calendarContext);
     notify('isCalendarContextActive', isCalendarContextActive);
-    notify('isStreamingEnabled', isStreamingEnabled);
+    // notify('isStreamingEnabled', isStreamingEnabled); // REMOVED
     notify('isFilePluginEnabled', isFilePluginEnabled);
     notify('isCalendarPluginEnabled', isCalendarPluginEnabled);
     notify('isWebSearchPluginEnabled', isWebSearchPluginEnabled);
@@ -354,13 +354,7 @@ export function setCalendarContextActive(active) {
     }
 }
 
-export function setStreamingEnabled(enabled) {
-    if (isStreamingEnabled !== enabled) {
-        isStreamingEnabled = enabled;
-        notify('isStreamingEnabled', isStreamingEnabled);
-        notify('pluginEnabled', 'streaming'); // Notify generic plugin change
-    }
-}
+// REMOVED setStreamingEnabled function
 
 export function setFilePluginEnabled(enabled) {
     if (isFilePluginEnabled !== enabled) {

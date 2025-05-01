@@ -1225,8 +1225,8 @@ export function sendMessage() { // No longer async, just emits
         enable_web_search_plugin: state.isWebSearchPluginEnabled,
         // Include the determined mode
         mode: mode,
-        // Include streaming flag for chat mode
-        enable_streaming: (mode === 'chat' && state.isStreamingEnabled),
+        // Always enable streaming for chat mode
+        enable_streaming: (mode === 'chat'), // Always true if mode is 'chat'
         // Include improve prompt flag (only relevant for 'chat' mode, backend handles logic)
         improve_prompt: state.isImprovePromptEnabled, // Read directly from state here
     };
