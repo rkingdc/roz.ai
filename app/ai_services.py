@@ -1112,9 +1112,8 @@ def _generate_chat_response_stream(
         if not emitted_error:
             socketio.emit("task_error", {"error": error_msg}, room=sid)
             emitted_error = True
-        cancelled_during_streaming = (
-            False  # Flag specific to cancellation within the loop
-        )
+
+    cancelled_during_streaming = False # Initialize BEFORE the try block
 
     try:
         # --- Cancellation Check ---
