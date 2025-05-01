@@ -1110,11 +1110,38 @@ export async function loadChat(chatId) {
         const data = await response.json();
 
         // Update state with chat details and history
+        const fetchedHistory = data.history || [];
+        const currentHistory = state.chatHistory; // Get current history from state
+
+        // --- Deduplication Logic ---
+        let historyNeedsUpdate = true; // Assume update is needed
+        if (currentHistory.length > 0 && fetchedHistory.length > 0) {
+            const lastCurrentMsg = currentHistory[currentHistory.length - 1];
+            const lastFetchedMsg = fetchedHistory[fetchedHistory.length - 1];
+
+            // Check if the last message in current state matches the last in fetched history
+            // This indicates the fetched history likely just includes the message recently streamed.
+            if (lastCurrentMsg.role === 'assistant' &&
+                lastFetchedMsg.role === 'assistant' &&
+                lastCurrentMsg.content === lastFetchedMsg.content)
+            {
+                console.log(`[DEBUG] loadChat(${chatId}): Last message matches current state. Skipping history update to prevent duplication.`);
+                historyNeedsUpdate = false;
+            }
+        }
+        // --- End Deduplication Logic ---
+
         state.setCurrentChatId(data.details.id);
         localStorage.setItem('currentChatId', data.details.id); // Persist ID
-        state.setCurrentChatName(data.details.name || ''); // Assuming you add setCurrentChatName to state.js
-        state.setCurrentChatModel(data.details.model_name || ''); // Assuming you add setCurrentChatModel to state.js
-        state.setChatHistory(data.history || []); // Update state with history
+        state.setCurrentChatName(data.details.name || '');
+        state.setCurrentChatModel(data.details.model_name || '');
+
+        // Only update history state if needed
+        if (historyNeedsUpdate) {
+            console.log(`[DEBUG] loadChat(${chatId}): Updating chat history state.`);
+            state.setChatHistory(fetchedHistory);
+        }
+
         state.setCurrentChatMode('chat'); // Always default to 'chat' mode when loading a chat
 
         // Reset chat-specific context states (files, calendar, web search toggle)
