@@ -195,22 +195,32 @@ def add_file_from_url_route():
     try:
         logger.info(f"Attempting to fetch content from URL: {url}")
         # Fetch content from the URL
-        # fetch_web_content returns (content, title) or (None, None) on failure
-        content = web_search.fetch_web_content(url)
-        # title = url # Use URL as a fallback title - not used in file record
+        # fetch_web_content returns a dict: {'type': ..., 'content': ..., 'url': ..., 'filename': ...}
+        content_dict = web_search.fetch_web_content(url) # Renamed variable
 
-        if content is None:
-             # fetch_web_content logs its own errors, just return a generic failure
-             logger.error(f"Failed to fetch content from URL: {url}")
-             return jsonify({"error": f"Failed to fetch content from URL: {url}"}), 500
+        # Check for errors from fetch_web_content first
+        if content_dict.get('type') == 'error':
+             error_msg = content_dict.get('content', 'Unknown error fetching content')
+             logger.error(f"Failed to fetch content from URL: {url}. Reason: {error_msg}")
+             # Return the specific error from fetch_web_content if available
+             return jsonify({"error": f"Failed to fetch content from URL: {error_msg}"}), 500
 
-        # Get content - it might be bytes (for PDFs) or string (for HTML)
-        fetched_content = content['content']
+        # Now process the content
+        fetched_content = content_dict.get('content') # Use .get() for safety
+        if fetched_content is None:
+            # Should not happen if type wasn't 'error', but defensive check
+            logger.error(f"Content was None in response from fetch_web_content for URL {url}, despite type being '{content_dict.get('type')}'")
+            return jsonify({"error": "Internal error processing fetched content."}), 500
+
+        # --- Log type before checking ---
+        logger.debug(f"Type of fetched_content from URL {url} before encoding check: {type(fetched_content)}")
+
+        # Handle str vs bytes
         if isinstance(fetched_content, str):
-            # If it's a string, encode it
+            logger.debug(f"Fetched content is string, encoding to UTF-8.")
             content_blob = fetched_content.encode('utf-8')
         elif isinstance(fetched_content, bytes):
-            # If it's already bytes, use it directly
+            logger.debug(f"Fetched content is bytes, using directly.")
             content_blob = fetched_content
         else:
             # Handle unexpected type
@@ -223,19 +233,49 @@ def add_file_from_url_route():
         # Check size after fetching
         if filesize > max_size:
              logger.warning(f"Content from URL {url} ({filesize} bytes) exceeds size limit {max_size}.")
-             return jsonify({"error": f"Content from URL ({filesize} bytes) exceeds size limit ({max_size // 1024 // 2024} MB)."}), 400 # Corrected MB calculation
+             # Corrected MB calculation again
+             return jsonify({"error": f"Content from URL ({filesize} bytes) exceeds size limit ({max_size // 1024 // 1024} MB)."}), 400
 
-        # Determine filename (use URL as requested, maybe truncate if too long)
-        # Using the full URL as filename might be problematic for some DBs/filesystems,
-        # but sticking to the request for now. A safer approach might be a hash or truncated URL.
-        # Let's use the full URL for now.
-        filename = url # As requested
+        # Determine filename and mimetype based on content_dict
+        filename = content_dict.get('filename') # Get filename if present (PDFs)
+        mimetype = 'application/octet-stream' # Default
 
-        # Determine mimetype (default to text/plain for fetched web content)
-        mimetype = 'text/plain' # Or 'text/html' if you want to preserve HTML structure
+        content_type = content_dict.get('type')
+        if content_type == 'pdf':
+            mimetype = 'application/pdf'
+            # Ensure filename exists for PDF (should be set by fetch_web_content)
+            if not filename:
+                 # Use werkzeug's secure_filename and urlparse for better fallback
+                 parsed_url = urlparse(url)
+                 base_name = os.path.basename(parsed_url.path)
+                 fallback_name = base_name if base_name else parsed_url.netloc # Use domain if no path
+                 filename = secure_filename(fallback_name) + ".pdf"
+                 logger.warning(f"Filename missing/invalid from PDF fetch result for {url}, using fallback: {filename}")
+        elif content_type == 'html':
+            mimetype = 'text/html' # Or text/plain if preferred
+            # Use URL as filename for HTML if specific filename wasn't provided
+            if not filename:
+                 filename = url # Use full URL as filename for HTML
+        # Add other type handling here if needed
+        else:
+             # For other types or if type is missing, use URL as filename if not already set
+             if not filename:
+                  filename = url # Use full URL as filename
+
+        # Ensure filename is not excessively long (e.g., limit to 255 chars for compatibility)
+        max_filename_len = 255
+        if len(filename) > max_filename_len:
+            # Simple truncation, could be smarter (e.g., keep extension)
+            original_filename = filename
+            filename = filename[:max_filename_len]
+            logger.warning(f"Original filename '{original_filename}' exceeded max length {max_filename_len}, truncated to '{filename}'.")
+
+
+        logger.info(f"Using filename: {filename}, mimetype: {mimetype}")
+
 
         # Save record and blob to DB - Commit immediately for single file from URL
-        logger.debug(f"Calling database_module.save_file_record_to_db for URL '{filename}' with commit=True.")
+        logger.debug(f"Calling database_module.save_file_record_to_db for filename '{filename}' with commit=True.")
         file_id = database_module.save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=True) # Ensure commit=True here
 
         if file_id:
@@ -265,7 +305,12 @@ def add_file_from_url_route():
         # Use the imported SQLAlchemy db instance directly
         db.session.rollback()
         logger.error(f"Unexpected error adding file from URL '{url}': {e}", exc_info=True)
-        return jsonify({"error": f"An unexpected error occurred while processing the URL: {e}"}), 500
+        # Check if the error is the specific encoding error to provide a clearer message
+        if isinstance(e, AttributeError) and "'bytes' object has no attribute 'encode'" in str(e):
+             error_message = "Internal error: Attempted to double-encode content." # More specific error
+        else:
+             error_message = f"An unexpected error occurred while processing the URL: {e}"
+        return jsonify({"error": error_message}), 500
 
 
 @bp.route('/files/<int:file_id>/summary', methods=['GET'])
