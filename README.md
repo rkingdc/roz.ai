@@ -39,20 +39,22 @@ This is mostly an experiment in how far AI coding can take us. Aiming for as clo
 *   **Session Files:**
     *   Upload files directly into the current chat session.
     *   Base64 encoding to pass to Gemini
-*   **Customizable Interface:**
-    *   Clean and intuitive user interface built with Tailwind CSS.
-    *   Themeable color scheme based on custom roz.ai color palette.
-    *   Collapsible sidebars for managing chat sessions and plugins.
 *   **Notetaking:**
     *   Create, edit, and save notes directly within the application.
 *   **Note History:**
     *   Access previous versions of your notes with a full history, allowing you to revert to earlier states and track changes. AI generated summaries between versions of notes are saved.
 *   **Voice Transcription:**
-    *   Transcribe audio into text using the integrated voice transcription service.  Supports both live streaming transcription and transcription of uploaded audio files.
+    *   Transcribe audio into text using the integrated voice transcription service.  Supports both live streaming transcription and long running transcripton (great for transcribing meetings).
 *   **AI Transcription Clean Up:**
     *   Leverage AI to clean up voice transcriptions, removing filler words and improving readability.
 *   **Drawio Diagram Rendering:**
-    *  Future support for rendering Drawio diagrams directly in the application.
+    *  Supports for rendering Drawio diagrams directly in the application.
+*   **Deep Research Agent:**
+    * Agent derives a research plan, executes initial research, updates, research plan, and executes research report.
+*   **Auto Prompt Improver:**
+    * Optionally send all promps to a LLM that will rewrite your prompt to improve effectiveness. 
+
+
 
 ## Technologies Used
 
