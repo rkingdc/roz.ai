@@ -156,7 +156,20 @@ export function updateLoadingState() {
     // --- Disable/Modify Chat-Specific Inputs if *Current Chat* is Processing ---
     if (elements.messageInput) elements.messageInput.disabled = isCurrentChatProcessing;
     if (elements.sendButton) {
-        const sendButtonIcon = elements.sendButton.querySelector('i');
+        const sendButtonIcon = elements.sendButton.querySelector('i'); // Find the icon
+        // Find the text node within the button (assuming it's directly after the icon or the last text node)
+        let buttonTextNode = null;
+        for (const node of elements.sendButton.childNodes) {
+            // Find the last text node that isn't just whitespace
+            if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim()) {
+                buttonTextNode = node;
+            }
+        }
+        // Fallback: If no text node found, maybe create one? For now, log error if needed.
+        if (!buttonTextNode) {
+            console.warn("Could not find text node within send button to update.");
+        }
+
         if (isCurrentChatProcessing) {
             // Change to Stop button
             elements.sendButton.disabled = false; // Keep button enabled to allow stopping
@@ -166,6 +179,9 @@ export function updateLoadingState() {
                 sendButtonIcon.classList.remove('fa-paper-plane');
                 sendButtonIcon.classList.add('fa-stop');
             }
+            if (buttonTextNode) {
+                buttonTextNode.nodeValue = ' Stop'; // Update text content (add space for padding)
+            }
         } else {
             // Change back to Send button
             elements.sendButton.disabled = isGloballyLoading; // Disable only if globally loading, not just processing
@@ -174,6 +190,9 @@ export function updateLoadingState() {
             if (sendButtonIcon) {
                 sendButtonIcon.classList.remove('fa-stop');
                 sendButtonIcon.classList.add('fa-paper-plane');
+            }
+            if (buttonTextNode) {
+                buttonTextNode.nodeValue = ' Send'; // Restore original text content (add space for padding)
             }
         }
     }
