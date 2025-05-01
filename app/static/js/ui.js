@@ -762,11 +762,7 @@ export function renderUploadedFiles() {
 
     const files = state.uploadedFiles; // Read from state
 
-    if (!state.isFilePluginEnabled) {
-         uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Files plugin disabled.</p>`;
-         manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Files plugin disabled.</p>`;
-         return;
-    }
+    // Removed check for state.isFilePluginEnabled - plugin is always considered enabled in UI
 
     if (!files || files.length === 0) {
         uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`;
@@ -1114,8 +1110,9 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
     // Check if required plugin is enabled (Read from state)
     if (requiredPlugin) {
         let pluginEnabled = false;
-        if (requiredPlugin === 'files' && state.isFilePluginEnabled) pluginEnabled = true;
-        if (requiredPlugin === 'calendar' && state.isCalendarPluginEnabled) pluginEnabled = true;
+        // Files plugin is always considered enabled in UI
+        if (requiredPlugin === 'files') pluginEnabled = true;
+        else if (requiredPlugin === 'calendar' && state.isCalendarPluginEnabled) pluginEnabled = true;
         // Add checks for other plugins here
         if (!pluginEnabled) {
             // Status update handled by event listener or caller
