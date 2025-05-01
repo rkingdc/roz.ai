@@ -506,6 +506,20 @@
      margin-bottom: 0;
 }
 
+/* Style links within chat messages */
+.message.prose a,
+.message a { /* Fallback if prose class isn't always applied */
+    color: var(--rz-toolbar-text);
+    text-decoration: underline;
+    font-weight: 500; /* Slightly bolder */
+}
+.message.prose a:hover,
+.message a:hover {
+    /* Optional: Add hover effect if desired, e.g., slightly different color */
+    /* color: var(--rz-button-primary-hover-bg); */
+    text-decoration: underline; /* Ensure underline remains on hover */
+}
+
 
 /* --- End Custom Prose Styles --- */
 
@@ -1080,13 +1094,17 @@
     color: var(--rz-popup-text); /* Default text color */
 }
 
-#notes-preview .prose a {
+#notes-preview .prose a,
+#notes-preview a { /* Fallback if prose class isn't always applied */
     color: var(--rz-toolbar-text); /* Link color */
-    text-decoration: none; /* Remove underline */
+    text-decoration: underline; /* ADD underline by default */
+    font-weight: 500; /* Slightly bolder */
 }
 
-#notes-preview .prose a:hover {
-    text-decoration: underline; /* Underline on hover */
+#notes-preview .prose a:hover,
+#notes-preview a:hover {
+    /* Optional: Add hover effect if desired */
+    text-decoration: underline; /* Ensure underline remains on hover */
 }
 
 /* --- Fallback Markdown Styling for Notes Preview --- */
