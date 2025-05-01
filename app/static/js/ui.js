@@ -1887,12 +1887,7 @@ export function handleStateChange_isWebSearchEnabled() {
     renderChatInputArea(); // Updates web search toggle checked state
 }
 
-export function handleStateChange_pluginEnabled(pluginName) {
-    // This function is called when any plugin enabled state changes
-    updatePluginUI(); // Updates visibility of plugin sections and related UI
-    // Specific plugin state changes (files, calendar) might trigger further actions
-    // handled by eventListeners.js reacting to the toggle change.
-}
+// REMOVED handleStateChange_pluginEnabled function
 
 export function handleStateChange_currentTab() {
     // The switchTab function already handles rendering everything for the new tab

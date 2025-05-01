@@ -375,13 +375,7 @@ export function setDeepResearchEnabled(enabled) {
 }
 
 
-export function setWebSearchPluginEnabled(enabled) {
-    if (isWebSearchPluginEnabled !== enabled) {
-        isWebSearchPluginEnabled = enabled;
-        notify('isWebSearchPluginEnabled', isWebSearchPluginEnabled);
-        notify('pluginEnabled', 'websearch'); // Notify generic plugin change
-    }
-}
+// REMOVED setWebSearchPluginEnabled function
 
 
 export function setCurrentTab(tab) {
