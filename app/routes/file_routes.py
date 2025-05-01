@@ -85,16 +85,16 @@ def upload_file_route():
 
                      # save_file_record_to_db adds to session, returns File object or None
                      # Pass commit=False to defer commit until after the loop
-                     logger.debug(f"Calling db.save_file_record_to_db for '{filename}' with commit=False.")
-                     file_obj = db.save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=False)
+                     logger.debug(f"Calling database_module.save_file_record_to_db for '{filename}' with commit=False.")
+                     file_obj = database_module.save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=False)
 
                      if file_obj:
-                         logger.debug(f"db.save_file_record_to_db returned file object (ID before commit: {file_obj.id}). Appending to files_added_to_session.")
+                         logger.debug(f"database_module.save_file_record_to_db returned file object (ID before commit: {file_obj.id}). Appending to files_added_to_session.")
                          files_added_to_session.append(file_obj) # Collect the object
                          logger.debug(f"files_added_to_session now has {len(files_added_to_session)} items.")
                      else:
-                         # Error logged in db function
-                         logger.error(f"db.save_file_record_to_db returned None for '{filename}'.")
+                         # Error logged in database_module function
+                         logger.error(f"database_module.save_file_record_to_db returned None for '{filename}'.")
                          request_errors.append(f"Failed to add file '{filename}' to database session.")
 
                  except Exception as e:
