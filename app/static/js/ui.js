@@ -153,14 +153,34 @@ export function updateLoadingState() {
     const isGloballyLoading = state.isLoading; // For non-chat operations
     const isCurrentChatProcessing = state.currentChatId !== null && state.currentChatId === state.processingChatId;
 
-    // --- Disable Chat-Specific Inputs if *Current Chat* is Processing ---
+    // --- Disable/Modify Chat-Specific Inputs if *Current Chat* is Processing ---
     if (elements.messageInput) elements.messageInput.disabled = isCurrentChatProcessing;
-    if (elements.sendButton) elements.sendButton.disabled = isCurrentChatProcessing;
-    if (elements.modelSelector) elements.modelSelector.disabled = isCurrentChatProcessing; // Disable model selector too
-    if (elements.micButton) elements.micButton.disabled = isCurrentChatProcessing || isGloballyLoading; // Disable if processing OR globally loading
-    if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = isCurrentChatProcessing || isGloballyLoading; // Disable if processing OR globally loading
-    // Also consider disabling file attachment buttons if current chat is processing?
-    if (elements.fileUploadSessionLabel) elements.fileUploadSessionLabel.classList.toggle('disabled', isCurrentChatProcessing);
+    if (elements.sendButton) {
+        const sendButtonIcon = elements.sendButton.querySelector('i');
+        if (isCurrentChatProcessing) {
+            // Change to Stop button
+            elements.sendButton.disabled = false; // Keep button enabled to allow stopping
+            elements.sendButton.title = "Stop Generation";
+            elements.sendButton.classList.add('stop-button'); // Add class for styling
+            if (sendButtonIcon) {
+                sendButtonIcon.classList.remove('fa-paper-plane');
+                sendButtonIcon.classList.add('fa-stop');
+            }
+        } else {
+            // Change back to Send button
+            elements.sendButton.disabled = isGloballyLoading; // Disable only if globally loading, not just processing
+            elements.sendButton.title = "Send Message";
+            elements.sendButton.classList.remove('stop-button'); // Remove class
+            if (sendButtonIcon) {
+                sendButtonIcon.classList.remove('fa-stop');
+                sendButtonIcon.classList.add('fa-paper-plane');
+            }
+        }
+    }
+    if (elements.modelSelector) elements.modelSelector.disabled = isCurrentChatProcessing || isGloballyLoading; // Disable if processing OR globally loading
+    if (elements.micButton) elements.micButton.disabled = isCurrentChatProcessing || isGloballyLoading;
+    if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = isCurrentChatProcessing || isGloballyLoading;
+    if (elements.fileUploadSessionLabel) elements.fileUploadSessionLabel.classList.toggle('disabled', isCurrentChatProcessing || isGloballyLoading);
     // Attach buttons state is handled by updateAttachButtonState, which now checks processingChatId
  
     // --- Disable Global Actions if *Any* Global Operation is Loading ---

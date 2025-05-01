@@ -712,8 +712,9 @@ def generate_chat_response(
     calendar_context=None,
     web_search_enabled=False,
     streaming_enabled=False,
-    socketio=None,  # Add socketio instance
-    sid=None,  # Add client session ID
+    socketio=None,
+    sid=None,
+    is_cancelled_callback: Callable[[], bool] = lambda: False, # Add cancellation callback
 ):
     """
     Generates a chat response using the Gemini API via the client.
@@ -803,15 +804,22 @@ def generate_chat_response(
         calendar_context=calendar_context,
         web_search_enabled=web_search_enabled,
         socketio=socketio,  # Pass socketio
-        sid=sid,  # Pass sid
+        sid=sid,
+        is_cancelled_callback=is_cancelled_callback, # Pass callback
     )
 
-    # Check if preparation failed (it emits the error, returns None on failure)
+    # Check if preparation failed or was cancelled
     if preparation_result is None:
-        logger.error(
-            f"Content preparation failed for chat {chat_id} (SID: {sid}). Error already emitted."
+        # Error/cancellation message already emitted by _prepare_chat_content
+        logger.warning(
+            f"Content preparation failed or was cancelled for chat {chat_id} (SID: {sid})."
         )
-        return  # Stop execution
+        # Ensure cleanup happens even if preparation fails/cancels
+        _cleanup_temp_files(
+            preparation_result[2] if preparation_result else [], # Get temp files if tuple returned
+            f"chat {chat_id} (SID: {sid}) after prep failure/cancel"
+        )
+        return # Stop execution
 
     # Unpack results if preparation succeeded
     history, current_turn_parts, temp_files_to_clean = preparation_result
@@ -839,6 +847,8 @@ def generate_chat_response(
             temp_files_to_clean=temp_files_to_clean,
             socketio=socketio,
             sid=sid,
+            is_cancelled_callback=is_cancelled_callback, # Pass callback
+            is_cancelled_callback=is_cancelled_callback, # Pass callback
         )
     else:
         _generate_chat_response_non_stream(
@@ -863,12 +873,23 @@ def _generate_chat_response_non_stream(
     temp_files_to_clean,
     socketio,
     sid,
+    is_cancelled_callback: Callable[[], bool], # Add callback param
 ):
-    """Internal helper to generate a full chat response and emit it via SocketIO."""
+    """Internal helper to generate a full chat response and emit it via SocketIO. Checks for cancellation."""
     logger.info(
         f"_generate_chat_response_non_stream called for chat {chat_id} (SID: {sid})"
     )
-    assistant_response_content = None  # To store the final content for DB saving
+    assistant_response_content = None # To store the final content for DB saving
+
+    # --- Cancellation Check ---
+    if is_cancelled_callback():
+        logger.info(f"Non-streaming generation cancelled before API call for chat {chat_id} (SID: {sid}).")
+        assistant_response_content = "[AI Info: Generation cancelled by user before starting.]"
+        # Emit cancellation confirmation
+        socketio.emit("generation_cancelled", {"message": "Cancelled by user.", "chat_id": chat_id}, room=sid)
+        # Save cancellation message and cleanup (handled in finally block)
+        return # Exit early
+
     try:
         # --- Call Gemini API (Non-Streaming) ---
         # Construct conversation history. Only add the final user Content if parts exist.
@@ -1065,8 +1086,9 @@ def _generate_chat_response_stream(
     temp_files_to_clean,
     socketio,
     sid,
+    is_cancelled_callback: Callable[[], bool], # Add callback param
 ):
-    """Internal helper that generates and emits chat response chunks via SocketIO."""
+    """Internal helper that generates and emits chat response chunks via SocketIO. Checks for cancellation."""
     logger.info(
         f"_generate_chat_response_stream called for chat {chat_id} (SID: {sid})"
     )
@@ -1123,6 +1145,15 @@ def _generate_chat_response_stream(
         # --- Process Chunks from Iterator ---
         chunk_count = 0
         for chunk in response_iterator:
+            # --- Cancellation Check within loop ---
+            if is_cancelled_callback():
+                logger.info(f"Streaming generation cancelled during processing for chat {chat_id} (SID: {sid}).")
+                full_reply_content += "\n[AI Info: Generation cancelled by user.]" # Append cancellation note
+                cancelled_during_streaming = True
+                # Emit cancellation confirmation
+                socketio.emit("generation_cancelled", {"message": "Cancelled by user.", "chat_id": chat_id}, room=sid)
+                break # Stop processing chunks
+
             chunk_text = ""
             try:
                 # Extract text content if available
@@ -1191,13 +1222,13 @@ def _generate_chat_response_stream(
                 )
 
         logger.info(
-            f"Finished processing {chunk_count} chunks for chat {chat_id} (SID: {sid})."
+            f"Finished processing {chunk_count} chunks for chat {chat_id} (SID: {sid}). Cancelled: {cancelled_during_streaming}"
         )
-        # Emit stream end signal if no error occurred during streaming
-        if not emitted_error:
+        # Emit stream end signal only if no error occurred AND not cancelled during streaming
+        if not emitted_error and not cancelled_during_streaming:
             socketio.emit(
                 "stream_end", {"message": "Stream finished."}, room=sid
-            )  # Ensure this line is present and uncommented
+            )
 
     # --- Error Handling for Streaming API Call ---
     except InvalidArgument as e:
@@ -1273,11 +1304,9 @@ def _generate_chat_response_stream(
         emit_error_once(full_reply_content)
     finally:
         # --- Save Full Accumulated Reply to DB ---
-        # Ensure we save something, even if it's just an error message or placeholder
-        if not full_reply_content.strip():
-            if (
-                not emitted_error
-            ):  # If no specific error was emitted, save a generic note
+        # Ensure we save something, even if it's just an error message, cancellation note, or placeholder
+        if not full_reply_content.strip() and not cancelled_during_streaming: # Check cancel flag too
+            if not emitted_error: # If no specific error was emitted, save a generic note
                 full_reply_content = "[System Note: The AI did not return any content.]"
                 logger.warning(
                     f"Streaming for chat {chat_id} (SID: {sid}) yielded no content. Saving placeholder."
@@ -1286,14 +1315,32 @@ def _generate_chat_response_stream(
                 # If an error was emitted, full_reply_content might still be empty if the error happened early.
                 # We rely on the emitted error message for the user, and save a generic note here.
                 full_reply_content = (
-                    "[System Note: An error occurred during streaming.]"
+                    "[System Note: An error occurred during streaming.]" if emitted_error else "[AI Info: Generation cancelled by user.]"
                 )
                 logger.warning(
-                    f"Saving placeholder for chat {chat_id} (SID: {sid}) after streaming error."
+                    f"Saving placeholder/cancellation note for chat {chat_id} (SID: {sid}) after streaming error/cancellation."
                 )
 
-        logger.info(
-            f"Attempting to save final streamed assistant message for chat {chat_id} (SID: {sid}). Length: {len(full_reply_content)}"
+        # Only attempt DB save if there's content (including error/cancel messages)
+        if full_reply_content:
+            logger.info(
+                f"Attempting to save final streamed assistant message for chat {chat_id} (SID: {sid}). Length: {len(full_reply_content)}"
+            )
+            try:
+                save_success = database.add_message_to_db(
+                    chat_id, "assistant", full_reply_content
+                )
+                if not save_success:
+                    logger.error(
+                        f"Failed to save final streamed assistant message for chat {chat_id} (SID: {sid})."
+                    )
+            except Exception as db_err:
+                logger.error(
+                    f"DB error saving final streamed assistant message for chat {chat_id} (SID: {sid}): {db_err}",
+                    exc_info=True,
+                )
+        else:
+             logger.warning(f"No content (not even error/cancel) to save for chat {chat_id} (SID: {sid}).")
         )
         try:
             save_success = database.add_message_to_db(
@@ -1323,11 +1370,12 @@ def _prepare_chat_content(
     session_files,
     calendar_context,
     web_search_enabled,
-    socketio=None,  # Add socketio
-    sid=None,  # Add sid
+    socketio=None,
+    sid=None,
+    is_cancelled_callback: Callable[[], bool] = lambda: False, # Add callback
 ):
     """
-    Prepares history list and current turn parts list.
+    Prepares history list and current turn parts list. Checks for cancellation.
     Returns (history, parts, temp_files) on success.
     Emits 'task_error' via SocketIO and returns None on failure.
     """
@@ -1336,11 +1384,16 @@ def _prepare_chat_content(
     current_turn_parts = []
     temp_files_to_clean = []
 
-    def emit_prep_error(error_msg):
-        logger.error(f"Preparation error for chat {chat_id} (SID: {sid}): {error_msg}")
+    def emit_prep_error(error_msg, is_cancel=False):
+        log_level = logging.INFO if is_cancel else logging.ERROR
+        logger.log(log_level, f"Preparation {'cancelled' if is_cancel else 'error'} for chat {chat_id} (SID: {sid}): {error_msg}")
         if socketio and sid:
-            socketio.emit("task_error", {"error": error_msg}, room=sid)
-        return None  # Signal failure
+            if is_cancel:
+                 # Emit cancellation confirmation instead of generic task error
+                 socketio.emit("generation_cancelled", {"message": error_msg, "chat_id": chat_id}, room=sid)
+            else:
+                 socketio.emit("task_error", {"error": error_msg}, room=sid)
+        return None # Signal failure/cancellation
 
     # --- Fetch History ---
     try:
@@ -1373,6 +1426,7 @@ def _prepare_chat_content(
 
     # --- Prepare Current Turn Parts ---
     # Wrap the rest in try/except to catch errors during part preparation and emit them
+    # Check for cancellation periodically during potentially long operations
     try:
         # 1. Calendar Context
         if calendar_context:
@@ -1399,6 +1453,10 @@ def _prepare_chat_content(
                 logger.debug(
                     f"Processing attached file: ID={file_id}, Type={attachment_type}, Name={frontend_filename}"
                 )
+
+                # --- Cancellation Check ---
+                if is_cancelled_callback():
+                    return emit_prep_error("[AI Info: Generation cancelled during file processing.]", is_cancel=True)
 
                 if file_id is None or attachment_type is None:
                     logger.warning(
@@ -1450,6 +1508,11 @@ def _prepare_chat_content(
                                     temp_file.write(content_blob)
                                     temp_filepath = temp_file.name
                                     temp_files_to_clean.append(temp_filepath)
+
+                                # --- Cancellation Check ---
+                                if is_cancelled_callback():
+                                    return emit_prep_error("[AI Info: Generation cancelled during file upload.]", is_cancel=True)
+
                                 uploaded_file = client.files.upload(
                                     file=temp_filepath,
                                     config={
@@ -1523,6 +1586,10 @@ def _prepare_chat_content(
                     f"Processing session file: {filename}, Mimetype: {mimetype}"
                 )
 
+                # --- Cancellation Check ---
+                if is_cancelled_callback():
+                    return emit_prep_error("[AI Info: Generation cancelled during session file processing.]", is_cancel=True)
+
                 if not filename or not mimetype or not content_base64:
                     logger.warning(
                         f"Skipping invalid session file detail: {filename or 'No Name'}"
@@ -1588,9 +1655,18 @@ def _prepare_chat_content(
 
         # 4. Web Search
         if web_search_enabled:
+            # --- Cancellation Check ---
+            if is_cancelled_callback():
+                return emit_prep_error("[AI Info: Generation cancelled before web search.]", is_cancel=True)
+
             logger.info(f"Web search enabled for chat {chat_id}. Generating query...")
-            search_query = generate_search_query(user_message)
+            search_query = generate_search_query(user_message) # This function has its own readiness check but not cancellation check
+
             if search_query:
+                # --- Cancellation Check ---
+                if is_cancelled_callback():
+                    return emit_prep_error("[AI Info: Generation cancelled before performing web search.]", is_cancel=True)
+
                 logger.info(f"Performing web search for query: '{search_query}'")
                 search_results_list = perform_web_search(
                     search_query
@@ -1609,6 +1685,10 @@ def _prepare_chat_content(
                         fetch_result = result_item.get("fetch_result", {})
                         result_type = fetch_result.get("type", "error")
                         result_content = fetch_result.get("content", "Unknown error")
+
+                        # --- Cancellation Check (within loop) ---
+                        if is_cancelled_callback():
+                            return emit_prep_error("[AI Info: Generation cancelled during web search result processing.]", is_cancel=True)
 
                         # Add text part describing the result source
                         # This text part serves as the citation reference point for the AI
@@ -1764,6 +1844,10 @@ At the end of your response, include a list of the cited sources, formatted as f
         return emit_prep_error(
             f"[Error: Failed to prepare content for AI ({type(prep_err).__name__})]"
         )
+
+    # --- Final Cancellation Check ---
+    if is_cancelled_callback():
+        return emit_prep_error("[AI Info: Generation cancelled after content preparation.]", is_cancel=True)
 
     # --- Return successful preparation results ---
     logger.info(

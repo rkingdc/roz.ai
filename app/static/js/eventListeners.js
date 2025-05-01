@@ -195,14 +195,22 @@ export function setupEventListeners() {
     // console.log("Global keyboard listeners set up.");
 
 
-    // --- Chat Input & Sending ---
-    elements.sendButton?.addEventListener('click', () => { // Removed async as api.sendMessage is no longer async
-        console.log("[DEBUG] Send button clicked. Calling api.sendMessage()..."); // ADDED LOG
-        api.sendMessage(); // Updates state (chatHistory, isLoading, statusMessage, sessionFile)
-        // UI updates are triggered by state notifications within api.sendMessage
+    // --- Chat Input & Sending / Stopping ---
+    elements.sendButton?.addEventListener('click', () => {
+        const isCurrentChatProcessing = state.currentChatId !== null && state.currentChatId === state.processingChatId;
+        if (isCurrentChatProcessing) {
+            console.log("[DEBUG] Stop button clicked. Calling api.cancelChatGeneration()...");
+            api.cancelChatGeneration(); // Call the new cancel function
+        } else {
+            console.log("[DEBUG] Send button clicked. Calling api.sendMessage()...");
+            api.sendMessage(); // Call the original send function
+        }
+        // UI updates are triggered by state notifications within the API functions
     });
-    elements.messageInput?.addEventListener('keypress', (e) => { // Removed async
-        if (e.key === 'Enter' && !e.shiftKey) {
+    elements.messageInput?.addEventListener('keypress', (e) => {
+        // Only send on Enter if not currently processing
+        const isCurrentChatProcessing = state.currentChatId !== null && state.currentChatId === state.processingChatId;
+        if (e.key === 'Enter' && !e.shiftKey && !isCurrentChatProcessing) {
             console.log("[DEBUG] Enter key pressed in message input. Triggering send button click..."); // ADDED LOG
             e.preventDefault();
             elements.sendButton?.click(); // Trigger send button click

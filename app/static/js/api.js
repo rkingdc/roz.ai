@@ -242,6 +242,30 @@ function initializeSocketListeners() {
         // setLoading(false); // Don't use global loading for chat processing
     });
 
+    // --- NEW: Listener for Cancellation Confirmation ---
+    socket.on('generation_cancelled', (data) => {
+        console.log("Backend confirmed generation cancelled:", data.message);
+        // Check if the cancelled chat is the one currently being processed
+        if (data.chat_id && data.chat_id === state.processingChatId) {
+            setStatus("Generation cancelled by user.");
+            state.setProcessingChatId(null); // Clear processing state
+            // Optionally add a system message to history?
+            // state.addMessageToHistory({ role: 'system', content: '[Generation Cancelled]' });
+            loadSavedChats(); // Reload chat list to update timestamp (optional)
+        } else {
+            console.warn(`Received 'generation_cancelled' for chat ${data.chat_id}, but current processing chat is ${state.processingChatId}.`);
+        }
+        // setLoading(false); // Don't use global loading
+    });
+
+    socket.on('cancel_request_received', (data) => {
+        // Optional: Provide immediate feedback that the request was received
+        console.log("Backend acknowledged cancellation request:", data.message);
+        setStatus("Cancellation requested...");
+    });
+    // -------------------------------------------------
+
+
     // --- Other Permanent Listeners (e.g., for transcription confirmation/errors) ---
     // These might be less critical now if promise handles initial start, but keep for logging/robustness
     socket.on('transcription_started', (data) => {
@@ -1254,6 +1278,26 @@ export function sendMessage() { // No longer async, just emits
 
     // Note: setLoading(false) will be called by the event listeners
     // when the final response or an error is received.
+}
+
+/** Emits a request to cancel the currently processing chat generation. */
+export function cancelChatGeneration() {
+    const processingId = state.processingChatId;
+    if (!processingId) {
+        console.warn("Cancel button clicked, but no chat is currently processing.");
+        return;
+    }
+    if (!socket || !socket.connected) {
+        setStatus("Cannot cancel: Not connected to the server.", true);
+        return;
+    }
+
+    console.log(`[DEBUG] Emitting 'cancel_generation' for Chat ID: ${processingId}`);
+    socket.emit('cancel_generation', { chat_id: processingId });
+    setStatus("Requesting cancellation..."); // Provide immediate feedback
+
+    // The backend will emit 'generation_cancelled' which is handled by the listener
+    // to update status and clear processingChatId.
 }
 
 

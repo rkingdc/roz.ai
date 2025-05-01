@@ -679,11 +679,20 @@ Here are the components:
         return f"{executive_summary}\n\n---\n\n{report_body}\n\n---\n\n{next_steps}\n\n---".strip()
 
 
+from typing import Callable # Import Callable
+
 # --- Main Deep Research Orchestration ---
-def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> None:
+def perform_deep_research(
+    query: str,
+    socketio=None,
+    sid=None,
+    chat_id=None,
+    is_cancelled_callback: Callable[[], bool] = lambda: False # Add callback
+) -> None:
     """
     Orchestrates the deep research process from query to final report.
-    Emits results ('deep_research_result') or errors ('task_error') via SocketIO.
+    Checks for cancellation periodically.
+    Emits results ('deep_research_result'), cancellation ('generation_cancelled'), or errors ('task_error') via SocketIO.
     Saves the final report/error to the database.
     """
     logger.info(
@@ -697,15 +706,21 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
             logger.info(f"Status Update (SID: {sid}): {message}")
             socketio.emit("status_update", {"message": message}, room=sid)
 
-    def emit_error(error_msg, save_to_db=True):
+    def emit_cancellation_or_error(message, is_cancel=False, save_to_db=True):
         nonlocal final_report_content
-        logger.error(
-            f"Deep Research Error (SID: {sid}, ChatID: {chat_id}): {error_msg}"
+        log_level = logging.INFO if is_cancel else logging.ERROR
+        log_prefix = "Cancelled" if is_cancel else "Error"
+        logger.log(
+            log_level,
+            f"Deep Research {log_prefix} (SID: {sid}, ChatID: {chat_id}): {message}"
         )
-        final_report_content = error_msg  # Store error for DB saving
+        final_report_content = message # Store message for DB saving
         if socketio and sid:
-            socketio.emit("task_error", {"error": error_msg}, room=sid)
-        # Save error to DB if requested
+            if is_cancel:
+                socketio.emit("generation_cancelled", {"message": message, "chat_id": chat_id}, room=sid)
+            else:
+                socketio.emit("task_error", {"error": message}, room=sid)
+        # Save message to DB if requested
         if save_to_db and chat_id is not None:
             try:
                 logger.info(
@@ -718,10 +733,10 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
                 db.add_message_to_db(chat_id, "assistant", final_report_content)
             except Exception as db_err:
                 logger.error(
-                    f"Failed to save deep research error to DB for chat {chat_id}: {db_err}",
+                    f"Failed to save deep research {'cancellation' if is_cancel else 'error'} to DB for chat {chat_id}: {db_err}",
                     exc_info=True,
                 )
-        return None  # Indicate failure
+        return None # Indicate failure/cancellation
 
     # --- Check for socketio/sid ---
     if not socketio or not sid:
@@ -735,13 +750,18 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
     app = current_app._get_current_object()
     with app.app_context():
         # --- Start Actual Research Process ---
+
+        # --- Cancellation Check ---
+        if is_cancelled_callback():
+            return emit_cancellation_or_error("[AI Info: Deep research cancelled before starting.]", is_cancel=True)
+
         emit_status("Generating initial research plan...")
         # 1. Generate Initial Research Plan
-        research_plan: List[Tuple[str, str]] = query_to_research_plan(query)
+        research_plan: List[Tuple[str, str]] = query_to_research_plan(query) # Needs app context, but not cancellation check
         if not research_plan:
-            return emit_error(
-                "[Error: Could not generate initial research plan.]"
-            )  # Use emit_error
+            return emit_cancellation_or_error(
+                "[Error: Could not generate initial research plan.]", is_cancel=False
+            )
         logger.info(
             f"Initial Research Plan (SID: {sid}):\n{json.dumps(research_plan, indent=2)}"
         )
@@ -762,6 +782,10 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
     emit_status("Performing initial research...")
     step_counter = 0
     for step_name, step_description in research_plan:
+        # --- Cancellation Check (before each step) ---
+        if is_cancelled_callback():
+            return emit_cancellation_or_error(f"[AI Info: Deep research cancelled before step '{step_name}'.]", is_cancel=True)
+
         step_counter += 1
         emit_status(
             f"Research Step {step_counter}/{len(research_plan)}: {step_name}..."
@@ -772,8 +796,7 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
         all_raw_dicts_for_step = []
         try:
             # a. Determine Search Queries
-            # Assumes this function is called within a request context or has access to app context
-            search_queries: List[str] = determine_research_queries(step_description)
+            search_queries: List[str] = determine_research_queries(step_description) # Needs app context, no cancellation check
             if not search_queries:
                 logger.warning(f"No search queries generated for step: {step_name}")
                 collected_research[step_name] = []
@@ -782,7 +805,11 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
 
             # b. Perform Web Search & Scrape Results for each query
             for search_query in search_queries:
-                # web_search also needs app context implicitly
+                # --- Cancellation Check (before each search) ---
+                if is_cancelled_callback():
+                    return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during step '{step_name}' before searching '{search_query}'.]", is_cancel=True)
+
+                # web_search also needs app context implicitly, no cancellation check inside
                 processed_content, raw_dicts = web_search(search_query)
                 if processed_content:
                     all_processed_content_for_step.extend(processed_content)
@@ -805,15 +832,20 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
                 f"Error executing research step '{step_name}' (SID: {sid}): {e}",
                 exc_info=True,
             )
-            error_msg = f"[System Error: Failed to execute research step '{step_name}' due to {type(e).__name__}]"
+            # Log error but continue to next step if possible
+            error_msg = f"[System Error: Failed during research step '{step_name}': {type(e).__name__}]"
             collected_research[step_name] = [error_msg]
             collected_raw_results[step_name] = [{"error": error_msg}]
-            # Optionally emit a non-fatal warning? For now, just log.
 
     logger.info(
         f"--- Finished Sequential Execution of Initial Research Steps (SID: {sid}) ---"
     )
     emit_status("Initial research complete. Refining report plan...")
+
+    # --- Cancellation Check ---
+    if is_cancelled_callback():
+        return emit_cancellation_or_error("[AI Info: Deep research cancelled before refining plan.]", is_cancel=True)
+
     # Log collected research summary
     for step, items in collected_research.items():
         raw_count = len(collected_raw_results.get(step, []))
@@ -840,7 +872,7 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
             ]
         )
         error_msg = f"# Deep Research Error\n\nFailed to generate the report outline after initial research.\n\n## Collected Research Snippets:\n\n{error_report_body}"
-        return emit_error(error_msg)  # Use emit_error
+        return emit_cancellation_or_error(error_msg, is_cancel=False)
 
     logger.info(
         f"Updated Report Plan (SID: {sid}):\n{json.dumps(updated_report_plan, indent=2)}"
@@ -872,6 +904,10 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
     if new_sections_to_research:
         step_counter = 0
         for section_name, section_description in new_sections_to_research:
+            # --- Cancellation Check (before each additional step) ---
+            if is_cancelled_callback():
+                return emit_cancellation_or_error(f"[AI Info: Deep research cancelled before additional research for '{section_name}'.]", is_cancel=True)
+
             step_counter += 1
             emit_status(
                 f"Additional Research {step_counter}/{len(new_sections_to_research)}: {section_name}..."
@@ -896,6 +932,10 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
 
                 # b. Perform Web Search & Scrape Results for each query
                 for search_query in search_queries:
+                    # --- Cancellation Check (before each search) ---
+                    if is_cancelled_callback():
+                        return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during additional research for '{section_name}' before searching '{search_query}'.]", is_cancel=True)
+
                     processed_content, raw_dicts = web_search(search_query)
                     if processed_content:
                         processed_content_for_section.extend(processed_content)
@@ -921,6 +961,7 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
                     f"Error during additional research step for section '{section_name}': {e}",
                     exc_info=True,
                 )
+                # Log error but continue if possible
 
         logger.info(
             f"--- Finished sequential execution of additional research for {len(new_sections_to_research)} section(s) (SID: {sid}) ---"
@@ -978,6 +1019,10 @@ def perform_deep_research(query: str, socketio=None, sid=None, chat_id=None) -> 
         f"--- Finished Sequential Execution of Section Synthesis (SID: {sid}) ---"
     )
     emit_status("Section synthesis complete. Assembling final report...")
+
+    # --- Cancellation Check ---
+    if is_cancelled_callback():
+        return emit_cancellation_or_error("[AI Info: Deep research cancelled before final assembly.]", is_cancel=True)
 
     # Ensure sections are assembled in the order defined by updated_report_plan
     ordered_section_texts = [
