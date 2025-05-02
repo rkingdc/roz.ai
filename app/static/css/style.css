@@ -521,35 +521,55 @@
 }
 
 /* --- Table Styling within Prose --- */
-.message.prose table,
-#notes-preview .prose table {
-    width: auto; /* Allow table to shrink to content */
-    max-width: 100%; /* Prevent overflow */
-    margin-top: 1em !important; /* Ensure margin overrides resets */
-    margin-bottom: 1em !important; /* Ensure margin overrides resets */
-    border-collapse: collapse !important; /* Collapse borders */
-    border: 1px solid var(--rz-tab-line) !important; /* Outer border for the table */
-    border-spacing: 0 !important; /* Ensure no space between borders */
-    table-layout: auto !important; /* Explicitly set */
+/* Styling for tables in chat messages */
+.message.prose table {
+    width: auto !important;
+    max-width: 100% !important;
+    margin-top: 1em !important;
+    margin-bottom: 1em !important;
+    border-collapse: collapse !important;
+    border: 1px solid var(--rz-tab-line) !important;
+    border-spacing: 0 !important;
+    table-layout: auto !important;
+}
+.message.prose th,
+.message.prose td {
+    border: 1px solid var(--rz-tab-line) !important;
+    border-style: solid !important;
+    padding: 0.4rem 0.6rem !important;
+    text-align: left !important;
+    vertical-align: top !important;
+}
+.message.prose th {
+    background-color: var(--rz-frame) !important;
+    color: var(--rz-sidebar-text) !important;
+    font-weight: 600 !important;
 }
 
-.message.prose th,
-.message.prose td,
-#notes-preview .prose th,
-#notes-preview .prose td {
-    border: 1px solid var(--rz-tab-line) !important; /* Border for each cell */
-    border-style: solid !important; /* Explicitly set */
-    padding: 0.4rem 0.6rem !important; /* Ensure padding overrides resets/prose */
-    text-align: left !important; /* Ensure alignment overrides */
-    vertical-align: top !important; /* Align content to top of cell */
+/* Styling for tables directly within notes-preview (overriding prose if needed) */
+#notes-preview table {
+    width: auto !important;
+    max-width: 100% !important;
+    margin-top: 1em !important;
+    margin-bottom: 1em !important;
+    border-collapse: collapse !important;
+    border: 1px solid var(--rz-tab-line) !important; /* Outer border */
+    border-spacing: 0 !important;
+    table-layout: auto !important;
 }
-
-.message.prose th,
-#notes-preview .prose th {
-    background-color: var(--rz-frame) !important; /* Ensure background overrides */
-    color: var(--rz-sidebar-text) !important; /* Ensure text color overrides */
-    font-weight: 600 !important; /* Ensure font weight overrides */
-    text-align: left !important; /* Ensure alignment overrides */
+#notes-preview th,
+#notes-preview td {
+    border: 1px solid var(--rz-tab-line) !important; /* Cell borders */
+    border-style: solid !important; /* Ensure border style */
+    border-width: 1px !important; /* Ensure border width overrides resets */
+    padding: 0.4rem 0.6rem !important;
+    text-align: left !important; /* Default alignment */
+    vertical-align: top !important;
+}
+#notes-preview th {
+    background-color: var(--rz-frame) !important;
+    color: var(--rz-sidebar-text) !important;
+    font-weight: 600 !important;
 }
 /* --- End Table Styling --- */
 
