@@ -520,6 +520,32 @@
     text-decoration: underline; /* Ensure underline remains on hover */
 }
 
+/* --- Table Styling within Prose --- */
+.message.prose table,
+#notes-preview .prose table {
+    width: auto; /* Allow table to shrink to content */
+    margin-top: 1em;
+    margin-bottom: 1em;
+    border-collapse: collapse; /* Collapse borders */
+    border: 1px solid var(--rz-tab-line); /* Outer border for the table */
+}
+
+.message.prose th,
+.message.prose td,
+#notes-preview .prose th,
+#notes-preview .prose td {
+    border: 1px solid var(--rz-tab-line); /* Border for each cell */
+    padding: 0.4rem 0.6rem; /* Padding within cells */
+    text-align: left; /* Default alignment */
+}
+
+.message.prose th,
+#notes-preview .prose th {
+    background-color: var(--rz-frame); /* Header background */
+    color: var(--rz-sidebar-text); /* Header text color */
+    font-weight: 600; /* Make headers bolder */
+}
+/* --- End Table Styling --- */
 
 /* --- End Custom Prose Styles --- */
 
