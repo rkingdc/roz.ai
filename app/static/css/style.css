@@ -521,23 +521,24 @@
 }
 
 /* --- Table Styling within Prose --- */
-/* Styling for tables in chat messages */
+/* Styling for tables in chat messages (matching notes-preview) */
 .message.prose table {
     width: auto !important;
     max-width: 100% !important;
     margin-top: 1em !important;
     margin-bottom: 1em !important;
     border-collapse: collapse !important;
-    border: 1px solid var(--rz-tab-line) !important;
+    border: 1px solid var(--rz-tab-line) !important; /* Outer border */
     border-spacing: 0 !important;
     table-layout: auto !important;
 }
 .message.prose th,
 .message.prose td {
-    border: 1px solid var(--rz-tab-line) !important;
-    border-style: solid !important;
+    border: 1px solid var(--rz-tab-line) !important; /* Cell borders */
+    border-style: solid !important; /* Ensure border style */
+    border-width: 1px !important; /* Ensure border width overrides resets */
     padding: 0.4rem 0.6rem !important;
-    text-align: left !important;
+    text-align: left !important; /* Default alignment */
     vertical-align: top !important;
 }
 .message.prose th {
