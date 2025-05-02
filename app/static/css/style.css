@@ -1509,3 +1509,15 @@
     color: var(--rz-toolbar-text); /* Use theme color for success */
 }
 /* --- End Message Copy Button Styles --- */
+
+/* --- Markdown Tips Modal Font --- */
+#markdown-tips-modal .modal-body {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.9rem; /* Adjust font size slightly if needed */
+}
+/* Ensure code blocks within the modal also use monospace */
+#markdown-tips-modal .modal-body pre,
+#markdown-tips-modal .modal-body code {
+    font-family: inherit; /* Inherit the monospace font from the modal body */
+}
+/* --- End Markdown Tips Modal Font --- */
