@@ -522,7 +522,8 @@
 
 /* --- Table Styling within Prose --- */
 /* Styling for tables in chat messages (matching notes-preview) */
-.message.prose table {
+/* REMOVED .prose from selectors below */
+.message table {
     width: auto !important;
     max-width: 100% !important;
     margin-top: 1em !important;
@@ -532,8 +533,8 @@
     border-spacing: 0 !important;
     table-layout: auto !important;
 }
-.message.prose th,
-.message.prose td {
+.message th,
+.message td {
     border: 1px solid var(--rz-tab-line) !important; /* Cell borders */
     border-style: solid !important; /* Ensure border style */
     border-width: 1px !important; /* Ensure border width overrides resets */
@@ -541,7 +542,7 @@
     text-align: left !important; /* Default alignment */
     vertical-align: top !important;
 }
-.message.prose th {
+.message th {
     background-color: var(--rz-frame) !important;
     color: var(--rz-sidebar-text) !important;
     font-weight: 600 !important;
