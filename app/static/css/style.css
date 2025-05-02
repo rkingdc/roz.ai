@@ -524,26 +524,32 @@
 .message.prose table,
 #notes-preview .prose table {
     width: auto; /* Allow table to shrink to content */
-    margin-top: 1em;
-    margin-bottom: 1em;
-    border-collapse: collapse; /* Collapse borders */
-    border: 1px solid var(--rz-tab-line); /* Outer border for the table */
+    max-width: 100%; /* Prevent overflow */
+    margin-top: 1em !important; /* Ensure margin overrides resets */
+    margin-bottom: 1em !important; /* Ensure margin overrides resets */
+    border-collapse: collapse !important; /* Collapse borders */
+    border: 1px solid var(--rz-tab-line) !important; /* Outer border for the table */
+    border-spacing: 0 !important; /* Ensure no space between borders */
+    table-layout: auto !important; /* Explicitly set */
 }
 
 .message.prose th,
 .message.prose td,
 #notes-preview .prose th,
 #notes-preview .prose td {
-    border: 1px solid var(--rz-tab-line); /* Border for each cell */
-    padding: 0.4rem 0.6rem; /* Padding within cells */
-    text-align: left; /* Default alignment */
+    border: 1px solid var(--rz-tab-line) !important; /* Border for each cell */
+    border-style: solid !important; /* Explicitly set */
+    padding: 0.4rem 0.6rem !important; /* Ensure padding overrides resets/prose */
+    text-align: left !important; /* Ensure alignment overrides */
+    vertical-align: top !important; /* Align content to top of cell */
 }
 
 .message.prose th,
 #notes-preview .prose th {
-    background-color: var(--rz-frame); /* Header background */
-    color: var(--rz-sidebar-text); /* Header text color */
-    font-weight: 600; /* Make headers bolder */
+    background-color: var(--rz-frame) !important; /* Ensure background overrides */
+    color: var(--rz-sidebar-text) !important; /* Ensure text color overrides */
+    font-weight: 600 !important; /* Ensure font weight overrides */
+    text-align: left !important; /* Ensure alignment overrides */
 }
 /* --- End Table Styling --- */
 
