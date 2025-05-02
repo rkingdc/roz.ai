@@ -547,7 +547,15 @@ function greet(name) {
                 <p>Use three or more hyphens (`---`), asterisks (`***`), or underscores (`___`) on a line by themselves.</p>
                 <pre><code class="language-markdown">---</code></pre>
 
-                <p>Remember to leave a blank line before and after block-level elements like headers, lists, and code blocks for proper rendering.</p>
+                <h4>Tables</h4>
+                <p>Create tables using pipes (`|`) to separate columns and hyphens (`-`) to create the header separator. Colons (`:`) can be used within the separator line to control column alignment.</p>
+                <pre><code class="language-markdown">| Header 1 | Header 2 | Header 3 |
+| :------- | :------: | -------: |
+| Left     | Center   | Right    |
+| Cell     | Cell     | Cell     |</code></pre>
+                <p>The separator line must have at least three hyphens per column.</p>
+
+                <p>Remember to leave a blank line before and after block-level elements like headers, lists, code blocks, and tables for proper rendering.</p>
             </div>
         </div>
     </div>
