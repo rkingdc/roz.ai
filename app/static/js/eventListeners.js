@@ -1310,6 +1310,10 @@ function subscribeStateChangeListeners() {
     state.subscribe('noteHistory', ui.handleStateChange_noteHistory); // Corrected handler name
     // ----------------------------------------------------
 
+    // --- NEW: Subscribe UI to H1 tab index change ---
+    state.subscribe('currentNoteActiveH1SectionIndex', ui.handleStateChange_currentNoteActiveH1SectionIndex);
+    // ------------------------------------------------
+
     // --- Subscribe UI to streaming transcript state change ---
     state.subscribe('streamingTranscript', ui.handleStateChange_streamingTranscript);
     // -------------------------------------------------------

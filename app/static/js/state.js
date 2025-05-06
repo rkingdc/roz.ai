@@ -34,6 +34,7 @@ export let isImprovePromptEnabled = false; // <<< ADDED: Toggle state for improv
 // Tab and Note Mode states
 export let currentTab = 'chat';
 export let currentNoteMode = 'edit';
+export let currentNoteActiveH1SectionIndex = 0; // Index of the active H1 tab for the current note
 
 // Lists of saved items
 export let savedChats = []; // Array of { id, name, last_updated_at }
@@ -197,6 +198,8 @@ export function notifyAll() {
     notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Include mode in combined state
     notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
     notify('pluginEnabled', 'all'); // Generic notification for any plugin state change
+    notify('currentNoteActiveH1SectionIndex', currentNoteActiveH1SectionIndex);
+
 
     // Notify combined states including deep research
     notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled });
@@ -218,8 +221,13 @@ export function setCurrentChatId(id) {
 export function setCurrentNoteId(id) {
     if (currentNoteId !== id) {
         currentNoteId = id;
+        setCurrentNoteActiveH1SectionIndex(0); // Reset to the first H1 section/tab
         notify('currentNoteId', currentNoteId);
         notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent }); // Notify combined note state
+    } else if (id === null && currentNoteId !== null) {
+        // If setting to null (e.g. new note before save, or deleting current note)
+        // also ensure the index is reset.
+        setCurrentNoteActiveH1SectionIndex(0);
     }
 }
 
@@ -468,6 +476,15 @@ export function setCurrentChatMode(mode) {
     }
 }
 // -----------------------------
+
+// --- Setter for H1 Section Index ---
+export function setCurrentNoteActiveH1SectionIndex(index) {
+    if (currentNoteActiveH1SectionIndex !== index) {
+        currentNoteActiveH1SectionIndex = index;
+        notify('currentNoteActiveH1SectionIndex', currentNoteActiveH1SectionIndex);
+    }
+}
+// ---------------------------------
 
 // --- Note Content Functions ---
 export function setNoteContent(content) {
