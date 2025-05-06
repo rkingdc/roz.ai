@@ -49,7 +49,7 @@ class Config:
     # File Uploads (Using BLOB storage now, UPLOAD_FOLDER not needed)
     # Define allowed extensions for frontend validation and potential backend checks
     ALLOWED_EXTENSIONS = {
-        "txt",
+        "txt","tf",
         "py",
         "js",
         "html",
