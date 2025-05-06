@@ -76,8 +76,8 @@ def transcribe_audio(
         operation = client.long_running_recognize(config=config, audio=audio)
 
         logger.info("Waiting for long-running transcription operation to complete...")
-        # Set a timeout (e.g., 300 seconds = 5 minutes) to avoid hanging indefinitely
-        response = operation.result(timeout=300)
+        # Set a timeout (e.g., 900 seconds = 15 minutes) to avoid hanging indefinitely
+        response = operation.result(timeout=900)
         logger.info("Long-running transcription operation finished.")
 
         # Process the response
@@ -205,12 +205,12 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         logger.info("Waiting for long-running transcription operation to complete...")
 
         # Wait for the operation to complete. Timeout needs to be long enough for transcription.
-        # Example: 300 seconds (5 minutes). Adjust as needed based on expected max audio length.
+        # Example: 900 seconds (15 minutes). Adjust as needed based on expected max audio length.
         # Consider making this timeout configurable.
         try:
             # Use google.api_core.exceptions.TimeoutError if needed, but standard TimeoutError should work
             from concurrent.futures import TimeoutError
-            response = operation.result(timeout=300)
+            response = operation.result(timeout=900)
             logger.info("Long-running transcription operation finished.")
         except TimeoutError:
             logger.error("Timeout waiting for long-running transcription operation to complete.")
