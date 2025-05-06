@@ -1523,3 +1523,60 @@
     font-family: inherit; /* Inherit the monospace font from the modal body */
 }
 /* --- End Markdown Tips Modal Font --- */
+
+/* Notes H1 Tabs Styling */
+.note-h1-tabs {
+    display: flex;
+    flex-wrap: wrap; /* Allow tabs to wrap if many */
+    border-bottom: 2px solid var(--rz-tab-line); /* Separator line below tabs */
+    margin-bottom: 1rem; /* Space between tabs and content */
+    padding-left: 0; /* Align with note content */
+}
+
+.note-h1-tab {
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border: none;
+    background-color: transparent;
+    color: var(--rz-tab-background-text); /* Default tab text color */
+    font-size: 0.9rem;
+    font-weight: 500;
+    border-bottom: 2px solid transparent; /* For active indicator */
+    margin-bottom: -2px; /* Overlap with container's border-bottom */
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.note-h1-tab:hover {
+    color: var(--rz-toolbar-text); /* Gold on hover */
+}
+
+.note-h1-tab.active {
+    color: var(--rz-toolbar-text); /* Gold for active tab text */
+    border-bottom-color: var(--rz-toolbar-text); /* Gold underline for active tab */
+    font-weight: 600;
+}
+
+/* Container for the content of the active H1 section */
+.note-h1-content {
+    /* Prose styles are applied via class in JS */
+    min-height: 100px; /* Give it some minimum height */
+}
+
+/* Ensure notes-preview itself can still scroll if tabbed content is very long */
+#notes-preview {
+    /* overflow-y: auto; is already there */
+    display: flex; /* Add flex */
+    flex-direction: column; /* Stack tabs above content */
+}
+#note-h1-content-container {
+    flex-grow: 1; /* Allow content to take available space */
+    min-height: 0; /* For proper flex scroll */
+    overflow-y: auto; /* Scroll content within its container if needed */
+    /* Apply prose styles here if not on parent, or ensure parent prose styles cascade */
+}
+
+/* Scrollbar for H1 content container */
+#note-h1-content-container::-webkit-scrollbar { width: 6px; height: 6px; }
+#note-h1-content-container::-webkit-scrollbar-track { background: var(--rz-popup); border-radius: 10px; }
+#note-h1-content-container::-webkit-scrollbar-thumb { background: var(--rz-tab-line); border-radius: 10px; }
+#note-h1-content-container::-webkit-scrollbar-thumb:hover { background: var(--rz-toolbar-text); }

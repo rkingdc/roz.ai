@@ -12,6 +12,10 @@ import * as config from './config.js'; // Import config for keys
 import { escapeHtml, formatFileSize, debounce } from './utils.js'; // Import utility functions, including debounce
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js'; // Import marked for lexer
 import { markedRenderer } from './config.js'; // Import the custom renderer from config.js
+
+// Module-level variable to store parsed H1 sections for the current note
+let _currentNoteH1Sections = [];
+
 // No direct imports of api.js here to break the cycle.
 // Event listeners will import api functions dynamically when needed.
 
@@ -776,6 +780,85 @@ export function renderNoteContent() {
         autoResizeTextarea(notesTextarea);
         // -----------------------------------------------------
     }
+
+
+    // --- Helper to Parse Note into H1 Sections ---
+    function _parseNoteIntoH1Sections(markdown) {
+        if (!markdown || markdown.trim() === '') {
+            return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
+        }
+
+        const tokens = marked.lexer(markdown);
+        const sections = [];
+        let currentSectionTokens = [];
+        let currentH1Title = null;
+
+        // Handle content before the very first H1 heading
+        const firstH1TokenIndex = tokens.findIndex(token => token.type === 'heading' && token.depth === 1);
+
+        if (firstH1TokenIndex === -1) { // No H1 headings at all
+            return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
+        }
+
+        if (firstH1TokenIndex > 0) {
+            const preH1ContentTokens = tokens.slice(0, firstH1TokenIndex);
+            if (preH1ContentTokens.some(t => t.raw.trim() !== '')) {
+                 sections.push({
+                    title: "Overview", // Default title for content before the first H1
+                    rawMarkdownContent: preH1ContentTokens.map(t => t.raw).join(''),
+                    isPreH1Content: true
+                });
+            }
+        }
+
+        // Process from the first H1 onwards
+        const processTokens = tokens.slice(firstH1TokenIndex);
+
+        processTokens.forEach(token => {
+            if (token.type === 'heading' && token.depth === 1) {
+                if (currentSectionTokens.length > 0 && currentH1Title) {
+                    // Save the previous H1 section
+                    sections.push({
+                        title: currentH1Title,
+                        rawMarkdownContent: currentSectionTokens.map(t => t.raw).join('')
+                    });
+                }
+                // Start new section
+                currentH1Title = token.text;
+                currentSectionTokens = [token]; // Start with the H1 token itself
+            } else if (currentH1Title) { // Only add to section if an H1 has been encountered for this section
+                currentSectionTokens.push(token);
+            }
+        });
+
+        // Add the last processed H1 section
+        if (currentSectionTokens.length > 0 && currentH1Title) {
+            sections.push({
+                title: currentH1Title,
+                rawMarkdownContent: currentSectionTokens.map(t => t.raw).join('')
+            });
+        }
+    
+        // If, after all processing, no sections were created (e.g. only whitespace H1s)
+        // or only pre-H1 content was found but no actual H1s, treat the whole note as one section.
+        if (sections.length === 0 && markdown.trim().length > 0) {
+            return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
+        }
+    
+        if (sections.length === 1 && !sections[0].isPreH1Content) { // If only one actual H1 section (not pre-H1)
+            sections[0].isOnlySection = true;
+        } else if (sections.length > 0) {
+            // Mark all sections as not the only one if there are multiple
+            sections.forEach(s => s.isOnlySection = false);
+            // If there's only pre-H1 content and no actual H1s, it should have been caught by the (sections.length === 0) check.
+            // If there's pre-H1 and one H1, they are two sections.
+            // If there's pre-H1 and multiple H1s, they are multiple sections.
+        }
+
+
+        return sections;
+    }
+    // --- End Helper ---
     if (notesPreview) {
         // Update preview based on current mode and content
         updateNotesPreview(); // This function already reads from state and renders preview
@@ -1595,15 +1678,19 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
         viewNoteButton.classList.remove('active');
         // Explicitly remove 'hidden' class for edit mode
         notesMicButtonGroup.classList.remove('hidden');
-        // Ensure preview is updated if switching back to edit after viewing
-        if (typeof marked !== 'undefined') {
-             notesPreview.innerHTML = marked.parse(notesTextarea.value); // Read from DOM for immediate preview update
-        } else {
-             notesPreview.textContent = notesTextarea.value; // Read from DOM
+        
+        _currentNoteH1Sections = []; // Clear H1 sections when going to edit mode
+        notesPreview.classList.remove('prose', 'prose-sm', 'max-w-none'); // Remove prose if added
+        if (document.getElementById('note-h1-tabs-container')) { // Clear H1 tabs if they exist
+            notesPreview.innerHTML = '';
         }
+
+
         // --- NEW: Trigger auto-resize after switching to edit mode ---
         autoResizeTextarea(notesTextarea);
         // -------------------------------------------------------------
+        // Ensure TOC is updated for edit mode (based on full content)
+        generateAndRenderToc(state.noteContent || '');
     } else { // state.currentNoteMode === 'view'
         notesTextarea.classList.add('hidden');
         notesPreview.classList.remove('hidden');
@@ -1612,21 +1699,8 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
         notesMicButtonGroup.classList.add('hidden');
         editNoteButton.classList.remove('active');
         viewNoteButton.classList.add('active');
-        // Render markdown and make headings collapsible in the preview area
-        notesPreview.innerHTML = ''; // Clear previous content
-        if (typeof marked !== 'undefined') {
-             // Use the custom renderer from config.js
-             const rawHtml = marked.parse(state.noteContent || '', { renderer: markedRenderer });
-             const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
-             notesPreview.appendChild(collapsibleFragment); // Append the processed fragment
-             // Apply prose styles to the container if desired
-             notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
-             // --- Process Draw.io diagrams AFTER adding HTML using the robust checker ---
-             waitForGraphViewerAndProcess();
-             // -------------------------------------------------------------------------
-        } else {
-             notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
-        }
+        // The call to updateNotesPreview() will handle rendering tabs or full content
+        updateNotesPreview(); // This will now build tabs if needed
     }
 }
 
@@ -1647,33 +1721,116 @@ export function updateNotesPreview() {
 
     if (state.currentNoteMode === 'view') { // Read from state
         notesPreview.innerHTML = ''; // Clear previous content
-        if (typeof marked !== 'undefined') {
-            // Use the custom renderer from config.js
-            const rawHtml = marked.parse(state.noteContent || '', { renderer: markedRenderer });
-            const collapsibleFragment = makeHeadingsCollapsible(rawHtml); // Keep collapsible headings
-            notesPreview.appendChild(collapsibleFragment);
-            // Apply prose styles
-            notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
-            // --- Process Draw.io diagrams AFTER adding HTML using the robust checker ---
-            waitForGraphViewerAndProcess();
-            // -------------------------------------------------------------------------
+        notesPreview.classList.remove('prose', 'prose-sm', 'max-w-none'); // Remove general prose if tabs are used
+
+        _currentNoteH1Sections = _parseNoteIntoH1Sections(state.noteContent || '');
+
+        if (_currentNoteH1Sections.length > 1 && !_currentNoteH1Sections.every(s => s.isOnlySection)) {
+            // Create and render H1 tabs
+            const tabsContainer = document.createElement('div');
+            tabsContainer.id = 'note-h1-tabs-container';
+            tabsContainer.className = 'note-h1-tabs'; // For styling
+
+            _currentNoteH1Sections.forEach((section, index) => {
+                const tabButton = document.createElement('button');
+                tabButton.className = 'note-h1-tab';
+                tabButton.textContent = section.title || `Section ${index + 1}`;
+                tabButton.dataset.sectionIndex = index;
+                if (index === state.currentNoteActiveH1SectionIndex) {
+                    tabButton.classList.add('active');
+                }
+                tabButton.addEventListener('click', () => {
+                    state.setCurrentNoteActiveH1SectionIndex(index);
+                    // The state change handler will call _renderActiveH1SectionUI
+                });
+                tabsContainer.appendChild(tabButton);
+            });
+            notesPreview.appendChild(tabsContainer);
+
+            const contentContainer = document.createElement('div');
+            contentContainer.id = 'note-h1-content-container';
+            // Apply prose styles directly to the content container for H1 sections
+            contentContainer.className = 'note-h1-content prose prose-sm max-w-none';
+            notesPreview.appendChild(contentContainer);
+
+            // Render the active section (triggered by state change or initial load)
+            _renderActiveH1SectionUI();
+
         } else {
-            notesPreview.textContent = state.noteContent || ''; // Read from state (fallback)
+            // Single section or no H1s (or only pre-H1 content), render as before
+            if (typeof marked !== 'undefined') {
+                const rawHtml = marked.parse(state.noteContent || '', { renderer: markedRenderer });
+                const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
+                notesPreview.appendChild(collapsibleFragment);
+                notesPreview.classList.add('prose', 'prose-sm', 'max-w-none'); // Add prose for single view
+                waitForGraphViewerAndProcess();
+                generateAndRenderToc(state.noteContent || ''); // TOC for the whole note
+            } else {
+                notesPreview.textContent = state.noteContent || '';
+            }
         }
     }
     // If in edit mode, the textarea is visible.
     // The preview is updated when switching TO view mode by setNoteMode.
 
-    // --- NEW: Regenerate and render TOC when note content changes ---
-    // Use debounce to avoid excessive updates while typing
-    const debouncedUpdateToc = debounce(() => {
-        if (state.currentTab === 'notes') {
-            generateAndRenderToc();
-        }
-    }, 300); // Adjust debounce delay as needed (e.g., 300ms)
-    debouncedUpdateToc();
-    // -------------------------------------------------------------
+    // TOC update for edit mode or single-section view mode
+    if (state.currentNoteMode === 'edit' || (_currentNoteH1Sections.length <= 1 && state.currentNoteMode === 'view') || (_currentNoteH1Sections.every(s => s.isOnlySection) && state.currentNoteMode === 'view') ) {
+        const debouncedUpdateToc = debounce(() => {
+            if (state.currentTab === 'notes') {
+                generateAndRenderToc(state.noteContent || ''); // Pass full content
+            }
+        }, 300);
+        debouncedUpdateToc();
+    }
 }
+
+
+// --- NEW: Render Active H1 Section UI ---
+function _renderActiveH1SectionUI() {
+    if (state.currentNoteMode !== 'view' || _currentNoteH1Sections.length <= 1 || _currentNoteH1Sections.every(s => s.isOnlySection)) {
+        // Not in view mode or not using H1 tabs, so do nothing here.
+        return;
+    }
+
+    const activeIndex = state.currentNoteActiveH1SectionIndex;
+    const section = _currentNoteH1Sections[activeIndex];
+
+    if (!section) {
+        console.warn(`[UI] _renderActiveH1SectionUI: No section found for index ${activeIndex}`);
+        return;
+    }
+
+    const contentContainer = document.getElementById('note-h1-content-container');
+    if (!contentContainer) {
+        console.warn(`[UI] _renderActiveH1SectionUI: Content container not found.`);
+        return;
+    }
+
+    contentContainer.innerHTML = ''; // Clear previous section content
+
+    if (typeof marked !== 'undefined') {
+        const rawHtml = marked.parse(section.rawMarkdownContent || '', { renderer: markedRenderer });
+        const collapsibleFragment = makeHeadingsCollapsible(rawHtml); // Process H2-H6 within this section
+        contentContainer.appendChild(collapsibleFragment);
+        // Prose styles are on contentContainer already
+        waitForGraphViewerAndProcess();
+        generateAndRenderToc(section.rawMarkdownContent || ''); // TOC for the current H1 section
+    } else {
+        contentContainer.textContent = section.rawMarkdownContent || '';
+    }
+
+    // Update active tab styling
+    const tabsContainer = document.getElementById('note-h1-tabs-container');
+    if (tabsContainer) {
+        tabsContainer.querySelectorAll('.note-h1-tab').forEach(tab => {
+            tab.classList.remove('active');
+            if (parseInt(tab.dataset.sectionIndex) === activeIndex) {
+                tab.classList.add('active');
+            }
+        });
+    }
+}
+// --- End Render Active H1 Section UI ---
 
 /**
  * Renders the note history list from the state.
@@ -2069,10 +2226,10 @@ export function handleStateChange_isPluginsCollapsed() {
 
 /**
  * Generates a Table of Contents data structure from the current note's markdown content.
+ * @param {string} markdown - The markdown content to parse for TOC.
  * @returns {Array<Object>} An array of TOC entries { level, text, targetId }.
  */
-function generateTocData() {
-    const markdown = state.noteContent;
+function generateTocData(markdown) { // Accept markdown as parameter
     if (!markdown) return [];
 
     const toc = [];
@@ -2127,9 +2284,11 @@ function renderTableOfContents(tocData) {
 }
 
 /** Generates and renders the TOC based on current note content */
-export function generateAndRenderToc() { // Export this function
+export function generateAndRenderToc(customMarkdownContent = null) { // Export this function and accept custom content
     if (state.currentTab === 'notes') {
-        const tocData = generateTocData();
+        // Use customMarkdownContent if provided (for H1 sections), otherwise use full note content
+        const markdownToParse = customMarkdownContent !== null ? customMarkdownContent : (state.noteContent || '');
+        const tocData = generateTocData(markdownToParse); // Pass content to generateTocData
         renderTableOfContents(tocData);
     }
 }
@@ -2175,6 +2334,14 @@ export function handleStateChange_isNotesTocCollapsed() {
     setNotesTocCollapsedUI(state.isNotesTocCollapsed); // Update UI based on state
 }
 // ----------------------------------------------------
+
+// --- NEW: State Change Handler for Active H1 Section Index ---
+export function handleStateChange_currentNoteActiveH1SectionIndex() {
+    if (state.currentTab === 'notes' && state.currentNoteMode === 'view' && _currentNoteH1Sections.length > 1 && !_currentNoteH1Sections.every(s => s.isOnlySection)) {
+        _renderActiveH1SectionUI();
+    }
+}
+// -----------------------------------------------------------
 
 
 // --- NEW: Reusable Textarea Auto-Resize Function ---
