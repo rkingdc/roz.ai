@@ -1603,10 +1603,8 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
         notesMicButtonGroup.classList.remove('hidden');
         
         _currentNoteH1Sections = []; // Clear H1 sections when going to edit mode
+        notesPreview.innerHTML = ''; // Always clear preview content when switching to edit
         notesPreview.classList.remove('prose', 'prose-sm', 'max-w-none'); // Remove prose if added
-        if (document.getElementById('note-h1-tabs-container')) { // Clear H1 tabs if they exist
-            notesPreview.innerHTML = '';
-        }
 
 
         // --- NEW: Trigger auto-resize after switching to edit mode ---
@@ -1727,7 +1725,8 @@ export function updateNotesPreview() {
 
         _currentNoteH1Sections = _parseNoteIntoH1Sections(state.noteContent || '');
 
-        if (_currentNoteH1Sections.length > 1 && !_currentNoteH1Sections.every(s => s.isOnlySection)) {
+        // Simplified condition: Show tabs if there's more than one section.
+        if (_currentNoteH1Sections.length > 1) {
             // Create and render H1 tabs
             const tabsContainer = document.createElement('div');
             tabsContainer.id = 'note-h1-tabs-container';
