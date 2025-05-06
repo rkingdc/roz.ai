@@ -1629,7 +1629,7 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
 // --- Helper to Parse Note into H1 Sections ---
 function _parseNoteIntoH1Sections(markdown) {
     if (!markdown || markdown.trim() === '') {
-        return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
+        return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true, isFallback: true }];
     }
 
     const tokens = marked.lexer(markdown);
@@ -1641,7 +1641,7 @@ function _parseNoteIntoH1Sections(markdown) {
     const firstH1TokenIndex = tokens.findIndex(token => token.type === 'heading' && token.depth === 1);
 
     if (firstH1TokenIndex === -1) { // No H1 headings at all
-        return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
+        return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true, isFallback: true }];
     }
 
     if (firstH1TokenIndex > 0) {
@@ -1686,19 +1686,18 @@ function _parseNoteIntoH1Sections(markdown) {
     // If, after all processing, no sections were created (e.g. only whitespace H1s)
     // or only pre-H1 content was found but no actual H1s, treat the whole note as one section.
     if (sections.length === 0 && markdown.trim().length > 0) {
-        return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
+        return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true, isFallback: true }];
     }
     
+    // Mark sections as not fallback if they were generated from H1s
+    sections.forEach(s => s.isFallback = false);
+
     if (sections.length === 1 && !sections[0].isPreH1Content) { // If only one actual H1 section (not pre-H1)
-        sections[0].isOnlySection = true;
+        sections[0].isOnlySection = true; 
     } else if (sections.length > 0) {
         // Mark all sections as not the only one if there are multiple
         sections.forEach(s => s.isOnlySection = false);
-        // If there's only pre-H1 content and no actual H1s, it should have been caught by the (sections.length === 0) check.
-        // If there's pre-H1 and one H1, they are two sections.
-        // If there's pre-H1 and multiple H1s, they are multiple sections.
     }
-
 
     return sections;
 }
@@ -1724,9 +1723,9 @@ export function updateNotesPreview() {
         notesPreview.classList.remove('prose', 'prose-sm', 'max-w-none'); // Remove general prose if tabs are used
 
         _currentNoteH1Sections = _parseNoteIntoH1Sections(state.noteContent || '');
+        const showTabs = _currentNoteH1Sections.length > 0 && !(_currentNoteH1Sections.length === 1 && _currentNoteH1Sections[0].isFallback === true);
 
-        // Simplified condition: Show tabs if there's more than one section.
-        if (_currentNoteH1Sections.length > 1) {
+        if (showTabs) {
             // Create and render H1 tabs
             const tabsContainer = document.createElement('div');
             tabsContainer.id = 'note-h1-tabs-container';
@@ -1758,11 +1757,13 @@ export function updateNotesPreview() {
             _renderActiveH1SectionUI();
 
         } else {
-            // Single section or no H1s (or only pre-H1 content), render as before
+            // No "real" H1s found, or note is empty. Render full content as a single block.
             if (typeof marked !== 'undefined') {
                 const rawHtml = marked.parse(state.noteContent || '', { renderer: markedRenderer });
-                const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
-                notesPreview.appendChild(collapsibleFragment);
+                // TEST: Directly insert rawHTML to see if content appears, bypassing makeHeadingsCollapsible
+                notesPreview.innerHTML = rawHtml;
+                // const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
+                // notesPreview.appendChild(collapsibleFragment);
                 notesPreview.classList.add('prose', 'prose-sm', 'max-w-none'); // Add prose for single view
                 waitForGraphViewerAndProcess();
                 generateAndRenderToc(state.noteContent || ''); // TOC for the whole note
@@ -1774,11 +1775,11 @@ export function updateNotesPreview() {
     // If in edit mode, the textarea is visible.
     // The preview is updated when switching TO view mode by setNoteMode.
 
-    // TOC update for edit mode or single-section view mode
-    if (state.currentNoteMode === 'edit' || (_currentNoteH1Sections.length <= 1 && state.currentNoteMode === 'view') || (_currentNoteH1Sections.every(s => s.isOnlySection) && state.currentNoteMode === 'view') ) {
+    // TOC update for edit mode or if tabs are not shown in view mode
+    if (state.currentNoteMode === 'edit' || (state.currentNoteMode === 'view' && !showTabs)) {
         const debouncedUpdateToc = debounce(() => {
             if (state.currentTab === 'notes') {
-                generateAndRenderToc(state.noteContent || ''); // Pass full content
+                generateAndRenderToc(state.noteContent || ''); // Pass full content for TOC
             }
         }, 300);
         debouncedUpdateToc();
@@ -1788,8 +1789,9 @@ export function updateNotesPreview() {
 
 // --- NEW: Render Active H1 Section UI ---
 function _renderActiveH1SectionUI() {
-    if (state.currentNoteMode !== 'view' || _currentNoteH1Sections.length <= 1 || _currentNoteH1Sections.every(s => s.isOnlySection)) {
-        // Not in view mode or not using H1 tabs, so do nothing here.
+    const showTabs = _currentNoteH1Sections.length > 0 && !(_currentNoteH1Sections.length === 1 && _currentNoteH1Sections[0].isFallback === true);
+    if (state.currentNoteMode !== 'view' || !showTabs) {
+        // Not in view mode or tabs are not being shown for this note.
         return;
     }
 
