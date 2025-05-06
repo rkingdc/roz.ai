@@ -782,83 +782,6 @@ export function renderNoteContent() {
     }
 
 
-    // --- Helper to Parse Note into H1 Sections ---
-    function _parseNoteIntoH1Sections(markdown) {
-        if (!markdown || markdown.trim() === '') {
-            return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
-        }
-
-        const tokens = marked.lexer(markdown);
-        const sections = [];
-        let currentSectionTokens = [];
-        let currentH1Title = null;
-
-        // Handle content before the very first H1 heading
-        const firstH1TokenIndex = tokens.findIndex(token => token.type === 'heading' && token.depth === 1);
-
-        if (firstH1TokenIndex === -1) { // No H1 headings at all
-            return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
-        }
-
-        if (firstH1TokenIndex > 0) {
-            const preH1ContentTokens = tokens.slice(0, firstH1TokenIndex);
-            if (preH1ContentTokens.some(t => t.raw.trim() !== '')) {
-                 sections.push({
-                    title: "Overview", // Default title for content before the first H1
-                    rawMarkdownContent: preH1ContentTokens.map(t => t.raw).join(''),
-                    isPreH1Content: true
-                });
-            }
-        }
-
-        // Process from the first H1 onwards
-        const processTokens = tokens.slice(firstH1TokenIndex);
-
-        processTokens.forEach(token => {
-            if (token.type === 'heading' && token.depth === 1) {
-                if (currentSectionTokens.length > 0 && currentH1Title) {
-                    // Save the previous H1 section
-                    sections.push({
-                        title: currentH1Title,
-                        rawMarkdownContent: currentSectionTokens.map(t => t.raw).join('')
-                    });
-                }
-                // Start new section
-                currentH1Title = token.text;
-                currentSectionTokens = [token]; // Start with the H1 token itself
-            } else if (currentH1Title) { // Only add to section if an H1 has been encountered for this section
-                currentSectionTokens.push(token);
-            }
-        });
-
-        // Add the last processed H1 section
-        if (currentSectionTokens.length > 0 && currentH1Title) {
-            sections.push({
-                title: currentH1Title,
-                rawMarkdownContent: currentSectionTokens.map(t => t.raw).join('')
-            });
-        }
-    
-        // If, after all processing, no sections were created (e.g. only whitespace H1s)
-        // or only pre-H1 content was found but no actual H1s, treat the whole note as one section.
-        if (sections.length === 0 && markdown.trim().length > 0) {
-            return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
-        }
-    
-        if (sections.length === 1 && !sections[0].isPreH1Content) { // If only one actual H1 section (not pre-H1)
-            sections[0].isOnlySection = true;
-        } else if (sections.length > 0) {
-            // Mark all sections as not the only one if there are multiple
-            sections.forEach(s => s.isOnlySection = false);
-            // If there's only pre-H1 content and no actual H1s, it should have been caught by the (sections.length === 0) check.
-            // If there's pre-H1 and one H1, they are two sections.
-            // If there's pre-H1 and multiple H1s, they are multiple sections.
-        }
-
-
-        return sections;
-    }
-    // --- End Helper ---
     if (notesPreview) {
         // Update preview based on current mode and content
         updateNotesPreview(); // This function already reads from state and renders preview
@@ -1703,6 +1626,85 @@ export function setNoteMode(mode) { // Made synchronous, state is already update
         updateNotesPreview(); // This will now build tabs if needed
     }
 }
+
+
+// --- Helper to Parse Note into H1 Sections ---
+function _parseNoteIntoH1Sections(markdown) {
+    if (!markdown || markdown.trim() === '') {
+        return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
+    }
+
+    const tokens = marked.lexer(markdown);
+    const sections = [];
+    let currentSectionTokens = [];
+    let currentH1Title = null;
+
+    // Handle content before the very first H1 heading
+    const firstH1TokenIndex = tokens.findIndex(token => token.type === 'heading' && token.depth === 1);
+
+    if (firstH1TokenIndex === -1) { // No H1 headings at all
+        return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
+    }
+
+    if (firstH1TokenIndex > 0) {
+        const preH1ContentTokens = tokens.slice(0, firstH1TokenIndex);
+        if (preH1ContentTokens.some(t => t.raw.trim() !== '')) {
+             sections.push({
+                title: "Overview", // Default title for content before the first H1
+                rawMarkdownContent: preH1ContentTokens.map(t => t.raw).join(''),
+                isPreH1Content: true
+            });
+        }
+    }
+
+    // Process from the first H1 onwards
+    const processTokens = tokens.slice(firstH1TokenIndex);
+
+    processTokens.forEach(token => {
+        if (token.type === 'heading' && token.depth === 1) {
+            if (currentSectionTokens.length > 0 && currentH1Title) {
+                // Save the previous H1 section
+                sections.push({
+                    title: currentH1Title,
+                    rawMarkdownContent: currentSectionTokens.map(t => t.raw).join('')
+                });
+            }
+            // Start new section
+            currentH1Title = token.text;
+            currentSectionTokens = [token]; // Start with the H1 token itself
+        } else if (currentH1Title) { // Only add to section if an H1 has been encountered for this section
+            currentSectionTokens.push(token);
+        }
+    });
+
+    // Add the last processed H1 section
+    if (currentSectionTokens.length > 0 && currentH1Title) {
+        sections.push({
+            title: currentH1Title,
+            rawMarkdownContent: currentSectionTokens.map(t => t.raw).join('')
+        });
+    }
+    
+    // If, after all processing, no sections were created (e.g. only whitespace H1s)
+    // or only pre-H1 content was found but no actual H1s, treat the whole note as one section.
+    if (sections.length === 0 && markdown.trim().length > 0) {
+        return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true }];
+    }
+    
+    if (sections.length === 1 && !sections[0].isPreH1Content) { // If only one actual H1 section (not pre-H1)
+        sections[0].isOnlySection = true;
+    } else if (sections.length > 0) {
+        // Mark all sections as not the only one if there are multiple
+        sections.forEach(s => s.isOnlySection = false);
+        // If there's only pre-H1 content and no actual H1s, it should have been caught by the (sections.length === 0) check.
+        // If there's pre-H1 and one H1, they are two sections.
+        // If there's pre-H1 and multiple H1s, they are multiple sections.
+    }
+
+
+    return sections;
+}
+// --- End Helper ---
 
 /**
  * Updates the notes preview area by rendering the markdown from the state.
