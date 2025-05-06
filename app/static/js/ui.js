@@ -1711,6 +1711,8 @@ export function updateNotesPreview() {
     // Add null checks for individual elements
     if (!notesTextarea || !notesPreview) return;
 
+    let showTabs = false; // Declare showTabs here and initialize
+
     // This function is typically called when the textarea content changes (via event listener)
     // or when the mode switches to 'view'.
     // It should read the *current* content from the textarea for immediate feedback in edit mode,
@@ -1723,7 +1725,8 @@ export function updateNotesPreview() {
         notesPreview.classList.remove('prose', 'prose-sm', 'max-w-none'); // Remove general prose if tabs are used
 
         _currentNoteH1Sections = _parseNoteIntoH1Sections(state.noteContent || '');
-        const showTabs = _currentNoteH1Sections.length > 0 && !(_currentNoteH1Sections.length === 1 && _currentNoteH1Sections[0].isFallback === true);
+        // Calculate and assign the actual value to showTabs if in view mode
+        showTabs = _currentNoteH1Sections.length > 0 && !(_currentNoteH1Sections.length === 1 && _currentNoteH1Sections[0].isFallback === true);
 
         if (showTabs) {
             // Create and render H1 tabs
