@@ -2035,8 +2035,12 @@ export function handleStateChange_currentNote() { // Called when currentNoteId, 
 // --- NEW: State Change Handler for Note Content (to update TOC) ---
 export function handleStateChange_noteContent() {
     // This is called when the note content state changes (e.g., loading a note, typing in textarea)
-    renderNoteContent(); // Update textarea/preview
-    // TOC update is handled within renderNoteContent via debounced call
+    renderNoteContent(); // Update textarea.
+    if (state.currentTab === 'notes' && state.currentNoteMode === 'view') {
+        updateNotesPreview(); // Re-evaluate for H1 tabs if content changes in view mode
+    } else if (state.currentTab === 'notes' && state.currentNoteMode === 'edit') {
+        // For edit mode, TOC updates based on textarea content (already handled by renderNoteContent -> updateNotesPreview -> debounced TOC)
+    }
 }
 // -----------------------------------------------------------------
 
