@@ -210,7 +210,7 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         try:
             # Use google.api_core.exceptions.TimeoutError if needed, but standard TimeoutError should work
             from concurrent.futures import TimeoutError
-            response = operation.result(timeout=900)
+            response = operation.result(timeout=1800)
             logger.info("Long-running transcription operation finished.")
         except TimeoutError:
             logger.error("Timeout waiting for long-running transcription operation to complete.")

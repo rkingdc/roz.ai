@@ -1996,7 +1996,7 @@ def clean_up_transcript(raw_transcript: str) -> str:
 
     # Determine model (use default or a specific one for cleaning if configured)
     raw_model_name = current_app.config.get(
-        "SUMMARY_MODEL", current_app.config["DEFAULT_MODEL"]
+        "DEFAULT_MODEL", 
     )
     model_to_use = (
         f"models/{raw_model_name}"
@@ -2005,25 +2005,34 @@ def clean_up_transcript(raw_transcript: str) -> str:
     )
 
     prompt = f"""
-    You are a skilled technical writer whose role is to format audio transcriptions into well-structured Markdown documents while preserving *as much detail as possible*. Your focus is on formatting, *not summarizing unless absolutely necessary*.
+    ---
+    You are a skilled technical writer whose role is to reformat audio transcription streams into well-structured transcripts.
 
-*   **Headings:** Identify all distinct topics and subtopics in the transcript and create corresponding headings and subheadings (using #, ##, ###, etc.). Headings should be descriptive but concise.
+    The transcript may contain multiple speakers. Do not try to guess who is speaking. Only notate the speaker when it is clear from context who is speaking. Otherwise use **Unknown:**. If it is likely a speaker but you lack full confidence, use **Unknown(possibly <speaker>)**:
 
-*   **Bullet Points (Detailed):** Extract key points, examples, arguments, and supporting details and represent them as bullet points (* or -). *Each bullet point should contain enough information to be understood independently.* Avoid overly concise summaries that lose important nuances.
+===Example_Format
 
-*   **Numbered Lists:** Accurately format all numbered lists, steps, or sequences from the transcript as numbered lists (1., 2., 3., etc.). Do not omit steps or details.
+**Unknown(possible Roz):** Ok, let's get this meeting started. Jane is everyone here?
 
-*   **Order Preservation:** Maintain the original order of topics, bullet points, and numbered list items as closely as possible. Only reorder if the original order is demonstrably illogical.
+**Jane:** Yes, I think we have quorum. Roz do you want to kick us off?
 
-*   **Limited Filler Removal:** Remove filler words (um, uh, okay, you know, etc.) *only if their removal does not alter the meaning or clarity of the sentence*. In some cases, these words may convey emphasis or tone, which should be preserved.
+**Roz:** Yes. Ok sales are up this quarter...
 
-*   **Verbatim Phrases (When Appropriate):** If a particular phrase or sentence is especially well-articulated or insightful, consider including it verbatim (within quotation marks) as a bullet point or within the text.
+===
+ **Additional Instructions**:
+Some keywords and nouns that are commonly used but missidentified by the transcription software
+People: Roz(not Ross), Nikhil, Sagar, Vijay, Haritha, Vikas, Ajay, Shridar, Vipin
+Companies: LakeFusion, Newmark, Dun & Bradstreet, Databricks, Frisco Analytics
+Technical Terms: DUNS or DUNS Number, match, enrich, kubectl
+    
+Make replacements where appropriate.
 
-*   **Markdown Output Only:** Provide the complete Markdown document as the sole output.
+Reply only with the reformatted transcript. Include an empty line break between each speaker's text. 
+---
 
-Here is the transcribed speech:
-    {raw_transcript}
-    """
+The raw transcript:{raw_transcript}
+The reformatted transcript:
+"""
 
     logger.info(f"Attempting transcript cleanup using model '{model_to_use}'...")
     response = None
@@ -2573,160 +2582,3 @@ def generate_text(
     )
     return "[AI Error: API rate limit exceeded after maximum retries.]"
 
-
-# --- Helper Function to Clean Up Temporary Files ---
-def _cleanup_temp_files(temp_files: list, context_msg: str):
-    """Safely removes a list of temporary files."""
-    if temp_files:
-        logger.info(
-            f"Cleaning up {len(temp_files)} temporary files for {context_msg}..."
-        )
-        for temp_path in temp_files:
-            try:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-                    logger.debug(f"Removed temp file: {temp_path}")
-                else:
-                    logger.debug(f"Temp file not found, already removed? {temp_path}")
-            except OSError as e:
-                logger.warning(f"Error removing temp file {temp_path}: {e}")
-        logger.info(f"Finished cleaning temp files for {context_msg}.")
-
-
-# --- Transcript Cleaning ---
-def clean_up_transcript(raw_transcript: str) -> str:
-    """
-    Uses an LLM to clean up a raw transcript, removing filler words, etc.
-    Falls back to the original transcript if cleaning fails.
-    """
-    logger.info("Entering clean_up_transcript.")
-
-    if not raw_transcript or raw_transcript.isspace():
-        logger.warning("clean_up_transcript received empty input.")
-        return ""  # Return empty if input is empty
-
-    # --- AI Readiness Check ---
-    try:
-        try:
-            _ = current_app.config
-            logger.debug("clean_up_transcript: Flask request context is active.")
-        except RuntimeError:
-            logger.error(
-                "clean_up_transcript called outside active Flask context.",
-                exc_info=True,
-            )
-            return raw_transcript  # Fallback
-
-        api_key = current_app.config.get("API_KEY")
-        if not api_key:
-            logger.error("API_KEY missing for clean_up_transcript.")
-            return raw_transcript  # Fallback
-
-        try:
-            if "genai_client" not in g:
-                logger.info("Creating new genai.Client for clean_up_transcript.")
-                g.genai_client = genai.Client(api_key=api_key)
-            else:
-                logger.debug("Using cached genai.Client for clean_up_transcript.")
-            client = g.genai_client
-        except (GoogleAPIError, ClientError, ValueError, Exception) as e:
-            logger.error(f"Failed to get genai.Client for cleanup: {e}", exc_info=True)
-            return raw_transcript  # Fallback
-
-    except Exception as e:
-        logger.error(
-            f"Unexpected error during readiness check for cleanup: {e}", exc_info=True
-        )
-        return raw_transcript  # Fallback
-    # --- End AI Readiness Check ---
-
-    # Determine model (use default or a specific one for cleaning if configured)
-    raw_model_name = current_app.config.get(
-        "SUMMARY_MODEL", current_app.config["DEFAULT_MODEL"]
-    )
-    model_to_use = (
-        f"models/{raw_model_name}"
-        if not raw_model_name.startswith("models/")
-        else raw_model_name
-    )
-
-    prompt = f"""
-    You are a skilled technical writer whose role is to format audio transcriptions into well-structured Markdown documents while preserving *as much detail as possible*. Your focus is on formatting, *not summarizing unless absolutely necessary*.
-
-*   **Headings:** Identify all distinct topics and subtopics in the transcript and create corresponding headings and subheadings (using #, ##, ###, etc.). Headings should be descriptive but concise.
-
-*   **Bullet Points (Detailed):** Extract key points, examples, arguments, and supporting details and represent them as bullet points (* or -). *Each bullet point should contain enough information to be understood independently.* Avoid overly concise summaries that lose important nuances.
-
-*   **Numbered Lists:** Accurately format all numbered lists, steps, or sequences from the transcript as numbered lists (1., 2., 3., etc.). Do not omit steps or details.
-
-*   **Order Preservation:** Maintain the original order of topics, bullet points, and numbered list items as closely as possible. Only reorder if the original order is demonstrably illogical.
-
-*   **Limited Filler Removal:** Remove filler words (um, uh, okay, you know, etc.) *only if their removal does not alter the meaning or clarity of the sentence*. In some cases, these words may convey emphasis or tone, which should be preserved.
-
-*   **Verbatim Phrases (When Appropriate):** If a particular phrase or sentence is especially well-articulated or insightful, consider including it verbatim (within quotation marks) as a bullet point or within the text.
-
-*   **Markdown Output Only:** Provide the complete Markdown document as the sole output.
-
-Here is the transcribed speech:
-    {raw_transcript}
-    """
-
-    logger.info(f"Attempting transcript cleanup using model '{model_to_use}'...")
-    response = None
-    try:
-        # Use non-streaming generation for cleanup
-        response = client.models.generate_content(
-            model=model_to_use,
-            contents=prompt,
-        )
-
-        # Process response
-        if response.prompt_feedback and response.prompt_feedback.block_reason:
-            reason = response.prompt_feedback.block_reason.name
-            logger.warning(
-                f"Text generation blocked by safety settings. Reason: {reason}"
-            )
-            return f"[Error: Text generation blocked due to safety settings (Reason: {reason})]"
-
-        if (
-            response.candidates
-            and hasattr(response.candidates[0], "content")
-            and hasattr(response.candidates[0].content, "parts")
-            and response.candidates[0].content.parts
-        ):
-            text_reply = "".join(
-                part.text
-                for part in response.candidates[0].content.parts
-                if hasattr(part, "text")
-            )
-            if text_reply.strip():
-                return text_reply
-            else:
-                logger.warning("Text generation resulted in empty text content.")
-                return "[System Note: AI generated empty text.]"
-        else:
-            logger.warning(
-                f"Text generation did not produce usable content. Response: {response!r}"
-            )
-            finish_reason = "UNKNOWN"
-            if response.candidates and hasattr(response.candidates[0], "finish_reason"):
-                finish_reason = response.candidates[0].finish_reason.name
-            return f"[Error: AI did not generate text content (Finish Reason: {finish_reason})]"
-
-    except InvalidArgument as e:
-        logger.error(
-            f"InvalidArgument error during text generation: {e}.", exc_info=True
-        )
-        return f"[AI Error: Invalid argument ({type(e).__name__}).]"
-    except NotFound:
-        return f"[Error: Model '{model_to_use}' not found]"
-    except GoogleAPIError as e:
-        # Simplified error handling for this example
-        logger.error(f"API error during text generation: {e}")
-        if "api key not valid" in str(e).lower():
-            return "[Error: Invalid Gemini API Key]"
-        # Add other common checks if needed (quota, etc.)
-        return f"[AI API Error: {type(e).__name__}]"
-    except Exception as e:
-        logger.error(f"Unexpected error during text generation: {e}", exc_info=True)
-        return f"[Unexpected AI Error: {type(e).__name__}]"
