@@ -50,7 +50,7 @@ class Config:
     # Define allowed extensions for frontend validation and potential backend checks
     ALLOWED_EXTENSIONS = {
         "txt","tf",
-        "py",
+        "py",'ipynb',
         "js",
         "html",
         "css",

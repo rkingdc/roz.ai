@@ -268,7 +268,7 @@ def generate_summary(file_id):
 
     content_parts = []  # Renamed from 'parts' to avoid confusion with genai.types.Part
     temp_file_to_clean = None
-    prompt = f"Please provide a concise summary of the attached file named '{filename}'. Focus on the main points and key information."
+    prompt = f"Please provide a detailed summary of the attached file named '{filename}'."
     response = None  # Initialize response to None
 
     try:
@@ -2147,7 +2147,7 @@ def generate_note_diff_summary(version_1_content: str, version_2_content: str) -
         else raw_model_name
     )
 
-    prompt = f"""Provide a concise summary of the changes made in Version 2 of the note below, compared to Version 1. Focus on the key differences.
+    prompt = f"""Provide a concise summary of the changes made in Version 2 of the note below, compared to Version 1. Focus on the key differences. Keep the summary terse and aim to use less than 15  words.
 
 Version 1:
 {version_1_content}
