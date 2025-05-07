@@ -111,7 +111,6 @@ function initializeSocketListeners() {
         }
         state.setIsSocketConnected(false);
         state.setIsRecording(false); // Stop recording state if disconnected
-        // state.setStreamingTranscript(""); // Clear transcript state if needed
         socket = null; // Nullify on disconnect
         permanentListenersAttached = false; // Reset flag
     });
@@ -130,19 +129,16 @@ function initializeSocketListeners() {
     });
 
     // --- Chat/Task Listeners (Permanent) ---
-    socket.on('prompt_improved', handlePromptImproved); // Add listener for improved prompt
+    socket.on('prompt_improved', handlePromptImproved);
     socket.on('task_started', (data) => {
         console.log("Backend task started:", data.message);
-        // Loading state is usually set when the task is initiated by the client
-        // We might update the status message here if provided
         if (data.message) {
-            setStatus(data.message); // Update status without setting loading=true
+            setStatus(data.message);
         }
     });
 
     socket.on('status_update', (data) => {
         console.log("Backend status update:", data.message);
-        // Update status message, keep loading=true
         if (data.message) {
             setStatus(data.message);
         }
@@ -151,161 +147,116 @@ function initializeSocketListeners() {
     socket.on('chat_response', (data) => {
         console.log("Received non-streaming chat response:", data.reply);
         if (data.reply !== undefined) {
-            state.addMessageToHistory({ role: 'assistant', content: data.reply });
+            // Assuming backend might send attachments with non-streaming responses too
+            state.addMessageToHistory({
+                role: 'assistant',
+                content: data.reply,
+                attachments: data.attachments || [] // Expect attachments from backend
+            });
             setStatus("Assistant replied.");
-            loadSavedChats(); // Reload chat list to update timestamp
+            loadSavedChats();
         } else {
             console.warn("Received 'chat_response' event with missing 'reply'.", data);
-            state.addMessageToHistory({ role: 'assistant', content: "[Error: Received empty response from server]", isError: true });
+            state.addMessageToHistory({ role: 'assistant', content: "[Error: Received empty response from server]", isError: true, attachments: [] });
             setStatus("Received empty response.", true);
         }
-        // Clear processing state if this response corresponds to the chat being processed
-        // Assuming the backend includes chat_id in the response or we infer it
-        // For now, assume any non-streaming response clears the processing state if one exists
-        if (state.processingChatId !== null) { // Check if any chat is processing
-             // TODO: Ideally, check if data contains the chat_id and matches state.processingChatId
+        if (state.processingChatId !== null) {
              console.log(`[DEBUG] chat_response received. Clearing processingChatId: ${state.processingChatId}`);
              state.setProcessingChatId(null);
         }
-        // setLoading(false); // Don't use global loading for chat processing
     });
 
     socket.on('stream_chunk', (data) => {
-        // console.debug("Received stream chunk:", data.chunk); // Verbose
         if (data.chunk !== undefined) {
-            // Check if the last message is from the user or if history is empty
             const lastMessage = state.chatHistory.length > 0 ? state.chatHistory[state.chatHistory.length - 1] : null;
-            if (!lastMessage || lastMessage.role === 'user') {
-                // If history is empty or last message is user, add a new assistant message first
+            if (!lastMessage || lastMessage.role === 'user' || (lastMessage.role === 'assistant' && lastMessage.isError)) { // Also add new if last was error
                 console.log("[DEBUG] stream_chunk: Adding initial assistant message placeholder.");
-                state.addMessageToHistory({ role: 'assistant', content: data.chunk }); // Add new message with the first chunk
+                // If backend sends attachments with the first chunk (unlikely but possible)
+                state.addMessageToHistory({ role: 'assistant', content: data.chunk, attachments: data.attachments || [] });
             } else {
-                // Otherwise, append to the existing assistant message
-                state.appendContentToLastMessage(data.chunk); // Append subsequent chunks
+                state.appendContentToLastMessage(data.chunk);
             }
-            // Status remains "Waiting for response..." or similar until stream_end
         }
     });
 
     socket.on('stream_end', (data) => {
         console.log("Received stream end signal:", data.message);
         setStatus("Assistant finished streaming.");
-        // Clear processing state if this response corresponds to the chat being processed
-        // Assuming the backend includes chat_id in the response or we infer it
-        // For now, assume any stream_end clears the processing state if one exists
-        if (state.processingChatId !== null) { // Check if any chat is processing
-             // TODO: Ideally, check if data contains the chat_id and matches state.processingChatId
+        if (state.processingChatId !== null) {
              console.log(`[DEBUG] stream_end received. Clearing processingChatId: ${state.processingChatId}`);
              state.setProcessingChatId(null);
         }
-        // setLoading(false); // Don't use global loading for chat processing
-        loadSavedChats(); // Reload chat list to update timestamp
+        loadSavedChats();
     });
 
     socket.on('deep_research_result', (data) => {
         console.log("Received deep research result.");
         if (data.report !== undefined) {
             const reportContent = `# Deep Research Report\n\n${data.report}`;
-            state.addMessageToHistory({ role: 'assistant', content: reportContent });
+            state.addMessageToHistory({ role: 'assistant', content: reportContent, attachments: [] });
             setStatus("Deep Research complete.");
-            loadSavedChats(); // Reload chat list to update timestamp
+            loadSavedChats();
         } else {
             console.warn("Received 'deep_research_result' event with missing 'report'.", data);
-            state.addMessageToHistory({ role: 'assistant', content: "[Error: Received empty report from server]", isError: true });
+            state.addMessageToHistory({ role: 'assistant', content: "[Error: Received empty report from server]", isError: true, attachments: [] });
             setStatus("Received empty report.", true);
         }
-        // Clear processing state if this response corresponds to the chat being processed
-        // Assuming the backend includes chat_id in the response or we infer it
-        // For now, assume any deep_research_result clears the processing state if one exists
-        if (state.processingChatId !== null) { // Check if any chat is processing
-             // TODO: Ideally, check if data contains the chat_id and matches state.processingChatId
+        if (state.processingChatId !== null) {
              console.log(`[DEBUG] deep_research_result received. Clearing processingChatId: ${state.processingChatId}`);
              state.setProcessingChatId(null);
         }
-        // setLoading(false); // Don't use global loading for chat processing
     });
 
     socket.on('task_error', (data) => {
         console.error("Received task error from backend:", data.error);
         const errorMessage = `[Error: ${data.error || 'Unknown error from server'}]`;
-        // Add error message to chat history
-        state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true });
+        state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true, attachments: [] });
         setStatus("Error processing request.", true);
-        // Clear processing state if this error corresponds to the chat being processed
-        // Assuming the backend includes chat_id in the error response or we infer it
-        // For now, assume any task_error clears the processing state if one exists
-        if (state.processingChatId !== null) { // Check if any chat is processing
-             // TODO: Ideally, check if data contains the chat_id and matches state.processingChatId
+        if (state.processingChatId !== null) {
              console.log(`[DEBUG] task_error received. Clearing processingChatId: ${state.processingChatId}`);
              state.setProcessingChatId(null);
         }
-        // setLoading(false); // Don't use global loading for chat processing
     });
 
-    // --- NEW: Listener for Cancellation Confirmation ---
     socket.on('generation_cancelled', (data) => {
         console.log("Backend confirmed generation cancelled:", data.message);
-        // Check if the cancelled chat is the one currently being processed
         if (data.chat_id && data.chat_id === state.processingChatId) {
             setStatus("Generation cancelled by user.");
-            state.setProcessingChatId(null); // Clear processing state
-            // Optionally add a system message to history?
-            // state.addMessageToHistory({ role: 'system', content: '[Generation Cancelled]' });
-            loadSavedChats(); // Reload chat list to update timestamp (optional)
+            state.setProcessingChatId(null);
+            loadSavedChats();
         } else {
             console.warn(`Received 'generation_cancelled' for chat ${data.chat_id}, but current processing chat is ${state.processingChatId}.`);
         }
-        // setLoading(false); // Don't use global loading
     });
 
     socket.on('cancel_request_received', (data) => {
-        // Optional: Provide immediate feedback that the request was received
         console.log("Backend acknowledged cancellation request:", data.message);
         setStatus("Cancellation requested...");
     });
-    // -------------------------------------------------
 
-
-    // --- Other Permanent Listeners (e.g., for transcription confirmation/errors) ---
-    // These might be less critical now if promise handles initial start, but keep for logging/robustness
     socket.on('transcription_started', (data) => {
-        // Usually handled by the promise in connectTranscriptionSocket for the *initial* start
         console.log("Backend confirmed transcription started (permanent listener).");
     });
 
     socket.on('transcription_error', (data) => {
-        // Catches errors *after* initial start, or general broadcast errors
         console.error("Transcription error from backend (permanent listener):", data.error);
         setStatus(`Transcription Error: ${data.error}`, true);
-        // Don't disconnect automatically
     });
 
     socket.on('transcription_complete', (data) => {
-        // Usually handled by the promise in stopAudioStream
         console.log("Backend confirmed transcription complete (permanent listener).");
     });
 
     socket.on('transcription_stop_acknowledged', (data) => {
-        // Usually handled by the promise in stopAudioStream
         console.log("Backend acknowledged stop signal (permanent listener).");
     });
 
-
-    permanentListenersAttached = true; // Set flag
+    permanentListenersAttached = true;
 }
 
-
-/**
- * Handles the 'prompt_improved' event from the server.
- * Updates the last user message in the chat history with the improved content.
- * @param {object} data - The event data.
- * @param {string} data.original - The original user message content.
- * @param {string} data.improved - The improved message content.
- */
 function handlePromptImproved({ original, improved }) {
     console.log(`[DEBUG] Received prompt_improved. Original: "${original.substring(0, 50)}...", Improved: "${improved.substring(0, 50)}..."`);
     const currentHistory = state.chatHistory;
-    // Find the index of the last message sent by the user
     let lastUserMessageIndex = -1;
     for (let i = currentHistory.length - 1; i >= 0; i--) {
         if (currentHistory[i].role === 'user') {
@@ -315,19 +266,14 @@ function handlePromptImproved({ original, improved }) {
     }
 
     if (lastUserMessageIndex !== -1) {
-        // Verify the content matches the original prompt (as a safety check)
         if (currentHistory[lastUserMessageIndex].content === original) {
             console.log(`[DEBUG] Found matching user message at index ${lastUserMessageIndex}. Updating content.`);
-            // Create a *new* history array with the updated message content
-            // This is crucial for triggering state notifications correctly
             const newHistory = currentHistory.map((message, index) => {
                 if (index === lastUserMessageIndex) {
-                    // Return a new message object with the updated content
-                    return { ...message, content: improved };
+                    return { ...message, content: improved, rawContent: improved }; // Update rawContent too
                 }
-                return message; // Return unchanged message object
+                return message;
             });
-            // Update the state with the new history array
             state.setChatHistory(newHistory);
         } else {
             console.warn(`[DEBUG] Found last user message at index ${lastUserMessageIndex}, but content did not match original prompt. Original in state: "${currentHistory[lastUserMessageIndex].content.substring(0, 50)}..."`);
@@ -337,31 +283,18 @@ function handlePromptImproved({ original, improved }) {
     }
 }
 
-
-// --- Voice Transcription API (WebSocket) ---
-
-/**
- * Connects to the WebSocket server if not already connected,
- * then starts a transcription stream.
- * @param {string} languageCode - e.g., 'en-US'
- * @param {string} audioFormat - e.g., 'WEBM_OPUS' (must match frontend recording)
- * @returns {Promise<void>} A promise that resolves when the backend confirms *this specific* transcription started, or rejects on error.
- */
 export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat = 'WEBM_OPUS') {
     return new Promise((resolve, reject) => {
-        // --- Promise state management for *this specific call* ---
-        // Use flags to prevent resolving/rejecting multiple times, especially with existing sockets
         let promiseResolved = false;
         let promiseRejected = false;
 
         const resolveOnce = () => {
             if (!promiseResolved && !promiseRejected) {
                 promiseResolved = true;
-                // Remove temporary listeners if they were added for this specific call
                 if (socket) {
                     socket.off('transcription_started', handleStarted);
                     socket.off('transcription_error', handleError);
-                    socket.off('disconnect', handleDisconnectError); // Remove disconnect listener added for this promise
+                    socket.off('disconnect', handleDisconnectError);
                 }
                 resolve();
             }
@@ -369,17 +302,15 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
         const rejectOnce = (error) => {
              if (!promiseResolved && !promiseRejected) {
                 promiseRejected = true;
-                 // Remove temporary listeners if they were added for this specific call
                 if (socket) {
                     socket.off('transcription_started', handleStarted);
                     socket.off('transcription_error', handleError);
-                    socket.off('disconnect', handleDisconnectError); // Remove disconnect listener added for this promise
+                    socket.off('disconnect', handleDisconnectError);
                 }
                 reject(error);
             }
         };
 
-        // --- Temporary event handlers for *this specific call's* promise ---
         const handleStarted = (data) => {
             setStatus("Recording... Speak now.");
             resolveOnce();
@@ -394,58 +325,35 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
             setStatus("Transcription service disconnected before starting.", true);
             rejectOnce(new Error(`WebSocket disconnected: ${reason}`));
         };
-        // -----------------------------------------------------------------
 
-        // --- Logic ---
-        initializeWebSocketConnection(); // Ensure connection attempt is active or connection exists
+        initializeWebSocketConnection();
 
-        // Check current status *after* initiating connection attempt
         if (socket && socket.connected) {
-            // --- Socket is already connected ---
             console.log("[DEBUG] connectTranscriptionSocket: Socket already connected. Proceeding.");
             setStatus("Initializing transcription stream...");
-
-            // Add temporary listeners for this specific start request
             socket.once('transcription_started', handleStarted);
             socket.once('transcription_error', handleError);
             socket.once('disconnect', handleDisconnectError);
-
-            // Emit start_transcription
             console.log("[DEBUG] Emitting start_transcription on existing socket.");
             socket.emit('start_transcription', { languageCode, audioFormat });
-            // Promise resolves/rejects based on temporary listeners
-
         } else {
-            // --- Socket is NOT connected (null, connecting, or disconnected) ---
             const errorMsg = socket ? "WebSocket is still connecting, please try again shortly." : "WebSocket connection failed to initialize.";
             console.warn(`connectTranscriptionSocket: Cannot start transcription - ${errorMsg}`);
             setStatus(errorMsg, true);
-            rejectOnce(new Error(errorMsg)); // Reject immediately
+            rejectOnce(new Error(errorMsg));
         }
-
-    }); //End of promise constructor
+    });
 }
 
-/**
- * Sends an audio chunk over the WebSocket.
- * @param {Blob | ArrayBuffer | Buffer} chunk - The audio data chunk.
- */
 export function sendAudioChunk(chunk) {
     if (socket && socket.connected) {
-        // console.debug(`Sending audio chunk, size: ${chunk.size || chunk.byteLength}`); // Verbose
         socket.emit('audio_chunk', chunk);
     } else {
         console.warn("Cannot send audio chunk: WebSocket not connected.");
-        // Handle error - maybe try reconnecting or notify user
         setStatus("Error: Transcription service disconnected. Cannot send audio.", true);
     }
 }
 
-/**
- * Signals the backend that audio streaming is finished and returns a promise
- * that resolves when the backend confirms completion, or rejects on error/disconnect.
- * @returns {Promise<void>}
- */
 export function stopAudioStream() {
     return new Promise((resolve, reject) => {
         if (!socket || !socket.connected) {
@@ -453,12 +361,10 @@ export function stopAudioStream() {
             return reject(new Error("WebSocket not connected."));
         }
 
-        // --- Promise state management ---
         let promiseResolved = false;
         let promiseRejected = false;
-        let timeoutId = null; // Declare timeoutId here
+        let timeoutId = null;
 
-        // Define removeListeners helper first
         const removeListeners = () => {
             if (socket) {
                 socket.off('transcription_complete', handleComplete);
@@ -467,10 +373,9 @@ export function stopAudioStream() {
             }
         };
 
-        // Define resolveOnce and rejectOnce with clearTimeout built-in
         const resolveOnce = (message = "Transcription complete.") => {
             if (!promiseResolved && !promiseRejected) {
-                clearTimeout(timeoutId); // Clear timeout on resolve
+                clearTimeout(timeoutId);
                 promiseResolved = true;
                 removeListeners();
                 resolve();
@@ -478,99 +383,62 @@ export function stopAudioStream() {
         };
         const rejectOnce = (error) => {
              if (!promiseResolved && !promiseRejected) {
-                clearTimeout(timeoutId); // Clear timeout on reject
+                clearTimeout(timeoutId);
                 promiseRejected = true;
                 removeListeners();
                 reject(error);
             }
         };
 
-        // --- Temporary listeners for this stop request (using the functions defined above) ---
-        const handleComplete = (data) => {
-            resolveOnce(data.message);
-        };
-        const handleError = (data) => {
-            console.error("Transcription error received while waiting for completion:", data.error);
-            rejectOnce(new Error(data.error));
-        };
-        const handleDisconnect = (reason) => {
-            console.warn(`WebSocket disconnected while waiting for transcription completion: ${reason}`);
-            rejectOnce(new Error(`WebSocket disconnected: ${reason}`));
-        };
-        // -------------------------------------------------
+        const handleComplete = (data) => resolveOnce(data.message);
+        const handleError = (data) => rejectOnce(new Error(data.error));
+        const handleDisconnect = (reason) => rejectOnce(new Error(`WebSocket disconnected: ${reason}`));
 
-        // Add listeners specifically for this stop request
         socket.on('transcription_complete', handleComplete);
-        socket.on('transcription_error', handleError); // Catch errors during finalization
+        socket.on('transcription_error', handleError);
         socket.on('disconnect', handleDisconnect);
-
-        // Emit the stop signal
         socket.emit('stop_transcription');
-
-        // Optional: Add a timeout in case the backend never sends 'transcription_complete'
-        const timeoutDuration = 10000; // 10 seconds
-        // Assign to the timeoutId declared earlier
-        timeoutId = setTimeout(() => {
-             rejectOnce(new Error(`Timeout waiting for transcription completion after ${timeoutDuration}ms`));
-        }, timeoutDuration);
-
-        // No need to modify resolveOnce/rejectOnce here, clearTimeout is already included
-
-    }); // End of promise constructor
+        const timeoutDuration = 10000;
+        timeoutId = setTimeout(() => rejectOnce(new Error(`Timeout waiting for transcription completion after ${timeoutDuration}ms`)), timeoutDuration);
+    });
 }
 
-/**
- * Disconnects the WebSocket.
- */
 export function disconnectTranscriptionSocket() {
     if (socket) {
         socket.disconnect();
-        socket = null; // Clear reference
-        state.setIsSocketConnected(false); // Update state
-        // Clear transcript state as well? Depends on desired behavior.
-        // state.setStreamingTranscript("");
+        socket = null;
+        state.setIsSocketConnected(false);
     }
 }
 
-
-// --- NEW: Long Audio Transcription API Call ---
 export async function transcribeLongAudio(audioBlob, languageCode = 'en-US') {
-    // Show a specific "transcribing" toast
     const transcribingToastId = showToast("Transcribing recorded audio...", { autoClose: false, type: 'info' });
-    console.log(`[DEBUG] transcribeLongAudio: Showing transcribing toast ID: ${transcribingToastId}`); // Add log
+    console.log(`[DEBUG] transcribeLongAudio: Showing transcribing toast ID: ${transcribingToastId}`);
 
     const formData = new FormData();
-    // Use a generic filename, backend doesn't rely on it but it's good practice
-    formData.append('audio_blob', audioBlob, `long_recording.${MIME_TYPE.split('/')[1].split(';')[0]}`); // e.g., long_recording.webm
+    formData.append('audio_blob', audioBlob, `long_recording.${MIME_TYPE.split('/')[1].split(';')[0]}`);
     formData.append('languageCode', languageCode);
-    // *** Crucially, send the MIME type used for recording ***
     formData.append('mimeType', MIME_TYPE);
 
     try {
         const response = await fetch('/api/voice/transcribe_long', {
             method: 'POST',
             body: formData,
-            // No 'Content-Type' header needed for FormData, browser sets it with boundary
         });
-
-        console.log(`[DEBUG] transcribeLongAudio: Removing transcribing toast ID: ${transcribingToastId}`); // Add log
-        removeToast(transcribingToastId); // Remove "transcribing" toast regardless of outcome
+        console.log(`[DEBUG] transcribeLongAudio: Removing transcribing toast ID: ${transcribingToastId}`);
+        removeToast(transcribingToastId);
 
         if (!response.ok) {
-            // Try to parse error JSON, provide fallback
             const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
             console.error('Long transcription API error:', response.status, errorData);
-            showToast(`Transcription Error: ${errorData.error || response.statusText}`, { type: 'error' }); // Show error toast
-            state.setLastLongTranscript(''); // Clear any previous transcript on error
-            return null; // Indicate failure
+            showToast(`Transcription Error: ${errorData.error || response.statusText}`, { type: 'error' });
+            state.setLastLongTranscript('');
+            return null;
         }
 
         const data = await response.json();
-        state.setLastLongTranscript(data.transcript); // Store transcript in state
-
-        // Show success toast with snippet, copy button, and close button
+        state.setLastLongTranscript(data.transcript);
         const snippet = data.transcript.substring(0, 70) + (data.transcript.length > 70 ? '...' : '');
-        // Ensure buttons have data attributes to identify target and action
         const toastContent = `
             <div class="flex flex-col space-y-1 relative pr-4">
                 <button class="toast-close-button absolute top-0 right-0 px-1 py-0 text-white hover:text-gray-300 text-lg leading-none" title="Close">&times;</button>
@@ -579,35 +447,25 @@ export async function transcribeLongAudio(audioBlob, languageCode = 'en-US') {
                 <button class="toast-copy-button self-end mt-1 px-2 py-0.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300" data-transcript-target="long">Copy</button>
             </div>
         `;
-        // Set autoClose to false so it only closes via the 'x' button
         showToast(toastContent, { type: 'success', autoClose: false });
-
-        return data.transcript; // Return the full transcript
-
+        return data.transcript;
     } catch (error) {
         console.error('Network or other error during long transcription:', error);
-        // Ensure toast is removed on network error, even if it wasn't explicitly removed above
         if (transcribingToastId) {
-             console.log(`[DEBUG] transcribeLongAudio (catch): Removing transcribing toast ID: ${transcribingToastId}`); // Add log
+             console.log(`[DEBUG] transcribeLongAudio (catch): Removing transcribing toast ID: ${transcribingToastId}`);
              removeToast(transcribingToastId);
         }
-        showToast(`Transcription Error: ${error.message}`, { type: 'error' }); // Show error toast
-        state.setLastLongTranscript(''); // Clear any previous transcript on error
-        return null; // Indicate failure
+        showToast(`Transcription Error: ${error.message}`, { type: 'error' });
+        state.setLastLongTranscript('');
+        return null;
     }
 }
-// -----------------------------------------
 
-
-// --- File API --- (Keep existing file API functions)
-
-/** Deletes a file from the backend and updates the state. */
 export async function deleteFile(fileId) {
     if (state.isLoading) return;
     if (!confirm("Are you sure you want to delete this file? This action cannot be undone.")) {
         return;
     }
-
     setLoading(true, "Deleting File");
     try {
         const response = await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
@@ -616,17 +474,12 @@ export async function deleteFile(fileId) {
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         setStatus(`File ${fileId} deleted.`);
-
-        // Update state lists directly
-        state.removeSidebarSelectedFileById(fileId); // Remove from sidebar selection state
-        state.removeAttachedFileById(fileId); // Remove from attached state
-        if (state.sessionFile && state.sessionFile.id === fileId) { // Check if it's the session file
+        state.removeSidebarSelectedFileById(fileId);
+        state.removeAttachedFileById(fileId);
+        if (state.sessionFile && state.sessionFile.id === fileId) {
              state.setSessionFile(null);
         }
-
-        // Reload the full list to ensure UI consistency (this will update state.uploadedFiles)
         await loadUploadedFiles();
-
     } catch (error) {
         console.error('Error deleting file:', error);
         setStatus(`Error deleting file: ${error.message}`, true);
@@ -635,62 +488,39 @@ export async function deleteFile(fileId) {
     }
 }
 
-/** Loads uploaded files from the backend and updates the state. */
 export async function loadUploadedFiles() {
-    // Files plugin is always enabled now
-
-    // Set loading state only if not already loading (might be called during init)
     const wasLoading = state.isLoading;
     if (!wasLoading) setLoading(true, "Loading Files");
-
-    // Clear current list in state immediately to show loading state in UI
     state.setUploadedFiles([]);
-
     try {
         const response = await fetch('/api/files');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const files = await response.json();
-
-        // Update state with fetched files
         state.setUploadedFiles(files);
-
         setStatus("Uploaded files loaded.");
     } catch (error) {
         console.error('Error loading uploaded files:', error);
         setStatus("Error loading files.", true);
-        // state.uploadedFiles is already [] from above
-        throw error; // Re-throw for caller (e.g., initializeApp) to handle if needed
+        throw error;
     } finally {
-        // Only turn off loading if this function set it
         if (!wasLoading) setLoading(false);
     }
 }
 
-
-/** Handles file upload triggered from the modal. */
 export async function handleFileUpload(event) {
-    // Files plugin is always enabled now
     if (state.currentTab !== 'chat') {
         setStatus("File uploads only allowed on Chat tab.", true);
         if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = '';
         return;
     }
-
     const files = event.target.files;
     if (!files || files.length === 0) {
         if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = '';
         return;
     }
-
-    // --- FIX: Reset the input value immediately after getting files ---
-    // This prevents the 'change' event from potentially re-firing when the value is cleared later.
     if(elements.fileUploadModalInput) elements.fileUploadModalInput.value = '';
-    // -----------------------------------------------------------------
-
-    // --- FIX: Disable input and label during upload ---
     if (elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = true;
     if (elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.add('disabled');
-    // -------------------------------------------------
 
     setLoading(true, "Uploading");
     const formData = new FormData();
@@ -706,11 +536,8 @@ export async function handleFileUpload(event) {
 
     if (fileCount === 0) {
         setLoading(false);
-        // --- FIX: Re-enable input and label ---
         if(elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = false;
         if(elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.remove('disabled');
-        // -------------------------------------
-        // Input value is already reset
         setStatus("No valid files selected for upload.", true);
         return;
     }
@@ -728,40 +555,22 @@ export async function handleFileUpload(event) {
             statusMsg += ` ${errors.length} failed: ${errors.join('; ')}`;
         }
         setStatus(statusMsg, errors.length > 0);
-
-        // Reload the file list state after upload
         await loadUploadedFiles();
-
     } catch (error) {
         console.error('Error uploading files:', error);
         setStatus(`Error uploading files: ${error.message}`, true);
     } finally {
         setLoading(false);
-        // --- FIX: Re-enable input and label ---
         if(elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = false;
         if(elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.remove('disabled');
-        // Input value is already reset
-        // -----------------------------------------------------
-        // Closing modal should be handled by event listener or UI logic reacting to state
     }
 }
 
-/** Adds a file by fetching content from a URL. */
 export async function addFileFromUrl(url) {
      if (state.isLoading) return;
-     // Files plugin is always enabled now
-     if (state.currentTab !== 'chat') {
-         // Status update for URL modal handled by event listener
-         return;
-     }
-     if (!url || !url.startsWith('http')) {
-         // Status update for URL modal handled by event listener
-         return;
-     }
-
+     if (state.currentTab !== 'chat') return;
+     if (!url || !url.startsWith('http')) return;
      setLoading(true, "Fetching URL");
-     // Status update for URL modal handled by event listener
-
      try {
          const response = await fetch('/api/files/from_url', {
              method: 'POST',
@@ -773,34 +582,23 @@ export async function addFileFromUrl(url) {
              throw new Error(data.error || `HTTP error! status: ${response.status}`);
          }
          setStatus(`Successfully added file from URL: ${data.filename}`);
-         // Status update for URL modal handled by event listener
-         if(elements.urlInput) elements.urlInput.value = ''; // Clear input
-
-         // Reload the file list state
+         if(elements.urlInput) elements.urlInput.value = '';
          await loadUploadedFiles();
-
-         // Closing modal should be handled by event listener or UI logic reacting to state
      } catch (error) {
          console.error('Error adding file from URL:', error);
          setStatus(`Error adding file from URL: ${error.message}`, true);
-         // Status update for URL modal handled by event listener
      } finally {
          setLoading(false);
      }
 }
 
-/** Fetches/Generates summary and updates state. */
 export async function fetchSummary(fileId) {
     if (state.isLoading) return;
-    // Files plugin is always enabled now
     if (state.currentTab !== 'chat') {
          setStatus("Fetching summaries only allowed on Chat tab.", true);
          return;
     }
-
     setLoading(true, "Fetching Summary");
-    // Status update for summary modal handled by UI reacting to loading state
-
     try {
         const response = await fetch(`/api/files/${fileId}/summary`);
         if (!response.ok) {
@@ -808,43 +606,27 @@ export async function fetchSummary(fileId) {
             throw new Error(errorData.error || `HTTP ${response.status}`);
         }
         const data = await response.json();
-
-        // Update state with the summary content
-        // Assuming state has a place to hold the summary for the currently edited file
-        // We need a state variable for the summary content itself, tied to currentEditingFileId
-        state.setCurrentEditingFileId(fileId); // Ensure state knows which file summary is being edited
-        state.setSummaryContent(data.summary); // Assuming you add setSummaryContent to state.js
-
+        state.setCurrentEditingFileId(fileId);
+        state.setSummaryContent(data.summary);
         setStatus(`Summary loaded/generated for file ${fileId}.`);
-
-        // Reload file list state to update has_summary flag in UI
         await loadUploadedFiles();
-
     } catch (error) {
         console.error("Error fetching summary:", error);
-        state.setSummaryContent(`[Error loading summary: ${error.message}]`); // Update state with error
+        state.setSummaryContent(`[Error loading summary: ${error.message}]`);
         setStatus(`Error fetching summary for file ${fileId}.`, true);
     } finally {
         setLoading(false);
     }
 }
 
-
-/** Saves the edited summary. */
 export async function saveSummary() {
     if (!state.currentEditingFileId || state.isLoading) return;
-    // Files plugin is always enabled now
     if (state.currentTab !== 'chat') {
          setStatus("Saving summaries only allowed on Chat tab.", true);
          return;
     }
-
-    // Read the summary content from the state, not the DOM directly
-    const updatedSummary = state.summaryContent; // Assuming you add summaryContent to state.js
-
+    const updatedSummary = state.summaryContent;
     setLoading(true, "Saving Summary");
-    // Status update handled by UI reacting to loading state
-
     try {
         const response = await fetch(`/api/files/${state.currentEditingFileId}/summary`, {
             method: 'PUT',
@@ -856,11 +638,7 @@ export async function saveSummary() {
             throw new Error(errorData.error || `HTTP ${response.status}`);
         }
         setStatus("Summary saved successfully.");
-
-        // Reload file lists to update summary status display (has_summary flag)
         await loadUploadedFiles();
-
-        // Closing modal should be handled by event listener or UI logic reacting to state
     } catch (error) {
         console.error("Error saving summary:", error);
         setStatus("Error saving summary.", true);
@@ -869,12 +647,7 @@ export async function saveSummary() {
     }
 }
 
-/**
- * Attaches selected files from the sidebar to the current chat as 'full' files.
- * Updates state.attachedFiles and clears state.sidebarSelectedFiles.
- */
 export function attachSelectedFilesFull() {
-    // Files plugin is always enabled now
     if (state.currentTab !== 'chat' || state.isLoading) {
         setStatus("Cannot attach files: Not on Chat tab or busy.", true);
         return;
@@ -883,128 +656,78 @@ export function attachSelectedFilesFull() {
         setStatus("No files selected in the sidebar to attach.", true);
         return;
     }
-
-    // Add selected files to the attachedFiles state with type 'full'
     state.sidebarSelectedFiles.forEach(file => {
-        // Ensure we don't add duplicates (same file ID, same type)
         if (!state.attachedFiles.some(f => f.id === file.id && f.type === 'full')) {
-             state.addAttachedFile({ id: file.id, filename: file.filename, type: 'full' });
+             state.addAttachedFile({ id: file.id, filename: file.filename, type: 'full', mimetype: file.mimetype }); // Add mimetype
         }
     });
-
-    // Clear the temporary sidebar selection state
     state.clearSidebarSelectedFiles();
-
-    // UI will react to state changes (attachedFiles and sidebarSelectedFiles)
-    setStatus(`Attached ${state.attachedFiles.length} file(s) (full content).`); // Status message might need refinement
+    setStatus(`Attached ${state.attachedFiles.length} file(s) (full content).`);
 }
 
-/**
- * Attaches selected files from the sidebar to the current chat as 'summary' files.
- * Updates state.attachedFiles and clears state.sidebarSelectedFiles.
- * Generates summaries if they don't exist.
- */
 export async function attachSelectedFilesSummary() {
-    // Files plugin is always enabled now
     if (state.currentTab !== 'chat' || state.isLoading) {
         setStatus("Cannot attach files: Not on Chat tab or busy.", true);
         return;
     }
-    const selectedFiles = [...state.sidebarSelectedFiles]; // Copy selection
+    const selectedFiles = [...state.sidebarSelectedFiles];
     if (selectedFiles.length === 0) {
         setStatus("No files selected in the sidebar to attach.", true);
         return;
     }
-
     setLoading(true, "Attaching Summaries (generating if needed)...");
-    const filesToAttach = []; // Collect files to attach after processing
+    const filesToAttach = [];
     const errors = [];
 
     for (const file of selectedFiles) {
-        setStatus(`Processing ${file.filename}...`); // Update status per file
+        setStatus(`Processing ${file.filename}...`);
         let summaryAvailable = file.has_summary;
-        let fileId = file.id; // Get file ID
+        let fileId = file.id;
 
         if (!summaryAvailable) {
             setStatus(`Generating summary for ${file.filename}...`);
             try {
-                // Call fetchSummary which handles the API call, state update, and file list reload
                 await fetchSummary(fileId);
-
-                // Check state for the summary content after fetchSummary completes
-                // fetchSummary calls loadUploadedFiles on success, which updates state.uploadedFiles
                 const updatedFile = state.uploadedFiles.find(f => f.id === fileId);
-
-                // Check if summary generation was successful.
-                // fetchSummary updates state.summaryContent and reloads state.uploadedFiles.
-                // const updatedFile = state.uploadedFiles.find(f => f.id === fileId); // Removed duplicate declaration
-                const summaryLooksValid = !state.summaryContent.startsWith('[Error'); // Check if fetchSummary reported success
-
-                // Consider summary available if the reloaded data shows it OR if fetchSummary didn't report an error.
+                const summaryLooksValid = !state.summaryContent.startsWith('[Error');
                 if ((updatedFile && updatedFile.has_summary) || summaryLooksValid) {
-                    summaryAvailable = true; // Mark as available after successful generation
+                    summaryAvailable = true;
                     setStatus(`Summary generated and attached for ${file.filename}.`);
                 } else {
-                    // If both checks fail, generation likely failed.
-                    const errorMsg = state.summaryContent.startsWith('[Error')
-                        ? state.summaryContent // Use the specific error from fetchSummary/state
-                        : `[Error: Failed to generate or verify summary for ${file.filename}]`; // Fallback error
+                    const errorMsg = state.summaryContent.startsWith('[Error') ? state.summaryContent : `[Error: Failed to generate or verify summary for ${file.filename}]`;
                     console.error(`Summary generation failed for ${file.filename}: ${errorMsg}`);
-                    errors.push(`${file.filename}: ${specificError}`); // Use specificError
-                    summaryAvailable = false; // Ensure it's not attached if generation failed
+                    errors.push(`${file.filename}: ${errorMsg}`); // Use errorMsg
+                    summaryAvailable = false;
                 }
-            } catch (error) { // This catch block handles errors *within the try block above*
-                // This catch block handles errors *within the try block above*,
-                // like issues finding the updatedFile or accessing properties.
-                // Errors from fetchSummary itself are handled by checking state.summaryContent.
+            } catch (error) {
                 console.error(`Error during summary attachment logic for ${file.filename}:`, error);
-                // Use the caught error message if available, otherwise use the state message or a generic one
                 const specificError = error.message || (state.summaryContent.startsWith('[Error') ? state.summaryContent : `[Error: Unknown issue processing summary for ${file.filename}]`);
                 errors.push(`${file.filename}: ${specificError}`);
-                summaryAvailable = false; // Ensure it's not attached if generation failed
+                summaryAvailable = false;
             }
         }
-
-        // If summary was initially available or successfully generated, prepare to attach
         if (summaryAvailable) {
-            // Check for duplicates in the main attachedFiles state before adding
             if (!state.attachedFiles.some(f => f.id === fileId && f.type === 'summary')) {
-                 filesToAttach.push({ id: fileId, filename: file.filename, type: 'summary' });
+                 filesToAttach.push({ id: fileId, filename: file.filename, type: 'summary', mimetype: file.mimetype }); // Add mimetype
             } else {
                  console.log(`[DEBUG] File ${fileId} (summary) already attached, skipping duplicate.`);
             }
         }
-    } // End for loop
-
-    // Now add all successfully processed files to the state
-    filesToAttach.forEach(file => {
-        state.addAttachedFile(file); // Notifies attachedFiles
-    });
-
-    // Clear the temporary sidebar selection state
-    state.clearSidebarSelectedFiles(); // Notifies sidebarSelectedFiles
-
-    // Final status update
-    let finalStatus = `Attached ${filesToAttach.length} file(s) (summary).`;
-    if (errors.length > 0) {
-        finalStatus += ` Errors: ${errors.join('; ')}`;
     }
+    filesToAttach.forEach(file => state.addAttachedFile(file));
+    state.clearSidebarSelectedFiles();
+    let finalStatus = `Attached ${filesToAttach.length} file(s) (summary).`;
+    if (errors.length > 0) finalStatus += ` Errors: ${errors.join('; ')}`;
     setStatus(finalStatus, errors.length > 0);
     setLoading(false);
 }
 
-
-// --- Calendar API ---
-
-/** Fetches calendar events and updates state. */
 export async function loadCalendarEvents() {
     if (state.isLoading) return;
-    // Calendar plugin is always enabled now
     if (state.currentTab !== 'chat') {
         setStatus("Loading calendar events only allowed on Chat tab.", true);
         return;
     }
-
     setLoading(true, "Loading Events");
     try {
         const response = await fetch('/api/calendar/events');
@@ -1012,95 +735,64 @@ export async function loadCalendarEvents() {
         if (!response.ok) {
             throw new Error(data.error || `HTTP error ${response.status}`);
         }
-        // Update state with calendar context
         state.setCalendarContext(data.events || "[No event data received]");
-        // state.isCalendarContextActive is toggled by the UI element, not here
-
         setStatus("Calendar events loaded.");
     } catch (error) {
         console.error('Error loading calendar events:', error);
-        state.setCalendarContext(null); // Clear context on error
-        // Add a system message to chat history via state? Or let UI handle based on status?
-        // For now, just update status
+        state.setCalendarContext(null);
         setStatus(`Error loading calendar events: ${error.message}`, true);
     } finally {
         setLoading(false);
     }
 }
 
-
-// --- Chat API ---
-
-/** Loads the list of saved chats from the backend and updates the state. */
 export async function loadSavedChats() {
-    if (!elements.savedChatsList) return; // Cannot update UI placeholder if element missing
-
-    // Set loading only if not already loading (e.g., during init)
+    if (!elements.savedChatsList) return;
     const wasLoading = state.isLoading;
     if (!wasLoading) setLoading(true, "Loading Chats");
-
-    // Clear current list in state immediately to show loading state in UI
     state.setSavedChats([]);
-
     try {
         const response = await fetch('/api/chats');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const chats = await response.json();
-        state.setSavedChats(chats); // Update state
-
+        state.setSavedChats(chats);
         setStatus("Saved chats loaded.");
     } catch (error) {
         console.error('Error loading saved chats:', error);
         setStatus("Error loading saved chats.", true);
-        // state.savedChats is already [] from above
-        throw error; // Re-throw for initializeApp to catch
+        throw error;
     } finally {
         if (!wasLoading) setLoading(false);
     }
 }
 
-
-/** Starts a new chat session by calling the backend and updates state. */
 export async function startNewChat() {
     if (state.isLoading) return;
     setLoading(true, "Creating Chat");
-    // Clear current chat state immediately
     state.setCurrentChatId(null);
-    state.setCurrentChatName(''); // Assuming setCurrentChatName in state.js
-    state.setCurrentChatModel(''); // Assuming setCurrentChatModel in state.js
-    state.setChatHistory([]); // Clear history for the new empty chat
-    resetChatContext(); // Clear chat-specific context states
-    state.setCurrentChatMode('chat'); // Reset mode to default 'chat' for new chat
-
+    state.setCurrentChatName('');
+    state.setCurrentChatModel('');
+    state.setChatHistory([]);
+    resetChatContext();
+    state.setCurrentChatMode('chat');
     try {
         const response = await fetch('/api/chat', { method: 'POST' });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const newChat = await response.json();
-
-        // Load the new chat (this updates state.currentChatId, loads history, resets context)
         await loadChat(newChat.id);
-
-        // Reload the chat list state to include the new chat
         await loadSavedChats();
-
         setStatus(`New chat created (ID: ${newChat.id}).`);
     } catch (error) {
         console.error('Error starting new chat:', error);
-        // Add system message via state? Or let UI react to status?
-        // For now, just update status
         setStatus("Error creating new chat.", true);
-        // state is already reset above
     } finally {
         setLoading(false);
     }
 }
 
-/** Loads a specific chat's history and details from the backend and updates state. */
 export async function loadChat(chatId) {
     setLoading(true, "Loading Chat");
-    // Clear chat history in state immediately to show loading state in UI
-    state.setChatHistory([]); // Assuming you add setChatHistory to state.js
-
+    state.setChatHistory([]);
     try {
         const response = await fetch(`/api/chat/${chatId}`);
         if (!response.ok) {
@@ -1108,206 +800,158 @@ export async function loadChat(chatId) {
             throw new Error(`HTTP error! status: ${response.status} ${response.statusText} - ${errorText}`);
         }
         const data = await response.json();
-
-        // Update state with chat details and history
         const fetchedHistory = data.history || [];
-        const currentHistory = state.chatHistory; // Get current history from state
-
-        // --- Deduplication Logic ---
-        let historyNeedsUpdate = true; // Assume update is needed
+        const currentHistory = state.chatHistory;
+        let historyNeedsUpdate = true;
         if (currentHistory.length > 0 && fetchedHistory.length > 0) {
             const lastCurrentMsg = currentHistory[currentHistory.length - 1];
             const lastFetchedMsg = fetchedHistory[fetchedHistory.length - 1];
-
-            // Check if the last message in current state matches the last in fetched history
-            // This indicates the fetched history likely just includes the message recently streamed.
-            if (lastCurrentMsg.role === 'assistant' &&
-                lastFetchedMsg.role === 'assistant' &&
-                lastCurrentMsg.content === lastFetchedMsg.content)
-            {
+            if (lastCurrentMsg.role === 'assistant' && lastFetchedMsg.role === 'assistant' && lastCurrentMsg.content === lastFetchedMsg.content) {
                 console.log(`[DEBUG] loadChat(${chatId}): Last message matches current state. Skipping history update to prevent duplication.`);
                 historyNeedsUpdate = false;
             }
         }
-        // --- End Deduplication Logic ---
-
         state.setCurrentChatId(data.details.id);
-        localStorage.setItem('currentChatId', data.details.id); // Persist ID
+        localStorage.setItem('currentChatId', data.details.id);
         state.setCurrentChatName(data.details.name || '');
         state.setCurrentChatModel(data.details.model_name || '');
-
-        // Only update history state if needed
         if (historyNeedsUpdate) {
             console.log(`[DEBUG] loadChat(${chatId}): Updating chat history state.`);
             state.setChatHistory(fetchedHistory);
         }
-
-        state.setCurrentChatMode('chat'); // Always default to 'chat' mode when loading a chat
-
-        // Reset chat-specific context states (files, calendar, web search toggle)
-        resetChatContext(); // This updates state variables
-
-        // Assuming the backend returns attached files with chat details
+        state.setCurrentChatMode('chat');
+        resetChatContext();
         state.setAttachedFiles(data.details.attached_files || []);
-
-        // Plugin enabled states are loaded from localStorage in app.js init
-
         setStatus(`Chat ${state.currentChatId} loaded.`);
-
     } catch (error) {
         console.error(`Error loading chat ${chatId}:`, error);
-        // Add system message via state? Or let UI react to status?
-        // For now, just update status
         setStatus(`Error loading chat ${chatId}.`, true);
-
-        // Reset state on error
         state.setCurrentChatId(null);
         localStorage.removeItem('currentChatId');
         state.setCurrentChatName('');
         state.setCurrentChatModel('');
         state.setChatHistory([]);
-        resetChatContext(); // Clear files, calendar, etc. state
-        state.setCurrentChatMode('chat'); // Reset mode on error
-
-        throw error; // Re-throw for initializeApp or switchTab to handle
+        resetChatContext();
+        state.setCurrentChatMode('chat');
+        throw error;
     } finally {
         setLoading(false);
     }
 }
 
-// Helper to reset context state when switching chats or starting new
 function resetChatContext() {
-    state.clearSidebarSelectedFiles(); // Clear temporary sidebar selections
-    state.clearAttachedFiles(); // Clear permanent file selections
-    state.setSessionFile(null); // Clear session file state
-
+    state.clearSidebarSelectedFiles();
+    state.clearAttachedFiles();
+    state.setSessionFile(null);
     state.setCalendarContext(null);
-    state.setCalendarContextActive(false); // Reset toggle state
-
-    state.setWebSearchEnabled(false); // Assuming you add setWebSearchEnabled to state.js
+    state.setCalendarContextActive(false);
+    state.setWebSearchEnabled(false);
 }
 
-
-/**
- * Sends the user message and context to the backend.
- * Determines the mode ('chat' or 'deep_research') based on state.
- * Sends the message via SocketIO.
- */
-export function sendMessage() { // No longer async, just emits
+export function sendMessage() {
     if (state.isLoading || !state.currentChatId || state.currentTab !== 'chat') {
         setStatus("Cannot send: No active chat, busy, or not on Chat tab.", true);
         return;
     }
-
-    // Ensure socket connection exists
     if (!socket || !socket.connected) {
         setStatus("Cannot send: Not connected to the server.", true);
-        // Optionally try to reconnect here?
-        // connectTranscriptionSocket(); // Example, might need adjustments
         return;
     }
 
-    // Read message from DOM
     const message = elements.messageInput?.value.trim() || '';
-
-    // Files to send are the permanently attached files PLUS the session file
-    // Note: Files/context are ignored in 'deep_research' mode on the backend, but we still send them.
-    const filesToAttach = state.attachedFiles; // Files always available
-    const sessionFileToSend = state.sessionFile; // Session file always available
-    const calendarContextToSend = (state.isCalendarContextActive && state.calendarContext) ? state.calendarContext : null; // Calendar always available, check active toggle
-    const webSearchEnabledToSend = state.isWebSearchEnabled; // Web search always available, check active toggle
-    const deepResearchEnabled = state.isDeepResearchEnabled; // Read deep research state
-
-    // Determine the mode based on the toggle state
+    const stagedAttachedFiles = state.attachedFiles; // Files from sidebar (full/summary)
+    const stagedSessionFile = state.sessionFile;     // File from paperclip
+    const calendarContextToSend = (state.isCalendarContextActive && state.calendarContext) ? state.calendarContext : null;
+    const webSearchEnabledToSend = state.isWebSearchEnabled;
+    const deepResearchEnabled = state.isDeepResearchEnabled;
     const mode = deepResearchEnabled ? 'deep_research' : 'chat';
 
-    // --- Validation based on mode ---
+    // --- Prepare attachments list for chat history and backend payload ---
+    const attachmentsForHistory = [];
+    const backendAttachedFilesPayload = []; // For files like full/summary from sidebar
+    const backendSessionFilesPayload = [];  // For the main session file
+
+    if (stagedSessionFile) {
+        attachmentsForHistory.push({
+            filename: stagedSessionFile.filename,
+            type: 'session', // UI hint
+            mimetype: stagedSessionFile.mimetype
+        });
+        backendSessionFilesPayload.push({
+            filename: stagedSessionFile.filename,
+            content: stagedSessionFile.content, // Base64 content
+            mimetype: stagedSessionFile.mimetype
+        });
+    }
+
+    stagedAttachedFiles.forEach(file => {
+        attachmentsForHistory.push({
+            id: file.id, // Keep ID if available
+            filename: file.filename,
+            type: file.type, // 'full' or 'summary'
+            mimetype: file.mimetype
+        });
+        // For backend, send only id and type for these, as content is already on server
+        backendAttachedFilesPayload.push({ id: file.id, type: file.type });
+    });
+    // --- End Attachment Preparation ---
+
+
     if (mode === 'deep_research') {
         if (!message) {
             setStatus("Deep Research mode requires a text query.", true);
             return;
         }
-        // In deep research mode, we don't send files, context, or web search flags
-        // as the backend ignores them. This simplifies the payload.
-        // However, the backend is written to ignore them if mode is 'deep_research',
-        // so sending them is harmless, just slightly less efficient.
-        // Let's keep sending them for now as the backend handles the ignore logic.
-    } else { // 'chat' mode
-        if (!message && filesToAttach.length === 0 && !sessionFileToSend && !calendarContextToSend && !webSearchEnabledToSend) {
+    } else {
+        if (!message && attachmentsForHistory.length === 0 && !calendarContextToSend && !webSearchEnabledToSend) {
             setStatus("Cannot send: Empty message and no context/files attached.", true);
             return;
         }
     }
-    // --- End Validation ---
 
-    // Clear input in DOM immediately
     if (elements.messageInput) {
         elements.messageInput.value = '';
         ui.autoResizeTextarea(elements.messageInput);
     }
 
-    // Add user message to state immediately
-    // UI will react to this state change to display the message
-    if (message) { // Only add if there was a message
-        state.addMessageToHistory({ role: 'user', content: message });
-    } else if (mode === 'chat' && (filesToAttach.length > 0 || sessionFileToSend || calendarContextToSend || webSearchEnabledToSend)) {
-        // Add a placeholder if only context/files were sent in chat mode
-        state.addMessageToHistory({ role: 'user', content: '[Context/Files Sent]' });
+    // Add user message to state, now including the prepared attachmentsForHistory
+    const userMessageContent = message || (attachmentsForHistory.length > 0 ? '[Context/Files Sent]' : '');
+    if (userMessageContent) { // Only add if there's actual text or attachments
+        state.addMessageToHistory({
+            role: 'user',
+            content: userMessageContent,
+            attachments: attachmentsForHistory, // Pass the prepared attachments
+            rawContent: message // Store original message for copy
+        });
     }
-    // No user message added for deep research if only query was sent (handled by backend)
  
- 
-    // Set loading state (backend will emit results/errors)
-    // setLoading(true, mode === 'deep_research' ? "Performing Deep Research..." : "Waiting for response..."); // Use chat-specific processing state instead
-    state.setProcessingChatId(state.currentChatId); // Set the ID of the chat being processed
-    setStatus(mode === 'deep_research' ? "Performing Deep Research..." : "Waiting for response..."); // Update status message
+    state.setProcessingChatId(state.currentChatId);
+    setStatus(mode === 'deep_research' ? "Performing Deep Research..." : "Waiting for response...");
 
-    // Prepare payload for SocketIO emit
     const payload = {
-        chat_id: state.currentChatId, // Still needed for backend context
+        chat_id: state.currentChatId,
         message: message,
-        // Send attached files (full/summary)
-        attached_files: filesToAttach.map(f => ({ id: f.id, type: f.type })), // Send only id and type for attached files
-        // Send session file (content included)
-        session_files: sessionFileToSend ? [{ filename: sessionFileToSend.filename, content: sessionFileToSend.content, mimetype: sessionFileToSend.mimetype }] : [],
+        attached_files: backendAttachedFilesPayload, // Use prepared payload
+        session_files: backendSessionFilesPayload,   // Use prepared payload
         calendar_context: calendarContextToSend,
         enable_web_search: webSearchEnabledToSend,
-        // enable_streaming: state.isStreamingEnabled, // REMOVED - Always stream
-        // enable_files_plugin: state.isFilePluginEnabled, // REMOVED - Always available
-        // enable_calendar_plugin: state.isCalendarPluginEnabled, // REMOVED - Always available
-        // enable_web_search_plugin: state.isWebSearchPluginEnabled, // REMOVED - Always available
-        // Include the determined mode
         mode: mode,
-        // Always enable streaming for chat mode
-        enable_streaming: (mode === 'chat'), // Always true if mode is 'chat'
-        // Include improve prompt flag (only relevant for 'chat' mode, backend handles logic)
-        improve_prompt: state.isImprovePromptEnabled, // Read directly from state here
+        enable_streaming: (mode === 'chat'),
+        improve_prompt: state.isImprovePromptEnabled,
     };
 
-    const sentSessionFile = state.sessionFile; // Store to clear later if needed
-
-    // Emit the message via SocketIO
-    console.log(`[DEBUG] >>>>> Preparing to emit 'send_chat_message'. Socket state: connected=${socket?.connected}, id=${socket?.id}`); // ADDED LOG
+    console.log(`[DEBUG] >>>>> Preparing to emit 'send_chat_message'. Socket state: connected=${socket?.connected}, id=${socket?.id}`);
     console.log(`[DEBUG] Emitting 'send_chat_message' with payload:`, payload);
     socket.emit('send_chat_message', payload);
-    console.log(`[DEBUG] <<<<< Finished emitting 'send_chat_message'.`); // ADDED LOG
+    console.log(`[DEBUG] <<<<< Finished emitting 'send_chat_message'.`);
 
-    // --- Response handling is now done by socket.on listeners ---
-    // Remove the try/catch block that handled the fetch response.
-
-    // Clear temporary sidebar selection state immediately after sending
-    state.clearSidebarSelectedFiles();
-
-    // Clear the session file state immediately after sending
-    if (sentSessionFile && state.sessionFile === sentSessionFile) {
-         state.setSessionFile(null);
-    }
-
-    // Note: setLoading(false) will be called by the event listeners
-    // when the final response or an error is received.
+    // Clear all staged attachments from the input area state
+    state.clearAllCurrentMessageAttachments();
+    // Sidebar selections are typically cleared when they are "attached" to the message draft (state.attachedFiles)
+    // If they persist in state.sidebarSelectedFiles and should be cleared on send, do it here:
+    // state.clearSidebarSelectedFiles(); 
 }
 
-/** Emits a request to cancel the currently processing chat generation. */
 export function cancelChatGeneration() {
     const processingId = state.processingChatId;
     if (!processingId) {
@@ -1318,33 +962,19 @@ export function cancelChatGeneration() {
         setStatus("Cannot cancel: Not connected to the server.", true);
         return;
     }
-
     console.log(`[DEBUG] Emitting 'cancel_generation' for Chat ID: ${processingId}`);
     socket.emit('cancel_generation', { chat_id: processingId });
-    setStatus("Requesting cancellation..."); // Provide immediate feedback
-
-    // The backend will emit 'generation_cancelled' which is handled by the listener
-    // to update status and clear processingChatId.
+    setStatus("Requesting cancellation...");
 }
 
-
-/** Saves the current chat's name by calling the backend and updates state. */
 export async function handleSaveChatName() {
     if (state.isLoading || !state.currentChatId || state.currentTab !== 'chat') {
-        // Set status message if called when not appropriate
-        if (state.currentTab !== 'chat') {
-             setStatus("Cannot save chat name: Not on Chat tab.", true);
-        } else if (!state.currentChatId) {
-             setStatus("Cannot save chat name: No active chat.", true);
-        } else if (state.isLoading) {
-             setStatus("Cannot save chat name: Application is busy.", true);
-        }
+        if (state.currentTab !== 'chat') setStatus("Cannot save chat name: Not on Chat tab.", true);
+        else if (!state.currentChatId) setStatus("Cannot save chat name: No active chat.", true);
+        else if (state.isLoading) setStatus("Cannot save chat name: Application is busy.", true);
         return;
     }
-
-    // Read new name from DOM
     const newName = elements.currentChatNameInput?.value.trim() || 'New Chat';
-
     setLoading(true, "Saving Name");
     try {
         const response = await fetch(`/api/chat/${state.currentChatId}/name`, {
@@ -1357,13 +987,8 @@ export async function handleSaveChatName() {
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         setStatus(`Chat ${state.currentChatId} name saved.`);
-
-        // Update the name in the state directly
         state.setCurrentChatName(newName);
-
-        // Reload saved chats list state to update timestamp/name in sidebar
         await loadSavedChats();
-
     } catch (error) {
         console.error('Error saving chat name:', error);
         setStatus(`Error saving name: ${error.message}`, true);
@@ -1372,17 +997,11 @@ export async function handleSaveChatName() {
     }
 }
 
-/** Deletes a chat by calling the backend and updates state. */
-export async function handleDeleteChat(chatId) { // Removed listItemElement param
+export async function handleDeleteChat(chatId) {
     if (state.isLoading || state.currentTab !== 'chat') return;
-
-    // Find the chat name from state for the confirmation message
     const chatToDelete = state.savedChats.find(chat => chat.id === chatId);
     const chatName = chatToDelete ? (chatToDelete.name || `Chat ${chatId}`) : `Chat ${chatId}`;
-
-    if (!confirm(`Are you sure you want to delete "${chatName}"? This cannot be undone.`)) {
-        return;
-    }
+    if (!confirm(`Are you sure you want to delete "${chatName}"? This cannot be undone.`)) return;
     setLoading(true, "Deleting Chat");
     try {
         const response = await fetch(`/api/chat/${chatId}`, { method: 'DELETE' });
@@ -1391,47 +1010,28 @@ export async function handleDeleteChat(chatId) { // Removed listItemElement para
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         setStatus(`Chat ${chatId} deleted.`);
-
-        // Remove from state first
         state.setSavedChats(state.savedChats.filter(chat => chat.id !== chatId));
-
-        // If the deleted chat was the currently active one, load another or start new
         if (chatId == state.currentChatId) {
-            state.setCurrentChatId(null); // Clear current chat state
+            state.setCurrentChatId(null);
             localStorage.removeItem('currentChatId');
-            // loadSavedChats already re-rendered the list state
-            const firstChat = state.savedChats.length > 0 ? state.savedChats[0] : null; // Get from updated state
-            if (firstChat) {
-                await loadChat(firstChat.id);
-            } else {
-                await startNewChat(); // Create and load a new chat
-            }
+            const firstChat = state.savedChats.length > 0 ? state.savedChats[0] : null;
+            if (firstChat) await loadChat(firstChat.id);
+            else await startNewChat();
         }
-        // If a different chat was deleted, loadSavedChats (called above) will trigger UI re-render
-
     } catch (error) {
         console.error(`Error deleting chat ${chatId}:`, error);
         setStatus(`Error deleting chat: ${error.message}`, true);
-        // Add system message via state? Or let UI react to status?
-        // For now, just update status
-        // Reload list state on failure to ensure UI consistency
         await loadSavedChats();
     } finally {
         setLoading(false);
     }
 }
 
-/** Handles changing the model for the current chat by calling the backend and updates state. */
 export async function handleModelChange() {
     if (!state.currentChatId || state.isLoading || state.currentTab !== 'chat') return;
-
-    // Read new model from DOM
     const newModel = elements.modelSelector?.value;
     if (!newModel) return;
-
-    // Store current model from state before attempting update in case of error
     const originalModel = state.currentChatModel;
-
     setLoading(true, "Updating Model");
     try {
         const response = await fetch(`/api/chat/${state.currentChatId}/model`, {
@@ -1444,96 +1044,67 @@ export async function handleModelChange() {
             throw new Error(errorData.error || `HTTP ${response.status}`);
         }
         setStatus(`Model updated to ${newModel} for this chat.`);
-
-        // Update state with the new model name
         state.setCurrentChatModel(newModel);
-
     } catch (error) {
         console.error("Error updating model:", error);
         setStatus(`Error updating model: ${error.message}`, true);
-        // Revert state on error
         state.setCurrentChatModel(originalModel);
     } finally {
         setLoading(false);
     }
 }
 
-
-// --- Notes API ---
-
-/** Loads the list of saved notes from the backend and updates the state. */
 export async function loadSavedNotes() {
-     if (!elements.savedNotesList) return; // Cannot update UI placeholder if element missing
-
+     if (!elements.savedNotesList) return;
      const wasLoading = state.isLoading;
      if (!wasLoading) setLoading(true, "Loading Notes");
-
-     // Clear current list in state immediately
      state.setSavedNotes([]);
-
      try {
          const response = await fetch('/api/notes');
          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
          const notes = await response.json();
-         state.setSavedNotes(notes); // Update state
-
+         state.setSavedNotes(notes);
          setStatus("Saved notes loaded.");
      } catch (error) {
          console.error('Error loading saved notes:', error);
          setStatus("Error loading saved notes.", true);
-         // state.savedNotes is already [] from above
-         throw error; // Re-throw for initializeApp
+         throw error;
      } finally {
          if (!wasLoading) setLoading(false);
      }
 }
 
-
-/** Creates a new note entry by calling the backend and updates state. */
 export async function startNewNote() {
     console.log(`[DEBUG] startNewNote called.`);
     if (state.isLoading) return;
     setLoading(true, "Creating Note");
-
-    // Clear current note state immediately
     state.setCurrentNoteId(null);
-    state.setCurrentNoteName(''); // Assuming setCurrentNoteName in state.js
-    state.setNoteContent(''); // Assuming setNoteContent in state.js
-    state.setNoteHistory([]); // Clear history for the new empty note
-
+    state.setCurrentNoteName('');
+    state.setNoteContent('');
+    state.setNoteHistory([]);
     try {
         const response = await fetch('/api/notes', { method: 'POST' });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const newNote = await response.json();
         console.log(`[DEBUG] startNewNote: Received new note ID ${newNote.id}. Loading it...`);
-
-        // Load the new note (this updates state.currentNoteId, name, content)
         await loadNote(newNote.id);
-
-        // Reload the notes list state
         await loadSavedNotes();
-
         setStatus(`New note created (ID: ${newNote.id}).`);
         console.log(`[DEBUG] startNewNote: Successfully created and loaded note ${newNote.id}.`);
     } catch (error) {
         console.error('Error starting new note:', error);
         setStatus("Error creating new note.", true);
-        // state is already reset above
     } finally {
         setLoading(false);
     }
 }
 
-/** Loads the content of a specific note from the backend and updates state. */
 export async function loadNote(noteId) {
     console.log(`[DEBUG] loadNote(${noteId}) called.`);
     if (state.isLoading) return;
     setLoading(true, "Loading Note");
-
-    // Clear current note content state immediately
-    state.setNoteContent(''); // Assuming setNoteContent in state.js
-    state.setNoteHistory([]); // Clear history while loading new note
-
+    state.setNoteContent('');
+    state.setNoteHistory([]);
     try {
         const response = await fetch(`/api/note/${noteId}`);
         if (!response.ok) {
@@ -1541,54 +1112,36 @@ export async function loadNote(noteId) {
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-
-        // Update state with note details and content
         state.setCurrentNoteId(data.id);
-        localStorage.setItem('currentNoteId', data.id); // Persist ID
+        localStorage.setItem('currentNoteId', data.id);
         state.setCurrentNoteName(data.name || '');
         state.setNoteContent(data.content || '');
-
-        // Load history for this note after loading the note itself
-        await loadNoteHistory(noteId); // Assuming loadNoteHistory exists and updates state.noteHistory
-
+        await loadNoteHistory(noteId);
         setStatus(`Note ${state.currentNoteId} loaded.`);
-
     } catch (error) {
         console.error(`Error loading note ${noteId}:`, error);
         setStatus(`Error loading note ${noteId}.`, true);
-
-        // Reset state on error
         state.setCurrentNoteId(null);
         localStorage.removeItem('currentNoteId');
         state.setCurrentNoteName('');
-        state.setNoteContent(`[Error loading note ${noteId}: ${error.message}]`); // Put error in content state
-        state.setNoteHistory([]); // Clear history on error
-
-        throw error; // Re-throw for switchTab to handle
+        state.setNoteContent(`[Error loading note ${noteId}: ${error.message}]`);
+        state.setNoteHistory([]);
+        throw error;
     } finally {
         setLoading(false);
     }
 }
 
-/** Saves the current note content and name by calling the backend and updates state. */
 export async function saveNote() {
     if (state.isLoading || !state.currentNoteId || state.currentTab !== 'notes') {
-        // Set status message if called when not appropriate
-        if (state.currentTab !== 'notes') {
-             setStatus("Cannot save note: Not on Notes tab.", true);
-        } else if (!state.currentNoteId) {
-             setStatus("Cannot save note: No active note.", true);
-        } else if (state.isLoading) {
-             setStatus("Cannot save note: Application is busy.", true);
-        }
+        if (state.currentTab !== 'notes') setStatus("Cannot save note: Not on Notes tab.", true);
+        else if (!state.currentNoteId) setStatus("Cannot save note: No active note.", true);
+        else if (state.isLoading) setStatus("Cannot save note: Application is busy.", true);
         return;
     }
     setLoading(true, "Saving Note");
-
-    // Read name and content from state, not DOM
     const noteName = state.currentNoteName || 'New Note';
-    const noteContent = state.noteContent || ''; // Assuming noteContent in state.js
-
+    const noteContent = state.noteContent || '';
     try {
         const response = await fetch(`/api/note/${state.currentNoteId}`, {
             method: 'PUT',
@@ -1600,13 +1153,8 @@ export async function saveNote() {
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         setStatus(`Note ${state.currentNoteId} saved successfully.`);
-
-        // Reload notes list state to update timestamp/name in sidebar
         await loadSavedNotes();
-
-        // Reload history for this note after saving
-        await loadNoteHistory(state.currentNoteId); // Assuming loadNoteHistory exists and updates state.noteHistory
-
+        await loadNoteHistory(state.currentNoteId);
     } catch (error) {
         console.error(`Error saving note ${state.currentNoteId}:`, error);
         setStatus(`Error saving note: ${error.message}`, true);
@@ -1615,59 +1163,36 @@ export async function saveNote() {
     }
 }
 
-/** Deletes a specific note by calling the backend and updates state. */
-export async function handleDeleteNote(noteId) { // Removed listItemElement param
+export async function handleDeleteNote(noteId) {
     if (state.isLoading || state.currentTab !== 'notes') return;
-
-    // Find the note name from state for the confirmation message
     const noteToDelete = state.savedNotes.find(note => note.id === noteId);
     const noteName = noteToDelete ? (noteToDelete.name || `Note ${noteId}`) : `Note ${noteId}`;
-
-    if (!confirm(`Are you sure you want to delete "${noteName}"? This cannot be undone.`)) {
-        return;
-    }
+    if (!confirm(`Are you sure you want to delete "${noteName}"? This cannot be undone.`)) return;
     setLoading(true, "Deleting Note");
     try {
         const response = await fetch(`/api/note/${noteId}`, { method: 'DELETE' });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         setStatus(`Note ${noteId} deleted.`);
-
-        // Remove from state first
         state.setSavedNotes(state.savedNotes.filter(note => note.id !== noteId));
-
-        // If the deleted note was the currently active one, load another or start new
         if (noteId == state.currentNoteId) {
-            state.setCurrentNoteId(null); // Clear current note state
+            state.setCurrentNoteId(null);
             localStorage.removeItem('currentNoteId');
-            state.setNoteContent(''); // Clear content for deleted note
-            state.setNoteHistory([]); // Clear history for the deleted note
-            // loadSavedNotes already re-rendered the list state
-            const firstNote = state.savedNotes.length > 0 ? state.savedNotes[0] : null; // Get from updated state
-            if (firstNote) {
-                await loadNote(firstNote.id);
-            } else {
-                await startNewNote(); // Create and load a new note
-            }
+            state.setNoteContent('');
+            state.setNoteHistory([]);
+            const firstNote = state.savedNotes.length > 0 ? state.savedNotes[0] : null;
+            if (firstNote) await loadNote(firstNote.id);
+            else await startNewNote();
         }
-        // If a different note was deleted, loadSavedNotes (called above) will trigger UI re-render
-
     } catch (error) {
         console.error(`Error deleting note ${noteId}:`, error);
         setStatus(`Error deleting note: ${error.message}`, true);
-        // Add system message via state? Or let UI react to status?
-        // For now, just update status
-        // Reload list state on failure
         await loadSavedNotes();
     } finally {
         setLoading(false);
     }
 }
 
-/** Loads the history of a specific note from the backend and updates state. */
 export async function loadNoteHistory(noteId) {
-    // Note: Loading state is handled by the caller (loadNote or saveNote)
-    // setStatus("Loading note history..."); // Status handled by caller
-
     try {
         const response = await fetch(`/api/notes/${noteId}/history`);
         if (!response.ok) {
@@ -1675,226 +1200,119 @@ export async function loadNoteHistory(noteId) {
              throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
         const history = await response.json();
-
-        // --- Frontend Workaround: Update the name of the most recent history entry ---
-        // This assumes the backend returns history sorted by saved_at DESC
-        // REMOVED: This workaround is no longer needed as the backend is fixed
-        // if (history && history.length > 0) {
-        //     const currentNote = state.savedNotes.find(note => note.id === noteId);
-        //     const currentNoteName = currentNote ? (currentNote.name || `Note ${noteId}`) : (state.currentNoteName || `Note ${noteId}`);
-        //     history[0] = { ...history[0], name: currentNoteName };
-        //     console.log('[DEBUG] loadNoteHistory: Applied frontend workaround to update name of most recent history entry:', history[0]);
-        // }
-        // -----------------------------------------------------------------------------
-
-        state.setNoteHistory(history); // Update state (this notifies 'noteHistory')
-        // Status handled by caller
+        state.setNoteHistory(history);
     } catch (error) {
-        state.setNoteHistory([]); // Clear history on error
-        // Status handled by caller
-        throw error; // Re-throw for caller to handle if needed
-    } finally {
-        // Loading state handled by caller
+        state.setNoteHistory([]);
+        throw error;
     }
 }
 
-
-// --- Removed Note Diff Summary Generation API function ---
-// Summary generation is now handled during note save.
-
-// --- NEW: On-Demand Note Diff Summary Generation API ---
-/**
- * Calls the backend to generate and save an AI diff summary for a specific note history entry.
- * This is typically called when clicking a history item with a pending summary.
- * @param {number} noteId - The ID of the parent note.
- * @param {number} historyId - The ID of the specific history entry.
- * @returns {Promise<boolean>} True if summary was generated/saved successfully or already existed, false otherwise.
- */
 export async function generateNoteDiffSummaryForHistoryItem(noteId, historyId) {
     if (state.isLoading) {
         setStatus("Cannot generate summary: Application is busy.", true);
-        return false; // Indicate failure
+        return false;
     }
-    // Use a more specific loading message
     setLoading(true, `Generating summary for version ${historyId}...`);
-
     try {
         const response = await fetch(`/api/notes/${noteId}/history/${historyId}/generate_summary`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            // No body needed for this request
         });
-
-        const data = await response.json(); // Always expect JSON back
-
+        const data = await response.json();
         if (!response.ok) {
-            // Throw error even if backend returns a summary but failed to save
             throw new Error(data.error || `HTTP error! status: ${response.status}`);
         }
-
-        // Check if the backend reported a save error despite 2xx status
         if (data.error && data.error.includes("Failed to save")) {
              setStatus(`Summary generated for version ${historyId}, but failed to save.`, true);
-             // Reload history anyway to show the generated (but unsaved) summary if backend sent it
              await loadNoteHistory(noteId);
-             return false; // Indicate failure due to save error
+             return false;
         } else if (data.message && data.message.includes("already existed")) {
              setStatus(`Summary for version ${historyId} already existed.`);
-             // No need to reload history if it already existed
-             return true; // Indicate success (already existed)
+             return true;
         } else {
              setStatus(`Summary generated for version ${historyId}.`);
-             // Reload history for this note to show the new summary
-             await loadNoteHistory(noteId); // This updates state.noteHistory
-             return true; // Indicate success
+             await loadNoteHistory(noteId);
+             return true;
         }
-
     } catch (error) {
         console.error(`Error generating/saveSummary for history ${historyId}:`, error);
         setStatus(`Error generating summary: ${error.message}`, true);
-        // Attempt to reload history even on error to reset UI state if needed
-        try {
-            await loadNoteHistory(noteId);
-        } catch (reloadError) {
-            console.error(`Error reloading note history after summary generation failure:`, reloadError);
-        }
-        return false; // Indicate failure
+        try { await loadNoteHistory(noteId); }
+        catch (reloadError) { console.error(`Error reloading note history after summary generation failure:`, reloadError); }
+        return false;
     } finally {
         setLoading(false);
     }
 }
-// -----------------------------------------
 
-
-// --- Transcript Cleanup API ---
-/**
- * Sends raw transcript text to the backend for cleanup.
- * @param {string} rawTranscript - The raw transcript text.
- * @returns {Promise<string>} A promise that resolves with the cleaned transcript or rejects on error.
- */
 export async function cleanupTranscript(rawTranscript) {
-    // console.log("[DEBUG] cleanupTranscript API called with:", rawTranscript); // Log input
     if (state.isLoading) {
-        // console.warn("[WARN] cleanupTranscript called while loading.");
-        throw new Error("Application is busy."); // Throw error if already loading
+        throw new Error("Application is busy.");
     }
     setLoading(true, "Cleaning Transcript");
-
     try {
         const response = await fetch('/api/voice/cleanup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ transcript: rawTranscript })
         });
-
-        // console.log("[DEBUG] cleanupTranscript API response status:", response.status);
-        const responseText = await response.text(); // Get raw text first for logging
-        // console.log("[DEBUG] cleanupTranscript API raw response body:", responseText);
-
+        const responseText = await response.text();
         let data;
-        try {
-            data = JSON.parse(responseText); // Try parsing JSON
-        } catch (parseError) {
-            console.error("[ERROR] Failed to parse cleanupTranscript API response as JSON:", parseError);
-            throw new Error(`Failed to parse API response. Status: ${response.status}`);
-        }
-
-
-        if (!response.ok) {
-            console.error("[ERROR] cleanupTranscript API returned error:", data.error || `HTTP ${response.status}`);
-            throw new Error(data.error || `HTTP error! status: ${response.status}`);
-        }
-
+        try { data = JSON.parse(responseText); }
+        catch (parseError) { throw new Error(`Failed to parse API response. Status: ${response.status}`); }
+        if (!response.ok) { throw new Error(data.error || `HTTP error! status: ${response.status}`); }
         const cleanedTranscript = data.cleaned_transcript;
-        // console.log("[DEBUG] cleanupTranscript API success. Cleaned text:", cleanedTranscript);
-
-        setStatus("Transcript cleaned."); // Set status on success
-        return cleanedTranscript; // Return the cleaned text
-
+        setStatus("Transcript cleaned.");
+        return cleanedTranscript;
     } catch (error) {
-        // Error is already logged above if it's an API error
-        // This catch block handles network errors or JSON parsing errors primarily
         console.error('Error during cleanupTranscript fetch/processing:', error);
-        setStatus(`Cleanup failed: ${error.message}`, true); // Set error status
-        throw error; // Re-throw the error for the caller to handle
+        setStatus(`Cleanup failed: ${error.message}`, true);
+        throw error;
     } finally {
         setLoading(false);
     }
 }
 
-
-// --- Initial Data Loading ---
-
-/** Loads the initial data required for the Chat tab. */
 export async function loadInitialChatData() {
-    // loadSavedChats is called by initializeApp before switchTab
-    // await loadSavedChats(); // Load chat list state first
-
-    let chatToLoadId = state.currentChatId; // Use persisted ID if available
+    let chatToLoadId = state.currentChatId;
     let chatFoundInList = false;
-
-    // Check if the persisted ID exists in the already loaded list of chats
     if (chatToLoadId !== null && state.savedChats.length > 0) {
         chatFoundInList = state.savedChats.some(chat => chat.id === chatToLoadId);
         if (!chatFoundInList) {
-            state.setCurrentChatId(null); // Clear the stale ID state
+            state.setCurrentChatId(null);
             localStorage.removeItem('currentChatId');
-            chatToLoadId = null; // Ensure fallback logic triggers
+            chatToLoadId = null;
         }
     } else if (chatToLoadId !== null && state.savedChats.length === 0) {
-         // If there's a persisted ID but no saved chats at all, it's definitely stale
-         state.setCurrentChatId(null); // Clear the stale ID state
+         state.setCurrentChatId(null);
          localStorage.removeItem('currentChatId');
-         chatToLoadId = null; // Ensure fallback logic triggers
+         chatToLoadId = null;
     }
-
-
-    // If no valid persisted chat or loading failed, load most recent or start new
-    if (state.currentChatId === null) { // Check state.currentChatId after attempts
-        const firstChat = state.savedChats.length > 0 ? state.savedChats[0] : null; // Get from state (already sorted by loadSavedChats)
-        if (firstChat) {
-            const mostRecentChatId = firstChat.id;
-            await loadChat(mostRecentChatId); // Updates state
-        } else {
-            await startNewChat(); // Updates state
-        }
+    if (state.currentChatId === null) {
+        const firstChat = state.savedChats.length > 0 ? state.savedChats[0] : null;
+        if (firstChat) await loadChat(firstChat.id);
+        else await startNewChat();
     }
 }
 
-/** Loads the initial data required for the Notes tab. */
 export async function loadInitialNotesData() {
-    // loadSavedNotes is called by initializeApp before switchTab
-    // await loadSavedNotes(); // Load notes list state first
-
-    let noteToLoadId = state.currentNoteId; // Use persisted ID
+    let noteToLoadId = state.currentNoteId;
     let noteFoundInList = false;
-
-    // Check if the persisted ID exists in the already loaded list of notes
     if (noteToLoadId !== null && state.savedNotes.length > 0) {
         noteFoundInList = state.savedNotes.some(note => note.id === noteToLoadId);
         if (!noteFoundInList) {
-            state.setCurrentNoteId(null); // Clear the stale ID state
+            state.setCurrentNoteId(null);
             localStorage.removeItem('currentNoteId');
-            noteToLoadId = null; // Ensure fallback logic triggers
+            noteToLoadId = null;
         }
     } else if (noteToLoadId !== null && state.savedNotes.length === 0) {
-         // If there's a persisted ID but no saved notes at all, it's definitely stale
-         state.setCurrentNoteId(null); // Clear the stale ID state
+         state.setCurrentNoteId(null);
          localStorage.removeItem('currentNoteId');
-         noteToLoadId = null; // Ensure fallback logic triggers
+         noteToLoadId = null;
     }
-
-
-    // If no valid persisted note or loading failed, load most recent or start new
-    if (state.currentNoteId === null) { // Check state.currentNoteId after attempts
-        const firstNote = state.savedNotes.length > 0 ? state.savedNotes[0] : null; // Get from state (already sorted by loadSavedNotes)
-        if (firstNote) {
-            const mostRecentNoteId = firstNote.id;
-            await loadNote(mostRecentNoteId); // Updates state
-        } else {
-            await startNewNote(); // Creates and loads a new note
-        }
+    if (state.currentNoteId === null) {
+        const firstNote = state.savedNotes.length > 0 ? state.savedNotes[0] : null;
+        if (firstNote) await loadNote(firstNote.id);
+        else await startNewNote();
     }
-
-    // Note mode is handled by UI reacting to state.currentNoteMode
 }
