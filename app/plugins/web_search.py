@@ -9,6 +9,9 @@ from urllib.parse import urlparse # To parse URL for filename fallback
 from werkzeug.utils import secure_filename # To sanitize filenames
 import cgi # To parse Content-Disposition header
 
+# Import database function for saving files
+from app.database import save_file_record_to_db
+
 
 # Configure logging
 import logging
@@ -29,6 +32,7 @@ def fetch_web_content(url):
               - 'type': 'html', 'pdf', or 'error'
               - 'content': Extracted text (for html), raw bytes (for pdf, currently unused downstream), or error message.
               - 'url': The original URL.
+              - 'filename': (for pdf type) The suggested filename for the PDF.
     """
     try:
         # Use stream=True to check headers before downloading the whole body
@@ -42,7 +46,7 @@ def fetch_web_content(url):
         if 'application/pdf' in content_type:
             logger.info(f"Detected PDF content at {url}. Downloading...")
             # Download the full PDF content
-            pdf_bytes = response.content
+            pdf_bytes = response.content # Read the full content now
             logger.info(f"Downloaded {len(pdf_bytes)} bytes for PDF from {url}")
 
             # --- Extract Filename ---
@@ -76,7 +80,7 @@ def fetch_web_content(url):
         # Proceed only if it's likely HTML (or unspecified, default to HTML attempt)
         if 'text/html' in content_type or not content_type:
             # Download the full content now
-            html_content = response.content
+            html_content = response.content # Read the full content now
             soup = BeautifulSoup(html_content, "html.parser")
             text = None
 
@@ -140,14 +144,16 @@ def fetch_web_content(url):
 def perform_web_search(query, num_results=3):
     """
     Performs a web search using the Google Custom Search JSON API.
+    Fetched content (HTML/PDF) is saved to the database.
 
     Args:
         query (str): The search query string.
         num_results (int): The desired number of search results (max 10 per request).
 
     Returns:
-        list: A list of strings, where each string contains the title and snippet
-              of a search result, or an empty list if an error occurs or no results found.
+        list: A list of dictionaries, where each dictionary contains title, link, snippet,
+              fetch_result (with type, content, url, [filename]), and potentially saved_file_id.
+              Returns an empty list or a list with error messages on failure.
     """
     logger.info(
         f"Performing Google Custom Search for: '{query}' (requesting {num_results} results)"
@@ -158,56 +164,84 @@ def perform_web_search(query, num_results=3):
 
     if not api_key:
         logger.error("ERROR: GOOGLE_API_KEY not found in Flask config.")
-        return ["[System Error: Web search API key not configured]"]
+        return [{"type": "error", "content": "[System Error: Web search API key not configured]", "url": query}]
     if not cse_id:
         logger.error("ERROR: GOOGLE_CSE_ID not found in Flask config.")
-        return ["[System Error: Web search Engine ID not configured]"]
+        return [{"type": "error", "content": "[System Error: Web search Engine ID not configured]", "url": query}]
 
     # Ensure num_results is within the API limits (1-10)
     num_results = max(1, min(num_results, 10))
 
-    search_results_processed = [] # Changed variable name
+    search_results_processed = []
     try:
-        # Build the service object
         service = build("customsearch", "v1", developerKey=api_key)
-
-        # Execute the search request
         result = service.cse().list(q=query, cx=cse_id, num=num_results).execute()
-
-        # Extract snippets from results
         search_items = result.get("items", [])
+
         if not search_items:
             logger.info("Web search returned no results.")
-            return [] # Return empty list
+            return []
 
         for i, item in enumerate(search_items):
             title = item.get("title", "No Title")
             link = item.get("link", "no link")
-            snippet = item.get("snippet", "No Snippet Available")
+            snippet = item.get("snippet", "No Snippet Available").replace(chr(10), ' ').replace(chr(13), ' ')
 
-            # Fetch content using the unified function
             logger.info(f"Fetching content for result {i+1}: {link}")
-            fetch_result = fetch_web_content(link) # fetch_result is a dict now
+            fetch_result = fetch_web_content(link)
 
-            # Store result details in a dictionary
+            saved_file_id = None
+            if fetch_result['type'] == 'html' and fetch_result['content']:
+                html_text = fetch_result['content']
+                # Create a filename from title or URL
+                base_filename = title if title != "No Title" else urlparse(link).path.split('/')[-1]
+                if not base_filename: # if path is like '/'
+                    base_filename = urlparse(link).netloc
+                html_filename = secure_filename(f"{base_filename[:100]}.html")
+
+                content_bytes = html_text.encode('utf-8')
+                mimetype = 'text/html'
+                filesize = len(content_bytes)
+                try:
+                    saved_file_id = save_file_record_to_db(html_filename, content_bytes, mimetype, filesize)
+                    if saved_file_id:
+                        logger.info(f"Saved HTML content from {link} as file ID {saved_file_id} ({html_filename})")
+                    else:
+                        logger.error(f"Failed to save HTML content from {link} to database.")
+                except Exception as e_save:
+                    logger.error(f"Exception saving HTML content from {link} to DB: {e_save}", exc_info=True)
+
+            elif fetch_result['type'] == 'pdf' and fetch_result['content']:
+                pdf_bytes = fetch_result['content']
+                pdf_filename = fetch_result['filename'] # Already secured
+                mimetype = 'application/pdf'
+                filesize = len(pdf_bytes)
+                try:
+                    saved_file_id = save_file_record_to_db(pdf_filename, pdf_bytes, mimetype, filesize)
+                    if saved_file_id:
+                        logger.info(f"Saved PDF content from {link} as file ID {saved_file_id} ({pdf_filename})")
+                    else:
+                        logger.error(f"Failed to save PDF content from {link} to database.")
+                except Exception as e_save:
+                    logger.error(f"Exception saving PDF content from {link} to DB: {e_save}", exc_info=True)
+
             result_data = {
                 'title': title,
                 'link': link,
-                'snippet': snippet.replace(chr(10), ' ').replace(chr(13), ' '), # Clean snippet here
-                'fetch_result': fetch_result # Contains type, content, url, [filename]
+                'snippet': snippet,
+                'fetch_result': fetch_result, # Contains type, content, url, [filename]
             }
+            if saved_file_id:
+                result_data['saved_file_id'] = saved_file_id
 
             search_results_processed.append(result_data)
-            logger.info(f"  - Processed Result {i+1}: {title} ({fetch_result['type']})")
+            logger.info(f"  - Processed Result {i+1}: {title} ({fetch_result['type']}) - Saved File ID: {saved_file_id}")
 
-        return search_results_processed # Return list of dictionaries
+        return search_results_processed
 
     except HttpError as e:
         logger.error(f"ERROR during Google Custom Search API call: {e}")
-        # Provide a generic error for the AI context, don't expose detailed API errors
-        return [
-            f"[System Error: Web search failed. Reason: {e.resp.status} {e.resp.reason}]"
-        ]
+        return [{"type": "error", "content": f"[System Error: Web search failed. Reason: {e.resp.status} {e.resp.reason}]", "url": query}]
     except Exception as e:
-        logger.error(f"An unexpected error occurred during web search: {e}")
-        return ["[System Error: An unexpected error occurred during web search.]"]
+        logger.error(f"An unexpected error occurred during web search: {e}", exc_info=True)
+        return [{"type": "error", "content": "[System Error: An unexpected error occurred during web search.]", "url": query}]
