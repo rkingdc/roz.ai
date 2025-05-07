@@ -733,6 +733,12 @@
      min-height: 0; /* Important for scrollable flex children */
      /* --- END ADDED LINES --- */
 }
+/* --- NEW: Style for #uploaded-files-list in the plugin sidebar --- */
+#uploaded-files-list {
+    max-height: 66vh; /* Cap height at approx 2/3 of viewport height */
+    /* Other properties like overflow-y: auto, flex-grow, min-height: 0
+       are inherited from .sidebar-list or Tailwind classes */
+}
  .list-item {
      display: flex; /* Keep flex display */
      flex-direction: column; /* Stack children vertically */
