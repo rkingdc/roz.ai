@@ -9,8 +9,8 @@ from urllib.parse import urlparse # To parse URL for filename fallback
 from werkzeug.utils import secure_filename # To sanitize filenames
 import cgi # To parse Content-Disposition header
 
-# Import database function for saving files
-from app.database import save_file_record_to_db
+# Import database function for saving files - MOVED INSIDE perform_web_search
+# from app.database import save_file_record_to_db
 
 
 # Configure logging
@@ -155,6 +155,9 @@ def perform_web_search(query, num_results=3):
               fetch_result (with type, content, url, [filename]), and potentially saved_file_id.
               Returns an empty list or a list with error messages on failure.
     """
+    # Moved import here to break circular dependency
+    from app.database import save_file_record_to_db
+
     logger.info(
         f"Performing Google Custom Search for: '{query}' (requesting {num_results} results)"
     )
