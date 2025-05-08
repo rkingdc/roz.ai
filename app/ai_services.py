@@ -14,7 +14,7 @@ import tempfile
 import os
 import re
 import base64
-from . import database # Use alias to avoid conflict with db instance
+from . import database  # Use alias to avoid conflict with db instance
 from .plugins.web_search import perform_web_search  # Remove fetch_web_content import
 from google.api_core.exceptions import (
     GoogleAPIError,
@@ -1086,35 +1086,35 @@ def _generate_chat_response_non_stream(
             assistant_response_content = f"[Unexpected AI Error: {type(e).__name__}]"
             socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
 
-    finally:
-        # --- Save Assistant Response to DB ---
-        if (
-            assistant_response_content
-        ):  # Ensure there's content (even error messages)
-            logger.info(
-                f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
-            )
-            try:
-                # Assistant messages don't have attached_data in this context
-                save_success = database.add_message_to_db(
-                    chat_id,
-                    "assistant",
-                    assistant_response_content,
-                    attached_data_json=None,
+        finally:
+            # --- Save Assistant Response to DB ---
+            if (
+                assistant_response_content
+            ):  # Ensure there's content (even error messages)
+                logger.info(
+                    f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
                 )
-                if not save_success:
-                    logger.error(
-                        f"Failed to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
+                try:
+                    # Assistant messages don't have attached_data in this context
+                    save_success = database.add_message_to_db(
+                        chat_id,
+                        "assistant",
+                        assistant_response_content,
+                        attached_data_json=None,
                     )
-            except Exception as db_err:
-                logger.error(
-                    f"DB error saving non-streaming assistant message for chat {chat_id} (SID: {sid}): {db_err}",
-                    exc_info=True,
+                    if not save_success:
+                        logger.error(
+                            f"Failed to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
+                        )
+                except Exception as db_err:
+                    logger.error(
+                        f"DB error saving non-streaming assistant message for chat {chat_id} (SID: {sid}): {db_err}",
+                        exc_info=True,
+                    )
+            else:
+                logger.warning(
+                    f"No assistant content generated to save for non-streaming chat {chat_id} (SID: {sid})."
                 )
-        else:
-            logger.warning(
-                f"No assistant content generated to save for non-streaming chat {chat_id} (SID: {sid})."
-            )
 
         _cleanup_temp_files(
             temp_files_to_clean, f"non-streaming chat {chat_id} (SID: {sid})"
