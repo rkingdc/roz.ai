@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timezone
 from flask import current_app
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text # Added for FTS queries
 
 # Import AI services for summary generation
 from app import ai_services
@@ -610,4 +611,129 @@ def get_note_history_from_db(note_id, limit=None):
         ]
     except SQLAlchemyError as e:
         logger.error(f"Database error getting history for note {note_id}: {e}", exc_info=True)
+        return []
+
+# --- FTS Search Functions ---
+
+def search_messages(search_term: str, limit: int = 10):
+    """Searches messages using FTS5 and returns Message objects as dictionaries."""
+    if not search_term:
+        logger.debug("Search term is empty for messages, returning empty list.")
+        return []
+    try:
+        # FTS5 query to get matching rowids (Message IDs)
+        # Results are ordered by relevance by default (rank)
+        sql_query = text("""
+            SELECT rowid
+            FROM message_fts
+            WHERE message_fts MATCH :term
+            ORDER BY rank
+            LIMIT :limit
+        """)
+        result = db.session.execute(sql_query, {"term": search_term, "limit": limit})
+        message_ids = [row[0] for row in result]
+
+        if not message_ids:
+            logger.debug(f"No messages found for search term: '{search_term}'")
+            return []
+
+        # Fetch Message objects based on the IDs, preserving FTS relevance order
+        messages = db.session.query(Message).filter(Message.id.in_(message_ids)).all()
+        
+        # Create a dictionary for quick lookups and then re-order
+        messages_dict = {msg.id: msg for msg in messages}
+        ordered_messages = [messages_dict[id] for id in message_ids if id in messages_dict]
+
+        logger.info(f"Found {len(ordered_messages)} messages for search term: '{search_term}'")
+        return [
+            {
+                'id': msg.id,
+                'chat_id': msg.chat_id,
+                'role': msg.role,
+                'content': msg.content, # Consider adding snippet() function later
+                'timestamp': msg.timestamp,
+                'attachments': msg.attached_data or []
+            }
+            for msg in ordered_messages
+        ]
+    except SQLAlchemyError as e:
+        logger.error(f"Database error searching messages for '{search_term}': {e}", exc_info=True)
+        return []
+
+def search_notes(search_term: str, limit: int = 10):
+    """Searches notes using FTS5 and returns Note objects as dictionaries."""
+    if not search_term:
+        logger.debug("Search term is empty for notes, returning empty list.")
+        return []
+    try:
+        sql_query = text("""
+            SELECT rowid
+            FROM note_fts
+            WHERE note_fts MATCH :term
+            ORDER BY rank
+            LIMIT :limit
+        """)
+        result = db.session.execute(sql_query, {"term": search_term, "limit": limit})
+        note_ids = [row[0] for row in result]
+
+        if not note_ids:
+            logger.debug(f"No notes found for search term: '{search_term}'")
+            return []
+
+        notes = db.session.query(Note).filter(Note.id.in_(note_ids)).all()
+        notes_dict = {note.id: note for note in notes}
+        ordered_notes = [notes_dict[id] for id in note_ids if id in notes_dict]
+        
+        logger.info(f"Found {len(ordered_notes)} notes for search term: '{search_term}'")
+        return [
+            {
+                'id': note.id,
+                'name': note.name,
+                'content': note.content, # Consider snippet()
+                'last_saved_at': note.last_saved_at
+            }
+            for note in ordered_notes
+        ]
+    except SQLAlchemyError as e:
+        logger.error(f"Database error searching notes for '{search_term}': {e}", exc_info=True)
+        return []
+
+def search_files(search_term: str, limit: int = 10):
+    """Searches file summaries using FTS5 and returns File objects as dictionaries."""
+    if not search_term:
+        logger.debug("Search term is empty for files, returning empty list.")
+        return []
+    try:
+        sql_query = text("""
+            SELECT rowid
+            FROM file_fts
+            WHERE file_fts MATCH :term
+            ORDER BY rank
+            LIMIT :limit
+        """)
+        result = db.session.execute(sql_query, {"term": search_term, "limit": limit})
+        file_ids = [row[0] for row in result]
+
+        if not file_ids:
+            logger.debug(f"No files found for search term: '{search_term}'")
+            return []
+
+        files = db.session.query(File).filter(File.id.in_(file_ids)).all()
+        files_dict = {f.id: f for f in files}
+        ordered_files = [files_dict[id] for id in file_ids if id in files_dict]
+
+        logger.info(f"Found {len(ordered_files)} files for search term: '{search_term}'")
+        return [
+            {
+                'id': f.id,
+                'filename': f.filename,
+                'mimetype': f.mimetype,
+                'filesize': f.filesize,
+                'uploaded_at': f.uploaded_at,
+                'summary': f.summary, # Consider snippet()
+                'has_summary': f.summary is not None
+            } for f in ordered_files
+        ]
+    except SQLAlchemyError as e:
+        logger.error(f"Database error searching files for '{search_term}': {e}", exc_info=True)
         return []
