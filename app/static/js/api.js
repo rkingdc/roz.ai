@@ -647,6 +647,38 @@ export async function saveSummary() {
     }
 }
 
+/**
+ * Fetches the content of a specific file from the backend.
+ * @param {number} fileId - The ID of the file to fetch.
+ * @returns {Promise<object|null>} A promise that resolves to the file data object
+ * (id, filename, content, mimetype, is_base64) or null if an error occurs.
+ */
+export async function fetchFileContent(fileId) {
+    if (state.isLoading) {
+        setStatus("Cannot fetch file content: Application is busy.", true);
+        return null;
+    }
+    setLoading(true, `Fetching content for file ${fileId}...`);
+    try {
+        const response = await fetch(`/api/file_content/${fileId}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const fileData = await response.json();
+        // The response should include: id, filename, content, mimetype, is_base64
+        setStatus(`Content loaded for file ${fileData.filename}.`);
+        return fileData;
+    } catch (error) {
+        console.error(`Error fetching content for file ${fileId}:`, error);
+        setStatus(`Error fetching file content: ${error.message}`, true);
+        return null;
+    } finally {
+        setLoading(false);
+    }
+}
+
+
 export function attachSelectedFilesFull() {
     if (state.currentTab !== 'chat' || state.isLoading) {
         setStatus("Cannot attach files: Not on Chat tab or busy.", true);
