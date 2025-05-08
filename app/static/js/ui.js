@@ -297,9 +297,15 @@ function addMessageToDom(messageObject) {
                 attachmentElement.classList.add(
                     'message-attachment-tag', 'inline-flex', 'items-center', 'text-xs', 'font-medium',
                     'px-2', 'py-0.5', 'rounded-full', 'bg-gray-100', 'text-gray-700',
-                    'dark:bg-gray-600', 'dark:text-gray-200' // Example dark mode styling
+                    'dark:bg-gray-600', 'dark:text-gray-200', // Example dark mode styling
+                    'cursor-pointer', 'hover:bg-gray-200', 'dark:hover:bg-gray-500' // Make it clickable
                 );
-                attachmentElement.title = `Attached: ${escapeHtml(attachment.filename)}`;
+                attachmentElement.title = `Click to view: ${escapeHtml(attachment.filename)}`;
+                // Store file ID and type for click handler
+                if (attachment.id) { // Only add data-file-id if it's a saved file (not session)
+                    attachmentElement.dataset.fileId = attachment.id;
+                }
+                attachmentElement.dataset.fileType = attachment.type; // 'full', 'summary', 'session'
 
                 let iconClass = 'fa-file'; // Default icon
                 // Determine icon based on attachment.type or attachment.mimetype
@@ -325,6 +331,57 @@ function addMessageToDom(messageObject) {
                 attachmentElement.appendChild(iconElement);
                 attachmentElement.appendChild(nameSpan);
                 attachmentsContainer.appendChild(attachmentElement);
+
+                // Add click listener to the attachment tag
+                attachmentElement.addEventListener('click', async () => {
+                    const fileId = attachmentElement.dataset.fileId;
+                    const fileType = attachmentElement.dataset.fileType;
+
+                    if (fileType === 'session') {
+                        // Handle session file display (content is in state.sessionFile)
+                        // Find the session file in state.sessionFile
+                        const sessionFile = state.sessionFile;
+                        if (sessionFile && sessionFile.filename === attachment.filename && sessionFile.mimetype === attachment.mimetype) {
+                             // Assuming sessionFile.content is already available (e.g., base64)
+                             // Need to decide how session file content is stored and accessed.
+                             // If sessionFile.content is the raw data (bytes or string), we need to handle it.
+                             // For now, let's assume sessionFile.content is the base64 string or text.
+                             console.log(`[DEBUG] Displaying session file content for ${sessionFile.filename}`);
+                             // Need to determine if sessionFile.content is text or base64 based on mimetype
+                             const isText = sessionFile.mimetype.startsWith('text/') || sessionFile.mimetype === 'application/json' || sessionFile.filename.endsWith(('.txt', '.py', '.js', '.html', '.css', '.md', '.json', '.csv'));
+                             state.setCurrentViewingFile(
+                                 'session', // Use a placeholder ID for session files
+                                 sessionFile.filename,
+                                 sessionFile.content, // Assuming this is the content to display (text or base64)
+                                 sessionFile.mimetype,
+                                 !isText // isBase64 flag
+                             );
+                             showModal(elements.fileContentModal);
+                        } else {
+                             console.error("Session file not found in state for display.");
+                             // Maybe show an error toast?
+                        }
+
+                    } else if (fileId) {
+                        // Handle saved file display (fetch content from backend)
+                        console.log(`[DEBUG] Fetching content for file ID: ${fileId}`);
+                        const fileData = await import('./api.js').then(api => api.fetchFileContent(parseInt(fileId)));
+                        if (fileData && fileData.content !== undefined) {
+                            state.setCurrentViewingFile(
+                                fileData.id,
+                                fileData.filename,
+                                fileData.content,
+                                fileData.mimetype,
+                                fileData.is_base64
+                            );
+                            showModal(elements.fileContentModal);
+                        } else {
+                            // Error message already handled by fetchFileContent
+                        }
+                    } else {
+                        console.warn("Clicked attachment tag has no file ID or is not a session file.", attachment);
+                    }
+                });
             }
         });
         messageElement.appendChild(attachmentsContainer); // Add attachments before message content
@@ -1087,7 +1144,48 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
 
     modalElement.classList.add('show');
     if (elements.bodyElement) elements.bodyElement.classList.add('modal-open');
+    state.setIsFileContentModalOpen(true); // Update state
     return true;
+}
+
+
+/**
+ * Hides a modal window.
+ * @param {HTMLElement} modalElement - The modal element to hide.
+ */
+export function hideModal(modalElement) {
+    if (modalElement) {
+        modalElement.classList.remove('show');
+        // Check if *any* modal is still open before removing the body class
+        const anyModalOpen = document.querySelectorAll('.modal.show').length > 0;
+        if (!anyModalOpen && elements.bodyElement) elements.bodyElement.classList.remove('modal-open');
+
+        // Specific cleanup for file content modal
+        if (modalElement.id === 'file-content-modal') {
+            state.setIsFileContentModalOpen(false); // Update state
+            state.clearCurrentViewingFile(); // Clear viewing state
+        }
+         // Specific cleanup for summary modal
+        if (modalElement.id === 'summary-modal') {
+             state.setCurrentEditingFileId(null); // Clear editing state
+             state.setSummaryContent(""); // Clear summary content state
+        }
+         // Specific cleanup for URL modal
+        if (modalElement.id === 'url-modal') {
+             if(elements.urlInput) elements.urlInput.value = ''; // Clear input
+             if(elements.urlStatus) elements.urlStatus.textContent = ''; // Clear status
+        }
+         // Specific cleanup for settings modal
+        if (modalElement.id === 'settings-modal') {
+             // No specific state to clear currently
+        }
+         // Specific cleanup for markdown tips modal
+        if (modalElement.id === 'markdown-tips-modal') {
+             // No specific state to clear currently
+        }
+
+        console.log(`[DEBUG] Modal hidden: ${modalElement.id}`);
+    }
 }
 
 
@@ -1612,14 +1710,8 @@ export function openModal(modalElement) {
     }
 }
 
-export function closeModal(modalElement) {
-    if (modalElement) {
-        modalElement.classList.remove('show');
-        const anyModalOpen = document.querySelectorAll('.modal.show').length > 0;
-        if (!anyModalOpen && elements.bodyElement) elements.bodyElement.classList.remove('modal-open');
-        console.log(`[DEBUG] Modal closed: ${modalElement.id}`);
-    }
-}
+// NOTE: The old closeModal function is replaced by the more specific hideModal function above.
+//       Any calls to closeModal should be updated to hideModal.
 
 export function handleStateChange_isLoading() {
     updateLoadingState();
@@ -1701,6 +1793,40 @@ export function handleStateChange_currentEditingFileId() {
 export function handleStateChange_summaryContent() {
     renderSummaryModalContent();
 }
+
+export function handleStateChange_isFileContentModalOpen() {
+    if (state.isFileContentModalOpen) {
+        showModal(elements.fileContentModal);
+    } else {
+        hideModal(elements.fileContentModal);
+    }
+}
+
+export function handleStateChange_currentViewingFileId() {
+    // This state change primarily triggers renderFileContentModal
+    renderFileContentModal();
+}
+
+export function handleStateChange_currentViewingFilename() {
+    // This state change primarily triggers renderFileContentModal
+    renderFileContentModal();
+}
+
+export function handleStateChange_currentViewingFileContent() {
+    // This state change primarily triggers renderFileContentModal
+    renderFileContentModal();
+}
+
+export function handleStateChange_currentViewingFileMimetype() {
+    // This state change primarily triggers renderFileContentModal
+    renderFileContentModal();
+}
+
+export function handleStateChange_currentViewingFileIsBase64() {
+    // This state change primarily triggers renderFileContentModal
+    renderFileContentModal();
+}
+
 
 export function handleStateChange_calendarContext() {
     updateCalendarStatus();

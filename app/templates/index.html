@@ -450,6 +450,23 @@
         </div>
     </div>
 
+    <!-- New File Content Modal -->
+    <div id="file-content-modal" class="modal">
+        <div class="modal-content max-w-3xl w-full"> <!-- Increased max-width -->
+            <div class="modal-header">
+                <h3 class="modal-title">File Content: <span id="file-content-modal-filename"></span></h3>
+                <button class="close-btn" id="close-file-content-modal" title="Close">&times;</button>
+            </div>
+            <!-- Added overflow-y-auto and max-height -->
+            <div id="file-content-modal-content" class="modal-body overflow-y-auto" style="max-height: 70vh;">
+                <!-- File content will be loaded here -->
+                <p>Loading file content...</p>
+            </div>
+            <!-- No footer needed for this modal -->
+        </div>
+    </div>
+
+
     <!-- Existing URL Input Modal (will be triggered from Manage Files Modal) -->
     <div id="url-modal" class="modal">
         <div class="modal-content">

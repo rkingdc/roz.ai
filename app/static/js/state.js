@@ -20,6 +20,14 @@ export let sessionFile = null; // File object { filename, mimetype, content, nam
 export let currentEditingFileId = null; // For summary modal
 export let summaryContent = ""; // Content of the summary being edited
 
+// State for the File Content Modal
+export let isFileContentModalOpen = false;
+export let currentViewingFileId = null;
+export let currentViewingFilename = "";
+export let currentViewingFileContent = ""; // Decoded text or base64 string
+export let currentViewingFileMimetype = "";
+export let currentViewingFileIsBase64 = false; // Flag if content is base64
+
 export let calendarContext = null; // Loaded calendar events object { events: [], timestamp: ... }
 export let isCalendarContextActive = false; // Toggle state for including calendar context
 
@@ -119,6 +127,12 @@ export function notifyAll() {
     notify('sessionFile', sessionFile);     // For input area display
     notify('currentEditingFileId', currentEditingFileId);
     notify('summaryContent', summaryContent);
+    notify('isFileContentModalOpen', isFileContentModalOpen);
+    notify('currentViewingFileId', currentViewingFileId);
+    notify('currentViewingFilename', currentViewingFilename);
+    notify('currentViewingFileContent', currentViewingFileContent);
+    notify('currentViewingFileMimetype', currentViewingFileMimetype);
+    notify('currentViewingFileIsBase64', currentViewingFileIsBase64);
     notify('calendarContext', calendarContext);
     notify('isCalendarContextActive', isCalendarContextActive);
     notify('isWebSearchEnabled', isWebSearchEnabled);
@@ -296,6 +310,46 @@ export function setSummaryContent(content) {
     if (summaryContent !== content) {
         summaryContent = content;
         notify('summaryContent', summaryContent);
+    }
+}
+
+// --- File Content Modal State Functions ---
+export function setIsFileContentModalOpen(isOpen) {
+    if (isFileContentModalOpen !== isOpen) {
+        isFileContentModalOpen = isOpen;
+        notify('isFileContentModalOpen', isFileContentModalOpen);
+    }
+}
+
+export function setCurrentViewingFile(fileId, filename, content, mimetype, isBase64) {
+    if (currentViewingFileId !== fileId || currentViewingFilename !== filename ||
+        currentViewingFileContent !== content || currentViewingFileMimetype !== mimetype ||
+        currentViewingFileIsBase64 !== isBase64) {
+        currentViewingFileId = fileId;
+        currentViewingFilename = filename;
+        currentViewingFileContent = content;
+        currentViewingFileMimetype = mimetype;
+        currentViewingFileIsBase64 = isBase64;
+        notify('currentViewingFileId', currentViewingFileId); // Notify individually for granular updates
+        notify('currentViewingFilename', currentViewingFilename);
+        notify('currentViewingFileContent', currentViewingFileContent);
+        notify('currentViewingFileMimetype', currentViewingFileMimetype);
+        notify('currentViewingFileIsBase64', currentViewingFileIsBase64);
+    }
+}
+
+export function clearCurrentViewingFile() {
+    if (currentViewingFileId !== null) {
+        currentViewingFileId = null;
+        currentViewingFilename = "";
+        currentViewingFileContent = "";
+        currentViewingFileMimetype = "";
+        currentViewingFileIsBase64 = false;
+        notify('currentViewingFileId', currentViewingFileId);
+        notify('currentViewingFilename', currentViewingFilename);
+        notify('currentViewingFileContent', currentViewingFileContent);
+        notify('currentViewingFileMimetype', currentViewingFileMimetype);
+        notify('currentViewingFileIsBase64', currentViewingFileIsBase64);
     }
 }
 
