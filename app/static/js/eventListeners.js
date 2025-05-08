@@ -805,16 +805,16 @@ export function setupEventListeners() {
 
 
     // --- Manage Files Modal ---
-    elements.closeManageFilesModal?.addEventListener('click', () => ui.closeModal(elements.manageFilesModal)); // UI-only modal close
+    elements.closeManageFilesModal?.addEventListener('click', () => ui.hideModal(elements.manageFilesModal)); // UI-only modal close
     elements.manageFilesModal?.addEventListener('click', (event) => {
-        if (event.target === elements.manageFilesModal) ui.closeModal(elements.manageFilesModal); // UI-only modal close
+        if (event.target === elements.manageFilesModal) ui.hideModal(elements.manageFilesModal); // UI-only modal close
     });
     elements.fileUploadModalInput?.addEventListener('change', async (event) => {
         await api.handleFileUpload(event); // Updates state (uploadedFiles, isLoading, statusMessage)
         // UI updates are triggered by state notifications.
         // Closing modal after successful upload should be handled here based on state.
         if (!state.isErrorStatus) { // Check state after API call
-             ui.closeModal(elements.manageFilesModal);
+             ui.hideModal(elements.manageFilesModal);
         }
     });
     elements.addUrlModalButton?.addEventListener('click', () => {
@@ -827,9 +827,9 @@ export function setupEventListeners() {
     });
 
     // --- URL Modal ---
-    elements.closeUrlModal?.addEventListener('click', () => ui.closeModal(elements.urlModal)); // UI-only modal close
+    elements.closeUrlModal?.addEventListener('click', () => ui.hideModal(elements.urlModal)); // UI-only modal close
     elements.urlModal?.addEventListener('click', (event) => {
-        if (event.target === elements.urlModal) ui.closeModal(elements.urlModal); // UI-only modal close
+        if (event.target === elements.urlModal) ui.hideModal(elements.urlModal); // UI-only modal close
     });
     elements.fetchUrlButton?.addEventListener('click', async () => {
         const url = elements.urlInput?.value;
@@ -852,7 +852,7 @@ export function setupEventListeners() {
         // This might require adding modal-specific status state or reading the global status carefully.
         // For now, let's rely on the global status bar and close the modal on success.
         if (!state.isErrorStatus) { // Check global state after API call
-             ui.closeModal(elements.urlModal);
+             ui.hideModal(elements.urlModal);
         } else {
              // If there was an error, update the modal's status text
              if(elements.urlStatus) {
@@ -905,9 +905,9 @@ export function setupEventListeners() {
 
 
     // --- Summary Modal ---
-    elements.closeSummaryModal?.addEventListener('click', () => ui.closeModal(elements.summaryModal)); // UI-only modal close
+    elements.closeSummaryModal?.addEventListener('click', () => ui.hideModal(elements.summaryModal)); // UI-only modal close
     elements.summaryModal?.addEventListener('click', (event) => {
-        if (event.target === elements.summaryModal) ui.closeModal(elements.summaryModal); // UI-only modal close
+        if (event.target === elements.summaryModal) ui.hideModal(elements.summaryModal); // UI-only modal close
     });
     elements.saveSummaryButton?.addEventListener('click', async () => {
         // Read content from DOM input for immediate state update
@@ -919,7 +919,7 @@ export function setupEventListeners() {
         // UI updates are triggered by state notifications.
         // Closing modal after successful save should be handled here.
         if (!state.isErrorStatus) { // Check global state after API call
-             ui.closeModal(elements.summaryModal);
+             ui.hideModal(elements.summaryModal);
         }
     });
     // Summary textarea input updates state.summaryContent - handler already does this and calls ui.renderSummaryModalContent
@@ -939,16 +939,16 @@ export function setupEventListeners() {
         ui.showModal(elements.calendarModal, 'calendar', 'chat'); // UI-only modal show
         // Calendar content rendering in modal is handled by UI reacting to state.calendarContext
     });
-    elements.closeCalendarModal?.addEventListener('click', () => ui.closeModal(elements.calendarModal)); // UI-only modal close
+    elements.closeCalendarModal?.addEventListener('click', () => ui.hideModal(elements.calendarModal)); // UI-only modal close
     elements.calendarModal?.addEventListener('click', (event) => {
-        if (event.target === elements.calendarModal) ui.closeModal(elements.calendarModal); // UI-only modal close
+        if (event.target === elements.calendarModal) ui.hideModal(elements.calendarModal); // UI-only modal close
     });
 
     // --- Settings Modal & Toggles ---
     elements.settingsButton?.addEventListener('click', () => ui.showModal(elements.settingsModal)); // UI-only modal show
-    elements.closeSettingsModal?.addEventListener('click', () => ui.closeModal(elements.settingsModal)); // UI-only modal close
+    elements.closeSettingsModal?.addEventListener('click', () => ui.hideModal(elements.settingsModal)); // UI-only modal close
     elements.settingsModal?.addEventListener('click', (event) => {
-        if (event.target === elements.settingsModal) ui.closeModal(elements.settingsModal); // UI-only modal close
+        if (event.target === elements.settingsModal) ui.hideModal(elements.settingsModal); // UI-only modal close
     });
     // elements.streamingToggle?.addEventListener('change', handleStreamingToggleChange); // REMOVED Listener
     // elements.filesPluginToggle?.addEventListener('change', handleFilesPluginToggleChange); // REMOVED Listener
@@ -1060,9 +1060,9 @@ export function setupEventListeners() {
         // UI update is triggered by currentNoteMode notification
     });
     elements.markdownTipsButton?.addEventListener('click', () => ui.showModal(elements.markdownTipsModal, null, 'notes')); // UI-only modal show
-    elements.closeMarkdownTipsModal?.addEventListener('click', () => ui.closeModal(elements.markdownTipsModal)); // UI-only modal close
+    elements.closeMarkdownTipsModal?.addEventListener('click', () => ui.hideModal(elements.markdownTipsModal)); // UI-only modal close
     elements.markdownTipsModal?.addEventListener('click', (event) => {
-        if (event.target === elements.markdownTipsModal) ui.closeModal(elements.markdownTipsModal); // UI-only modal close
+        if (event.target === elements.markdownTipsModal) ui.hideModal(elements.markdownTipsModal); // UI-only modal close
     });
 
     // Add click listener for note list items (delegated)
