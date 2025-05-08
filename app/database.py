@@ -621,41 +621,47 @@ def search_messages(search_term: str, limit: int = 10):
         logger.debug("Search term is empty for messages, returning empty list.")
         return []
     try:
-        # FTS5 query to get matching rowids (Message IDs)
+        # FTS5 query to get matching rowids (Message IDs) and snippets
         # Results are ordered by relevance by default (rank)
+        # Column 0 in message_fts is 'content'
         sql_query = text("""
-            SELECT rowid
+            SELECT rowid, snippet(message_fts, 0, '<b>', '</b>', '...', 15) as snippet
             FROM message_fts
             WHERE message_fts MATCH :term
             ORDER BY rank
             LIMIT :limit
         """)
         result = db.session.execute(sql_query, {"term": search_term, "limit": limit})
-        message_ids = [row[0] for row in result]
+        
+        # Store rowids and their corresponding snippets, maintaining order
+        ranked_results = [{'id': row[0], 'snippet': row[1]} for row in result]
+        message_ids = [res['id'] for res in ranked_results]
 
         if not message_ids:
             logger.debug(f"No messages found for search term: '{search_term}'")
             return []
 
-        # Fetch Message objects based on the IDs, preserving FTS relevance order
+        # Fetch Message objects based on the IDs
         messages = db.session.query(Message).filter(Message.id.in_(message_ids)).all()
-        
-        # Create a dictionary for quick lookups and then re-order
         messages_dict = {msg.id: msg for msg in messages}
-        ordered_messages = [messages_dict[id] for id in message_ids if id in messages_dict]
 
-        logger.info(f"Found {len(ordered_messages)} messages for search term: '{search_term}'")
-        return [
-            {
-                'id': msg.id,
-                'chat_id': msg.chat_id,
-                'role': msg.role,
-                'content': msg.content, # Consider adding snippet() function later
-                'timestamp': msg.timestamp,
-                'attachments': msg.attached_data or []
-            }
-            for msg in ordered_messages
-        ]
+        # Construct final list, ordered by FTS rank, including snippets
+        ordered_results_with_details = []
+        for res_item in ranked_results:
+            msg = messages_dict.get(res_item['id'])
+            if msg:
+                ordered_results_with_details.append({
+                    'id': msg.id,
+                    'chat_id': msg.chat_id,
+                    'role': msg.role,
+                    'content': msg.content,
+                    'snippet': res_item['snippet'], # Add snippet here
+                    'timestamp': msg.timestamp,
+                    'attachments': msg.attached_data or []
+                })
+
+        logger.info(f"Found {len(ordered_results_with_details)} messages for search term: '{search_term}'")
+        return ordered_results_with_details
     except SQLAlchemyError as e:
         logger.error(f"Database error searching messages for '{search_term}': {e}", exc_info=True)
         return []
@@ -666,15 +672,18 @@ def search_notes(search_term: str, limit: int = 10):
         logger.debug("Search term is empty for notes, returning empty list.")
         return []
     try:
+        # Column 0 in note_fts is 'content'
         sql_query = text("""
-            SELECT rowid
+            SELECT rowid, snippet(note_fts, 0, '<b>', '</b>', '...', 15) as snippet
             FROM note_fts
             WHERE note_fts MATCH :term
             ORDER BY rank
             LIMIT :limit
         """)
         result = db.session.execute(sql_query, {"term": search_term, "limit": limit})
-        note_ids = [row[0] for row in result]
+        
+        ranked_results = [{'id': row[0], 'snippet': row[1]} for row in result]
+        note_ids = [res['id'] for res in ranked_results]
 
         if not note_ids:
             logger.debug(f"No notes found for search term: '{search_term}'")
@@ -682,18 +691,21 @@ def search_notes(search_term: str, limit: int = 10):
 
         notes = db.session.query(Note).filter(Note.id.in_(note_ids)).all()
         notes_dict = {note.id: note for note in notes}
-        ordered_notes = [notes_dict[id] for id in note_ids if id in notes_dict]
         
-        logger.info(f"Found {len(ordered_notes)} notes for search term: '{search_term}'")
-        return [
-            {
-                'id': note.id,
-                'name': note.name,
-                'content': note.content, # Consider snippet()
-                'last_saved_at': note.last_saved_at
-            }
-            for note in ordered_notes
-        ]
+        ordered_results_with_details = []
+        for res_item in ranked_results:
+            note = notes_dict.get(res_item['id'])
+            if note:
+                ordered_results_with_details.append({
+                    'id': note.id,
+                    'name': note.name,
+                    'content': note.content,
+                    'snippet': res_item['snippet'], # Add snippet here
+                    'last_saved_at': note.last_saved_at
+                })
+        
+        logger.info(f"Found {len(ordered_results_with_details)} notes for search term: '{search_term}'")
+        return ordered_results_with_details
     except SQLAlchemyError as e:
         logger.error(f"Database error searching notes for '{search_term}': {e}", exc_info=True)
         return []
@@ -704,15 +716,18 @@ def search_files(search_term: str, limit: int = 10):
         logger.debug("Search term is empty for files, returning empty list.")
         return []
     try:
+        # Column 0 in file_fts is 'summary'
         sql_query = text("""
-            SELECT rowid
+            SELECT rowid, snippet(file_fts, 0, '<b>', '</b>', '...', 15) as snippet
             FROM file_fts
             WHERE file_fts MATCH :term
             ORDER BY rank
             LIMIT :limit
         """)
         result = db.session.execute(sql_query, {"term": search_term, "limit": limit})
-        file_ids = [row[0] for row in result]
+        
+        ranked_results = [{'id': row[0], 'snippet': row[1]} for row in result]
+        file_ids = [res['id'] for res in ranked_results]
 
         if not file_ids:
             logger.debug(f"No files found for search term: '{search_term}'")
@@ -720,20 +735,24 @@ def search_files(search_term: str, limit: int = 10):
 
         files = db.session.query(File).filter(File.id.in_(file_ids)).all()
         files_dict = {f.id: f for f in files}
-        ordered_files = [files_dict[id] for id in file_ids if id in files_dict]
 
-        logger.info(f"Found {len(ordered_files)} files for search term: '{search_term}'")
-        return [
-            {
-                'id': f.id,
-                'filename': f.filename,
-                'mimetype': f.mimetype,
-                'filesize': f.filesize,
-                'uploaded_at': f.uploaded_at,
-                'summary': f.summary, # Consider snippet()
-                'has_summary': f.summary is not None
-            } for f in ordered_files
-        ]
+        ordered_results_with_details = []
+        for res_item in ranked_results:
+            f_obj = files_dict.get(res_item['id'])
+            if f_obj:
+                ordered_results_with_details.append({
+                    'id': f_obj.id,
+                    'filename': f_obj.filename,
+                    'mimetype': f_obj.mimetype,
+                    'filesize': f_obj.filesize,
+                    'uploaded_at': f_obj.uploaded_at,
+                    'summary': f_obj.summary,
+                    'snippet': res_item['snippet'], # Add snippet here
+                    'has_summary': f_obj.summary is not None
+                })
+
+        logger.info(f"Found {len(ordered_results_with_details)} files for search term: '{search_term}'")
+        return ordered_results_with_details
     except SQLAlchemyError as e:
         logger.error(f"Database error searching files for '{search_term}': {e}", exc_info=True)
         return []
