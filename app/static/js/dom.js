@@ -98,6 +98,13 @@ export const elements = {
     calendarModal: null,
     closeCalendarModal: null, // Corrected ID to match HTML
     calendarModalContent: null,
+
+    // File Content Modal Elements
+    fileContentModal: null,
+    closeFileContentModal: null,
+    fileContentModalFilename: null,
+    fileContentModalContent: null,
+
     urlModal: null,
     closeUrlModal: null, // Corrected ID to match HTML
     urlInput: null,
@@ -174,6 +181,14 @@ export function populateElements() {
     elements.calendarModal = document.getElementById('calendar-modal');
     elements.closeCalendarModal = document.getElementById('close-calendar-modal'); // Corrected ID
     elements.calendarModalContent = document.getElementById('calendar-modal-content');
+
+    // Populate File Content Modal Elements
+    elements.fileContentModal = document.getElementById('file-content-modal');
+    elements.closeFileContentModal = document.getElementById('close-file-content-modal');
+    elements.fileContentModalFilename = document.getElementById('file-content-modal-filename');
+    elements.fileContentModalContent = document.getElementById('file-content-modal-content');
+
+
     elements.webSearchToggle = document.getElementById('web-search-toggle');
     elements.webSearchToggleLabel = document.getElementById('web-search-toggle-label');
     elements.improvePromptToggle = document.getElementById('improve-prompt-toggle'); // Added improve prompt toggle
