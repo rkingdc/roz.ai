@@ -155,9 +155,9 @@ def delete_chat_from_db(chat_id):
         return False
 
 # Messages
-def add_message_to_db(chat_id, role, content):
+def add_message_to_db(chat_id, role, content, attached_data_json=None):
     """Adds a message using the Message model and updates chat timestamp."""
-    logger.info(f"--> Entering add_message_to_db for chat {chat_id}, role '{role}'.")
+    logger.info(f"--> Entering add_message_to_db for chat {chat_id}, role '{role}'. Attached data: {attached_data_json is not None}")
     try:
         # Check if chat exists first
         chat = db.session.get(Chat, chat_id)
@@ -168,7 +168,8 @@ def add_message_to_db(chat_id, role, content):
         new_message = Message(
             chat_id=chat_id,
             role=role,
-            content=content
+            content=content,
+            attached_data=attached_data_json  # Store the JSON payload
             # timestamp has default in model
         )
         db.session.add(new_message)
@@ -177,7 +178,7 @@ def add_message_to_db(chat_id, role, content):
         chat.last_updated_at = default_utcnow()
         db.session.add(chat) # Add chat to session again to ensure update is tracked
 
-        logger.info(f"Attempting to add '{role}' message to chat {chat_id} and update timestamp...")
+        logger.info(f"Attempting to add '{role}' message to chat {chat_id} with attached_data and update timestamp...")
         if _commit_session():
             logger.info(f"Successfully added '{role}' message to chat {chat_id} and updated timestamp.")
             return True
@@ -197,7 +198,12 @@ def get_chat_history_from_db(chat_id, limit=100):
                                 .all()
         # Return list of dictionaries matching previous structure
         return [
-            {'role': msg.role, 'content': msg.content, 'timestamp': msg.timestamp}
+            {
+                'role': msg.role,
+                'content': msg.content,
+                'timestamp': msg.timestamp,
+                'attachments': msg.attached_data or []  # Include attached_data, default to empty list
+            }
             for msg in messages
         ]
     except SQLAlchemyError as e:

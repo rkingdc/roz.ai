@@ -46,6 +46,7 @@ class Message(db.Model):
     timestamp = db.Column(
         db.DateTime(timezone=True), nullable=False, default=default_utcnow, index=True
     )  # Added index=True, timezone=True
+    attached_data = db.Column(db.JSON, nullable=True)  # New field for attached file metadata
 
     # Define relationship back to Chat
     chat = db.relationship("Chat", back_populates="messages")  # Use back_populates
