@@ -13,6 +13,7 @@ import validators  # Import validators library for URL validation
 from sqlalchemy.exc import SQLAlchemyError  # Import SQLAlchemyError
 from .. import db  # Import the db instance
 from ..models import File  # Import the File model
+import base64 # Import for base64 encoding
 
 # Configure logging
 import logging
@@ -329,6 +330,7 @@ def add_file_from_url_route():
             # Ensure filename exists for PDF (should be set by fetch_web_content)
             if not filename:
                 # Use werkzeug's secure_filename and urlparse for better fallback
+                from urllib.parse import urlparse # Import locally if not already global
                 parsed_url = urlparse(url)
                 base_name = os.path.basename(parsed_url.path)
                 fallback_name = (
@@ -429,6 +431,140 @@ def add_file_from_url_route():
                 f"An unexpected error occurred while processing the URL: {e}"
             )
         return jsonify({"error": error_message}), 500
+
+
+@bp.route("/file_content/<int:file_id>", methods=["GET"])
+def get_file_content_route(file_id):
+    """API endpoint to get the content of a specific file."""
+    logger.info(f"Received GET request for /api/file_content/{file_id}")
+    try:
+        # Fetch file details including content
+        # The database_module.get_file_details_from_db should return a dict
+        # or None if not found.
+        file_details = database_module.get_file_details_from_db(
+            file_id, include_content=True
+        )
+
+        if file_details is None:
+            logger.warning(f"File with ID {file_id} not found.")
+            return jsonify({"error": "File not found"}), 404
+
+        content_blob = file_details.get("content")
+        mimetype = file_details.get("mimetype", "application/octet-stream")
+        filename = file_details.get("filename", "unknown_file")
+        db_id = file_details.get("id")
+
+        if content_blob is None:
+            logger.error(
+                f"Content blob is None for file ID {file_id} even though record was found."
+            )
+            return jsonify({"error": "File content not available"}), 500
+
+        # Determine if content is text or binary to decide on base64 encoding
+        # Common text mimetypes that can be sent as plain strings
+        text_mimetypes = [
+            "text/plain",
+            "text/html",
+            "text/css",
+            "text/javascript",
+            "application/json",
+            "application/xml",
+            "text/markdown",
+            "text/csv",
+            # Add more as needed
+        ]
+        # Check common text file extensions as a fallback
+        text_extensions = (
+            ".txt",
+            ".py",
+            ".js",
+            ".jsx",
+            ".ts",
+            ".tsx",
+            ".html",
+            ".htm",
+            ".css",
+            ".scss",
+            ".less",
+            ".md",
+            ".json",
+            ".csv",
+            ".xml",
+            ".log",
+            ".yaml",
+            ".yml",
+            ".ini",
+            ".cfg",
+            ".sh",
+            ".bash",
+            ".zsh",
+            ".ps1",
+            ".bat",
+            ".java",
+            ".c",
+            ".cpp",
+            ".h",
+            ".hpp",
+            ".cs",
+            ".go",
+            ".rb",
+            ".php",
+            ".swift",
+            ".kt",
+            ".kts",
+            ".dart",
+            ".rs",
+            ".lua",
+            ".pl",
+            ".sql",
+            ".r",
+            ".vbs",
+            ".conf",
+        )
+
+        is_text_displayable = mimetype.lower() in text_mimetypes or filename.lower().endswith(text_extensions)
+
+        content_to_send = ""
+        is_base64_encoded = False
+
+        if is_text_displayable:
+            try:
+                content_to_send = content_blob.decode("utf-8")
+                is_base64_encoded = False
+                logger.debug(f"Decoded content for text file ID {file_id} as UTF-8.")
+            except UnicodeDecodeError:
+                logger.warning(
+                    f"UnicodeDecodeError for file ID {file_id} (mimetype: {mimetype}, filename: {filename}). Sending as base64."
+                )
+                content_to_send = base64.b64encode(content_blob).decode("utf-8")
+                is_base64_encoded = True
+        else:
+            # For binary files (images, pdfs, etc.), encode to base64
+            content_to_send = base64.b64encode(content_blob).decode("utf-8")
+            is_base64_encoded = True
+            logger.debug(f"Base64 encoded content for binary file ID {file_id}.")
+
+        logger.info(f"Successfully retrieved content for file ID {file_id}.")
+        return jsonify(
+            {
+                "id": db_id,
+                "filename": filename,
+                "content": content_to_send,
+                "mimetype": mimetype,
+                "is_base64": is_base64_encoded,
+            }
+        )
+
+    except Exception as e:
+        logger.error(
+            f"Error retrieving content for file {file_id}: {e}", exc_info=True
+        )
+        return (
+            jsonify(
+                {"error": "Failed to retrieve file content due to server error"}
+            ),
+            500,
+        )
 
 
 @bp.route("/files/<int:file_id>/summary", methods=["GET"])
