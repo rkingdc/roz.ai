@@ -13,9 +13,10 @@ export let isErrorStatus = false; // Indicates if the status message is an error
 // Files temporarily selected in the sidebar for attachment (before clicking Attach button)
 export let sidebarSelectedFiles = [];
 // Files permanently attached to the current chat session (sent with every message until removed)
-export let attachedFiles = []; // Array of { id, filename, type ('full' or 'summary') }
+// These are files intended to be sent WITH the NEXT message.
+export let attachedFiles = []; // Array of { id, filename, type ('full' or 'summary'), mimetype }
 // File attached via paperclip for the current message only
-export let sessionFile = null; // File object { filename, mimetype, content }
+export let sessionFile = null; // File object { filename, mimetype, content, name (same as filename) }
 export let currentEditingFileId = null; // For summary modal
 export let summaryContent = ""; // Content of the summary being edited
 
@@ -23,13 +24,9 @@ export let calendarContext = null; // Loaded calendar events object { events: []
 export let isCalendarContextActive = false; // Toggle state for including calendar context
 
 // Plugin enabled states (from settings)
-// export let isStreamingEnabled = true; // REMOVED - Always stream
-// export let isFilePluginEnabled = true; // REMOVED - Always available
-// export let isCalendarPluginEnabled = true; // REMOVED - Always available
-// export let isWebSearchPluginEnabled = true; // REMOVED - Always available
 export let isWebSearchEnabled = false; // Toggle state for including web search in current message
 export let isDeepResearchEnabled = false; // Toggle state for deep research mode
-export let isImprovePromptEnabled = false; // <<< ADDED: Toggle state for improving the prompt before sending
+export let isImprovePromptEnabled = false; // Toggle state for improving the prompt before sending
 
 // Tab and Note Mode states
 export let currentTab = 'chat';
@@ -44,51 +41,43 @@ export let uploadedFiles = []; // Array of { id, filename, mimetype, filesize, h
 // Chat specific state
 export let currentChatName = '';
 export let currentChatModel = '';
-export let chatHistory = []; // Array of { role, content, isError }
+// chatHistory stores message objects. Each message object should now include an 'attachments' array
+// if files were sent with that message.
+// Example message object: { role, content, isError, attachments: [{filename, type, mimetype}, ...] }
+export let chatHistory = [];
 export let processingChatId = null; // ID of the chat currently waiting for backend response, or null
-// --- NEW: Chat Mode State ---
 export let currentChatMode = 'chat'; // 'chat' or 'deep_research'
-// ----------------------------
 
 // Note specific state
-export let currentNoteName = ''; // Already exists, but adding for clarity
+export let currentNoteName = '';
 export let noteContent = '';
 
 // Sidebar collapsed states
 export let isSidebarCollapsed = false;
 export let isPluginsCollapsed = false;
-export let isNotesSidebarCollapsed = false; // Assuming a separate notes sidebar state
-export let isNotesTocCollapsed = true; // TOC drawer state, default collapsed
+export let isNotesSidebarCollapsed = false;
+export let isNotesTocCollapsed = true;
 
 // Note History State
-export let noteHistory = []; // History entries for the currently selected note
+export let noteHistory = [];
 
 // Voice Recording State
-export let isRecording = false; // Whether audio is currently being recorded
-export let recordingContext = null; // Context associated with the current recording (e.g., 'chat', 'note')
-export let isSocketConnected = false; // WebSocket connection status for transcription
-// --- REPLACED streamingTranscript & finalTranscriptSegment ---
-export let finalizedTranscript = ""; // Holds the concatenated FINAL results for the current session
-export let currentInterimTranscript = ""; // Holds the LATEST interim result
-// -----------------------------------------------------------
+export let isRecording = false;
+export let recordingContext = null;
+export let isSocketConnected = false;
+export let finalizedTranscript = "";
+export let currentInterimTranscript = "";
 
-// --- NEW: Long Recording State ---
-export let isLongRecordingActive = false; // Tracks the non-streaming recording state
-export let longRecordingToastId = null; // To manage the persistent recording toast
-export let lastLongTranscript = ''; // Store the last successful long transcript
-// ---------------------------------
+// Long Recording State
+export let isLongRecordingActive = false;
+export let longRecordingToastId = null;
+export let lastLongTranscript = '';
 
 
 // --- Observer Pattern ---
-// Map to store listeners for different state change events
 const listeners = new Map();
-let notificationsEnabled = true; // Flag to control notifications
+let notificationsEnabled = true;
 
-/**
- * Subscribes a listener function to a specific state change event.
- * @param {string} eventType - The type of state change (e.g., 'isLoading', 'chatHistory').
- * @param {function} listener - The function to call when the state changes.
- */
 export function subscribe(eventType, listener) {
     if (!listeners.has(eventType)) {
         listeners.set(eventType, []);
@@ -96,11 +85,6 @@ export function subscribe(eventType, listener) {
     listeners.get(eventType).push(listener);
 }
 
-/**
- * Notifies all listeners subscribed to a specific state change event.
- * @param {string} eventType - The type of state change.
- * @param {*} [data] - Optional data to pass to the listeners.
- */
 function notify(eventType, data) {
     if (!notificationsEnabled) {
         return;
@@ -109,7 +93,7 @@ function notify(eventType, data) {
         const eventListeners = listeners.get(eventType);
         eventListeners.forEach((listener, index) => {
             try {
-                listener(data); // Pass data if provided
+                listener(data);
             } catch (error) {
                 console.error(`Error in listener for event "${eventType}" (Listener ${index + 1}):`, error);
             }
@@ -117,50 +101,29 @@ function notify(eventType, data) {
     }
 }
 
-export function setProcessingChatId(id) {
-    if (processingChatId !== id) {
-        processingChatId = id;
-        notify('processingChatId', processingChatId);
-    }
-}
-/**
- * Temporarily disables state change notifications.
- */
 export function disableNotifications() {
     notificationsEnabled = false;
 }
 
-/**
- * Re-enables state change notifications.
- */
 export function enableNotifications() {
     notificationsEnabled = true;
 }
 
-/**
- * Notifies all listeners for all current state values.
- * Useful for initial render after loading state.
- */
 export function notifyAll() {
-    // Explicitly notify for each state property that UI might depend on
     notify('currentChatId', currentChatId);
     notify('currentNoteId', currentNoteId);
     notify('isLoading', isLoading);
     notify('statusMessage', { message: statusMessage, isError: isErrorStatus });
     notify('sidebarSelectedFiles', sidebarSelectedFiles);
-    notify('attachedFiles', attachedFiles);
-    notify('sessionFile', sessionFile);
+    notify('attachedFiles', attachedFiles); // For input area display
+    notify('sessionFile', sessionFile);     // For input area display
     notify('currentEditingFileId', currentEditingFileId);
     notify('summaryContent', summaryContent);
     notify('calendarContext', calendarContext);
     notify('isCalendarContextActive', isCalendarContextActive);
-    // notify('isStreamingEnabled', isStreamingEnabled); // REMOVED
-    // notify('isFilePluginEnabled', isFilePluginEnabled); // REMOVED
-    // notify('isCalendarPluginEnabled', isCalendarPluginEnabled); // REMOVED
-    // notify('isWebSearchPluginEnabled', isWebSearchPluginEnabled); // REMOVED
     notify('isWebSearchEnabled', isWebSearchEnabled);
-    notify('isDeepResearchEnabled', isDeepResearchEnabled); // Notify deep research state
-    notify('isImprovePromptEnabled', isImprovePromptEnabled); // Notify improve prompt state
+    notify('isDeepResearchEnabled', isDeepResearchEnabled);
+    notify('isImprovePromptEnabled', isImprovePromptEnabled);
     notify('currentTab', currentTab);
     notify('currentNoteMode', currentNoteMode);
     notify('savedChats', savedChats);
@@ -168,65 +131,48 @@ export function notifyAll() {
     notify('uploadedFiles', uploadedFiles);
     notify('currentChatName', currentChatName);
     notify('currentChatModel', currentChatModel);
-    notify('chatHistory', chatHistory);
-    notify('processingChatId', processingChatId); // Notify processing chat ID
-    // --- NEW: Notify Chat Mode State ---
+    notify('chatHistory', chatHistory); // For chat display
+    notify('processingChatId', processingChatId);
     notify('currentChatMode', currentChatMode);
-    // ----------------------------------
     notify('noteContent', noteContent);
     notify('currentNoteName', currentNoteName);
     notify('isSidebarCollapsed', isSidebarCollapsed);
     notify('isPluginsCollapsed', isPluginsCollapsed);
     notify('isNotesSidebarCollapsed', isNotesSidebarCollapsed);
-    notify('isNotesTocCollapsed', isNotesTocCollapsed); // Notify TOC drawer state
+    notify('isNotesTocCollapsed', isNotesTocCollapsed);
     notify('noteHistory', noteHistory);
     notify('isRecording', isRecording);
     notify('recordingContext', recordingContext);
-    notify('isSocketConnected', isSocketConnected); // Notify socket status
-    // --- Notify NEW transcript states ---
+    notify('isSocketConnected', isSocketConnected);
     notify('finalizedTranscript', finalizedTranscript);
     notify('currentInterimTranscript', currentInterimTranscript);
-    // ----------------------------------
-    // --- NEW: Notify long recording state ---
     notify('isLongRecordingActive', isLongRecordingActive);
-    notify('longRecordingToastId', longRecordingToastId); // If UI needs to react to toast ID changes
-    notify('lastLongTranscript', lastLongTranscript); // If UI needs to react to transcript changes
-    // ---------------------------------------
-
-
-    // Also notify combined states if listeners are subscribed to them
-    notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode }); // Include mode in combined state
-    notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
-    notify('pluginEnabled', 'all'); // Generic notification for any plugin state change
-    notify('currentNoteActiveH1SectionIndex', currentNoteActiveH1SectionIndex);
-
-
-    // Notify combined states including deep research
+    notify('longRecordingToastId', longRecordingToastId);
+    notify('lastLongTranscript', lastLongTranscript);
     notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled });
     notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
+    notify('pluginEnabled', 'all');
+    notify('currentNoteActiveH1SectionIndex', currentNoteActiveH1SectionIndex);
 }
 
 
-// Functions to update state
-// These functions modify the state variables *within* this module and notify listeners.
+// --- State Update Functions ---
 
 export function setCurrentChatId(id) {
     if (currentChatId !== id) {
         currentChatId = id;
         notify('currentChatId', currentChatId);
-        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled }); // Notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled });
     }
 }
 
 export function setCurrentNoteId(id) {
     if (currentNoteId !== id) {
         currentNoteId = id;
-        setCurrentNoteActiveH1SectionIndex(0); // Reset to the first H1 section/tab
+        setCurrentNoteActiveH1SectionIndex(0);
         notify('currentNoteId', currentNoteId);
-        notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent }); // Notify combined note state
+        notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
     } else if (id === null && currentNoteId !== null) {
-        // If setting to null (e.g. new note before save, or deleting current note)
-        // also ensure the index is reset.
         setCurrentNoteActiveH1SectionIndex(0);
     }
 }
@@ -234,12 +180,10 @@ export function setCurrentNoteId(id) {
 export function setIsLoading(loading) {
     if (isLoading !== loading) {
         isLoading = loading;
-        // When loading starts, clear previous status unless it was an error
         if (loading && !isErrorStatus) {
-            setStatusMessage("Busy..."); // This will notify 'statusMessage'
+            setStatusMessage("Busy...");
         } else if (!loading && !isErrorStatus && statusMessage === "Busy...") {
-            // If loading finished without an explicit error status being set, revert to Idle
-             setStatusMessage("Idle"); // This will notify 'statusMessage'
+             setStatusMessage("Idle");
         }
         notify('isLoading', isLoading);
     }
@@ -253,8 +197,14 @@ export function setStatusMessage(message, isError = false) {
     }
 }
 
+export function setProcessingChatId(id) {
+    if (processingChatId !== id) {
+        processingChatId = id;
+        notify('processingChatId', processingChatId);
+    }
+}
 
-// --- Functions for sidebarSelectedFiles ---
+// --- Sidebar Selected Files (for potential attachment) ---
 export function setSidebarSelectedFiles(files) {
     sidebarSelectedFiles = files;
     notify('sidebarSelectedFiles', sidebarSelectedFiles);
@@ -268,7 +218,6 @@ export function clearSidebarSelectedFiles() {
 }
 
 export function addSidebarSelectedFile(file) {
-    // Add the file if it's not already selected (check by id)
     if (!sidebarSelectedFiles.some(f => f.id === file.id)) {
         sidebarSelectedFiles.push(file);
         notify('sidebarSelectedFiles', sidebarSelectedFiles);
@@ -283,7 +232,7 @@ export function removeSidebarSelectedFileById(fileId) {
      }
 }
 
-// --- Functions for attachedFiles (files attached to the chat session) ---
+// --- Attached Files (staged for the *next* message) ---
 export function setAttachedFiles(files) {
     attachedFiles = files;
     notify('attachedFiles', attachedFiles);
@@ -291,21 +240,18 @@ export function setAttachedFiles(files) {
 
 export function clearAttachedFiles() {
     if (attachedFiles.length > 0) {
-        attachedFiles.length = 0;
+        attachedFiles.length = 0; // Modifies in place
         notify('attachedFiles', attachedFiles);
     }
 }
 
 export function addAttachedFile(file) {
-    // Add the file if it's not already attached (check by id and type)
-    // Type is important here ('full' or 'summary')
     if (!attachedFiles.some(f => f.id === file.id && f.type === file.type)) {
         attachedFiles.push(file);
         notify('attachedFiles', attachedFiles);
     }
 }
 
-// Function to remove by ID and Type, to match the UI's remove button logic
 export function removeAttachedFileByIdAndType(fileIdToRemove, fileTypeToRemove) {
     const initialLength = attachedFiles.length;
     attachedFiles = attachedFiles.filter(f => !(f.id === fileIdToRemove && f.type === fileTypeToRemove));
@@ -314,7 +260,6 @@ export function removeAttachedFileByIdAndType(fileIdToRemove, fileTypeToRemove) 
     }
 }
 
-// Function to remove by ID (removes all types for that ID)
 export function removeAttachedFileById(fileIdToRemove) {
      const initialLength = attachedFiles.length;
      attachedFiles = attachedFiles.filter(f => f.id !== fileIdToRemove);
@@ -323,15 +268,22 @@ export function removeAttachedFileById(fileIdToRemove) {
      }
 }
 
-
-// --- Function for sessionFile (file attached for the current message) ---
+// --- Session File (single file from paperclip for *next* message) ---
 export function setSessionFile(file) {
-    if (sessionFile !== file) { // Simple reference check
+    if (sessionFile !== file) {
         sessionFile = file;
         notify('sessionFile', sessionFile);
     }
 }
 
+// --- NEW: Clear all attachments staged for the next message ---
+// This should be called by the message sending logic *after* the message
+// (and its attachments) have been processed and added to chatHistory.
+export function clearAllCurrentMessageAttachments() { // <<< ADDED export
+    setSessionFile(null);    // Notifies 'sessionFile'
+    clearAttachedFiles();    // Notifies 'attachedFiles'
+}
+// --- END NEW ---
 
 export function setCurrentEditingFileId(id) {
     if (currentEditingFileId !== id) {
@@ -347,9 +299,8 @@ export function setSummaryContent(content) {
     }
 }
 
-
 export function setCalendarContext(context) {
-    if (calendarContext !== context) { // Simple reference check
+    if (calendarContext !== context) {
         calendarContext = context;
         notify('calendarContext', calendarContext);
     }
@@ -362,10 +313,6 @@ export function setCalendarContextActive(active) {
     }
 }
 
-// REMOVED setStreamingEnabled function
-// REMOVED setFilePluginEnabled function
-// REMOVED setCalendarPluginEnabled function
-
 export function setWebSearchEnabled(enabled) {
     if (isWebSearchEnabled !== enabled) {
         isWebSearchEnabled = enabled;
@@ -377,14 +324,9 @@ export function setDeepResearchEnabled(enabled) {
     if (isDeepResearchEnabled !== enabled) {
         isDeepResearchEnabled = enabled;
         notify('isDeepResearchEnabled', isDeepResearchEnabled);
-        // Also notify combined chat state
         notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled });
     }
 }
-
-
-// REMOVED setWebSearchPluginEnabled function
-
 
 export function setCurrentTab(tab) {
     if (currentTab !== tab) {
@@ -400,42 +342,40 @@ export function setCurrentNoteMode(mode) {
     }
 }
 
-// Add setter functions for saved lists
 export function setSavedChats(chats) {
-    savedChats = chats; // Assume chats array is new or represents a change
+    savedChats = chats;
     notify('savedChats', savedChats);
 }
 
 export function setSavedNotes(notes) {
-    savedNotes = notes; // Assume notes array is new or represents a change
+    savedNotes = notes;
     notify('savedNotes', savedNotes);
 }
 
 export function setUploadedFiles(files) {
-    uploadedFiles = files; // Assume files array is new or represents a change
+    uploadedFiles = files;
     notify('uploadedFiles', uploadedFiles);
 }
 
 // --- Chat History Functions ---
-export function setChatHistory(history) {
-    chatHistory = history; // Assume history array is new or represents a change
+// The 'message' object passed to addMessageToHistory should be prepared by the caller.
+// It MUST include: { role, content, attachments: [], rawContent (optional), isError (optional) }
+// 'attachments' is an array of file objects {filename, type, mimetype} that were sent with THIS message.
+export function addMessageToHistory(message) {
+    chatHistory.push(message);
     notify('chatHistory', chatHistory);
 }
 
-export function addMessageToHistory(message) {
-    chatHistory.push(message);
-    // Notify that history has changed. Pass a copy or the new message if needed by listeners.
-    // For simplicity, just notify that the array content changed.
+export function setChatHistory(history) {
+    chatHistory = history;
     notify('chatHistory', chatHistory);
 }
 
 export function appendContentToLastMessage(content) {
     if (chatHistory.length > 0) {
         const lastMessage = chatHistory[chatHistory.length - 1];
-        // Ensure it's an assistant message and not an error
         if (lastMessage.role === 'assistant' && !lastMessage.isError) {
              lastMessage.content += content;
-             // Notify that history has changed.
              notify('chatHistory', chatHistory);
         }
     }
@@ -446,7 +386,7 @@ export function setCurrentChatName(name) {
     if (currentChatName !== name) {
         currentChatName = name;
         notify('currentChatName', currentChatName);
-        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled }); // Notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled });
     }
 }
 
@@ -454,44 +394,38 @@ export function setCurrentChatModel(modelName) {
     if (currentChatModel !== modelName) {
         currentChatModel = modelName;
         notify('currentChatModel', currentChatModel);
-        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled }); // Notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled });
     }
 }
 
-// --- NEW: Improve Prompt Setter ---
 export function setImprovePromptEnabled(enabled) {
     if (isImprovePromptEnabled !== enabled) {
         isImprovePromptEnabled = enabled;
         notify('isImprovePromptEnabled', isImprovePromptEnabled);
     }
 }
-// -----------------------------
 
-// --- NEW: Chat Mode Setter ---
 export function setCurrentChatMode(mode) {
     if (currentChatMode !== mode) {
         currentChatMode = mode;
         notify('currentChatMode', currentChatMode);
-        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled }); // Notify combined chat state
+        notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, mode: currentChatMode, deepResearch: isDeepResearchEnabled });
     }
 }
-// -----------------------------
 
-// --- Setter for H1 Section Index ---
 export function setCurrentNoteActiveH1SectionIndex(index) {
     if (currentNoteActiveH1SectionIndex !== index) {
         currentNoteActiveH1SectionIndex = index;
         notify('currentNoteActiveH1SectionIndex', currentNoteActiveH1SectionIndex);
     }
 }
-// ---------------------------------
 
 // --- Note Content Functions ---
 export function setNoteContent(content) {
     if (noteContent !== content) {
         noteContent = content;
         notify('noteContent', noteContent);
-        notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent }); // Notify combined note state
+        notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
     }
 }
 
@@ -499,7 +433,7 @@ export function setCurrentNoteName(name) {
     if (currentNoteName !== name) {
         currentNoteName = name;
         notify('currentNoteName', currentNoteName);
-        notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent }); // Notify combined note state
+        notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
     }
 }
 
@@ -525,7 +459,6 @@ export function setIsNotesSidebarCollapsed(isCollapsed) {
     }
 }
 
-// --- Notes TOC Drawer State ---
 export function setIsNotesTocCollapsed(isCollapsed) {
     if (isNotesTocCollapsed !== isCollapsed) {
         isNotesTocCollapsed = isCollapsed;
@@ -535,7 +468,7 @@ export function setIsNotesTocCollapsed(isCollapsed) {
 
 // --- Note History State ---
 export function setNoteHistory(history) {
-    noteHistory = history; // Assume history array is new or represents a change
+    noteHistory = history;
     notify('noteHistory', noteHistory);
 }
 
@@ -543,9 +476,9 @@ export function setNoteHistory(history) {
 export function setIsRecording(recording, context = null) {
     if (isRecording !== recording) {
         isRecording = recording;
-        recordingContext = recording ? context : null; // Set context only when starting
+        recordingContext = recording ? context : null;
         notify('isRecording', isRecording);
-        notify('recordingContext', recordingContext); // Notify context change as well
+        notify('recordingContext', recordingContext);
     }
 }
 
@@ -556,13 +489,6 @@ export function setIsSocketConnected(connected) {
     }
 }
 
-// --- REMOVED Old Transcript Setters ---
-// export function setStreamingTranscript(transcript) { ... }
-// export function appendStreamingTranscript(text) { ... }
-// export function setFinalTranscriptSegment(text) { ... }
-// ------------------------------------
-
-// --- NEW: Setters for New Transcript State ---
 export function setFinalizedTranscript(transcript) {
     if (finalizedTranscript !== transcript) {
         finalizedTranscript = transcript;
@@ -571,7 +497,6 @@ export function setFinalizedTranscript(transcript) {
 }
 
 export function appendFinalizedTranscript(segment) {
-    // Append with a space if the current finalized transcript isn't empty
     const separator = finalizedTranscript ? " " : "";
     finalizedTranscript += separator + segment;
     notify('finalizedTranscript', finalizedTranscript);
@@ -583,11 +508,8 @@ export function setCurrentInterimTranscript(transcript) {
         notify('currentInterimTranscript', currentInterimTranscript);
     }
 }
-// -----------------------------------------
 
-
-// --- NEW: Function to get the appropriate input element based on context ---
-export function getInputElementForContext(context) { // Add export keyword
+export function getInputElementForContext(context) {
     if (context === 'chat') {
         return elements.messageInput;
     } else if (context === 'notes') {
@@ -596,8 +518,7 @@ export function getInputElementForContext(context) { // Add export keyword
     return null;
 }
 
-
-// --- NEW: Long Recording State Functions ---
+// --- Long Recording State Functions ---
 export function setIsLongRecordingActive(isActive) {
     if (isLongRecordingActive !== isActive) {
         isLongRecordingActive = isActive;
@@ -606,13 +527,10 @@ export function setIsLongRecordingActive(isActive) {
 }
 
 export function setLongRecordingToastId(toastId) {
-    // No need to check for change, just set it and notify if needed
     longRecordingToastId = toastId;
-    // notify('longRecordingToastId', longRecordingToastId); // Usually not needed to notify for this
 }
 
 export function setLastLongTranscript(transcript) {
     lastLongTranscript = transcript;
-    notify('lastLongTranscript', lastLongTranscript); // Notify if UI needs to display this elsewhere
+    notify('lastLongTranscript', lastLongTranscript);
 }
-// -----------------------------------------
