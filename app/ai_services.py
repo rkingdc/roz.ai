@@ -14,7 +14,7 @@ import tempfile
 import os
 import re
 import base64
-from . import database  # Use alias to avoid conflict with db instance
+from . import database # Use alias to avoid conflict with db instance
 from .plugins.web_search import perform_web_search  # Remove fetch_web_content import
 from google.api_core.exceptions import (
     GoogleAPIError,
@@ -806,59 +806,12 @@ def generate_chat_response(
         return  # Stop execution
     # --- End AI Readiness Check ---
 
-    # --- Save User Message with Attachments ---
-    # This happens *before* preparing content for the AI, using the metadata passed in.
-    user_message_content_for_db = user_message
-    if not user_message_content_for_db and message_attachments_metadata:
-        user_message_content_for_db = (
-            "[User sent attachments]"  # Placeholder if only files sent
-        )
-
-    if user_message_content_for_db:  # Save if there's text OR attachments
-        logger.info(
-            f"Attempting to save user message for chat {chat_id} (SID: {sid}) with attachments metadata."
-        )
-        try:
-            save_success = database.add_message_to_db(
-                chat_id=chat_id,
-                role="user",
-                content=user_message_content_for_db,
-                # Pass the received metadata directly
-                attached_data_json=(
-                    message_attachments_metadata
-                    if message_attachments_metadata
-                    else None
-                ),
-            )
-            if not save_success:
-                logger.error(
-                    f"Failed to save user message for chat {chat_id} (SID: {sid}) to database."
-                )
-                # Decide if we should stop or continue if user message save fails
-                # For now, let's emit an error and stop.
-                socketio.emit(
-                    "task_error",
-                    {"error": "[Error: Failed to save your message to the database]"},
-                    room=sid,
-                )
-                return
-            else:
-                logger.info(
-                    f"Successfully saved user message for chat {chat_id} (SID: {sid}) with attachments metadata."
-                )
-        except Exception as db_err:
-            logger.error(
-                f"Database error saving user message for chat {chat_id} (SID: {sid}): {db_err}",
-                exc_info=True,
-            )
-            socketio.emit(
-                "task_error",
-                {
-                    "error": f"[Error: Database error saving your message ({type(db_err).__name__})]"
-                },
-                room=sid,
-            )
-            return  # Stop if DB error saving user message
+    # --- REMOVED USER MESSAGE SAVE BLOCK ---
+    # The user message is now saved synchronously in sockets.py before this task starts.
+    # The message_attachments_metadata is passed to this function but only used
+    # if we needed to save the user message *here*. Since we don't, it's not used
+    # directly in this function anymore, but kept in the signature for clarity
+    # about the data flow from sockets.py.
 
     # --- Main Logic ---
     # This part needs to be structured differently depending on streaming
@@ -1133,14 +1086,14 @@ def _generate_chat_response_non_stream(
             assistant_response_content = f"[Unexpected AI Error: {type(e).__name__}]"
             socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
 
-        finally:
-            # --- Save Assistant Response to DB ---
-            if (
-                assistant_response_content
-            ):  # Ensure there's content (even error messages)
-                logger.info(
-                    f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
-                )
+    finally:
+        # --- Save Assistant Response to DB ---
+        if (
+            assistant_response_content
+        ):  # Ensure there's content (even error messages)
+            logger.info(
+                f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
+            )
             try:
                 # Assistant messages don't have attached_data in this context
                 save_success = database.add_message_to_db(
@@ -1158,10 +1111,10 @@ def _generate_chat_response_non_stream(
                     f"DB error saving non-streaming assistant message for chat {chat_id} (SID: {sid}): {db_err}",
                     exc_info=True,
                 )
-            else:
-                logger.warning(
-                    f"No assistant content generated to save for non-streaming chat {chat_id} (SID: {sid})."
-                )
+        else:
+            logger.warning(
+                f"No assistant content generated to save for non-streaming chat {chat_id} (SID: {sid})."
+            )
 
         _cleanup_temp_files(
             temp_files_to_clean, f"non-streaming chat {chat_id} (SID: {sid})"
