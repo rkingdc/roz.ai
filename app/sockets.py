@@ -1,6 +1,7 @@
 import logging
 from flask import request  # Removed current_app, not used here
 from flask_socketio import emit, join_room, leave_room, disconnect  # Added disconnect
+import base64 # Import base64 for decoding session files
 
 # Removed OutOfRange, threading, queue - they are handled within voice_services
 # from google.api_core.exceptions import OutOfRange
@@ -173,7 +174,7 @@ def handle_cancel_generation(data):
 # --- Chat Message Handling ---
 
 # Import necessary modules for chat handling
-from . import database as db  # Use relative import
+from . import database as db_module # Use alias to avoid conflict with db instance
 from . import ai_services
 from .ai_services import prompt_improver  # Import the specific function
 from . import deep_research
@@ -182,7 +183,7 @@ from . import deep_research
 from flask import current_app  # Import current_app
 
 
-def _process_chat_message_async(app, sid, data):  # Ensure app argument is present
+def _process_chat_message_async(app, sid, data, message_attachments_metadata): # Add metadata param
     """
     Runs in a background task to process chat messages (AI or Deep Research).
     Emits results back to the client via SocketIO.
@@ -190,8 +191,8 @@ def _process_chat_message_async(app, sid, data):  # Ensure app argument is prese
     """
     chat_id = data.get("chat_id")
     user_message = data.get("message", "")
-    attached_files = data.get("attached_files", [])
-    session_files = data.get("session_files", [])
+    attached_files = data.get("attached_files", []) # References to existing files
+    session_files = data.get("session_files", []) # New files with content
     calendar_context = data.get("calendar_context")
     enable_web_search = data.get("enable_web_search", False)
     enable_streaming = data.get("enable_streaming", False)
@@ -251,14 +252,15 @@ def _process_chat_message_async(app, sid, data):  # Ensure app argument is prese
                 ai_services.generate_chat_response(
                     chat_id=chat_id,
                     user_message=user_message,
-                    attached_files=attached_files,
-                    session_files=session_files,
+                    attached_files=attached_files, # Pass raw refs
+                    session_files=session_files, # Pass raw session data
                     calendar_context=calendar_context,
                     web_search_enabled=enable_web_search,
                     streaming_enabled=enable_streaming,
                     socketio=socketio,
                     sid=sid,
-                    is_cancelled_callback=is_cancelled # Pass the check function
+                    is_cancelled_callback=is_cancelled, # Pass the check function
+                    message_attachments_metadata=message_attachments_metadata # Pass metadata for DB saving
                 )
                 # generate_chat_response needs to be updated to accept and use is_cancelled_callback
                 logger.info(
@@ -282,9 +284,10 @@ def _process_chat_message_async(app, sid, data):  # Ensure app argument is prese
                 logger.info(
                     f"Attempting to save background task error message for chat {chat_id}."
                 )
-                db.add_message_to_db(
-                    chat_id, "assistant", error_msg
-                )  # Role is assistant for system errors
+                # Use the aliased db_module here
+                db_module.add_message_to_db(
+                    chat_id, "assistant", error_msg, attached_data_json=None # Error messages don't have attachments
+                )
             except Exception as emit_save_err:
                 logger.error(
                     f"CRITICAL: Failed to emit or save background task error for SID {sid}, Chat {chat_id}: {emit_save_err}",
@@ -315,8 +318,9 @@ def handle_send_chat_message(data):
     mode = data.get("mode", "chat")
     improve_prompt_enabled = data.get("improve_prompt", False)  # Get the new flag
     # Get other fields needed for validation/saving
-    attached_files = data.get("attached_files", [])
-    session_files = data.get("session_files", [])
+    attached_files_payload = data.get("attached_files", []) # References to existing files
+    session_files_payload = data.get("session_files", []) # New files with content
+    message_attachments_metadata = data.get("message_attachments_metadata", []) # Metadata for DB
     calendar_context = data.get("calendar_context")
     enable_web_search = data.get("enable_web_search", False)
 
@@ -341,11 +345,12 @@ def handle_send_chat_message(data):
         else:  # mode is 'chat'
             # Check if any relevant input exists for chat mode
             # Use state values passed from client payload
-            files_plugin_enabled = data.get("enable_files_plugin", False)
-            calendar_plugin_enabled = data.get("enable_calendar_plugin", False)
-            web_search_plugin_enabled = data.get("enable_web_search_plugin", False)
+            files_plugin_enabled = data.get("enable_files_plugin", False) # Assuming frontend sends this if needed
+            calendar_plugin_enabled = data.get("enable_calendar_plugin", False) # Assuming frontend sends this if needed
+            web_search_plugin_enabled = data.get("enable_web_search_plugin", False) # Assuming frontend sends this if needed
 
-            has_file_input = files_plugin_enabled and (attached_files or session_files)
+            # Check if there are any attachments (session or existing)
+            has_file_input = bool(attached_files_payload or session_files_payload)
             has_calendar_input = calendar_plugin_enabled and calendar_context
             has_web_search_input = web_search_plugin_enabled and enable_web_search
 
@@ -439,6 +444,48 @@ def handle_send_chat_message(data):
                 f"Proceeding with original prompt for chat {chat_id} (SID: {sid}) after improvement error."
             )
 
+    # --- Optional: Save Session Files as Persistent Files ---
+    # If session files (from paperclip) should be saved to the main 'files' table
+    processed_session_file_ids = []
+    if session_files_payload:
+        logger.info(f"Processing {len(session_files_payload)} session files for persistence...")
+        for sf_data in session_files_payload:
+            try:
+                # Assuming content is base64 encoded string from JS FileReader
+                if "," in sf_data['content']:
+                    _, base64_string = sf_data['content'].split(",", 1)
+                else:
+                    base64_string = sf_data['content']
+                file_content_bytes = base64.b64decode(base64_string)
+                filesize = len(file_content_bytes)
+
+                # Save to File table (commit each one for simplicity, or batch if needed)
+                new_file_id = db_module.save_file_record_to_db(
+                    filename=sf_data['filename'],
+                    content_blob=file_content_bytes,
+                    mimetype=sf_data['mimetype'],
+                    filesize=filesize,
+                    commit=True # Commit each session file
+                )
+                if new_file_id:
+                    processed_session_file_ids.append(new_file_id)
+                    logger.info(f"Saved session file '{sf_data['filename']}' as persistent File ID: {new_file_id}")
+                    # Update the corresponding metadata entry with the new file_id
+                    for att_meta in message_attachments_metadata:
+                        if att_meta.get('type') == 'session' and att_meta.get('filename') == sf_data['filename']:
+                            att_meta['file_id'] = new_file_id # Add the persistent file_id
+                            att_meta['type'] = 'file' # Optionally change type to 'file' now
+                            logger.debug(f"Updated metadata for '{sf_data['filename']}' with file_id: {new_file_id}")
+                            break
+                else:
+                    logger.error(f"Failed to save session file '{sf_data['filename']}' to File table.")
+            except base64.BinasciiError as b64_err:
+                logger.error(f"Base64 decoding failed for session file '{sf_data['filename']}': {b64_err}")
+            except Exception as e:
+                logger.error(f"Error processing/saving session file '{sf_data['filename']}': {e}", exc_info=True)
+    # --- End Session File Saving ---
+
+
     # --- Save User Message (Synchronously) ---
     # Use the potentially modified user_message
     logger.debug(
@@ -446,13 +493,24 @@ def handle_send_chat_message(data):
     )  # ADDED LOG
     # Save the user message immediately before starting the background task
     user_save_success = False
-    if user_message:  # Save the potentially improved message
+    # Determine content for DB (e.g., if message is empty but attachments exist)
+    user_message_content_for_db = user_message
+    if not user_message_content_for_db and message_attachments_metadata:
+        user_message_content_for_db = "[User sent attachments]" # Or similar placeholder
+
+    if user_message_content_for_db: # Save if there's text OR attachments
         logger.info(f"Attempting to save user message for chat {chat_id} (SID: {sid}).")
         try:
-            user_save_success = db.add_message_to_db(chat_id, "user", user_message)
+            # Pass the potentially updated metadata to be saved in Message.attached_data
+            user_save_success = db_module.add_message_to_db(
+                chat_id=chat_id,
+                role="user",
+                content=user_message_content_for_db,
+                attached_data_json=message_attachments_metadata if message_attachments_metadata else None
+            )
             if user_save_success:
                 logger.info(
-                    f"Successfully saved user message for chat {chat_id} (SID: {sid})."
+                    f"Successfully saved user message for chat {chat_id} (SID: {sid}) with attachments metadata."
                 )
                 # Optional: Notify client that message was saved
                 # emit('message_saved', {'role': 'user'}, room=sid)
@@ -498,11 +556,13 @@ def handle_send_chat_message(data):
         # Don't stop the whole process, but log it.
 
     try:
+        # Pass the potentially updated metadata to the background task
         socketio.start_background_task(
             _process_chat_message_async,
             app=app_instance,  # Ensure app instance is passed
             sid=sid,
-            data=data,  # Pass the full data dictionary received
+            data=data,  # Pass the full original data dictionary received
+            message_attachments_metadata=message_attachments_metadata # Pass the metadata separately
         )
     except Exception as task_start_err:
         logger.error(
@@ -518,10 +578,11 @@ def handle_send_chat_message(data):
         )
         # Attempt to save an error message to DB as well
         try:
-            db.add_message_to_db(
+            db_module.add_message_to_db(
                 chat_id,
                 "assistant",
                 f"[Server Error: Failed to start background task: {type(task_start_err).__name__}]",
+                attached_data_json=None # Errors don't have attachments
             )
         except Exception as db_save_err:
             logger.error(

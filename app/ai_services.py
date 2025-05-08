@@ -14,7 +14,7 @@ import tempfile
 import os
 import re
 import base64
-from . import database
+from . import database # Use alias to avoid conflict with db instance
 from .plugins.web_search import perform_web_search  # Remove fetch_web_content import
 from google.api_core.exceptions import (
     GoogleAPIError,
@@ -726,20 +726,21 @@ def generate_chat_response(
     streaming_enabled=False,
     socketio=None,
     sid=None,
-    is_cancelled_callback: Callable[
-        [], bool
-    ] = lambda: False,  # Add cancellation callback
+    is_cancelled_callback: Callable[[], bool] = lambda: False,
+    message_attachments_metadata=None, # Add new parameter for metadata
 ):
     """
     Generates a chat response using the Gemini API via the client.
     Handles history, context, files, web search. Handles errors gracefully.
-    Emits results back to the client via SocketIO.
+    Emits results back to the client via SocketIO. Saves user message with attachments.
 
     Args:
         ... (standard args) ...
         streaming_enabled (bool): Determines if the response should be streamed.
         socketio: The Flask-SocketIO instance.
         sid: The session ID of the client to emit results to.
+        is_cancelled_callback: Function to check if cancellation was requested.
+        message_attachments_metadata (list, optional): Metadata about attachments for saving to DB.
     """
     logger.info(
         f"Entering generate_chat_response for chat {chat_id} (SID: {sid}). Streaming: {streaming_enabled}"
@@ -803,6 +804,35 @@ def generate_chat_response(
         return  # Stop execution
     # --- End AI Readiness Check ---
 
+    # --- Save User Message with Attachments ---
+    # This happens *before* preparing content for the AI, using the metadata passed in.
+    user_message_content_for_db = user_message
+    if not user_message_content_for_db and message_attachments_metadata:
+        user_message_content_for_db = "[User sent attachments]" # Placeholder if only files sent
+
+    if user_message_content_for_db: # Save if there's text OR attachments
+        logger.info(f"Attempting to save user message for chat {chat_id} (SID: {sid}) with attachments metadata.")
+        try:
+            save_success = database.add_message_to_db(
+                chat_id=chat_id,
+                role="user",
+                content=user_message_content_for_db,
+                # Pass the received metadata directly
+                attached_data_json=message_attachments_metadata if message_attachments_metadata else None
+            )
+            if not save_success:
+                logger.error(f"Failed to save user message for chat {chat_id} (SID: {sid}) to database.")
+                # Decide if we should stop or continue if user message save fails
+                # For now, let's emit an error and stop.
+                socketio.emit("task_error", {"error": "[Error: Failed to save your message to the database]"}, room=sid)
+                return
+            else:
+                 logger.info(f"Successfully saved user message for chat {chat_id} (SID: {sid}) with attachments metadata.")
+        except Exception as db_err:
+            logger.error(f"Database error saving user message for chat {chat_id} (SID: {sid}): {db_err}", exc_info=True)
+            socketio.emit("task_error", {"error": f"[Error: Database error saving your message ({type(db_err).__name__})]"}, room=sid)
+            return # Stop if DB error saving user message
+
     # --- Main Logic ---
     # This part needs to be structured differently depending on streaming
     # We use helper functions that now emit results via SocketIO.
@@ -812,9 +842,9 @@ def generate_chat_response(
     preparation_result = _prepare_chat_content(
         client=client,
         chat_id=chat_id,
-        user_message=user_message,
-        attached_files=attached_files,
-        session_files=session_files,
+        user_message=user_message, # Pass original user message for context prep
+        attached_files=attached_files, # Pass raw attached file refs
+        session_files=session_files, # Pass raw session file data
         calendar_context=calendar_context,
         web_search_enabled=web_search_enabled,
         socketio=socketio,  # Pass socketio
@@ -875,6 +905,7 @@ def generate_chat_response(
             temp_files_to_clean=temp_files_to_clean,
             socketio=socketio,
             sid=sid,
+            is_cancelled_callback=is_cancelled_callback, # Pass callback here too
         )
 
 
@@ -911,165 +942,166 @@ def _generate_chat_response_non_stream(
             room=sid,
         )
         # Save cancellation message and cleanup (handled in finally block)
-        return  # Exit early
-
-    try:
-        # --- Call Gemini API (Non-Streaming) ---
-        # Construct conversation history. Only add the final user Content if parts exist.
-        # The user's text message should be the last item in 'history'.
-        full_conversation = history
-        if current_turn_parts:
-            full_conversation.append(Content(role="user", parts=current_turn_parts))
-        else:
-            logger.debug(
-                f"No additional parts for user turn in chat {chat_id} (SID: {sid}). Sending history only."
-            )
-
-        logger.info(
-            f"Calling model.generate_content (non-streaming) for chat {chat_id} (SID: {sid})"
-        )
-        system_prompt = f"""You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
-        response = client.models.generate_content(
-            model=model_to_use,
-            contents=full_conversation,
-            system_instruction=system_prompt,
-        )
-        logger.info(
-            f"Non-streaming generate_content call returned for chat {chat_id} (SID: {sid})."
-        )
-
-        # --- Process Non-Streaming Response ---
-        logger.debug(f"Non-streaming raw response object (SID: {sid}): {response!r}")
-
-        # Check for safety issues first
-        if response.prompt_feedback and response.prompt_feedback.block_reason:
-            reason = response.prompt_feedback.block_reason.name
-            logger.warning(
-                f"Non-streaming response blocked by safety settings for chat {chat_id} (SID: {sid}). Reason: {reason}"
-            )
-            assistant_response_content = f"[AI Safety Error: Request blocked due to safety settings (Reason: {reason})]"
-            socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
-        # Check candidates and extract text
-        elif (
-            response.candidates
-            and hasattr(response.candidates[0], "content")
-            and hasattr(response.candidates[0].content, "parts")
-            and response.candidates[0].content.parts
-        ):
-            assistant_reply = "".join(
-                part.text
-                for part in response.candidates[0].content.parts
-                if hasattr(part, "text")
-            )
-            if assistant_reply.strip():
-                logger.info(
-                    f"Successfully received full response text (length {len(assistant_reply)}) for chat {chat_id} (SID: {sid})."
-                )
-                assistant_response_content = assistant_reply
-                socketio.emit(
-                    "chat_response", {"reply": assistant_response_content}, room=sid
-                )
+        # No return here, let finally block handle saving and cleanup
+    else: # Only proceed if not cancelled before API call
+        try:
+            # --- Call Gemini API (Non-Streaming) ---
+            # Construct conversation history. Only add the final user Content if parts exist.
+            # The user's text message should be the last item in 'history'.
+            full_conversation = history
+            if current_turn_parts:
+                full_conversation.append(Content(role="user", parts=current_turn_parts))
             else:
-                logger.warning(
-                    f"Non-streaming response for chat {chat_id} (SID: {sid}) was empty or whitespace."
+                logger.debug(
+                    f"No additional parts for user turn in chat {chat_id} (SID: {sid}). Sending history only."
                 )
-                assistant_response_content = (
-                    "[System Note: The AI returned an empty response.]"
-                )
-                socketio.emit(
-                    "chat_response", {"reply": assistant_response_content}, room=sid
-                )  # Emit the note
-        else:
-            logger.warning(
-                f"Non-streaming response for chat {chat_id} (SID: {sid}) did not produce usable content. Response: {response!r}"
+
+            logger.info(
+                f"Calling model.generate_content (non-streaming) for chat {chat_id} (SID: {sid})"
             )
-            finish_reason = "UNKNOWN"
-            if response.candidates and hasattr(response.candidates[0], "finish_reason"):
-                finish_reason = response.candidates[0].finish_reason.name
-            # Check prompt feedback again
+            system_prompt = f"""You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
+            response = client.models.generate_content(
+                model=model_to_use,
+                contents=full_conversation,
+                system_instruction=system_prompt,
+            )
+            logger.info(
+                f"Non-streaming generate_content call returned for chat {chat_id} (SID: {sid})."
+            )
+
+            # --- Process Non-Streaming Response ---
+            logger.debug(f"Non-streaming raw response object (SID: {sid}): {response!r}")
+
+            # Check for safety issues first
             if response.prompt_feedback and response.prompt_feedback.block_reason:
                 reason = response.prompt_feedback.block_reason.name
-                assistant_response_content = f"[AI Safety Error: Request blocked (Reason: {reason}, Finish Reason: {finish_reason})]"
+                logger.warning(
+                    f"Non-streaming response blocked by safety settings for chat {chat_id} (SID: {sid}). Reason: {reason}"
+                )
+                assistant_response_content = f"[AI Safety Error: Request blocked due to safety settings (Reason: {reason})]"
+                socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
+            # Check candidates and extract text
+            elif (
+                response.candidates
+                and hasattr(response.candidates[0], "content")
+                and hasattr(response.candidates[0].content, "parts")
+                and response.candidates[0].content.parts
+            ):
+                assistant_reply = "".join(
+                    part.text
+                    for part in response.candidates[0].content.parts
+                    if hasattr(part, "text")
+                )
+                if assistant_reply.strip():
+                    logger.info(
+                        f"Successfully received full response text (length {len(assistant_reply)}) for chat {chat_id} (SID: {sid})."
+                    )
+                    assistant_response_content = assistant_reply
+                    socketio.emit(
+                        "chat_response", {"reply": assistant_response_content}, room=sid
+                    )
+                else:
+                    logger.warning(
+                        f"Non-streaming response for chat {chat_id} (SID: {sid}) was empty or whitespace."
+                    )
+                    assistant_response_content = (
+                        "[System Note: The AI returned an empty response.]"
+                    )
+                    socketio.emit(
+                        "chat_response", {"reply": assistant_response_content}, room=sid
+                    )  # Emit the note
             else:
-                assistant_response_content = f"[AI Error: The AI did not return any content (Finish Reason: {finish_reason})]"
+                logger.warning(
+                    f"Non-streaming response for chat {chat_id} (SID: {sid}) did not produce usable content. Response: {response!r}"
+                )
+                finish_reason = "UNKNOWN"
+                if response.candidates and hasattr(response.candidates[0], "finish_reason"):
+                    finish_reason = response.candidates[0].finish_reason.name
+                # Check prompt feedback again
+                if response.prompt_feedback and response.prompt_feedback.block_reason:
+                    reason = response.prompt_feedback.block_reason.name
+                    assistant_response_content = f"[AI Safety Error: Request blocked (Reason: {reason}, Finish Reason: {finish_reason})]"
+                else:
+                    assistant_response_content = f"[AI Error: The AI did not return any content (Finish Reason: {finish_reason})]"
+                socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
+
+        # --- Error Handling for Non-Streaming API Call ---
+        except InvalidArgument as e:
+            logger.error(
+                f"InvalidArgument error during non-streaming chat {chat_id} (SID: {sid}): {e}.",
+                exc_info=True,
+            )
+            assistant_response_content = f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
+            socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
+        except ValidationError as e:
+            logger.error(
+                f"Data validation error calling non-streaming Gemini API for chat {chat_id} (SID: {sid}): {e}",
+                exc_info=True,
+            )
+            try:
+                error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
+            except Exception:
+                error_details = "Check logs."
+            assistant_response_content = (
+                f"[AI Error: Internal data format error. {error_details}]"
+            )
+            socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
+        except DeadlineExceeded:
+            logger.error(
+                f"Non-streaming Gemini API call timed out for chat {chat_id} (SID: {sid})."
+            )
+            assistant_response_content = (
+                "[AI Error: The request timed out. Please try again.]"
+            )
+            socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
+        except NotFound as e:
+            logger.error(
+                f"Model for non-streaming chat {chat_id} (SID: {sid}) not found: {e}"
+            )
+            assistant_response_content = f"[AI Error: Model '{model_to_use}' not found or access denied.]"  # Use model_to_use here
+            socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
+        except GoogleAPIError as e:
+            logger.error(
+                f"Google API error for non-streaming chat {chat_id} (SID: {sid}): {e}",
+                exc_info=False,
+            )
+            err_str = str(e).lower()
+            if "api key not valid" in err_str:
+                assistant_response_content = "[Error: Invalid Gemini API Key]"
+            elif "permission denied" in err_str:
+                assistant_response_content = (
+                    f"[AI Error: Permission denied for model. Check API key permissions.]"
+                )
+            elif "resource has been exhausted" in err_str or "429" in str(e):
+                logger.warning(
+                    f"Quota/Rate limit hit for non-streaming chat {chat_id} (SID: {sid})."
+                )
+                assistant_response_content = (
+                    "[AI Error: API quota or rate limit exceeded. Please try again later.]"
+                )
+            elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
+                logger.warning(
+                    f"API error indicates safety block for non-streaming chat {chat_id} (SID: {sid}): {e}"
+                )
+                assistant_response_content = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: SAFETY)]"
+            elif "internal error" in err_str or "500" in str(e):
+                logger.error(
+                    f"Internal server error from Gemini API for non-streaming chat {chat_id} (SID: {sid}): {e}"
+                )
+                assistant_response_content = (
+                    "[AI Error: The AI service encountered an internal error.]"
+                )
+            else:
+                assistant_response_content = f"[AI API Error: {type(e).__name__}]"
+            socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
+        except Exception as e:
+            logger.error(
+                f"Unexpected error during non-streaming Gemini API interaction for chat {chat_id} (SID: {sid}): {e}",
+                exc_info=True,
+            )
+            assistant_response_content = f"[Unexpected AI Error: {type(e).__name__}]"
             socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
 
-    # --- Error Handling for Non-Streaming API Call ---
-    except InvalidArgument as e:
-        logger.error(
-            f"InvalidArgument error during non-streaming chat {chat_id} (SID: {sid}): {e}.",
-            exc_info=True,
-        )
-        assistant_response_content = f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
-        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
-    except ValidationError as e:
-        logger.error(
-            f"Data validation error calling non-streaming Gemini API for chat {chat_id} (SID: {sid}): {e}",
-            exc_info=True,
-        )
-        try:
-            error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
-        except Exception:
-            error_details = "Check logs."
-        assistant_response_content = (
-            f"[AI Error: Internal data format error. {error_details}]"
-        )
-        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
-    except DeadlineExceeded:
-        logger.error(
-            f"Non-streaming Gemini API call timed out for chat {chat_id} (SID: {sid})."
-        )
-        assistant_response_content = (
-            "[AI Error: The request timed out. Please try again.]"
-        )
-        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
-    except NotFound as e:
-        logger.error(
-            f"Model for non-streaming chat {chat_id} (SID: {sid}) not found: {e}"
-        )
-        assistant_response_content = f"[AI Error: Model '{model_to_use}' not found or access denied.]"  # Use model_to_use here
-        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
-    except GoogleAPIError as e:
-        logger.error(
-            f"Google API error for non-streaming chat {chat_id} (SID: {sid}): {e}",
-            exc_info=False,
-        )
-        err_str = str(e).lower()
-        if "api key not valid" in err_str:
-            assistant_response_content = "[Error: Invalid Gemini API Key]"
-        elif "permission denied" in err_str:
-            assistant_response_content = (
-                f"[AI Error: Permission denied for model. Check API key permissions.]"
-            )
-        elif "resource has been exhausted" in err_str or "429" in str(e):
-            logger.warning(
-                f"Quota/Rate limit hit for non-streaming chat {chat_id} (SID: {sid})."
-            )
-            assistant_response_content = (
-                "[AI Error: API quota or rate limit exceeded. Please try again later.]"
-            )
-        elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
-            logger.warning(
-                f"API error indicates safety block for non-streaming chat {chat_id} (SID: {sid}): {e}"
-            )
-            assistant_response_content = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: SAFETY)]"
-        elif "internal error" in err_str or "500" in str(e):
-            logger.error(
-                f"Internal server error from Gemini API for non-streaming chat {chat_id} (SID: {sid}): {e}"
-            )
-            assistant_response_content = (
-                "[AI Error: The AI service encountered an internal error.]"
-            )
-        else:
-            assistant_response_content = f"[AI API Error: {type(e).__name__}]"
-        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
-    except Exception as e:
-        logger.error(
-            f"Unexpected error during non-streaming Gemini API interaction for chat {chat_id} (SID: {sid}): {e}",
-            exc_info=True,
-        )
-        assistant_response_content = f"[Unexpected AI Error: {type(e).__name__}]"
-        socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
     finally:
         # --- Save Assistant Response to DB ---
         if assistant_response_content:  # Ensure there's content (even error messages)
@@ -1077,8 +1109,9 @@ def _generate_chat_response_non_stream(
                 f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
             )
             try:
+                # Assistant messages don't have attached_data in this context
                 save_success = database.add_message_to_db(
-                    chat_id, "assistant", assistant_response_content
+                    chat_id, "assistant", assistant_response_content, attached_data_json=None
                 )
                 if not save_success:
                     logger.error(
@@ -1144,138 +1177,138 @@ def _generate_chat_response_stream(
                 room=sid,
             )
             # Save cancellation message and cleanup (handled in finally block)
-            return  # Exit early
+            # No return here, let finally block handle saving and cleanup
+        else: # Only proceed if not cancelled before API call
+            # --- Call Gemini API (Streaming) ---
+            # Determine model (ensure 'models/' prefix) - Moved model determination here
+            raw_model_name = current_app.config.get(
+                "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
+            )
+            model_to_use = (
+                f"models/{raw_model_name}"
+                if not raw_model_name.startswith("models/")
+                else raw_model_name
+            )
+            logger.info(
+                f"Using model '{model_to_use}' for streaming chat {chat_id} (SID: {sid})."
+            )  # Log the final model name
 
-        # --- Call Gemini API (Streaming) ---
-        # Determine model (ensure 'models/' prefix) - Moved model determination here
-        raw_model_name = current_app.config.get(
-            "PRIMARY_MODEL", current_app.config["DEFAULT_MODEL"]
-        )
-        model_to_use = (
-            f"models/{raw_model_name}"
-            if not raw_model_name.startswith("models/")
-            else raw_model_name
-        )
-        logger.info(
-            f"Using model '{model_to_use}' for streaming chat {chat_id} (SID: {sid})."
-        )  # Log the final model name
+            # Construct conversation history. Only add the final user Content if parts exist.
+            # The user's text message should be the last item in 'history'.
+            full_conversation = history
+            if current_turn_parts:
+                full_conversation.append(Content(role="user", parts=current_turn_parts))
+            else:
+                logger.debug(
+                    f"No additional parts for user turn in chat {chat_id} (SID: {sid}). Sending history only."
+                )
 
-        # Construct conversation history. Only add the final user Content if parts exist.
-        # The user's text message should be the last item in 'history'.
-        full_conversation = history
-        if current_turn_parts:
-            full_conversation.append(Content(role="user", parts=current_turn_parts))
-        else:
-            logger.debug(
-                f"No additional parts for user turn in chat {chat_id} (SID: {sid}). Sending history only."
+            # System prompt (currently unsupported by stream API, but keep for future)
+            system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
+
+            logger.info(
+                f"Calling model.generate_content_stream for chat {chat_id} (SID: {sid})"
+            )
+            response_iterator = client.models.generate_content_stream(
+                model=model_to_use,
+                contents=full_conversation,
+                # system_instruction=system_prompt, # Still unsupported
+            )
+            logger.info(
+                f"Streaming generate_content call returned iterator for chat {chat_id} (SID: {sid})."
             )
 
-        # System prompt (currently unsupported by stream API, but keep for future)
-        system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
-
-        logger.info(
-            f"Calling model.generate_content_stream for chat {chat_id} (SID: {sid})"
-        )
-        response_iterator = client.models.generate_content_stream(
-            model=model_to_use,
-            contents=full_conversation,
-            # system_instruction=system_prompt, # Still unsupported
-        )
-        logger.info(
-            f"Streaming generate_content call returned iterator for chat {chat_id} (SID: {sid})."
-        )
-
-        # --- Process Chunks from Iterator ---
-        chunk_count = 0
-        for chunk in response_iterator:
-            # --- Cancellation Check within loop ---
-            if is_cancelled_callback():
-                logger.info(
-                    f"Streaming generation cancelled during processing for chat {chat_id} (SID: {sid})."
-                )
-                full_reply_content += "\n[AI Info: Generation cancelled by user.]"  # Append cancellation note
-                cancelled_during_streaming = True
-                # Emit cancellation confirmation
-                socketio.emit(
-                    "generation_cancelled",
-                    {"message": "Cancelled by user.", "chat_id": chat_id},
-                    room=sid,
-                )
-                break  # Stop processing chunks
-
-            chunk_text = ""
-            try:
-                # Extract text content if available
-                if hasattr(chunk, "text") and chunk.text:
-                    chunk_text = chunk.text
-                # Check for safety blocking (prompt feedback)
-                elif (
-                    hasattr(chunk, "prompt_feedback")
-                    and chunk.prompt_feedback
-                    and chunk.prompt_feedback.block_reason
-                ):
-                    reason = chunk.prompt_feedback.block_reason.name
-                    logger.warning(
-                        f"Stream chunk blocked by safety settings for chat {chat_id} (SID: {sid}). Reason: {reason}"
+            # --- Process Chunks from Iterator ---
+            chunk_count = 0
+            for chunk in response_iterator:
+                # --- Cancellation Check within loop ---
+                if is_cancelled_callback():
+                    logger.info(
+                        f"Streaming generation cancelled during processing for chat {chat_id} (SID: {sid})."
                     )
-                    chunk_text = f"\n[AI Safety Error: Request or response blocked due to safety settings (Reason: {reason})]"
-                    emit_error_once(chunk_text)  # Emit as error
-                # Check for safety blocking (finish reason)
-                elif (
-                    hasattr(chunk, "candidates")
-                    and chunk.candidates
-                    and hasattr(chunk.candidates[0], "finish_reason")
-                    and chunk.candidates[0].finish_reason == 3
-                ):  # SAFETY
-                    safety_reason = "SAFETY"
-                    try:
-                        if chunk.candidates[0].safety_ratings:
-                            safety_reason = "; ".join(
-                                [
-                                    f"{r.category.name}: {r.probability.name}"
-                                    for r in chunk.candidates[0].safety_ratings
-                                ]
-                            )
-                    except Exception:
-                        pass
-                    logger.warning(
-                        f"Stream chunk finished due to SAFETY for chat {chat_id} (SID: {sid}). Ratings: {safety_reason}"
-                    )
-                    chunk_text = f"\n[AI Safety Error: Response blocked due to safety settings (Reason: {safety_reason})]"
-                    emit_error_once(chunk_text)  # Emit as error
-
-                # Emit the chunk text if it's not empty
-                if chunk_text:
-                    # logger.debug(f"Emitting stream chunk for SID {sid}: {chunk_text[:100]}...") # Verbose
+                    full_reply_content += "\n[AI Info: Generation cancelled by user.]"  # Append cancellation note
+                    cancelled_during_streaming = True
+                    # Emit cancellation confirmation
                     socketio.emit(
-                        "stream_chunk", {"chunk": chunk_text}, room=sid
-                    )  # Ensure this line is present and uncommented
-                    full_reply_content += chunk_text  # Accumulate for saving
-                    chunk_count += 1
+                        "generation_cancelled",
+                        {"message": "Cancelled by user.", "chat_id": chat_id},
+                        room=sid,
+                    )
+                    break  # Stop processing chunks
 
-            except AttributeError as ae:
-                logger.error(
-                    f"AttributeError processing stream chunk for SID {sid}: {ae} - Chunk: {chunk!r}",
-                    exc_info=True,
-                )
-                emit_error_once(
-                    f"[System Error: Problem processing AI response chunk ({type(ae).__name__})]"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Unexpected error processing stream chunk for SID {sid}: {e} - Chunk: {chunk!r}",
-                    exc_info=True,
-                )
-                emit_error_once(
-                    f"[System Error: Problem processing AI response chunk ({type(e).__name__})]"
-                )
+                chunk_text = ""
+                try:
+                    # Extract text content if available
+                    if hasattr(chunk, "text") and chunk.text:
+                        chunk_text = chunk.text
+                    # Check for safety blocking (prompt feedback)
+                    elif (
+                        hasattr(chunk, "prompt_feedback")
+                        and chunk.prompt_feedback
+                        and chunk.prompt_feedback.block_reason
+                    ):
+                        reason = chunk.prompt_feedback.block_reason.name
+                        logger.warning(
+                            f"Stream chunk blocked by safety settings for chat {chat_id} (SID: {sid}). Reason: {reason}"
+                        )
+                        chunk_text = f"\n[AI Safety Error: Request or response blocked due to safety settings (Reason: {reason})]"
+                        emit_error_once(chunk_text)  # Emit as error
+                    # Check for safety blocking (finish reason)
+                    elif (
+                        hasattr(chunk, "candidates")
+                        and chunk.candidates
+                        and hasattr(chunk.candidates[0], "finish_reason")
+                        and chunk.candidates[0].finish_reason == 3
+                    ):  # SAFETY
+                        safety_reason = "SAFETY"
+                        try:
+                            if chunk.candidates[0].safety_ratings:
+                                safety_reason = "; ".join(
+                                    [
+                                        f"{r.category.name}: {r.probability.name}"
+                                        for r in chunk.candidates[0].safety_ratings
+                                    ]
+                                )
+                        except Exception:
+                            pass
+                        logger.warning(
+                            f"Stream chunk finished due to SAFETY for chat {chat_id} (SID: {sid}). Ratings: {safety_reason}"
+                        )
+                        chunk_text = f"\n[AI Safety Error: Response blocked due to safety settings (Reason: {safety_reason})]"
+                        emit_error_once(chunk_text)  # Emit as error
 
-        logger.info(
-            f"Finished processing {chunk_count} chunks for chat {chat_id} (SID: {sid}). Cancelled: {cancelled_during_streaming}"
-        )
-        # Emit stream end signal only if no error occurred AND not cancelled during streaming
-        if not emitted_error and not cancelled_during_streaming:
-            socketio.emit("stream_end", {"message": "Stream finished."}, room=sid)
+                    # Emit the chunk text if it's not empty
+                    if chunk_text:
+                        # logger.debug(f"Emitting stream chunk for SID {sid}: {chunk_text[:100]}...") # Verbose
+                        socketio.emit(
+                            "stream_chunk", {"chunk": chunk_text}, room=sid
+                        )  # Ensure this line is present and uncommented
+                        full_reply_content += chunk_text  # Accumulate for saving
+                        chunk_count += 1
+
+                except AttributeError as ae:
+                    logger.error(
+                        f"AttributeError processing stream chunk for SID {sid}: {ae} - Chunk: {chunk!r}",
+                        exc_info=True,
+                    )
+                    emit_error_once(
+                        f"[System Error: Problem processing AI response chunk ({type(ae).__name__})]"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Unexpected error processing stream chunk for SID {sid}: {e} - Chunk: {chunk!r}",
+                        exc_info=True,
+                    )
+                    emit_error_once(
+                        f"[System Error: Problem processing AI response chunk ({type(e).__name__})]"
+                    )
+
+            logger.info(
+                f"Finished processing {chunk_count} chunks for chat {chat_id} (SID: {sid}). Cancelled: {cancelled_during_streaming}"
+            )
+            # Emit stream end signal only if no error occurred AND not cancelled during streaming
+            if not emitted_error and not cancelled_during_streaming:
+                socketio.emit("stream_end", {"message": "Stream finished."}, room=sid)
 
     # --- Error Handling for Streaming API Call ---
     except InvalidArgument as e:
@@ -1380,8 +1413,9 @@ def _generate_chat_response_stream(
                 f"Attempting to save final streamed assistant message for chat {chat_id} (SID: {sid}). Length: {len(full_reply_content)}"
             )
             try:
+                # Assistant messages don't have attached_data in this context
                 save_success = database.add_message_to_db(
-                    chat_id, "assistant", full_reply_content
+                    chat_id, "assistant", full_reply_content, attached_data_json=None
                 )
                 if not save_success:
                     logger.error(
@@ -1451,12 +1485,38 @@ def _prepare_chat_content(
         history = []
         for msg in history_data:
             role = "user" if msg["role"] == "user" else "model"
+            # Prepare parts for history, including potential attachments from DB
+            msg_parts = []
             if msg.get("content"):
-                history.append(Content(role=role, parts=[Part(text=msg["content"])]))
+                msg_parts.append(Part(text=msg["content"]))
+            
+            # Add parts for attachments stored in the message's attached_data
+            # This assumes attached_data stores a list of dicts like {filename, mimetype, file_id, type}
+            # We only need filename and type for context here, not the full file content again.
+            db_attachments = msg.get("attachments", []) 
+            if db_attachments:
+                attachment_texts = []
+                for att in db_attachments:
+                    att_type = att.get('type', 'file') # Default to 'file' if type missing
+                    att_name = att.get('filename', 'Unknown File')
+                    if att_type == 'session':
+                        attachment_texts.append(f"[User attached session file: {att_name}]")
+                    elif att_type == 'summary':
+                         attachment_texts.append(f"[User attached summary of file: {att_name}]")
+                    elif att_type == 'full':
+                         attachment_texts.append(f"[User attached full content of file: {att_name}]")
+                    else: # Handle 'file' type from potentially saved session files
+                         attachment_texts.append(f"[User attached file: {att_name}]")
+
+                if attachment_texts:
+                     # Combine attachment info into one text part for history simplicity
+                     msg_parts.append(Part(text="\n".join(attachment_texts)))
+
+            if msg_parts: # Only add history turn if there are parts (text or attachment info)
+                history.append(Content(role=role, parts=msg_parts))
             else:
-                logger.warning(
-                    f"Skipping history message with empty content for chat {chat_id}: Role={role}"
-                )
+                 logger.warning(f"Skipping history message with no parts for chat {chat_id}: Role={role}")
+
         logger.info(f"Prepared {len(history)} history turns for chat {chat_id}.")
 
         # Ensure history starts with 'user' if not empty
@@ -1488,20 +1548,17 @@ def _prepare_chat_content(
                 ]
             )
 
-        # 2. Attached Files (DB)
+        # 2. Attached Files (DB References)
         if attached_files:
             logger.info(
-                f"Processing {len(attached_files)} attached files for chat {chat_id}."
+                f"Processing {len(attached_files)} attached file references for chat {chat_id}."
             )
             for file_detail in attached_files:
-                # ... (Existing logic for attached files - summary/full) ...
-                # Ensure this logic appends Parts or FileDataParts to current_turn_parts
-                # and adds temp file paths to temp_files_to_clean
                 file_id = file_detail.get("id")
                 attachment_type = file_detail.get("type")
-                frontend_filename = file_detail.get("filename", "Unknown File")
+                frontend_filename = file_detail.get("filename", f"File ID {file_id}") # Use filename from metadata if available
                 logger.debug(
-                    f"Processing attached file: ID={file_id}, Type={attachment_type}, Name={frontend_filename}"
+                    f"Processing attached file reference: ID={file_id}, Type={attachment_type}, Name={frontend_filename}"
                 )
 
                 # --- Cancellation Check ---
@@ -1513,19 +1570,21 @@ def _prepare_chat_content(
 
                 if file_id is None or attachment_type is None:
                     logger.warning(
-                        f"Skipping invalid attached file detail: {file_detail}"
+                        f"Skipping invalid attached file reference detail: {file_detail}"
                     )
                     current_turn_parts.append(
-                        Part(text=f"[System: Skipped invalid attached file detail.]")
+                        Part(text=f"[System: Skipped invalid attached file reference.]")
                     )
                     continue
                 try:
+                    # Fetch details needed for processing (content only if 'full')
+                    include_content = attachment_type == "full"
                     db_file_details = database.get_file_details_from_db(
-                        file_id, include_content=True
+                        file_id, include_content=include_content
                     )
-                    if not db_file_details or not db_file_details.get("content"):
+                    if not db_file_details:
                         logger.warning(
-                            f"Could not get details/content for attached file_id {file_id} ('{frontend_filename}') in chat {chat_id}."
+                            f"Could not get details for attached file_id {file_id} ('{frontend_filename}') in chat {chat_id}."
                         )
                         current_turn_parts.append(
                             Part(
@@ -1533,19 +1592,33 @@ def _prepare_chat_content(
                             )
                         )
                         continue
+                    
+                    # Check content specifically if 'full' type was requested
+                    if include_content and not db_file_details.get("content"):
+                         logger.warning(
+                            f"Could not get content for attached file_id {file_id} ('{frontend_filename}') requested as 'full' in chat {chat_id}."
+                        )
+                         current_turn_parts.append(
+                            Part(
+                                text=f"[System: Error retrieving content for attached file '{frontend_filename}']"
+                            )
+                        )
+                         continue
+
 
                     filename = db_file_details["filename"]
                     mimetype = db_file_details["mimetype"]
-                    content_blob = db_file_details["content"]
+
 
                     if attachment_type == "summary":
-                        summary = get_or_generate_summary(file_id)
+                        summary = get_or_generate_summary(file_id) # This handles DB fetch or generation
                         current_turn_parts.append(
                             Part(
                                 text=f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"
                             )
                         )
                     elif attachment_type == "full":
+                        content_blob = db_file_details["content"] # Content was included
                         supported_mimetypes = (
                             "image/",
                             "audio/",
@@ -1626,15 +1699,12 @@ def _prepare_chat_content(
                         )
                     )
 
-        # 3. Session Files (Base64)
+        # 3. Session Files (Base64 Content)
         if session_files:
             logger.info(
                 f"Processing {len(session_files)} session files for chat {chat_id}."
             )
             for session_file_detail in session_files:
-                # ... (Existing logic for session files) ...
-                # Ensure this logic appends Parts or FileDataParts to current_turn_parts
-                # and adds temp file paths to temp_files_to_clean
                 filename = session_file_detail.get("filename", "Unknown Session File")
                 mimetype = session_file_detail.get("mimetype")
                 content_base64 = session_file_detail.get("content")
@@ -1866,17 +1936,16 @@ def _prepare_chat_content(
                     )
                 )
 
-        # 5. User Message
-        # The user message text is expected to be the last item in the 'history' list fetched from DB.
-        # We no longer add the 'user_message' variable content here to avoid duplication.
-        # current_turn_parts will now only contain non-message items like files, context, search results, instructions.
-        if (
-            not user_message and not current_turn_parts and not history
-        ):  # Add placeholder only if absolutely nothing else exists for the turn
+        # 5. User Message Text (Add as the *last* part if it exists)
+        # This ensures context items come before the actual user query text.
+        if user_message:
+            current_turn_parts.append(Part(text=user_message))
+        elif not current_turn_parts and not history: # Add placeholder only if absolutely nothing else exists for the turn
             current_turn_parts.append(
                 Part(text="[User provided no text, only attachments or context.]")
             )
-        # Ensure special instructions are still added if web search was enabled (handled below)
+
+        # 6. Special Instructions (Add after all other content)
         if web_search_enabled:
             # Update prompt instructions to reflect attached PDFs
             current_turn_parts.extend(
@@ -2581,4 +2650,3 @@ def generate_text(
         f"Text generation failed after {max_retries} retries due to rate limiting."
     )
     return "[AI Error: API rate limit exceeded after maximum retries.]"
-

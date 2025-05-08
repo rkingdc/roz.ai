@@ -931,8 +931,9 @@ export function sendMessage() {
     const payload = {
         chat_id: state.currentChatId,
         message: message,
-        attached_files: backendAttachedFilesPayload, // Use prepared payload
-        session_files: backendSessionFilesPayload,   // Use prepared payload
+        attached_files: backendAttachedFilesPayload, 
+        session_files: backendSessionFilesPayload,  
+        message_attachments_metadata: attachmentsForHistory, // Send pre-formatted metadata for DB
         calendar_context: calendarContextToSend,
         enable_web_search: webSearchEnabledToSend,
         mode: mode,
