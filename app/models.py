@@ -1,6 +1,7 @@
 from datetime import datetime, timezone  # Use timezone-aware UTC
 from app import db  # Import the db instance from app/__init__.py
 import os
+from sqlalchemy import Table, DDL, event # New imports for FTS
 
 
 # Helper function for default timestamps
@@ -118,3 +119,198 @@ class NoteHistory(db.Model):
 
     # Define relationship back to Note
     note = db.relationship("Note", back_populates="history")
+
+
+# FTS5 Virtual Table Definitions
+
+# For Message content
+message_fts_table = Table(
+    'message_fts', db.metadata,
+    db.Column('rowid', db.Integer, primary_key=True),
+    db.Column('content', db.Text)
+)
+
+event.listen(
+    message_fts_table,
+    'after_create',
+    DDL(
+        f"CREATE VIRTUAL TABLE IF NOT EXISTS {message_fts_table.name} USING fts5("
+        f"  content, "
+        f"  content_table='{Message.__tablename__}', "
+        f"  content_rowid='id' "
+        f")"
+    )
+)
+
+# For Note content
+note_fts_table = Table(
+    'note_fts', db.metadata,
+    db.Column('rowid', db.Integer, primary_key=True),
+    db.Column('content', db.Text)
+)
+
+event.listen(
+    note_fts_table,
+    'after_create',
+    DDL(
+        f"CREATE VIRTUAL TABLE IF NOT EXISTS {note_fts_table.name} USING fts5("
+        f"  content, "
+        f"  content_table='{Note.__tablename__}', "
+        f"  content_rowid='id' "
+        f")"
+    )
+)
+
+# For File summaries
+file_fts_table = Table(
+    'file_fts', db.metadata,
+    db.Column('rowid', db.Integer, primary_key=True),
+    db.Column('summary', db.Text)
+)
+
+event.listen(
+    file_fts_table,
+    'after_create',
+    DDL(
+        f"CREATE VIRTUAL TABLE IF NOT EXISTS {file_fts_table.name} USING fts5("
+        f"  summary, "
+        f"  content_table='{File.__tablename__}', "
+        f"  content_rowid='id' "
+        f")"
+    )
+)
+
+# Triggers to keep FTS tables synchronized
+
+# --- Message FTS Triggers ---
+event.listen(
+    Message.__table__,
+    'after_create',
+    DDL(f"""
+        CREATE TRIGGER IF NOT EXISTS messages_ai_trigger
+        AFTER INSERT ON {Message.__tablename__}
+        BEGIN
+            INSERT INTO {message_fts_table.name} (rowid, content)
+            VALUES (new.id, new.content);
+        END;
+    """)
+)
+
+event.listen(
+    Message.__table__,
+    'after_create',
+    DDL(f"""
+        CREATE TRIGGER IF NOT EXISTS messages_ad_trigger
+        AFTER DELETE ON {Message.__tablename__}
+        BEGIN
+            INSERT INTO {message_fts_table.name} ({message_fts_table.name}, rowid, content)
+            VALUES ('delete', old.id, old.content);
+        END;
+    """)
+)
+
+event.listen(
+    Message.__table__,
+    'after_create',
+    DDL(f"""
+        CREATE TRIGGER IF NOT EXISTS messages_au_trigger
+        AFTER UPDATE ON {Message.__tablename__}
+        WHEN new.content IS NOT old.content
+        BEGIN
+            INSERT INTO {message_fts_table.name} ({message_fts_table.name}, rowid, content)
+            VALUES ('delete', old.id, old.content);
+            INSERT INTO {message_fts_table.name} (rowid, content)
+            VALUES (new.id, new.content);
+        END;
+    """)
+)
+
+# --- Note FTS Triggers ---
+event.listen(
+    Note.__table__,
+    'after_create',
+    DDL(f"""
+        CREATE TRIGGER IF NOT EXISTS notes_ai_trigger
+        AFTER INSERT ON {Note.__tablename__}
+        BEGIN
+            INSERT INTO {note_fts_table.name} (rowid, content)
+            VALUES (new.id, new.content);
+        END;
+    """)
+)
+
+event.listen(
+    Note.__table__,
+    'after_create',
+    DDL(f"""
+        CREATE TRIGGER IF NOT EXISTS notes_ad_trigger
+        AFTER DELETE ON {Note.__tablename__}
+        BEGIN
+            INSERT INTO {note_fts_table.name} ({note_fts_table.name}, rowid, content)
+            VALUES ('delete', old.id, old.content);
+        END;
+    """)
+)
+
+event.listen(
+    Note.__table__,
+    'after_create',
+    DDL(f"""
+        CREATE TRIGGER IF NOT EXISTS notes_au_trigger
+        AFTER UPDATE ON {Note.__tablename__}
+        WHEN new.content IS NOT old.content
+        BEGIN
+            INSERT INTO {note_fts_table.name} ({note_fts_table.name}, rowid, content)
+            VALUES ('delete', old.id, old.content);
+            INSERT INTO {note_fts_table.name} (rowid, content)
+            VALUES (new.id, new.content);
+        END;
+    """)
+)
+
+# --- File FTS Triggers (for summary) ---
+event.listen(
+    File.__table__,
+    'after_create',
+    DDL(f"""
+        CREATE TRIGGER IF NOT EXISTS files_ai_trigger
+        AFTER INSERT ON {File.__tablename__}
+        WHEN new.summary IS NOT NULL
+        BEGIN
+            INSERT INTO {file_fts_table.name} (rowid, summary)
+            VALUES (new.id, new.summary);
+        END;
+    """)
+)
+
+event.listen(
+    File.__table__,
+    'after_create',
+    DDL(f"""
+        CREATE TRIGGER IF NOT EXISTS files_ad_trigger
+        AFTER DELETE ON {File.__tablename__}
+        WHEN old.summary IS NOT NULL
+        BEGIN
+            INSERT INTO {file_fts_table.name} ({file_fts_table.name}, rowid, summary)
+            VALUES ('delete', old.id, old.summary);
+        END;
+    """)
+)
+
+event.listen(
+    File.__table__,
+    'after_create',
+    DDL(f"""
+        CREATE TRIGGER IF NOT EXISTS files_au_trigger
+        AFTER UPDATE ON {File.__tablename__}
+        WHEN new.summary IS NOT old.summary -- This condition handles changes to/from NULL correctly
+        BEGIN
+            -- Delete old entry (FTS handles old.summary being NULL as a no-op for deletion)
+            INSERT INTO {file_fts_table.name} ({file_fts_table.name}, rowid, summary)
+            VALUES ('delete', old.id, old.summary);
+            -- Insert new entry (FTS handles new.summary being NULL as a no-op for insertion)
+            INSERT INTO {file_fts_table.name} (rowid, summary)
+            VALUES (new.id, new.summary);
+        END;
+    """)
+)
