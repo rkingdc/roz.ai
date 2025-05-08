@@ -19,9 +19,6 @@ let _currentNoteH1Sections = [];
 // No direct imports of api.js here to break the cycle.
 // Event listeners will import api functions dynamically when needed.
 
-// --- REMOVED Old Custom Marked Renderer ---
-// --- REMOVED Old renderDrawioDiagrams function ---
-
 /**
  * Waits for GraphViewer to be available and then processes diagrams.
  * Polls for a limited number of attempts.
@@ -50,10 +47,6 @@ function waitForGraphViewerAndProcess(maxAttempts = 30, delay = 100) { // Increa
 
     checkAndProcess(); // Start the check
 }
-
-
-// Debounce function
-// Moved debounce to utils.js and imported
 
 
 /**
@@ -171,7 +164,7 @@ export function updateLoadingState() {
         }
         // Fallback: If no text node found, maybe create one? For now, log error if needed.
         if (!buttonTextNode) {
-            console.warn("Could not find text node within send button to update.");
+            // console.warn("Could not find text node within send button to update.");
         }
 
         if (isCurrentChatProcessing) {
@@ -204,13 +197,10 @@ export function updateLoadingState() {
     if (elements.micButton) elements.micButton.disabled = isCurrentChatProcessing || isGloballyLoading;
     if (elements.cleanupTranscriptButton) elements.cleanupTranscriptButton.disabled = isCurrentChatProcessing || isGloballyLoading;
     if (elements.fileUploadSessionLabel) elements.fileUploadSessionLabel.classList.toggle('disabled', isCurrentChatProcessing || isGloballyLoading);
-    // Attach buttons state is handled by updateAttachButtonState, which now checks processingChatId
  
-    // --- Disable Global Actions if *Any* Global Operation is Loading ---
-    // (New Chat, Save Name, Delete Chat, Load Calendar, Manage Files, Modals, Notes, Settings etc.)
     if (elements.newChatButton) elements.newChatButton.disabled = isGloballyLoading;
-    if (elements.saveChatNameButton) elements.saveChatNameButton.disabled = isGloballyLoading; // Saving name is global
-    if (elements.currentChatNameInput) elements.currentChatNameInput.disabled = isGloballyLoading; // Saving name is global
+    if (elements.saveChatNameButton) elements.saveChatNameButton.disabled = isGloballyLoading;
+    if (elements.currentChatNameInput) elements.currentChatNameInput.disabled = isGloballyLoading;
     if (elements.newNoteButton) elements.newNoteButton.disabled = isGloballyLoading;
     if (elements.saveNoteNameButton) elements.saveNoteNameButton.disabled = isGloballyLoading;
     if (elements.currentNoteNameInput) elements.currentNoteNameInput.disabled = isGloballyLoading;
@@ -222,15 +212,13 @@ export function updateLoadingState() {
     if (elements.fileUploadModalInput) elements.fileUploadModalInput.disabled = isGloballyLoading;
     if (elements.fileUploadModalLabel) elements.fileUploadModalLabel.classList.toggle('disabled', isGloballyLoading);
     if (elements.addUrlModalButton) elements.addUrlModalButton.disabled = isGloballyLoading;
-    if (elements.editNoteButton) elements.editNoteButton.disabled = isGloballyLoading; // Mode switching is global
-    if (elements.viewNoteButton) elements.viewNoteButton.disabled = isGloballyLoading; // Mode switching is global
+    if (elements.editNoteButton) elements.editNoteButton.disabled = isGloballyLoading;
+    if (elements.viewNoteButton) elements.viewNoteButton.disabled = isGloballyLoading;
     if (elements.markdownTipsButton) elements.markdownTipsButton.disabled = isGloballyLoading;
-    if (elements.micButtonNotes) elements.micButtonNotes.disabled = isGloballyLoading; // Notes mic is global op
-    if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = isGloballyLoading; // Notes cleanup is global op
-    if (elements.longRecButtonNotes) elements.longRecButtonNotes.disabled = isGloballyLoading; // Long recording is global op
+    if (elements.micButtonNotes) elements.micButtonNotes.disabled = isGloballyLoading;
+    if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = isGloballyLoading;
+    if (elements.longRecButtonNotes) elements.longRecButtonNotes.disabled = isGloballyLoading;
  
-    // Disable list items (chats, notes, files) based on global loading state
-    // This allows switching chats/notes even if one chat is processing in the background.
     document.querySelectorAll('.list-item').forEach(item => {
         if (isGloballyLoading) {
             item.classList.add('pointer-events-none', 'opacity-50');
@@ -239,13 +227,9 @@ export function updateLoadingState() {
         }
     });
  
-    // Add global loading class to body only for global operations
     elements.bodyElement?.classList.toggle('loading', isGloballyLoading);
-
-    // Update attach button state after loading state changes
     updateAttachButtonState();
 }
-
 
 /**
  * Renders the chat history from the state into the chatbox.
@@ -260,12 +244,17 @@ export function renderChatHistory() {
 
     if (state.chatHistory.length === 0) {
         // Add a placeholder message if history is empty
-        // Read loading state for placeholder text
-        addMessageToDom('system', state.isLoading ? 'Loading chat history...' : 'This chat is empty. Start typing!');
+        addMessageToDom({ // Pass object for consistency
+            role: 'system',
+            content: state.isLoading ? 'Loading chat history...' : 'This chat is empty. Start typing!',
+            isError: false,
+            attachments: [] // System messages typically don't have attachments
+        });
     } else {
         state.chatHistory.forEach(msg => {
-            // Re-render each message. If it was streaming, the full content is now in state.
-            addMessageToDom(msg.role, msg.content, msg.isError);
+            // Pass the entire message object to addMessageToDom
+            // This object should include role, content, isError, and attachments
+            addMessageToDom(msg);
         });
     }
 
@@ -275,130 +264,137 @@ export function renderChatHistory() {
 
 /**
  * Adds a single message to the chatbox DOM.
- * This is a helper for renderChatHistory. It reads message data from its parameters.
- * @param {'user' | 'assistant' | 'system'} role - The role of the message sender.
- * @param {string} content - The message content (can be markdown).
- * @param {boolean} [isError=false] - Whether the message indicates an error.
+ * @param {object} messageObject - The message object.
+ *   Expected properties: role, content, isError (optional), attachments (optional array), rawContent (optional for copy).
  * @returns {HTMLElement|null} The message element that was created.
  */
-function addMessageToDom(role, content, isError = false) {
+function addMessageToDom(messageObject) {
      if (!elements.chatbox) {
         console.error("Chatbox element not found.");
         return null;
     }
 
-    const messageElement = document.createElement('div');
-    // Add base classes and role-specific class
-    messageElement.classList.add('message', `${role}-msg`, 'p-3', 'mb-2', 'rounded-lg', 'whitespace-pre-wrap', 'relative'); // Added relative positioning
+    // Destructure properties from the messageObject
+    const { role, content, isError = false, attachments = [], rawContent: messageRawContent } = messageObject;
 
-    // Store raw content for copying
-    messageElement.dataset.rawContent = content;
+    const messageElement = document.createElement('div');
+    // Add base classes, role-specific class, and flex for stacking attachments and content
+    messageElement.classList.add('message', `${role}-msg`, 'p-3', 'mb-2', 'rounded-lg', 'whitespace-pre-wrap', 'relative', 'flex', 'flex-col');
+
+    // Store raw content for copying (should be just the text part)
+    const textToCopy = messageRawContent || (typeof content === 'string' ? content : "Complex content");
+    messageElement.dataset.rawContent = textToCopy;
+
+
+    // --- Render Attachments (if any) ---
+    if (attachments && attachments.length > 0) {
+        const attachmentsContainer = document.createElement('div');
+        attachmentsContainer.classList.add('message-attachments-container', 'mb-2', 'flex', 'flex-wrap', 'gap-2'); // Styles for layout
+
+        attachments.forEach(attachment => {
+            if (attachment && attachment.filename) { // Ensure filename exists
+                const attachmentElement = document.createElement('div');
+                attachmentElement.classList.add(
+                    'message-attachment-tag', 'inline-flex', 'items-center', 'text-xs', 'font-medium',
+                    'px-2', 'py-0.5', 'rounded-full', 'bg-gray-100', 'text-gray-700',
+                    'dark:bg-gray-600', 'dark:text-gray-200' // Example dark mode styling
+                );
+                attachmentElement.title = `Attached: ${escapeHtml(attachment.filename)}`;
+
+                let iconClass = 'fa-file'; // Default icon
+                // Determine icon based on attachment.type or attachment.mimetype
+                if (attachment.type === 'session') {
+                    iconClass = 'fa-paperclip';
+                } else if (attachment.mimetype && attachment.mimetype.startsWith('image/')) {
+                    iconClass = 'fa-file-image';
+                } else if (attachment.mimetype === 'application/pdf') {
+                    iconClass = 'fa-file-pdf';
+                } else if (attachment.type === 'summary') { // Assuming 'type' is passed in attachment object
+                    iconClass = 'fa-file-alt';
+                } else if (attachment.type === 'full') {
+                    iconClass = 'fa-file-invoice'; // Example, choose appropriate
+                }
+                // Add more specific icons as needed
+
+                const iconElement = document.createElement('i');
+                iconElement.className = `fas ${iconClass} mr-1.5`;
+
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = escapeHtml(attachment.filename);
+
+                attachmentElement.appendChild(iconElement);
+                attachmentElement.appendChild(nameSpan);
+                attachmentsContainer.appendChild(attachmentElement);
+            }
+        });
+        messageElement.appendChild(attachmentsContainer); // Add attachments before message content
+    }
+    // --- END: Render Attachments ---
+
 
     if (isError) {
-        messageElement.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-400');
-        messageElement.innerHTML = `<strong>Error:</strong> ${escapeHtml(content)}`; // Escape HTML for error messages
+        messageElement.classList.add('bg-red-100', 'text-red-800', 'border', 'border-red-400', 'dark:bg-red-900', 'dark:text-red-300');
+        const errorContentDiv = document.createElement('div'); // Create a div for content
+        errorContentDiv.innerHTML = `<strong>Error:</strong> ${escapeHtml(content)}`;
+        messageElement.appendChild(errorContentDiv);
     } else {
-         // Render markdown and make headings collapsible
+         const messageContentDiv = document.createElement('div'); // Create a div for main content
          if (typeof marked !== 'undefined') {
-             let rawHtml = marked.parse(content);
-             console.log("[DEBUG] Raw HTML after marked.parse:", rawHtml.substring(0, 200) + "..."); // Log initial HTML
-
-             // --- NEW: Detect and transform Draw.io XML code blocks ---
-             // Create a temporary container to parse the raw HTML
+             let rawHtml = marked.parse(content || ''); // Ensure content is not null
              const tempContainer = document.createElement('div');
              tempContainer.innerHTML = rawHtml;
-
-             // Find all XML code blocks generated by marked
-             const codeBlocks = tempContainer.querySelectorAll('pre > code.language-xml, pre > code.language-drawio'); // Look for xml or drawio hint
-             console.log(`[DEBUG] Found ${codeBlocks.length} potential XML/Drawio code blocks.`); // Log count
-
-             // --- Safer replacement: Collect nodes to replace first ---
+             const codeBlocks = tempContainer.querySelectorAll('pre > code.language-xml, pre > code.language-drawio');
              const replacements = [];
-             codeBlocks.forEach((codeBlock, index) => {
-                 console.log(`[DEBUG] Processing code block ${index + 1}`); // Log block processing
+             codeBlocks.forEach((codeBlock) => {
                  const parentPre = codeBlock.parentElement;
                  const xmlContent = codeBlock.textContent || '';
-
-                 // Check if the content looks like Draw.io XML
                  if (xmlContent.includes('<mxfile') && xmlContent.includes('</mxfile>')) {
-                     // Create the div structure expected by GraphViewer
                      const graphDiv = document.createElement('div');
-                     graphDiv.className = 'mxgraph'; // Required class
-                     // Add necessary attributes for the viewer
-                     graphDiv.setAttribute('style', 'max-width: 100%; border: 1px solid transparent;'); // Example style
+                     graphDiv.className = 'mxgraph';
+                     graphDiv.setAttribute('style', 'max-width: 100%; border: 1px solid transparent;');
                      graphDiv.setAttribute('data-mxgraph', JSON.stringify({
-                         highlight: '#0000ff',
-                         nav: true, // Enable navigation
-                         resize: true, // Enable resize
-                         toolbar: 'zoom layers lightbox', // Show toolbar elements
-                         xml: xmlContent // Pass the raw XML content
+                         highlight: '#0000ff', nav: true, resize: true, toolbar: 'zoom layers lightbox', xml: xmlContent
                      }));
-
-                     console.log(`[DEBUG] Code block ${index + 1} identified as Draw.io XML. Preparing replacement.`); // Log identification
-                     // Store the replacement details
                      replacements.push({ oldNode: parentPre, newNode: graphDiv });
-                 } else {
-                      console.log(`[DEBUG] Code block ${index + 1} does NOT look like Draw.io XML.`); // Log non-match
                  }
              });
-
-             // Perform replacements after iteration
              replacements.forEach(rep => {
                  if (rep.oldNode && rep.oldNode.parentNode) {
-                     console.log("[DEBUG] Performing replacement: Replacing <pre> with <div class='mxgraph'>"); // Log replacement action
                      rep.oldNode.parentNode.replaceChild(rep.newNode, rep.oldNode);
-                 } else {
-                      console.warn("[DEBUG] Could not perform replacement, oldNode or its parent not found.", rep.oldNode); // Log if replacement fails
                  }
              });
-             // --- End Safer replacement ---
-
-             // Get the potentially modified HTML back from the container
              rawHtml = tempContainer.innerHTML;
-             console.log("[DEBUG] HTML after Draw.io transformation:", rawHtml.substring(0, 200) + "..."); // Log HTML after transformation
-             // --- End Draw.io Transformation ---
-
              const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
-             // --- Log the fragment before appending ---
-             const tempFragmentDiv = document.createElement('div');
-             tempFragmentDiv.appendChild(collapsibleFragment.cloneNode(true)); // Clone to avoid modifying original
-             console.log("[DEBUG] Collapsible Fragment content before append:", tempFragmentDiv.innerHTML.substring(0, 200) + "...");
-             // ---------------------------------------
-             messageElement.appendChild(collapsibleFragment); // Append the processed fragment
-             // Apply prose styles to the container if desired, but be mindful of conflicts
-             // messageElement.classList.add('prose', 'prose-sm', 'max-w-none'); // Apply prose styles if needed
-             // --- Process Draw.io diagrams AFTER adding HTML with a slight delay ---
-             setTimeout(() => {
-                 waitForGraphViewerAndProcess();
-             }, 50); // 50ms delay - adjust if needed
-             // --------------------------------------------------------------------
+             messageContentDiv.appendChild(collapsibleFragment);
+             setTimeout(() => { waitForGraphViewerAndProcess(); }, 50);
          } else {
-             messageElement.textContent = content; // Fallback
+             messageContentDiv.textContent = content || ''; // Fallback, ensure content is not null
          }
+         messageElement.appendChild(messageContentDiv); // Append the content div
 
         // Apply role-specific styling
         if (role === 'user') {
-            messageElement.classList.add('bg-blue-100', 'self-end');
+            messageElement.classList.add('bg-blue-100', 'self-end', 'dark:bg-blue-800');
         } else if (role === 'assistant') {
-            messageElement.classList.add('bg-gray-200', 'self-start');
+            messageElement.classList.add('bg-gray-200', 'self-start', 'dark:bg-gray-700');
         } else if (role === 'system') {
-             messageElement.classList.add('bg-yellow-100', 'text-yellow-800', 'self-center', 'text-center', 'italic');
+             messageElement.classList.add('bg-yellow-100', 'text-yellow-800', 'self-center', 'text-center', 'italic', 'dark:bg-yellow-700', 'dark:text-yellow-200');
         }
 
         // Add copy button only for user and assistant messages (not system or error)
         if ((role === 'user' || role === 'assistant') && !isError) {
             const copyButton = document.createElement('button');
-            copyButton.classList.add('copy-message-button'); // Class for event listener
+            copyButton.classList.add('copy-message-button');
             copyButton.title = 'Copy raw text';
-            copyButton.innerHTML = '<i class="far fa-copy"></i>'; // Use 'far' for regular style copy icon
+            copyButton.innerHTML = '<i class="far fa-copy"></i>';
+            // Position copy button absolutely within the messageElement (which is relative)
+            copyButton.style.position = 'absolute';
+            copyButton.style.top = '0.25rem'; // Adjust as needed
+            copyButton.style.right = '0.25rem'; // Adjust as needed
             messageElement.appendChild(copyButton);
         }
     }
     elements.chatbox.appendChild(messageElement);
-
-    // Auto-scroll to the bottom (might be handled better by a separate observer)
-    // elements.chatbox.scrollTop = elements.chatbox.scrollHeight;
-
     return messageElement;
 }
 
@@ -466,9 +462,6 @@ function createChatItem(chat) {
     deleteButton.classList.add('delete-btn', 'text-rz-sidebar-text'); // Use specific class
     deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per CORRECT HTML
     deleteButton.title = `Delete "${chat.name || `Chat ${chat.id}`}"`;
-    // Event listener remains here, but calls API function
-    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
-    // deleteButton.addEventListener('click', (event) => { ... });
 
     nameDeleteContainer.appendChild(nameSpan);
     nameDeleteContainer.appendChild(deleteButton); // Append delete button
@@ -503,10 +496,6 @@ function createChatItem(chat) {
 
     listItem.appendChild(nameDeleteContainer); // Append the container
     listItem.appendChild(timestampDiv); // Append the timestamp div
-
-    // Add click listener to load chat
-    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
-    // listItem.addEventListener('click', () => { ... });
 
     savedChatsList.appendChild(listItem);
 }
@@ -666,9 +655,6 @@ function createNoteItem(note) {
     deleteButton.classList.add('delete-btn', 'text-rz-sidebar-text'); // Use specific class
     deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per provided HTML
     deleteButton.title = `Delete "${note.name || `Note ${note.id}`}"`;
-    // Event listener remains here, but calls API function
-    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
-    // deleteButton.addEventListener('click', (event) => { ... });
 
     nameDeleteContainer.appendChild(nameSpan);
     nameDeleteContainer.appendChild(deleteButton); // Append delete button
@@ -702,10 +688,6 @@ function createNoteItem(note) {
 
     listItem.appendChild(nameDeleteContainer); // Append the container
     listItem.appendChild(timestampDiv); // Append the timestamp div
-
-    // Add click listener to load note
-    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
-    // listItem.addEventListener('click', () => { ... });
 
     savedNotesList.appendChild(listItem);
 }
@@ -776,21 +758,13 @@ export function renderNoteContent() {
         notesTextarea.value = state.noteContent || ''; // Read from state
         notesTextarea.placeholder = state.isLoading ? "Loading note..." : "Start typing your markdown notes here...";
         notesTextarea.disabled = state.isLoading || state.currentNoteId === null; // Disable if loading or no note loaded
-        // --- NEW: Trigger auto-resize after updating value ---
         autoResizeTextarea(notesTextarea);
-        // -----------------------------------------------------
     }
 
 
     if (notesPreview) {
-        // Update preview based on current mode and content
-        updateNotesPreview(); // This function already reads from state and renders preview
+        updateNotesPreview();
     }
-
-
-    // --- NEW: Render Note History ---
-    // renderNoteHistory(); // Ensure history is rendered when note content/details change - This is now triggered by handleStateChange_noteHistory
-    // --------------------------------
 }
 
 
@@ -801,13 +775,10 @@ export function renderUploadedFiles() {
     const { uploadedFilesList, manageFilesList } = elements;
     if (!uploadedFilesList || !manageFilesList) return;
 
-    // Clear current lists
     uploadedFilesList.innerHTML = '';
     manageFilesList.innerHTML = '';
 
-    const files = state.uploadedFiles; // Read from state
-
-    // Removed check for state.isFilePluginEnabled - plugin is always considered enabled in UI
+    const files = state.uploadedFiles;
 
     if (!files || files.length === 0) {
         uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No files uploaded yet.</p>`;
@@ -816,16 +787,13 @@ export function renderUploadedFiles() {
     }
 
     files.forEach(file => {
-        // Check if the file is currently selected in the sidebar (using the correct state variable)
         const isSidebarSelected = state.sidebarSelectedFiles.some(sf => sf.id === file.id);
-        createSidebarFileItem(file, isSidebarSelected); // Use helper
-        // Modal list doesn't use checkboxes for selection anymore, only for management actions
-        createModalFileItem(file); // Use helper
+        createSidebarFileItem(file, isSidebarSelected);
+        createModalFileItem(file);
     });
 
-    // After rendering, update the display of attached files and session file in the input area
-    renderAttachedAndSessionFiles(); // Use state.attachedFiles and state.sessionFile
-    updateAttachButtonState(); // Update state of attach buttons based on sidebar selection
+    renderAttachedAndSessionFiles();
+    updateAttachButtonState();
 }
 
 /**
@@ -839,42 +807,29 @@ function createSidebarFileItem(file, isSelected) {
     if (!uploadedFilesList) return;
 
     const itemDiv = document.createElement('div');
-    // Add 'list-item' class and remove conflicting layout/padding classes
-    // Remove flex, items-center, p-1, truncate, flex-grow as they conflict with list-item's column flex
-    itemDiv.classList.add('list-item', 'file-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover'); // Removed flex, items-center, truncate, flex-grow, p-1
+    itemDiv.classList.add('list-item', 'file-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
     itemDiv.dataset.fileId = file.id;
     itemDiv.dataset.filename = file.filename;
-    itemDiv.dataset.hasSummary = file.has_summary; // Store summary status
-    // Add 'active' class if currently selected in the sidebar
+    itemDiv.dataset.hasSummary = file.has_summary;
     if (isSelected) {
-        itemDiv.classList.add('active'); // Corrected: Use itemDiv instead of item
+        itemDiv.classList.add('active');
     }
 
 
-    // Container for name and potential future actions (flex row) - similar to chat item
     const nameContainer = document.createElement('div');
-    nameContainer.classList.add('name-container'); // Use specific class
+    nameContainer.classList.add('name-container');
 
     const nameSpan = document.createElement('span');
-    // Use only 'filename' class as per CORRECT HTML - color handled by CSS
-    // Remove truncate and flex-grow as they conflict with list-item's column flex
-    nameSpan.classList.add('filename'); // Use specific class
+    nameSpan.classList.add('filename');
     nameSpan.textContent = file.filename;
-    nameSpan.title = file.filename; // Add tooltip
-
-    // No delete button or summary status indicator in sidebar file list as per request
+    nameSpan.title = file.filename;
 
     nameContainer.appendChild(nameSpan);
-    // Append other action buttons here if needed in the future, similar to chat item
 
-    // Add timestamp div
-    // Use 'div' and specific classes as per chat list item
     const timestampDiv = document.createElement('div');
-    // Default color is text-rz-tab-background-text (greyish) based on provided HTML
-    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-toolbar-field-text'); // Use specific classes and mt-0.5 - color handled by CSS
+    timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-toolbar-field-text');
     try {
-        const date = new Date(file.uploaded_at); // Use uploaded_at for files
-        // Format date nicely, e.g., "Oct 26, 10:30 AM" or "Yesterday, 3:15 PM"
+        const date = new Date(file.uploaded_at);
         const now = new Date();
         const yesterday = new Date(now);
         yesterday.setDate(now.getDate() - 1);
@@ -887,7 +842,6 @@ function createSidebarFileItem(file, isSelected) {
         } else {
             formattedDate = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ', ' + date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
         }
-        // Prepend "Uploaded: "
         timestampDiv.textContent = `Uploaded: ${formattedDate}`;
     } catch (e) {
         console.error("Error formatting date:", file.uploaded_at, e);
@@ -895,11 +849,8 @@ function createSidebarFileItem(file, isSelected) {
     }
 
 
-    itemDiv.appendChild(nameContainer); // Append the container
-    itemDiv.appendChild(timestampDiv); // Append the timestamp div
-
-    // Add click listener to toggle selection (handled by eventListeners.js)
-    // The event listener will update state, and state change will trigger UI re-render
+    itemDiv.appendChild(nameContainer);
+    itemDiv.appendChild(timestampDiv);
 
     uploadedFilesList.appendChild(itemDiv);
 }
@@ -916,15 +867,12 @@ export function updateSelectedFileListItemStyling() {
         const fileId = parseInt(item.dataset.fileId);
         if (isNaN(fileId)) return;
 
-        // Check against sidebarSelectedFiles (using the correct state variable)
-        const isSelected = state.sidebarSelectedFiles.some(sf => sf.id === fileId); // Read from state
+        const isSelected = state.sidebarSelectedFiles.some(sf => sf.id === fileId);
 
         if (isSelected) {
-            item.classList.add('active'); // Use 'active' class for selected state
-            // Timestamp and other elements will inherit active styles via CSS
+            item.classList.add('active');
         } else {
-            item.classList.remove('active'); // Remove 'active' class
-            // Timestamp and other elements will revert to default styles via CSS
+            item.classList.remove('active');
         }
     });
 }
@@ -935,22 +883,15 @@ export function updateSelectedFileListItemStyling() {
  */
 export function updateAttachButtonState() {
     const { attachFullButton, attachSummaryButton } = elements;
-    // Add null checks for individual elements
     if (!attachFullButton || !attachSummaryButton) return;
 
-    const selectedCount = state.sidebarSelectedFiles.length; // Read from state
-    // Check if any selected file in sidebarSelectedFiles has has_summary === true
-    const hasSummarizable = state.sidebarSelectedFiles.some(f => f.has_summary); // Read from state
-    console.log(`[DEBUG] updateAttachButtonState: selectedCount=${selectedCount}, hasSummarizable=${hasSummarizable}, isLoading=${state.isLoading}`); // Log state
-    console.log(`[DEBUG] updateAttachButtonState: state.sidebarSelectedFiles=`, JSON.parse(JSON.stringify(state.sidebarSelectedFiles))); // Log selected files state (deep copy for logging)
+    const selectedCount = state.sidebarSelectedFiles.length;
+    console.log(`[DEBUG] updateAttachButtonState: selectedCount=${selectedCount}, isLoading=${state.isLoading}`);
+    console.log(`[DEBUG] updateAttachButtonState: state.sidebarSelectedFiles=`, JSON.parse(JSON.stringify(state.sidebarSelectedFiles)));
 
 
-    // Attach Full is enabled if at least one file is selected in the sidebar AND not loading
-    attachFullButton.disabled = state.isLoading || selectedCount === 0; // Read from state
-
-    // Attach Summary is enabled if at least one file is selected in the sidebar AND not loading
-    // It will attempt to generate summaries if they don't exist.
-    attachSummaryButton.disabled = state.isLoading || selectedCount === 0; // Read from state
+    attachFullButton.disabled = state.isLoading || selectedCount === 0;
+    attachSummaryButton.disabled = state.isLoading || selectedCount === 0;
 }
 
 
@@ -968,49 +909,33 @@ function createModalFileItem(file) {
     itemDiv.dataset.filename = file.filename;
     itemDiv.dataset.hasSummary = file.has_summary;
 
-    // Filename (col-span-7) - Increased span as checkbox is removed
     const nameCol = document.createElement('div');
     nameCol.classList.add('col-span-7', 'text-sm', 'text-gray-800', 'truncate');
     nameCol.textContent = file.filename;
-    nameCol.title = file.filename; // Add tooltip
+    nameCol.title = file.filename;
 
-    // Size (col-span-2)
     const sizeCol = document.createElement('div');
     sizeCol.classList.add('col-span-2', 'text-xs', 'text-gray-500');
     sizeCol.textContent = formatFileSize(file.filesize);
 
-    // Actions (col-span-3)
     const actionsCol = document.createElement('div');
     actionsCol.classList.add('col-span-3', 'flex', 'gap-1', 'justify-end');
 
-    // Summary Button
     const summaryButton = document.createElement('button');
     summaryButton.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1');
     summaryButton.innerHTML = '<i class="fas fa-list-alt"></i>';
     summaryButton.title = file.has_summary ? 'View/Edit Summary' : 'Generate Summary';
-    // Event listener remains here, but calls API function and shows modal
-    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
-    // summaryButton.addEventListener('click', (e) => { ... });
 
-    // Delete Button
     const deleteButton = document.createElement('button');
     deleteButton.classList.add('btn', 'btn-outline', 'btn-xs', 'p-1', 'text-red-500', 'hover:text-red-700');
     deleteButton.innerHTML = '<i class="fas fa-trash-alt"></i>';
     deleteButton.title = 'Delete File';
-    // Event listener remains here, but calls API function
-    // NOTE: This listener is now moved to eventListeners.js to centralize event handling
-    // deleteButton.addEventListener('click', (e) => { ... });
 
     actionsCol.appendChild(summaryButton);
     actionsCol.appendChild(deleteButton);
-
-    // No checkbox column anymore
     itemDiv.appendChild(nameCol);
     itemDiv.appendChild(sizeCol);
     itemDiv.appendChild(actionsCol);
-
-     // No click listener on the item div itself for modal items
-
     manageFilesList.appendChild(itemDiv);
 }
 
@@ -1019,18 +944,16 @@ function createModalFileItem(file) {
  */
 export function renderSummaryModalContent() {
     const { summaryModalFilename, summaryTextarea, saveSummaryButton, summaryStatus } = elements;
-    // Add null checks for individual elements
     if (!summaryModalFilename || !summaryTextarea || !saveSummaryButton || !summaryStatus) return;
 
-    const file = state.uploadedFiles.find(f => f.id === state.currentEditingFileId); // Read from state
+    const file = state.uploadedFiles.find(f => f.id === state.currentEditingFileId);
     const filename = file ? file.filename : 'Unknown File';
 
     summaryModalFilename.textContent = filename;
-    summaryTextarea.value = state.summaryContent; // Read from state
-    summaryTextarea.placeholder = state.isLoading ? "Loading or generating summary..." : "Enter or edit summary here."; // Read from state
-    saveSummaryButton.disabled = state.isLoading || state.currentEditingFileId === null; // Read from state
+    summaryTextarea.value = state.summaryContent;
+    summaryTextarea.placeholder = state.isLoading ? "Loading or generating summary..." : "Enter or edit summary here.";
+    saveSummaryButton.disabled = state.isLoading || state.currentEditingFileId === null;
 
-    // Update status message in the modal based on state
     if (state.isLoading && state.statusMessage.includes("Fetching Summary")) {
          summaryStatus.textContent = "Fetching...";
          summaryStatus.classList.remove('text-red-500');
@@ -1038,10 +961,10 @@ export function renderSummaryModalContent() {
          summaryStatus.textContent = "Saving...";
          summaryStatus.classList.remove('text-red-500');
     } else if (state.isErrorStatus && state.statusMessage.includes("summary")) {
-         summaryStatus.textContent = `Error: ${state.statusMessage}`; // Display the specific error from state
+         summaryStatus.textContent = `Error: ${state.statusMessage}`;
          summaryStatus.classList.add('text-red-500');
     } else if (state.summaryContent.startsWith("[Error") || state.summaryContent.startsWith("[Summary not applicable")) {
-         summaryStatus.textContent = state.summaryContent; // Display error/not applicable from state content
+         summaryStatus.textContent = state.summaryContent;
          summaryStatus.classList.add('text-red-500');
          saveSummaryButton.disabled = state.summaryContent.startsWith("[Summary not applicable");
     }
@@ -1061,23 +984,27 @@ export function renderAttachedAndSessionFiles() {
 
     selectedFilesContainer.innerHTML = ''; // Clear current display
 
-    // Combine attached files and session file for rendering
-    const filesToDisplay = [...state.attachedFiles]; // Read from state
-    if (state.sessionFile) { // Read from state
-        // Add session file with a distinct type for rendering
+    const filesToDisplay = [];
+    if (state.sessionFile) {
         filesToDisplay.push({
-            // Session file doesn't have a backend ID, use a placeholder
             id: 'session',
-            filename: state.sessionFile.filename, // Read from state
+            filename: state.sessionFile.filename || state.sessionFile.name,
             type: 'session',
-            // Include other session file details if needed for display
+            mimetype: state.sessionFile.mimetype || state.sessionFile.type,
         });
     }
+    state.attachedFiles.forEach(file => {
+        filesToDisplay.push({
+            id: file.id,
+            filename: file.filename,
+            type: file.type,
+            mimetype: file.mimetype,
+        });
+    });
 
 
     if (filesToDisplay.length === 0) {
         selectedFilesContainer.classList.add('hidden');
-        // If session file was cleared, reset the input value
         if (!state.sessionFile && fileUploadSessionInput) {
              fileUploadSessionInput.value = '';
         }
@@ -1088,47 +1015,43 @@ export function renderAttachedAndSessionFiles() {
 
     filesToDisplay.forEach(file => {
         const fileTag = document.createElement('span');
-        // Use theme colors for tags
         fileTag.classList.add('selected-file-tag', 'inline-flex', 'items-center', 'text-xs', 'font-medium', 'px-2.5', 'py-0.5', 'rounded-full', 'mr-2', 'mb-1');
-        // Use data attributes to store file info for removal
-        fileTag.dataset.fileId = file.id; // Will be 'session' for session file
-        fileTag.dataset.fileType = file.type; // 'full', 'summary', or 'session'
+        fileTag.dataset.fileId = file.id;
+        fileTag.dataset.fileType = file.type;
 
-        // Apply color based on type (using theme variables)
         if (file.type === 'session') {
              fileTag.classList.add('bg-rz-tag-bg', 'text-rz-tag-text', 'border', 'border-rz-tag-border');
-        } else { // 'full' or 'summary'
+        } else {
              fileTag.classList.add('bg-rz-button-primary-bg', 'text-rz-button-primary-text');
         }
 
         const filenameSpan = document.createElement('span');
-        filenameSpan.textContent = file.filename;
+        filenameSpan.textContent = escapeHtml(file.filename);
         filenameSpan.classList.add('mr-1');
 
-        // Add file type indicator
         const typeSpan = document.createElement('span');
-        typeSpan.classList.add('file-type'); // Use specific class for styling
-        typeSpan.textContent = file.type === 'full' ? 'Full' : (file.type === 'summary' ? 'Summary' : 'Session');
-        filenameSpan.prepend(typeSpan); // Prepend type to filename span
+        typeSpan.classList.add('file-type');
+        let typeText = 'File';
+        if (file.type === 'full') typeText = 'Full';
+        else if (file.type === 'summary') typeText = 'Summary';
+        else if (file.type === 'session') typeText = 'Session';
+        typeSpan.textContent = typeText;
+        filenameSpan.prepend(typeSpan);
 
 
         const removeButton = document.createElement('button');
-        removeButton.classList.add('remove-file-btn', 'ml-1'); // Removed text-blue classes, use theme colors via CSS
+        removeButton.classList.add('remove-file-btn', 'ml-1');
         removeButton.innerHTML = '<i class="fas fa-times-circle"></i>';
         removeButton.title = `Remove ${file.type === 'session' ? 'session' : 'attached'} file`;
-        // Event listener remains here, modifies state
         removeButton.addEventListener('click', () => {
             if (file.type === 'session') {
-                state.setSessionFile(null); // Clear session file state (notifies sessionFile)
-                // Also reset the file input element
-                if (elements.fileUploadSessionInput) { // Use elements.fileUploadSessionInput
+                state.setSessionFile(null);
+                if (elements.fileUploadSessionInput) {
                     elements.fileUploadSessionInput.value = '';
                 }
-            } else { // Permanent file (full or summary)
-                // Remove from attachedFiles state by ID *and* Type
-                state.removeAttachedFileByIdAndType(parseInt(file.id), file.type); // Notifies attachedFiles
+            } else {
+                state.removeAttachedFileByIdAndType(parseInt(file.id), file.type);
             }
-            // UI update is triggered by state notifications
         });
 
         fileTag.appendChild(filenameSpan);
@@ -1152,28 +1075,18 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
         return false;
     }
 
-    // Check if required plugin is enabled (Read from state)
     if (requiredPlugin) {
         let pluginEnabled = false;
-        // Files plugin is always considered enabled in UI
         if (requiredPlugin === 'files') pluginEnabled = true;
         else if (requiredPlugin === 'calendar' && state.isCalendarPluginEnabled) pluginEnabled = true;
-        // Add checks for other plugins here
-        if (!pluginEnabled) {
-            // Status update handled by event listener or caller
-            return false;
-        }
+        if (!pluginEnabled) return false;
     }
 
-    // Check if required tab is active (Read from state)
-    if (requiredTab && state.currentTab !== requiredTab) {
-         // Status update handled by event listener or caller
-         return false;
-    }
+    if (requiredTab && state.currentTab !== requiredTab) return false;
 
 
     modalElement.classList.add('show');
-    if (elements.bodyElement) elements.bodyElement.classList.add('modal-open'); // Add null check
+    if (elements.bodyElement) elements.bodyElement.classList.add('modal-open');
     return true;
 }
 
@@ -1187,25 +1100,17 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
  * @param {'sidebar' | 'plugins'} type - The type of sidebar ('sidebar' or 'plugins').
  */
 export function setSidebarCollapsed(sidebarElement, toggleButton, isCollapsed, localStorageKey, type) {
-    // This function now ONLY updates localStorage and application state.
-    // The UI update (DOM manipulation) is handled by the state change handlers below.
-    if (!sidebarElement || !toggleButton) return; // Keep basic checks
-
+    if (!sidebarElement || !toggleButton) return;
     localStorage.setItem(localStorageKey, isCollapsed);
-
-    // Update state, which will trigger the corresponding handler to update the UI
-    if (type === 'sidebar') {
-        state.setIsSidebarCollapsed(isCollapsed);
-    } else if (type === 'plugins') {
-        state.setIsPluginsCollapsed(isCollapsed);
-    }
+    if (type === 'sidebar') state.setIsSidebarCollapsed(isCollapsed);
+    else if (type === 'plugins') state.setIsPluginsCollapsed(isCollapsed);
 }
 
 
 /** Toggles the left sidebar (chat/notes list). */
 export function toggleLeftSidebar() {
     const sidebarElement = document.getElementById('sidebar');
-    const toggleButton = document.getElementById('sidebar-toggle-tab'); // Use new ID
+    const toggleButton = document.getElementById('sidebar-toggle-tab');
     if (!sidebarElement || !toggleButton) return;
     setSidebarCollapsed(sidebarElement, toggleButton, !sidebarElement.classList.contains('collapsed'), config.SIDEBAR_COLLAPSED_KEY, 'sidebar');
 }
@@ -1213,7 +1118,7 @@ export function toggleLeftSidebar() {
 /** Toggles the right sidebar (plugins). */
 export function toggleRightSidebar() {
     const sidebarElement = document.getElementById('plugins-sidebar');
-    const toggleButton = document.getElementById('plugins-toggle-tab'); // Use new ID
+    const toggleButton = document.getElementById('plugins-toggle-tab');
     if (!sidebarElement || !toggleButton) return;
     setSidebarCollapsed(sidebarElement, toggleButton, !sidebarElement.classList.contains('collapsed'), config.PLUGINS_COLLAPSED_KEY, 'plugins');
 }
@@ -1262,7 +1167,6 @@ export function setPluginSectionCollapsed(headerElement, contentElement, isColla
          if (toggleIcon) toggleIcon.classList.replace('fa-chevron-right', 'fa-chevron-down');
      }
      localStorage.setItem(localStorageKey, isCollapsed);
-     // No state update needed here, as plugin section collapse is purely UI/localStorage
 }
 
 
@@ -1270,18 +1174,14 @@ export function setPluginSectionCollapsed(headerElement, contentElement, isColla
  * Updates the microphone button icons and styles based on recording state and active tab.
  */
 export function renderMicButtonState() {
-    const { micButton, micButtonNotes } = elements; // Get both buttons
-    const isRecording = state.isRecording; // Read from state
-    const activeTab = state.currentTab; // Read active tab
-
-    // Determine which button to update based on the active tab
+    const { micButton, micButtonNotes } = elements;
+    const isRecording = state.isRecording;
+    const activeTab = state.currentTab;
     const targetButton = activeTab === 'chat' ? micButton : (activeTab === 'notes' ? micButtonNotes : null);
     const otherButton = activeTab === 'chat' ? micButtonNotes : (activeTab === 'notes' ? micButton : null);
 
-    // Disable the button on the inactive tab
     if (otherButton) {
         otherButton.disabled = true;
-        // Reset icon on inactive button
         const otherIcon = otherButton.querySelector('i');
         if (otherIcon) {
              otherIcon.classList.remove('fa-stop', 'recording');
@@ -1289,51 +1189,40 @@ export function renderMicButtonState() {
         }
     }
 
-    if (!targetButton) return; // No button to update for the current tab
+    if (!targetButton) return;
 
-    // Find the icon wrapper and SVG container
     const iconWrapper = targetButton.querySelector('.mic-icon-wrapper');
-    // const stopIconWrapper = targetButton.querySelector('.mic-stop-icon-wrapper'); // Not using separate wrapper
-    const progressRing = targetButton.querySelector('.mic-progress-ring'); // Find SVG
+    const progressRing = targetButton.querySelector('.mic-progress-ring');
 
     if (isRecording) {
         targetButton.title = "Stop Recording";
-        targetButton.classList.add('recording'); // Add class for styling and SVG visibility
-        // Hide mic icon wrapper, show stop icon (by changing class), show progress ring via CSS
-        // If using the same <i> tag, change its class:
-        const iconElement = iconWrapper?.querySelector('i'); // Find icon inside wrapper
+        targetButton.classList.add('recording');
+        const iconElement = iconWrapper?.querySelector('i');
         if (iconElement) {
             iconElement.classList.remove('fa-microphone');
             iconElement.classList.add('fa-stop');
-            if (iconWrapper) iconWrapper.style.display = 'inline-block'; // Ensure wrapper is visible if reusing icon
+            if (iconWrapper) iconWrapper.style.display = 'inline-block';
         }
 
     } else {
         targetButton.title = activeTab === 'chat' ? "Record Voice" : "Record Voice into Note";
-        targetButton.classList.remove('recording'); // Remove class to hide SVG via CSS
-        // Show mic icon wrapper, hide stop icon (by changing class back)
-         const iconElement = iconWrapper?.querySelector('i'); // Find icon inside wrapper
+        targetButton.classList.remove('recording');
+         const iconElement = iconWrapper?.querySelector('i');
          if (iconElement) {
             iconElement.classList.remove('fa-stop');
             iconElement.classList.add('fa-microphone');
-            if (iconWrapper) iconWrapper.style.display = 'inline-block'; // Ensure wrapper is visible
+            if (iconWrapper) iconWrapper.style.display = 'inline-block';
          }
     }
 
-    // Disable button if loading
     targetButton.disabled = state.isLoading;
 
-    // Add visual cue and update tooltip if socket is disconnected but button is enabled
     if (!isRecording && !state.isSocketConnected && !targetButton.disabled) {
         targetButton.title += " (Service Disconnected)";
-        // Add a class for styling (e.g., opacity-75). Define '.disconnected-cue' in your CSS.
         targetButton.classList.add('disconnected-cue');
     } else if (!isRecording) {
-        // Ensure default title and remove cue class if connected or button is disabled
-        // Title is set above based on recording state and tab
         targetButton.classList.remove('disconnected-cue');
     }
-    // Tooltip for recording state is handled above
 }
 
 
@@ -1342,75 +1231,47 @@ export function renderMicButtonState() {
  */
 export function updatePluginUI() {
 
-    // Add null checks for all elements accessed in this function
     if (!elements.filePluginSection || !elements.fileUploadSessionLabel || !elements.selectedFilesContainer ||
         !elements.calendarPluginSection || !elements.calendarToggle || !elements.webSearchToggleLabel ||
         !elements.uploadedFilesList || !elements.manageFilesList || !elements.calendarStatus ||
         !elements.viewCalendarButton || !elements.webSearchToggle || !elements.historyPluginSection || !elements.noteHistoryList ||
-        !elements.pluginsSidebar || !elements.pluginsToggleTab) { // Use the new reference name
+        !elements.pluginsSidebar || !elements.pluginsToggleTab) {
         console.warn("Missing core plugin elements for updatePluginUI.");
         return;
     }
-
-    // Plugins are always enabled now, visibility depends only on the active tab
-    const activeTab = state.currentTab; // Read active tab from state
-
-    // Toggle visibility of entire plugin sections based on active tab
-    // File plugin is only visible in Chat tab
+    const activeTab = state.currentTab;
     const showFilesPlugin = activeTab === 'chat';
     elements.filePluginSection.classList.toggle('hidden', !showFilesPlugin);
-
-    // Calendar plugin is only visible in Chat tab
     const showCalendarPlugin = activeTab === 'chat';
     elements.calendarPluginSection.classList.toggle('hidden', !showCalendarPlugin);
-
-    // History plugin is only visible in Notes tab
     const showHistoryPlugin = activeTab === 'notes';
     elements.historyPluginSection.classList.toggle('hidden', !showHistoryPlugin);
 
-
-    // Update elements within the file plugin section (only relevant when visible)
-    if (showFilesPlugin) { // Use the calculated visibility flag
-        renderUploadedFiles(); // Ensure file list is rendered if tab is chat
+    if (showFilesPlugin) {
+        renderUploadedFiles();
     } else {
-         // Clear file list if tab is not chat
          if (elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Switch to Chat tab to use Files plugin.</p>`;
-         if (elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Switch to Chat tab to use Files plugin.</p>`; // Keep this message for modal
-         renderAttachedAndSessionFiles(); // Clear attached/session file display
-         updateAttachButtonState(); // Disable attach buttons
+         if (elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Switch to Chat tab to use Files plugin.</p>`;
+         renderAttachedAndSessionFiles();
+         updateAttachButtonState();
     }
-
-    // Update elements within the calendar plugin section (only relevant when visible)
-     if (showCalendarPlugin) { // Use the calculated visibility flag
-        updateCalendarStatus(); // Ensure calendar status is updated if tab is chat
+     if (showCalendarPlugin) {
+        updateCalendarStatus();
      } else {
-         // Clear calendar status if tab is not chat
          if (elements.calendarStatus) elements.calendarStatus.textContent = `Status: Switch to Chat tab to use Calendar plugin.`;
          if (elements.viewCalendarButton) elements.viewCalendarButton.classList.add('hidden');
          if (elements.calendarToggle) elements.calendarToggle.checked = false;
      }
-
-    // Web Search plugin has no section in the sidebar, its toggle is in the input area.
-    // Its visibility is controlled by renderChatInputArea.
-
-    // Update elements within the history plugin section (only relevant when visible)
-    if (showHistoryPlugin) { // Use the calculated visibility flag
-        renderNoteHistory(); // Ensure history is rendered when switching to notes tab
-        updateTocVisibility(); // Show/hide TOC drawer based on tab
+    if (showHistoryPlugin) {
+        renderNoteHistory();
+        updateTocVisibility();
     } else {
-        // Clear history list if tab is not notes
         if (elements.noteHistoryList) elements.noteHistoryList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Switch to Notes tab to view history.</p>`;
-        updateTocVisibility(); // Hide TOC drawer if not on notes tab
+        updateTocVisibility();
     }
-
-    // Ensure plugins sidebar itself is hidden if no plugins are visible on the current tab
-    // Web Search plugin doesn't make the sidebar visible on its own now.
-    const anyPluginSectionVisible = showFilesPlugin || showCalendarPlugin || showHistoryPlugin; // Check if ANY section is visible
+    const anyPluginSectionVisible = showFilesPlugin || showCalendarPlugin || showHistoryPlugin;
     if (elements.pluginsSidebar) elements.pluginsSidebar.classList.toggle('hidden', !anyPluginSectionVisible);
-    if (elements.pluginsToggleTab) elements.pluginsToggleTab.classList.toggle('hidden', !anyPluginSectionVisible); // Use the new reference name
-
-
-    // Render the chat input area elements based on plugin states (includes web search toggle visibility)
+    if (elements.pluginsToggleTab) elements.pluginsToggleTab.classList.toggle('hidden', !anyPluginSectionVisible);
     renderChatInputArea();
 }
 
@@ -1419,28 +1280,23 @@ export function updatePluginUI() {
  */
 export function updateCalendarStatus() {
     const { calendarStatus, viewCalendarButton, calendarToggle } = elements;
-    // Add null checks for individual elements
     if (!calendarStatus || !viewCalendarButton || !calendarToggle) {
-        // console.warn("Missing elements for updateCalendarStatus."); // Avoid excessive logs during early init
         return;
     }
 
-    const context = state.calendarContext; // Read from state
-    const isActive = state.isCalendarContextActive; // Read from state
-
-    // Calendar plugin is always enabled now
-    calendarToggle.disabled = false; // Enable toggle
+    const context = state.calendarContext;
+    const isActive = state.isCalendarContextActive;
+    calendarToggle.disabled = false;
 
     if (context) {
         const eventCount = context.events ? context.events.length : 0;
         calendarStatus.textContent = `Status: Loaded ${eventCount} events (last updated: ${new Date(context.timestamp).toLocaleTimeString()})`;
         viewCalendarButton.classList.remove('hidden');
-        calendarToggle.checked = isActive; // Reflect state
+        calendarToggle.checked = isActive;
     } else {
         calendarStatus.textContent = "Status: Not loaded";
         viewCalendarButton.classList.add('hidden');
-        calendarToggle.checked = false; // Ensure toggle is off if no context
-        // State is already false if context is null
+        calendarToggle.checked = false;
     }
 }
 
@@ -1449,38 +1305,18 @@ export function updateCalendarStatus() {
  */
 export function renderChatInputArea() {
     const {
-        fileUploadSessionLabel, selectedFilesContainer,
-        webSearchToggleLabel, webSearchToggle, calendarToggle,
-        deepResearchToggleLabel, deepResearchToggle // Add deep research elements
+        fileUploadSessionLabel, webSearchToggleLabel, webSearchToggle, calendarToggle,
+        deepResearchToggleLabel, deepResearchToggle, improvePromptToggleLabel, improvePromptToggle
     } = elements;
 
-    // Add null checks for individual elements
-    if (fileUploadSessionLabel) {
-        fileUploadSessionLabel.classList.toggle('hidden', false); // Files always available
-    }
-    // Visibility of selectedFilesContainer is handled by renderAttachedAndSessionFiles
-
-    // Calendar toggle is part of the plugin section, update its state
-    if (calendarToggle) { // Add null check
-        calendarToggle.checked = state.isCalendarContextActive; // Read from state
-    }
-
-    // Web search toggle label is always visible now
-    if (webSearchToggleLabel) { // Add null check
-        webSearchToggleLabel.classList.toggle('hidden', false);
-    }
-    if (webSearchToggle) { // Add null check
-        webSearchToggle.checked = state.isWebSearchEnabled; // Read from state
-    }
-
-    // Deep Research Toggle (Always visible when chat input is visible)
-    if (deepResearchToggleLabel) { // Add null check
-        // Visibility is handled by the parent input-area visibility
-        deepResearchToggleLabel.classList.toggle('hidden', false); // Ensure it's not hidden
-    }
-    if (deepResearchToggle) { // Add null check
-        deepResearchToggle.checked = state.isDeepResearchEnabled; // Read from state
-    }
+    if (fileUploadSessionLabel) fileUploadSessionLabel.classList.toggle('hidden', false);
+    if (calendarToggle) calendarToggle.checked = state.isCalendarContextActive;
+    if (webSearchToggleLabel) webSearchToggleLabel.classList.toggle('hidden', false);
+    if (webSearchToggle) webSearchToggle.checked = state.isWebSearchEnabled;
+    if (deepResearchToggleLabel) deepResearchToggleLabel.classList.toggle('hidden', false);
+    if (deepResearchToggle) deepResearchToggle.checked = state.isDeepResearchEnabled;
+    if (improvePromptToggleLabel) improvePromptToggleLabel.classList.toggle('hidden', false);
+    if (improvePromptToggle) improvePromptToggle.checked = state.isImprovePromptEnabled;
 }
 
 
@@ -1488,145 +1324,80 @@ export function renderChatInputArea() {
  * Switches between the Chat and Notes tabs (updates UI visibility).
  * @param {'chat' | 'notes'} tab - The desired tab ('chat' or 'notes').
  */
-export function switchTab(tab) { // Made synchronous, state is already updated by event listener
+export function switchTab(tab) {
     const {
         chatNavButton, notesNavButton, chatSection, notesSection,
         chatSidebarContent, notesSidebarContent, modelSelectorContainer,
-        notesModeElements, messageInput, notesTextarea, notesPreview,
-        currentChatNameInput, currentNoteNameInput, currentChatIdDisplay,
-        currentNoteIdDisplay, inputArea, sidebar, sidebarToggleTab // Use the new reference name
+        notesModeElements, inputArea
     } = elements;
 
-    // Add null checks for individual elements
     if (!chatNavButton || !notesNavButton || !chatSection || !notesSection ||
         !chatSidebarContent || !notesSidebarContent || !modelSelectorContainer ||
-        !notesModeElements || !messageInput || !notesTextarea || !notesPreview ||
-        !currentChatNameInput || !currentNoteNameInput || !currentChatIdDisplay ||
-        !currentNoteIdDisplay || !inputArea || !sidebar || !elements.sidebarToggleTab) { // Use the new reference name
+        !notesModeElements || !inputArea ) {
         console.error("Missing elements for tab switching.");
-        // Status update handled by event listener or caller
         return;
     }
 
-    // Update navigation buttons
     chatNavButton.classList.toggle('active', tab === 'chat');
     notesNavButton.classList.toggle('active', tab === 'notes');
+    if (chatSection) chatSection.classList.toggle('hidden', tab !== 'chat');
+    if (notesSection) notesSection.classList.toggle('hidden', tab !== 'notes');
+    if (chatSidebarContent) chatSidebarContent.classList.toggle('hidden', tab !== 'chat');
+    if (notesSidebarContent) notesSidebarContent.classList.toggle('hidden', tab !== 'notes');
+    if (modelSelectorContainer) modelSelectorContainer.classList.toggle('hidden', tab === 'notes');
+    if (notesModeElements) notesModeElements.classList.toggle('hidden', tab === 'chat');
+    if (inputArea) inputArea.classList.toggle('hidden', tab !== 'chat');
 
+    renderCurrentChatDetails();
+    renderCurrentNoteDetails();
 
-    // Toggle main content sections
-    if (chatSection) {
-        chatSection.classList.toggle('hidden', tab !== 'chat');
-    }
-    if (notesSection) {
-        notesSection.classList.toggle('hidden', tab !== 'notes');
-    }
-
-
-    // Toggle sidebar content sections
-    if (chatSidebarContent) {
-        chatSidebarContent.classList.toggle('hidden', tab !== 'chat');
-    }
-    if (notesSidebarContent) {
-        notesSidebarContent.classList.toggle('hidden', tab !== 'notes');
-    }
-
-
-    // Toggle header elements (Model Selector vs Notes Mode)
-    if (modelSelectorContainer) {
-        modelSelectorContainer.classList.toggle('hidden', tab === 'notes'); // Model selector only on chat tab
-    }
-    if (notesModeElements) {
-        notesModeElements.classList.toggle('hidden', tab === 'chat'); // Notes mode elements only on notes tab
-    }
-
-
-    // Toggle input area visibility (Chat needs it, Notes uses textarea directly)
-    if (inputArea) {
-        inputArea.classList.toggle('hidden', tab !== 'chat');
-    }
-
-
-    // Update current item display in sidebar header based on state
-    renderCurrentChatDetails(); // Reads state.currentChatName, state.currentChatId, state.currentChatModel
-    renderCurrentNoteDetails(); // Reads state.currentNoteName, state.currentNoteId
-
-
-    // Render content specific to the new tab based on state
     if (tab === 'chat') {
-        renderChatHistory(); // Reads state.chatHistory
-        // renderUploadedFiles(); // Called by updatePluginUI
-        // updateCalendarStatus(); // Called by updatePluginUI
-        // renderChatInputArea(); // Called by updatePluginUI
-    } else { // tab === 'notes'
-        console.log(`[DEBUG] ui.switchTab: Rendering notes specific content.`);
-        renderNoteContent(); // Reads state.noteContent, state.currentNoteId, state.isLoading
-        setNoteMode(state.currentNoteMode); // Applies persisted/default mode from state
-        // renderNoteHistory(); // Called by updatePluginUI
-        updateTocVisibility(); // Show/hide TOC drawer based on tab
+        renderChatHistory();
+    } else {
+        renderNoteContent();
+        setNoteMode(state.currentNoteMode);
     }
-
-    // --- FIX: Call updatePluginUI after switching tabs ---
-    // This ensures plugin sections and related UI elements are shown/hidden correctly
-    // based on the newly active tab and plugin enabled states.
     updatePluginUI();
-    updateNotesCleanupButtonState(); // Update button state when switching tabs
-    updateChatCleanupButtonState(); // Update button state when switching tabs
-    // ----------------------------------------------------
-
+    updateNotesCleanupButtonState();
+    updateChatCleanupButtonState();
 }
 
 /**
  * Sets the display mode for the notes section (edit or view) based on state.
  * @param {'edit' | 'view'} mode - The desired mode.
  */
-export function setNoteMode(mode) { // Made synchronous, state is already updated by event listener
-    const { notesTextarea, notesPreview, editNoteButton, viewNoteButton, notesMicButtonGroup } = elements; // Added notesMicButtonGroup
-    // Add null checks for individual elements
-    if (!notesTextarea || !notesPreview || !editNoteButton || !viewNoteButton || !notesMicButtonGroup) { // Added notesMicButtonGroup check
+export function setNoteMode(mode) {
+    const { notesTextarea, notesPreview, editNoteButton, viewNoteButton, notesMicButtonGroup } = elements;
+    if (!notesTextarea || !notesPreview || !editNoteButton || !viewNoteButton || !notesMicButtonGroup) {
         console.error("Missing elements for note mode switching.");
         return;
     }
-
-    console.log(`[DEBUG] setNoteMode called with mode: '${mode}'. notesMicButtonGroup exists: ${!!notesMicButtonGroup}`); // ADD LOGGING
-
-    // State is already updated by the event listener calling this function
-    // state.setCurrentNoteMode(mode);
-    // localStorage.setItem(config.CURRENT_NOTE_MODE_KEY, mode);
-
-    if (state.currentNoteMode === 'edit') { // Read from state
+    console.log(`[DEBUG] setNoteMode called with mode: '${mode}'. notesMicButtonGroup exists: ${!!notesMicButtonGroup}`);
+    if (state.currentNoteMode === 'edit') {
         notesTextarea.classList.remove('hidden');
         notesPreview.classList.add('hidden');
-        console.log("[DEBUG] setNoteMode: Setting to EDIT mode. Removing 'hidden' from notesMicButtonGroup."); // ADD LOGGING
+        console.log("[DEBUG] setNoteMode: Setting to EDIT mode. Removing 'hidden' from notesMicButtonGroup.");
         editNoteButton.classList.add('active');
         viewNoteButton.classList.remove('active');
-        // Explicitly remove 'hidden' class for edit mode
         notesMicButtonGroup.classList.remove('hidden');
         
-        _currentNoteH1Sections = []; // Clear H1 sections when going to edit mode
-        notesPreview.innerHTML = ''; // Always clear preview content when switching to edit
-        notesPreview.classList.remove('prose', 'prose-sm', 'max-w-none'); // Remove prose if added
-
-
-        // --- NEW: Trigger auto-resize after switching to edit mode ---
+        _currentNoteH1Sections = [];
+        notesPreview.innerHTML = '';
+        notesPreview.classList.remove('prose', 'prose-sm', 'max-w-none');
         autoResizeTextarea(notesTextarea);
-        // -------------------------------------------------------------
-        // Ensure TOC is updated for edit mode (based on full content)
         generateAndRenderToc(state.noteContent || '');
-    } else { // state.currentNoteMode === 'view'
+    } else {
         notesTextarea.classList.add('hidden');
         notesPreview.classList.remove('hidden');
-        // Explicitly add 'hidden' class for view mode
-        console.log("[DEBUG] setNoteMode: Setting to VIEW mode. Adding 'hidden' to notesMicButtonGroup."); // ADD LOGGING
+        console.log("[DEBUG] setNoteMode: Setting to VIEW mode. Adding 'hidden' to notesMicButtonGroup.");
         notesMicButtonGroup.classList.add('hidden');
         editNoteButton.classList.remove('active');
         viewNoteButton.classList.add('active');
-        // The call to updateNotesPreview() will handle rendering tabs or full content
-        updateNotesPreview(); // This will now build tabs if needed
+        updateNotesPreview();
     }
 }
 
 
-// --- Helper to Parse Note into H1 Sections ---
 function _parseNoteIntoH1Sections(markdown) {
     if (!markdown || markdown.trim() === '') {
         return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true, isFallback: true }];
@@ -1637,10 +1408,9 @@ function _parseNoteIntoH1Sections(markdown) {
     let currentSectionTokens = [];
     let currentH1Title = null;
 
-    // Handle content before the very first H1 heading
     const firstH1TokenIndex = tokens.findIndex(token => token.type === 'heading' && token.depth === 1);
 
-    if (firstH1TokenIndex === -1) { // No H1 headings at all
+    if (firstH1TokenIndex === -1) {
         return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true, isFallback: true }];
     }
 
@@ -1648,34 +1418,28 @@ function _parseNoteIntoH1Sections(markdown) {
         const preH1ContentTokens = tokens.slice(0, firstH1TokenIndex);
         if (preH1ContentTokens.some(t => t.raw.trim() !== '')) {
              sections.push({
-                title: "Overview", // Default title for content before the first H1
+                title: "Overview",
                 rawMarkdownContent: preH1ContentTokens.map(t => t.raw).join(''),
                 isPreH1Content: true
             });
         }
     }
-
-    // Process from the first H1 onwards
     const processTokens = tokens.slice(firstH1TokenIndex);
 
     processTokens.forEach(token => {
         if (token.type === 'heading' && token.depth === 1) {
             if (currentSectionTokens.length > 0 && currentH1Title) {
-                // Save the previous H1 section
                 sections.push({
                     title: currentH1Title,
                     rawMarkdownContent: currentSectionTokens.map(t => t.raw).join('')
                 });
             }
-            // Start new section
             currentH1Title = token.text;
-            currentSectionTokens = [token]; // Start with the H1 token itself
-        } else if (currentH1Title) { // Only add to section if an H1 has been encountered for this section
+            currentSectionTokens = [token];
+        } else if (currentH1Title) {
             currentSectionTokens.push(token);
         }
     });
-
-    // Add the last processed H1 section
     if (currentSectionTokens.length > 0 && currentH1Title) {
         sections.push({
             title: currentH1Title,
@@ -1683,329 +1447,201 @@ function _parseNoteIntoH1Sections(markdown) {
         });
     }
     
-    // If, after all processing, no sections were created (e.g. only whitespace H1s)
-    // or only pre-H1 content was found but no actual H1s, treat the whole note as one section.
     if (sections.length === 0 && markdown.trim().length > 0) {
         return [{ title: "Note", rawMarkdownContent: markdown, isOnlySection: true, isFallback: true }];
     }
     
-    // Mark sections as not fallback if they were generated from H1s
     sections.forEach(s => s.isFallback = false);
 
-    if (sections.length === 1 && !sections[0].isPreH1Content) { // If only one actual H1 section (not pre-H1)
+    if (sections.length === 1 && !sections[0].isPreH1Content) {
         sections[0].isOnlySection = true; 
     } else if (sections.length > 0) {
-        // Mark all sections as not the only one if there are multiple
         sections.forEach(s => s.isOnlySection = false);
     }
 
     return sections;
 }
-// --- End Helper ---
 
-/**
- * Updates the notes preview area by rendering the markdown from the state.
- */
 export function updateNotesPreview() {
     const { notesTextarea, notesPreview } = elements;
-    // Add null checks for individual elements
     if (!notesTextarea || !notesPreview) return;
-
-    let showTabs = false; // Declare showTabs here and initialize
-
-    // Calculate _currentNoteH1Sections regardless of mode, as it's used in TOC logic
+    let showTabs = false;
     _currentNoteH1Sections = _parseNoteIntoH1Sections(state.noteContent || '');
 
-    // This function is typically called when the textarea content changes (via event listener)
-    // or when the mode switches to 'view'.
-    // It should read the *current* content from the textarea for immediate feedback in edit mode,
-    // but from state.noteContent if rendering the preview based on loaded state.
-    // Let's adjust this to always read from state.noteContent for consistency,
-    // assuming the event listener updates state.noteContent on textarea input.
-
-    if (state.currentNoteMode === 'view') { // Read from state
-        notesPreview.innerHTML = ''; // Clear previous content
-        notesPreview.classList.remove('prose', 'prose-sm', 'max-w-none'); // Remove general prose if tabs are used
-
-        // _currentNoteH1Sections is now calculated above
-        // Calculate and assign the actual value to showTabs if in view mode
+    if (state.currentNoteMode === 'view') {
+        notesPreview.innerHTML = '';
+        notesPreview.classList.remove('prose', 'prose-sm', 'max-w-none');
         showTabs = _currentNoteH1Sections.length > 0 && !(_currentNoteH1Sections.length === 1 && _currentNoteH1Sections[0].isFallback === true);
 
         if (showTabs) {
-            // Create and render H1 tabs
             const tabsContainer = document.createElement('div');
             tabsContainer.id = 'note-h1-tabs-container';
-            tabsContainer.className = 'note-h1-tabs'; // For styling
-
+            tabsContainer.className = 'note-h1-tabs';
             _currentNoteH1Sections.forEach((section, index) => {
                 const tabButton = document.createElement('button');
                 tabButton.className = 'note-h1-tab';
                 tabButton.textContent = section.title || `Section ${index + 1}`;
                 tabButton.dataset.sectionIndex = index;
-                if (index === state.currentNoteActiveH1SectionIndex) {
-                    tabButton.classList.add('active');
-                }
-                tabButton.addEventListener('click', () => {
-                    state.setCurrentNoteActiveH1SectionIndex(index);
-                    // The state change handler will call _renderActiveH1SectionUI
-                });
+                if (index === state.currentNoteActiveH1SectionIndex) tabButton.classList.add('active');
+                tabButton.addEventListener('click', () => state.setCurrentNoteActiveH1SectionIndex(index));
                 tabsContainer.appendChild(tabButton);
             });
             notesPreview.appendChild(tabsContainer);
-
             const contentContainer = document.createElement('div');
             contentContainer.id = 'note-h1-content-container';
-            // Apply prose styles directly to the content container for H1 sections
             contentContainer.className = 'note-h1-content prose prose-sm max-w-none';
             notesPreview.appendChild(contentContainer);
-
-            // Render the active section (triggered by state change or initial load)
             _renderActiveH1SectionUI();
-
         } else {
-            // No "real" H1s found, or note is empty. Render full content as a single block.
             if (typeof marked !== 'undefined') {
                 const rawHtml = marked.parse(state.noteContent || '', { renderer: markedRenderer });
-                // TEST: Directly insert rawHTML to see if content appears, bypassing makeHeadingsCollapsible
                 notesPreview.innerHTML = rawHtml;
-                // const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
-                // notesPreview.appendChild(collapsibleFragment);
-                notesPreview.classList.add('prose', 'prose-sm', 'max-w-none'); // Add prose for single view
+                notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
                 waitForGraphViewerAndProcess();
-                generateAndRenderToc(state.noteContent || ''); // TOC for the whole note
+                generateAndRenderToc(state.noteContent || '');
             } else {
                 notesPreview.textContent = state.noteContent || '';
             }
         }
     }
-    // If in edit mode, the textarea is visible.
-    // The preview is updated when switching TO view mode by setNoteMode.
-
-    // TOC update for edit mode or if tabs are not shown in view mode
     if (state.currentNoteMode === 'edit' || (state.currentNoteMode === 'view' && !showTabs)) {
         const debouncedUpdateToc = debounce(() => {
-            if (state.currentTab === 'notes') {
-                generateAndRenderToc(state.noteContent || ''); // Pass full content for TOC
-            }
+            if (state.currentTab === 'notes') generateAndRenderToc(state.noteContent || '');
         }, 300);
         debouncedUpdateToc();
     }
 }
 
-
-// --- NEW: Render Active H1 Section UI ---
 function _renderActiveH1SectionUI() {
     const showTabs = _currentNoteH1Sections.length > 0 && !(_currentNoteH1Sections.length === 1 && _currentNoteH1Sections[0].isFallback === true);
-    if (state.currentNoteMode !== 'view' || !showTabs) {
-        // Not in view mode or tabs are not being shown for this note.
-        return;
-    }
+    if (state.currentNoteMode !== 'view' || !showTabs) return;
 
     const activeIndex = state.currentNoteActiveH1SectionIndex;
     const section = _currentNoteH1Sections[activeIndex];
-
-    if (!section) {
-        console.warn(`[UI] _renderActiveH1SectionUI: No section found for index ${activeIndex}`);
-        return;
-    }
+    if (!section) return;
 
     const contentContainer = document.getElementById('note-h1-content-container');
-    if (!contentContainer) {
-        console.warn(`[UI] _renderActiveH1SectionUI: Content container not found.`);
-        return;
-    }
-
-    contentContainer.innerHTML = ''; // Clear previous section content
+    if (!contentContainer) return;
+    contentContainer.innerHTML = '';
 
     if (typeof marked !== 'undefined') {
         const rawHtml = marked.parse(section.rawMarkdownContent || '', { renderer: markedRenderer });
-        const collapsibleFragment = makeHeadingsCollapsible(rawHtml); // Process H2-H6 within this section
+        const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
         contentContainer.appendChild(collapsibleFragment);
-        // Prose styles are on contentContainer already
         waitForGraphViewerAndProcess();
-        generateAndRenderToc(section.rawMarkdownContent || ''); // TOC for the current H1 section
+        generateAndRenderToc(section.rawMarkdownContent || '');
     } else {
         contentContainer.textContent = section.rawMarkdownContent || '';
     }
 
-    // Update active tab styling
     const tabsContainer = document.getElementById('note-h1-tabs-container');
     if (tabsContainer) {
         tabsContainer.querySelectorAll('.note-h1-tab').forEach(tab => {
             tab.classList.remove('active');
-            if (parseInt(tab.dataset.sectionIndex) === activeIndex) {
-                tab.classList.add('active');
-            }
+            if (parseInt(tab.dataset.sectionIndex) === activeIndex) tab.classList.add('active');
         });
     }
 }
-// --- End Render Active H1 Section UI ---
 
-/**
- * Renders the note history list from the state.
- */
 export function renderNoteHistory() {
     const { noteHistoryList } = elements;
     if (!noteHistoryList) return;
-
-    noteHistoryList.innerHTML = ''; // Clear current list
-
-    const history = state.noteHistory; // Read from state
-    const currentNoteId = state.currentNoteId; // Read current note ID for context
+    noteHistoryList.innerHTML = '';
+    const history = state.noteHistory;
+    const currentNoteId = state.currentNoteId;
 
     if (currentNoteId === null) {
          noteHistoryList.innerHTML = '<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Select a note to view history.</p>';
          return;
     }
-
     if (!history || history.length === 0) {
         noteHistoryList.innerHTML = '<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No save history for this note.</p>';
         return;
     }
 
-    // History is already sorted by saved_at DESC from the backend query
-    history.forEach((entry, index) => { // Add index here
+    history.forEach((entry, index) => {
         const listItem = document.createElement('div');
         listItem.classList.add('list-item', 'history-list-item', 'p-2', 'border-rz-sidebar-border', 'cursor-pointer', 'hover:bg-rz-sidebar-hover');
         listItem.dataset.historyId = entry.id;
-        // Optionally store the full entry data or just ID if needed for viewing past versions
-
-        // Name and Date (flex row)
         const headerDiv = document.createElement('div');
         headerDiv.classList.add('flex', 'justify-between', 'items-center');
-
         const nameSpan = document.createElement('span');
-        nameSpan.classList.add('text-rz-sidebar-text', 'text-sm', 'truncate', 'flex-grow'); // Added truncate and flex-grow
-        // Display the name saved at that point in history, fallback to current note name if history name is null
+        nameSpan.classList.add('text-rz-sidebar-text', 'text-sm', 'truncate', 'flex-grow');
         nameSpan.textContent = entry.name || state.currentNoteName || 'Untitled';
-
         headerDiv.appendChild(nameSpan);
-
-        // Timestamp div
         const timestampDiv = document.createElement('div');
-        timestampDiv.classList.add('text-rz-sidebar-text', 'opacity-75', 'text-xs', 'ml-2', 'flex-shrink-0'); // Added flex-shrink-0
-        // Format timestamp nicely
-        const date = new Date(entry.saved_at);
-        timestampDiv.textContent = date.toLocaleString(); // Or use a more specific format
-
+        timestampDiv.classList.add('text-rz-sidebar-text', 'opacity-75', 'text-xs', 'ml-2', 'flex-shrink-0');
+        timestampDiv.textContent = new Date(entry.saved_at).toLocaleString();
         listItem.appendChild(headerDiv);
         listItem.appendChild(timestampDiv);
-
-        // --- NEW: Add Diff Summary ---
         const diffDiv = document.createElement('div');
-        // Add line-clamp-2 for two-line truncation with ellipsis
         diffDiv.classList.add('text-xs', 'mt-1', 'text-rz-sidebar-text', 'opacity-80', 'note-diff-summary', 'line-clamp-2');
-
-        // Check if this is the oldest entry (last in the DESC sorted list)
         const isInitialVersion = index === history.length - 1;
         let summaryText = "";
-        let summaryTitle = ""; // Tooltip text
-
+        let summaryTitle = "";
         if (isInitialVersion) {
             summaryText = "Initial version";
             summaryTitle = "Initial version of the note.";
         } else if (entry.note_diff) {
-            // Display existing summary or marker text
             summaryText = entry.note_diff;
-            summaryTitle = entry.note_diff; // Use full summary for tooltip
-
-            // Handle specific markers
-            if (summaryText === "[Initial version]") { // Should be caught by isInitialVersion, but double-check
-                 summaryText = "Initial version";
-                 summaryTitle = "Initial version of the note.";
-            } else if (summaryText === "[Metadata change only]") {
+            summaryTitle = entry.note_diff;
+            if (summaryText === "[Metadata change only]") {
                  summaryText = "Name/Metadata changed";
                  summaryTitle = "Only the note name or other metadata changed in this version.";
             } else if (summaryText.startsWith("[AI summary generation failed]") || summaryText.startsWith("[Summary generation error]")) {
                  summaryText = "Summary unavailable";
                  summaryTitle = "Could not generate summary for this version.";
-                 diffDiv.classList.add('text-red-400'); // Indicate error subtly
+                 diffDiv.classList.add('text-red-400');
             }
-            // Removed manual character truncation - line-clamp handles it
         } else {
-            // If summary is null/empty and not initial version
             summaryText = "Summary pending...";
             summaryTitle = "Summary is being generated or was not created.";
-            diffDiv.classList.add('opacity-60'); // Dim pending text
+            diffDiv.classList.add('opacity-60');
         }
-
         diffDiv.textContent = summaryText;
-        diffDiv.title = summaryTitle; // Set tooltip
-
+        diffDiv.title = summaryTitle;
         listItem.appendChild(diffDiv);
-        // --- Removed Generate Button Logic ---
-
         noteHistoryList.appendChild(listItem);
-    }); // End forEach
-
-    // No active styling needed for history items based on the request, but could be added
+    });
 }
 
-
-// --- Modal Helpers (UI-local state) ---
-
-/**
- * Generic function to open a modal.
- * @param {HTMLElement} modalElement - The modal element.
- */
 export function openModal(modalElement) {
     if (modalElement) {
         modalElement.classList.add('show');
-        if (elements.bodyElement) elements.bodyElement.classList.add('modal-open'); // Add null check
+        if (elements.bodyElement) elements.bodyElement.classList.add('modal-open');
     }
 }
 
-/**
- * Generic function to close a modal.
- * @param {HTMLElement} modalElement - The modal element.
- */
 export function closeModal(modalElement) {
     if (modalElement) {
         modalElement.classList.remove('show');
-         // Check if any other modals are open before removing modal-open class
         const anyModalOpen = document.querySelectorAll('.modal.show').length > 0;
-        if (!anyModalOpen) {
-             if (elements.bodyElement) elements.bodyElement.classList.remove('modal-open'); // Add null check
-        }
-        console.log(`[DEBUG] Modal closed: ${modalElement.id}`); // Add logging
+        if (!anyModalOpen && elements.bodyElement) elements.bodyElement.classList.remove('modal-open');
+        console.log(`[DEBUG] Modal closed: ${modalElement.id}`);
     }
 }
 
-// --- State Change Reaction Functions ---
-// These functions are called by eventListeners.js when specific state
-// variables change, triggering the necessary UI updates.
-
 export function handleStateChange_isLoading() {
     updateLoadingState();
-    // renderStatus(); // Called by handleStateChange_statusMessage
-    // updateAttachButtonState(); // Called by updateLoadingState
-    renderNoteContent(); // Loading state affects note textarea placeholder/disabled
-    renderMicButtonState(); // Loading/recording state affects mic button disabled state
-    updateNotesCleanupButtonState(); // Loading state affects notes button enabled state
-    updateChatCleanupButtonState(); // Loading state affects chat button enabled state
-    // Update chat list processing indicator when global loading changes (e.g., initial load)
+    renderNoteContent();
+    renderMicButtonState();
+    updateNotesCleanupButtonState();
+    updateChatCleanupButtonState();
     updateChatListProcessingIndicator();
 }
 
 export function handleStateChange_statusMessage() {
     renderStatus();
-    // renderSummaryModalContent(); // Status message can affect modal status display
-    // renderUrlModalContent(); // Status message can affect modal status display
-    // Note: Modal status updates are handled within renderSummaryModalContent/renderUrlModalContent
-    // which are triggered by other state changes (e.g., currentEditingFileId, summaryContent, isLoading)
 }
  
 export function handleStateChange_savedChats() {
     renderSavedChats();
-    updateChatListProcessingIndicator(); // Update indicators when list re-renders
+    updateChatListProcessingIndicator();
 }
  
-export function handleStateChange_currentChat() { // Called when currentChatId, Name, Model change
+export function handleStateChange_currentChat() {
     renderCurrentChatDetails();
-    updateActiveChatListItem(); // Highlight correct chat in sidebar
-    // renderChatHistory(); // Called by handleStateChange_chatHistory
-    // File/Calendar/Web Search context UI is updated by renderChatInputArea, updateCalendarStatus
-    // which are triggered by pluginEnabled, calendarContext, isCalendarContextActive, isWebSearchEnabled notifications
+    updateActiveChatListItem();
 }
 
 export function handleStateChange_chatHistory() {
@@ -2013,363 +1649,234 @@ export function handleStateChange_chatHistory() {
 }
 
 export function handleStateChange_isRecording() {
-    renderMicButtonState(); // Update mic button icon/style
-    // Recording state itself doesn't trigger global loading state
-    // updateLoadingState();
-    // Connect/disconnect logic is handled by the event listener triggering start/stop recording
+    renderMicButtonState();
 }
 
-// --- NEW: Handle WebSocket Connection Status Change ---
 export function handleStateChange_isSocketConnected() {
-    renderMicButtonState(); // Update mic button (e.g., disable if not connected)
-    // Update status bar? Maybe not, status message handles connection status.
-    // Update status bar? Maybe not, status message handles connection status.
+    renderMicButtonState();
 }
 
-// --- NEW: Handle Streaming Transcript Update ---
 export function handleStateChange_streamingTranscript() {
-    renderStreamingTranscript(); // Update the target input field
+    renderStreamingTranscript();
 }
 
 export function handleStateChange_savedNotes() {
     renderSavedNotes();
 }
 
-export function handleStateChange_currentNote() { // Called when currentNoteId, Name, Content change
+export function handleStateChange_currentNote() {
     renderCurrentNoteDetails();
-    updateActiveNoteListItem(); // Highlight correct note in sidebar
-    renderNoteContent(); // Load content for the new note
+    updateActiveNoteListItem();
+    renderNoteContent();
 }
 
-// --- NEW: State Change Handler for Note Content (to update TOC) ---
 export function handleStateChange_noteContent() {
-    // This is called when the note content state changes (e.g., loading a note, typing in textarea)
-    renderNoteContent(); // Update textarea.
+    renderNoteContent();
     if (state.currentTab === 'notes' && state.currentNoteMode === 'view') {
-        updateNotesPreview(); // Re-evaluate for H1 tabs if content changes in view mode
-    } else if (state.currentTab === 'notes' && state.currentNoteMode === 'edit') {
-        // For edit mode, TOC updates based on textarea content (already handled by renderNoteContent -> updateNotesPreview -> debounced TOC)
+        updateNotesPreview();
     }
 }
-// -----------------------------------------------------------------
 
 export function handleStateChange_uploadedFiles() {
-    renderUploadedFiles(); // Renders sidebar and modal lists
+    renderUploadedFiles();
 }
 
 export function handleStateChange_sidebarSelectedFiles() {
-    updateSelectedFileListItemStyling(); // Updates sidebar highlighting
-    updateAttachButtonState(); // Updates attach button state
+    updateSelectedFileListItemStyling();
+    updateAttachButtonState();
 }
 
 export function handleStateChange_attachedFiles() {
-    renderAttachedAndSessionFiles(); // Updates the tags below the input
+    renderAttachedAndSessionFiles();
 }
 
 export function handleStateChange_sessionFile() {
-    renderAttachedAndSessionFiles(); // Updates the tags below the input
+    renderAttachedAndSessionFiles();
 }
 
 export function handleStateChange_currentEditingFileId() {
-    // When the file ID for summary editing changes, the modal content needs re-rendering
     renderSummaryModalContent();
 }
 
 export function handleStateChange_summaryContent() {
-    // When the summary content changes (e.g., after fetch or user edit), update the modal textarea
     renderSummaryModalContent();
 }
 
 export function handleStateChange_calendarContext() {
-    updateCalendarStatus(); // Updates status text and view button
+    updateCalendarStatus();
 }
 
 export function handleStateChange_isCalendarContextActive() {
-    updateCalendarStatus(); // Updates toggle state and status text
-    renderChatInputArea(); // Updates calendar toggle checked state
+    updateCalendarStatus();
+    renderChatInputArea();
 }
 
 export function handleStateChange_isWebSearchEnabled() {
-    renderChatInputArea(); // Updates web search toggle checked state
+    renderChatInputArea();
 }
 
-// REMOVED handleStateChange_pluginEnabled function
-
 export function handleStateChange_currentTab() {
-    // The switchTab function already handles rendering everything for the new tab
-    // This handler might be redundant if switchTab is only called by eventListeners.js
-    // reacting to the tab state change. Let's keep it simple and rely on eventListeners.js
-    // calling switchTab directly for now.
-    // No, this handler *is* needed because state.notifyAll() will trigger it initially.
-    // Let's call switchTab from here.
     switchTab(state.currentTab);
 }
 
 export function handleStateChange_processingChatId() {
-    // When the processing chat ID changes, update the loading state of UI elements
-    // and the visual indicator in the chat list.
     updateLoadingState();
     updateChatListProcessingIndicator();
 }
 
 export function handleStateChange_currentNoteMode() {
-    setNoteMode(state.currentNoteMode); // Applies the correct mode (edit/view)
-    // renderNoteContent(); // Called by setNoteMode (also triggers TOC update)
+    setNoteMode(state.currentNoteMode);
 }
 
-// --- NEW: State Change Handler for Deep Research Toggle ---
 export function handleStateChange_isDeepResearchEnabled() {
-    renderChatInputArea(); // Updates deep research toggle checked state
-}
-// -------------------------------------------------------
-
-// --- NEW: State Change Handler for Improve Prompt Toggle ---
-/** Handles state changes for the 'isImprovePromptEnabled' flag. Updates the UI accordingly. */
-export function handleStateChange_isImprovePromptEnabled() {
-    // This function relies on renderChatInputArea to update the toggle's checked state.
     renderChatInputArea();
 }
-// ---------------------------------------------------------
 
-// --- NEW: State Change Handler for Note History ---
-export function handleStateChange_noteHistory() {
-    renderNoteHistory(); // Re-render the history list when history state changes
+export function handleStateChange_isImprovePromptEnabled() {
+    renderChatInputArea();
 }
-// -------------------------------------------------
 
-/**
- * Updates the enabled/disabled state of the Notes "Cleanup" button
- * based on whether text is selected in the notes textarea.
- */
+export function handleStateChange_noteHistory() {
+    renderNoteHistory();
+}
+
 export function updateNotesCleanupButtonState() {
     if (!elements.notesTextarea || !elements.cleanupTranscriptButtonNotes) return;
-
     const hasSelection = elements.notesTextarea.selectionStart !== elements.notesTextarea.selectionEnd;
-    // Only enable if on the Notes tab, not loading, and text is selected
     elements.cleanupTranscriptButtonNotes.disabled = !(state.currentTab === 'notes' && !state.isLoading && hasSelection);
 }
 
-/**
- * Updates the enabled/disabled state of the Chat "Cleanup" button
- * based on whether text is selected in the message input field.
- */
 export function updateChatCleanupButtonState() {
     if (!elements.messageInput || !elements.cleanupTranscriptButton) return;
-
     const hasSelection = elements.messageInput.selectionStart !== elements.messageInput.selectionEnd;
-    // Only enable if on the Chat tab, not loading, and text is selected
     elements.cleanupTranscriptButton.disabled = !(state.currentTab === 'chat' && !state.isLoading && hasSelection);
 }
 
-
-// --- UPDATED: Render Streaming Transcript ---
-/**
- * Updates the appropriate input field with the combined finalized and interim transcript.
- */
 export function renderStreamingTranscript() {
-    // Combine finalized and interim transcripts from state
     const finalized = state.finalizedTranscript;
     const interim = state.currentInterimTranscript;
-    const fullTranscript = finalized ? `${finalized} ${interim}` : interim; // Add space only if finalized part exists
-
-    const context = state.recordingContext; // Read context
+    const fullTranscript = finalized ? `${finalized} ${interim}` : interim;
+    const context = state.recordingContext;
     const targetElement = getInputElementForContext(context);
 
     if (targetElement) {
         if (context === 'notes' && originalNoteTextBeforeRecording !== null) {
-            // Append combined transcript to original text for notes
-            targetElement.value = originalNoteTextBeforeRecording + (originalNoteTextBeforeRecording ? "\n\n" : "") + fullTranscript.trim(); // Trim combined transcript
+            targetElement.value = originalNoteTextBeforeRecording + (originalNoteTextBeforeRecording ? "\n\n" : "") + fullTranscript.trim();
         } else {
-            // Overwrite for chat or if original notes text wasn't stored
-            targetElement.value = fullTranscript.trim(); // Trim combined transcript
+            targetElement.value = fullTranscript.trim();
         }
-        // Optional: Auto-scroll if needed, especially for textarea
-        // if (targetElement.scrollHeight > targetElement.clientHeight) {
-        //     targetElement.scrollTop = targetElement.scrollHeight;
-        // }
-        // --- NEW: Trigger auto-resize after updating value ---
         autoResizeTextarea(targetElement);
-        // -----------------------------------------------------
     }
 }
-// ---------------------------------------
-
-// --- NEW: State Change Handlers for Sidebar Collapse ---
 
 export function handleStateChange_isSidebarCollapsed() {
-    const isCollapsed = state.isSidebarCollapsed; // Read state
+    const isCollapsed = state.isSidebarCollapsed;
     const sidebarElement = document.getElementById('sidebar');
-    const toggleButton = document.getElementById('sidebar-toggle-tab'); // Use new ID
+    const toggleButton = document.getElementById('sidebar-toggle-tab');
     if (!sidebarElement || !toggleButton) return;
-
     sidebarElement.classList.toggle('collapsed', isCollapsed);
-    toggleButton.classList.toggle('collapsed', isCollapsed); // Add/remove collapsed class on the tab itself
-
+    toggleButton.classList.toggle('collapsed', isCollapsed);
     const icon = toggleButton.querySelector('i');
     if (icon) {
-        // Left sidebar tab: Shows '<' when expanded (tab not collapsed), '>' when collapsed (tab is collapsed)
         icon.classList.toggle('fa-chevron-left', !isCollapsed);
         icon.classList.toggle('fa-chevron-right', isCollapsed);
     }
-    // Don't update localStorage or state here, just reflect the state in the UI
 }
 
 export function handleStateChange_isPluginsCollapsed() {
-    const isCollapsed = state.isPluginsCollapsed; // Read state
+    const isCollapsed = state.isPluginsCollapsed;
     const sidebarElement = document.getElementById('plugins-sidebar');
-    const toggleButton = document.getElementById('plugins-toggle-tab'); // Use new ID
+    const toggleButton = document.getElementById('plugins-toggle-tab');
     if (!sidebarElement || !toggleButton) return;
-
     sidebarElement.classList.toggle('collapsed', isCollapsed);
-    toggleButton.classList.toggle('collapsed', isCollapsed); // Add/remove collapsed class on the tab itself
-
+    toggleButton.classList.toggle('collapsed', isCollapsed);
     const icon = toggleButton.querySelector('i');
     if (icon) {
-        // Right sidebar tab: Shows '>' when expanded (tab not collapsed), '<' when collapsed (tab is collapsed)
         icon.classList.toggle('fa-chevron-right', !isCollapsed);
         icon.classList.toggle('fa-chevron-left', isCollapsed);
     }
-    // Don't update localStorage or state here, just reflect the state in the UI
 }
 
-// -------------------------------------------------------
-
-
-// --- NEW: TOC Generation and Rendering ---
-
-/**
- * Generates a Table of Contents data structure from the current note's markdown content.
- * @param {string} markdown - The markdown content to parse for TOC.
- * @returns {Array<Object>} An array of TOC entries { level, text, targetId }.
- */
-function generateTocData(markdown) { // Accept markdown as parameter
+function generateTocData(markdown) {
     if (!markdown) return [];
-
     const toc = [];
     const tokens = marked.lexer(markdown);
-    // console.log("[DEBUG] Marked Lexer Tokens:", tokens); // Log tokens for debugging
-
     tokens.forEach(token => {
         if (token.type === 'heading') {
-            // Generate a consistent, deterministic ID based on text and level for linking
             const level = token.depth;
             const text = token.text || `heading-${Date.now()}`;
             const slug = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
-            // Use level and slug, remove random part - MUST match makeHeadingsCollapsible
             const targetId = `toc-heading-level-${level}-${slug}`;
-            toc.push({
-                level: level, // Use the level variable
-                text: token.text, // Keep original text for display
-                targetId: targetId // Store the generated ID
-            });
+            toc.push({ level: level, text: token.text, targetId: targetId });
         }
     });
-    // console.log("[DEBUG] Generated TOC Data:", toc); // Log generated TOC
     return toc;
 }
 
-
-/**
- * Renders the Table of Contents list in the drawer.
- * @param {Array<Object>} tocData - The TOC data generated by generateTocData.
- */
 function renderTableOfContents(tocData) {
     const { notesTocList } = elements;
     if (!notesTocList) return;
-
-    notesTocList.innerHTML = ''; // Clear previous TOC
-
+    notesTocList.innerHTML = '';
     if (!tocData || tocData.length === 0) {
         notesTocList.innerHTML = '<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No headings found.</p>';
         return;
     }
-
     tocData.forEach(item => {
         const link = document.createElement('a');
-        link.href = `#${item.targetId}`; // Use href for semantic linking
-        link.classList.add('toc-item', `toc-level-${item.level}`, 'toc-link'); // Add toc-link class
+        link.href = `#${item.targetId}`;
+        link.classList.add('toc-item', `toc-level-${item.level}`, 'toc-link');
         link.textContent = item.text;
         link.title = `Jump to: ${item.text}`;
-        link.dataset.targetId = item.targetId; // Store target ID for event listener
-
+        link.dataset.targetId = item.targetId;
         notesTocList.appendChild(link);
     });
 }
 
-/** Generates and renders the TOC based on current note content */
-export function generateAndRenderToc(customMarkdownContent = null) { // Export this function and accept custom content
+export function generateAndRenderToc(customMarkdownContent = null) {
     if (state.currentTab === 'notes') {
-        // Use customMarkdownContent if provided (for H1 sections), otherwise use full note content
         const markdownToParse = customMarkdownContent !== null ? customMarkdownContent : (state.noteContent || '');
-        const tocData = generateTocData(markdownToParse); // Pass content to generateTocData
+        const tocData = generateTocData(markdownToParse);
         renderTableOfContents(tocData);
     }
 }
 
-/** Shows or hides the TOC drawer based on the current tab. */
 export function updateTocVisibility() {
     const { notesTocDrawer } = elements;
     if (!notesTocDrawer) return;
     notesTocDrawer.classList.toggle('hidden', state.currentTab !== 'notes');
 }
 
-/** Toggles the collapsed state of the Notes TOC drawer. */
 export function toggleNotesTocDrawer() {
     const { notesTocDrawer } = elements;
     if (!notesTocDrawer) return;
-    // Update state, which will trigger the UI update via the handler
     state.setIsNotesTocCollapsed(!state.isNotesTocCollapsed);
 }
 
-/** Sets the visual collapsed state of the Notes TOC drawer. */
 export function setNotesTocCollapsedUI(isCollapsed) {
     const { notesTocHeader, notesTocList, notesTocToggle } = elements;
     if (!notesTocHeader || !notesTocList || !notesTocToggle) return;
-
     const icon = notesTocToggle.querySelector('.toc-toggle-icon');
-
     notesTocHeader.classList.toggle('collapsed', isCollapsed);
     notesTocList.classList.toggle('collapsed', isCollapsed);
-
     if (icon) {
-        icon.classList.toggle('fa-chevron-up', !isCollapsed); // Up when expanded
-        icon.classList.toggle('fa-chevron-down', isCollapsed); // Down when collapsed
+        icon.classList.toggle('fa-chevron-up', !isCollapsed);
+        icon.classList.toggle('fa-chevron-down', isCollapsed);
     }
-    // Persist state
     localStorage.setItem(config.NOTES_TOC_COLLAPSED_KEY, isCollapsed);
 }
 
-// --- End TOC Functions ---
-
-
-// --- NEW: State Change Handler for TOC Collapse State ---
 export function handleStateChange_isNotesTocCollapsed() {
-    setNotesTocCollapsedUI(state.isNotesTocCollapsed); // Update UI based on state
+    setNotesTocCollapsedUI(state.isNotesTocCollapsed);
 }
-// ----------------------------------------------------
 
-// --- NEW: State Change Handler for Active H1 Section Index ---
 export function handleStateChange_currentNoteActiveH1SectionIndex() {
     if (state.currentTab === 'notes' && state.currentNoteMode === 'view' && _currentNoteH1Sections.length > 1 && !_currentNoteH1Sections.every(s => s.isOnlySection)) {
         _renderActiveH1SectionUI();
     }
 }
-// -----------------------------------------------------------
 
-
-// --- NEW: Reusable Textarea Auto-Resize Function ---
-/**
- * Adjusts the height of a textarea based on its content.
- * @param {HTMLTextAreaElement} textareaElement - The textarea to resize.
- */
 export function autoResizeTextarea(textareaElement) {
     if (!textareaElement) return;
-    // Temporarily reset height to get accurate scrollHeight
     textareaElement.style.height = 'auto';
-    // Set height to scrollHeight, respecting CSS max-height
     textareaElement.style.height = `${textareaElement.scrollHeight}px`;
 }
-// --------------------------------------------------
-
-
-// Add more handlers for other state changes as needed...
