@@ -338,27 +338,26 @@ function addMessageToDom(messageObject) {
                     const fileType = attachmentElement.dataset.fileType;
 
                     if (fileType === 'session') {
-                        // Handle session file display (content is in state.sessionFile)
-                        // Find the session file in state.sessionFile
-                        const sessionFile = state.sessionFile;
-                        if (sessionFile && sessionFile.filename === attachment.filename && sessionFile.mimetype === attachment.mimetype) {
-                             // Assuming sessionFile.content is already available (e.g., base64)
-                             // Need to decide how session file content is stored and accessed.
-                             // If sessionFile.content is the raw data (bytes or string), we need to handle it.
-                             // For now, let's assume sessionFile.content is the base64 string or text.
-                             console.log(`[DEBUG] Displaying session file content for ${sessionFile.filename}`);
-                             // Need to determine if sessionFile.content is text or base64 based on mimetype
-                             const isText = sessionFile.mimetype.startsWith('text/') || sessionFile.mimetype === 'application/json' || sessionFile.filename.endsWith(('.txt', '.py', '.js', '.html', '.css', '.md', '.json', '.csv'));
+                        // Handle session file display (content is stored in the attachment object in chatHistory)
+                        console.log(`[DEBUG] Displaying session file content for ${attachment.filename}`);
+                        // The attachment object for session files now includes 'content'
+                        const sessionFileContent = attachment.content;
+                        const sessionFileMimetype = attachment.mimetype;
+                        const sessionFilename = attachment.filename;
+
+                        if (sessionFileContent !== undefined && sessionFileContent !== null) {
+                             // Need to determine if sessionFileContent is text or base64 based on mimetype
+                             const isText = sessionFileMimetype.startsWith('text/') || sessionFileMimetype === 'application/json' || sessionFilename.endsWith(('.txt', '.py', '.js', '.html', '.css', '.md', '.json', '.csv'));
                              state.setCurrentViewingFile(
                                  'session', // Use a placeholder ID for session files
-                                 sessionFile.filename,
-                                 sessionFile.content, // Assuming this is the content to display (text or base64)
-                                 sessionFile.mimetype,
+                                 sessionFilename,
+                                 sessionFileContent, // Use content from the attachment object
+                                 sessionFileMimetype,
                                  !isText // isBase64 flag
                              );
                              showModal(elements.fileContentModal);
                         } else {
-                             console.error("Session file not found in state for display.");
+                             console.error("Session file content not found in attachment object for display.", attachment);
                              // Maybe show an error toast?
                         }
 

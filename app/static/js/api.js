@@ -875,7 +875,8 @@ export function sendMessage() {
         attachmentsForHistory.push({
             filename: stagedSessionFile.filename,
             type: 'session', // UI hint
-            mimetype: stagedSessionFile.mimetype
+            mimetype: stagedSessionFile.mimetype,
+            content: stagedSessionFile.content // Include content for display from history
         });
         backendSessionFilesPayload.push({
             filename: stagedSessionFile.filename,
@@ -890,6 +891,7 @@ export function sendMessage() {
             filename: file.filename,
             type: file.type, // 'full' or 'summary'
             mimetype: file.mimetype
+            // Content for 'full' or 'summary' is fetched from backend on click
         });
         // For backend, send only id and type for these, as content is already on server
         backendAttachedFilesPayload.push({ id: file.id, type: file.type });
