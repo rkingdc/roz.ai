@@ -389,8 +389,8 @@ function addMessageToDom(messageObject) {
             copyButton.innerHTML = '<i class="far fa-copy"></i>';
             // Position copy button absolutely within the messageElement (which is relative)
             copyButton.style.position = 'absolute';
-            copyButton.style.top = '0.25rem'; // Adjust as needed
-            copyButton.style.right = '0.25rem'; // Adjust as needed
+            copyButton.style.bottom = '0.25rem'; // <<< CHANGED from top to bottom
+            copyButton.style.right = '0.25rem'; // Keep right positioning
             messageElement.appendChild(copyButton);
         }
     }
