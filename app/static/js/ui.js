@@ -341,19 +341,23 @@ function addMessageToDom(messageObject) {
                         // Handle session file display (content is stored in the attachment object in chatHistory)
                         console.log(`[DEBUG] Displaying session file content for ${attachment.filename}`);
                         // The attachment object for session files now includes 'content'
-                        const sessionFileContent = attachment.content;
+                        const sessionFileContent = attachment.content; // This is a data URL
                         const sessionFileMimetype = attachment.mimetype;
                         const sessionFilename = attachment.filename;
 
                         if (sessionFileContent !== undefined && sessionFileContent !== null) {
-                             // Need to determine if sessionFileContent is text or base64 based on mimetype
-                             const isText = sessionFileMimetype.startsWith('text/') || sessionFileMimetype === 'application/json' || sessionFilename.endsWith(('.txt', '.py', '.js', '.html', '.css', '.md', '.json', '.csv'));
+                             // For session files, content is already a data URL.
+                             // The isBase64 flag for setCurrentViewingFile should reflect if the *original* data was binary,
+                             // not whether the dataURL itself is base64 (it always is).
+                             // The `isText` check here determines if the original was likely text.
+                             const isText = sessionFileMimetype.startsWith('text/') || sessionFileMimetype === 'application/json' || /\.(txt|py|js|html|css|md|json|csv)$/i.test(sessionFilename);
                              state.setCurrentViewingFile(
                                  'session', // Use a placeholder ID for session files
                                  sessionFilename,
-                                 sessionFileContent, // Use content from the attachment object
+                                 sessionFileContent, // Pass the data URL directly
                                  sessionFileMimetype,
-                                 !isText // isBase64 flag
+                                 false // For data URLs, the content itself is not "raw base64" in the same way backend files are.
+                                        // The rendering function will handle data URLs.
                              );
                              showModal(elements.fileContentModal);
                         } else {
@@ -364,14 +368,17 @@ function addMessageToDom(messageObject) {
                     } else if (fileId) {
                         // Handle saved file display (fetch content from backend)
                         console.log(`[DEBUG] Fetching content for file ID: ${fileId}`);
-                        const fileData = await import('./api.js').then(api => api.fetchFileContent(parseInt(fileId)));
+                        // Dynamically import api.js to avoid circular dependencies if ui.js is imported by api.js
+                        const apiModule = await import('./api.js');
+                        const fileData = await apiModule.fetchFileContent(parseInt(fileId));
+
                         if (fileData && fileData.content !== undefined) {
                             state.setCurrentViewingFile(
                                 fileData.id,
                                 fileData.filename,
                                 fileData.content,
                                 fileData.mimetype,
-                                fileData.is_base64
+                                fileData.is_base64 // This flag from backend indicates if content is raw base64
                             );
                             showModal(elements.fileContentModal);
                         } else {
@@ -706,7 +713,7 @@ function createNoteItem(note) {
     nameSpan.title = note.name || `Note ${note.id}`; // Add title for tooltip
 
     // Add delete button
-    // Use only 'delete-btn' class as per provided HTML - color handled by CSS
+    // Use only 'delete-btn' class as per CORRECT HTML - color handled by CSS
     const deleteButton = document.createElement('button');
     deleteButton.classList.add('delete-btn', 'text-rz-sidebar-text'); // Use specific class
     deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-xs"></i>'; // Use fa-xs as per provided HTML
@@ -716,7 +723,7 @@ function createNoteItem(note) {
     nameDeleteContainer.appendChild(deleteButton); // Append delete button
 
     // Add timestamp div
-    // Use 'div' and specific classes as per provided HTML - color handled by CSS
+    // Use 'div' and specific classes as per CORRECT HTML - color handled by CSS
     const timestampDiv = document.createElement('div');
     // Default color is text-rz-tab-background-text (greyish) based on provided HTML
     timestampDiv.classList.add('text-xs', 'mt-0.5', 'text-rz-toolbar-field-text'); // Use specific classes and mt-0.5 - color handled by CSS
@@ -1143,7 +1150,10 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
 
     modalElement.classList.add('show');
     if (elements.bodyElement) elements.bodyElement.classList.add('modal-open');
-    state.setIsFileContentModalOpen(true); // Update state
+    // Update state ONLY for file content modal, as other modals might have their own state flags
+    if (modalElement.id === 'file-content-modal') {
+        state.setIsFileContentModalOpen(true);
+    }
     return true;
 }
 
@@ -1712,6 +1722,162 @@ export function openModal(modalElement) {
 // NOTE: The old closeModal function is replaced by the more specific hideModal function above.
 //       Any calls to closeModal should be updated to hideModal.
 
+
+/**
+ * Renders the content of the file preview modal based on state.
+ */
+function renderFileContentModal() {
+    console.log('[DEBUG] renderFileContentModal called.'); // LOG: Function entry
+    const { fileContentModalFilename, fileContentModalContent, fileContentModal } = elements;
+
+    // --- Check if DOM elements exist ---
+    if (!fileContentModal) {
+        console.error('[DEBUG] renderFileContentModal: fileContentModal element not found.');
+        return;
+    }
+    if (!fileContentModalFilename) {
+        console.error('[DEBUG] renderFileContentModal: fileContentModalFilename element not found.');
+        return;
+    }
+    if (!fileContentModalContent) {
+        console.error('[DEBUG] renderFileContentModal: fileContentModalContent element not found.');
+        return;
+    }
+    // -----------------------------------
+
+    // --- Get state values ---
+    const filename = state.currentViewingFilename;
+    let fileContent = state.currentViewingFileContent;
+    const mimetype = state.currentViewingFileMimetype;
+    const isOriginallyBase64 = state.currentViewingFileIsBase64;
+    // ------------------------
+
+    // --- Log state values ---
+    console.log(`[DEBUG] renderFileContentModal states:
+        Filename: ${filename} (type: ${typeof filename})
+        Mimetype: ${mimetype} (type: ${typeof mimetype})
+        IsOriginallyBase64: ${isOriginallyBase64} (type: ${typeof isOriginallyBase64})
+        FileContent (first 100 chars): ${typeof fileContent === 'string' ? fileContent.substring(0, 100) : fileContent} (type: ${typeof fileContent})`);
+    // ------------------------
+
+    // --- Handle case where no file is selected or content is missing ---
+    if (filename === null || fileContent === null || mimetype === null) {
+        fileContentModalFilename.textContent = 'File Preview';
+        fileContentModalContent.innerHTML = '<p class="text-gray-500 dark:text-gray-400">No file selected or content not available.</p>';
+        console.log('[DEBUG] renderFileContentModal: Rendered "No file selected..."');
+        return;
+    }
+    // -----------------------------------------------------------------
+
+    // --- Set filename and clear previous content ---
+    fileContentModalFilename.textContent = escapeHtml(filename);
+    console.log(`[DEBUG] renderFileContentModal: Set modal filename to: ${filename}`);
+    const initialModalContentHTML = fileContentModalContent.innerHTML; // Log initial content for comparison
+    fileContentModalContent.innerHTML = ''; // Clear previous content
+    console.log(`[DEBUG] renderFileContentModal: Cleared modal content. Was: "${initialModalContentHTML.substring(0,100)}...", Now: "${fileContentModalContent.innerHTML}"`);
+    // ---------------------------------------------
+
+    // --- Determine how to display content ---
+    const isTextDisplayable = mimetype.startsWith('text/') ||
+        [
+            'application/json', 'application/xml', 'application/javascript',
+            'application/x-python-code', 'application/x-sh', 'application/csv',
+            'application/rtf', 'application/x-tex', 'application/x-latex',
+            'application/vnd.oasis.opendocument.text', // ODT
+            'application/msword', // .doc (might not render well)
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' // .docx
+        ].includes(mimetype) ||
+        /\.(txt|py|js|jsx|ts|tsx|html|htm|css|scss|less|md|json|csv|xml|log|yaml|yml|ini|cfg|sh|bash|zsh|ps1|bat|java|c|cpp|h|hpp|cs|go|rb|php|swift|kt|kts|dart|rs|lua|pl|sql|r|vbs|conf|rtf|tex|odt|doc|docx)$/i.test(filename);
+    console.log(`[DEBUG] renderFileContentModal: isTextDisplayable = ${isTextDisplayable} (mimetype: ${mimetype}, filename: ${filename})`);
+
+    let contentForTextDisplay = "";
+    let srcForEmbedOrImg = "";
+
+    // Process content based on its type (Data URL, raw base64, or plain text)
+    if (typeof fileContent === 'string' && fileContent.startsWith('data:')) {
+        console.log('[DEBUG] renderFileContentModal: Handling content as Data URL.');
+        srcForEmbedOrImg = fileContent;
+        if (isTextDisplayable) {
+            try {
+                const base64Data = fileContent.substring(fileContent.indexOf(',') + 1);
+                contentForTextDisplay = atob(base64Data);
+                console.log('[DEBUG] renderFileContentModal: Decoded text from Data URL.');
+            } catch (e) {
+                console.error("[DEBUG] renderFileContentModal: Error decoding base64 text from data URL:", e);
+                contentForTextDisplay = "Error decoding content from data URL.";
+            }
+        }
+    } else if (isOriginallyBase64) {
+        console.log('[DEBUG] renderFileContentModal: Handling content as raw base64 string.');
+        if (isTextDisplayable) {
+            try {
+                contentForTextDisplay = atob(fileContent);
+                console.log('[DEBUG] renderFileContentModal: Decoded text from raw base64 string.');
+            } catch (e) {
+                console.error("[DEBUG] renderFileContentModal: Error decoding base64 text content:", e);
+                contentForTextDisplay = "Error decoding base64 content.";
+            }
+        } else {
+            srcForEmbedOrImg = `data:${mimetype};base64,${fileContent}`;
+            console.log(`[DEBUG] renderFileContentModal: Created Data URL for binary content: data:${mimetype};base64,...`);
+        }
+    } else {
+        console.log('[DEBUG] renderFileContentModal: Handling content as plain text string.');
+        contentForTextDisplay = fileContent;
+    }
+    // ----------------------------------------
+
+    // --- Render content based on mimetype ---
+    if (mimetype.startsWith('image/')) {
+        console.log('[DEBUG] renderFileContentModal: Rendering as image.');
+        const img = document.createElement('img');
+        img.src = srcForEmbedOrImg;
+        img.alt = escapeHtml(filename);
+        img.className = 'max-w-full max-h-[70vh] object-contain mx-auto';
+        fileContentModalContent.appendChild(img);
+    } else if (mimetype === 'application/pdf' && srcForEmbedOrImg) {
+        console.log('[DEBUG] renderFileContentModal: Rendering as PDF embed.');
+        const embed = document.createElement('embed');
+        embed.src = srcForEmbedOrImg;
+        embed.type = 'application/pdf';
+        embed.className = 'w-full h-[75vh]';
+        fileContentModalContent.appendChild(embed);
+    } else if (isTextDisplayable) {
+        console.log('[DEBUG] renderFileContentModal: Rendering as preformatted text.');
+        const pre = document.createElement('pre');
+        pre.className = 'whitespace-pre-wrap break-all p-2 bg-gray-100 dark:bg-gray-700 dark:text-gray-200 rounded text-sm overflow-auto max-h-[75vh]';
+        pre.textContent = contentForTextDisplay;
+        fileContentModalContent.appendChild(pre);
+    } else {
+        console.log('[DEBUG] renderFileContentModal: Rendering "Preview not available" fallback.');
+        const p = document.createElement('p');
+        p.className = 'text-gray-600 dark:text-gray-400';
+        p.textContent = `Preview not available for this file type (${escapeHtml(mimetype)}).`;
+        
+        let downloadHref = null;
+        if (srcForEmbedOrImg) {
+            downloadHref = srcForEmbedOrImg;
+        } else if (isOriginallyBase64 && !isTextDisplayable) { 
+            downloadHref = `data:${mimetype};base64,${fileContent}`;
+        }
+
+        if (downloadHref) {
+            const downloadLink = document.createElement('a');
+            downloadLink.href = downloadHref;
+            downloadLink.download = filename;
+            downloadLink.textContent = `Download ${escapeHtml(filename)}`;
+            downloadLink.className = 'text-blue-500 hover:underline ml-2';
+            p.appendChild(document.createElement('br'));
+            p.appendChild(downloadLink);
+            console.log(`[DEBUG] renderFileContentModal: Added download link for ${filename}.`);
+        }
+        fileContentModalContent.appendChild(p);
+    }
+    // --------------------------------------
+    console.log(`[DEBUG] renderFileContentModal: Final modal content HTML (first 200 chars): "${fileContentModalContent.innerHTML.substring(0,200)}"`);
+}
+
+
 export function handleStateChange_isLoading() {
     updateLoadingState();
     renderNoteContent();
@@ -1795,6 +1961,8 @@ export function handleStateChange_summaryContent() {
 
 export function handleStateChange_isFileContentModalOpen() {
     if (state.isFileContentModalOpen) {
+        // Content rendering is triggered by other state changes (currentViewingFile...)
+        // So, just ensure modal is shown.
         showModal(elements.fileContentModal);
     } else {
         hideModal(elements.fileContentModal);
