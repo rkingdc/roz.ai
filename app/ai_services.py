@@ -14,7 +14,7 @@ import tempfile
 import os
 import re
 import base64
-from . import database # Use alias to avoid conflict with db instance
+from . import database  # Use alias to avoid conflict with db instance
 from .plugins.web_search import perform_web_search  # Remove fetch_web_content import
 from google.api_core.exceptions import (
     GoogleAPIError,
@@ -928,16 +928,25 @@ def _generate_chat_response_non_stream(
             # --- Call Gemini API (Non-Streaming) ---
             # Construct conversation history. Append extra parts to the last user message if applicable.
             full_conversation = history
-            if current_turn_parts and full_conversation and full_conversation[-1].role == "user":
-                logger.debug(f"Appending {len(current_turn_parts)} extra parts to last user message for chat {chat_id} (SID: {sid}).")
+            if (
+                current_turn_parts
+                and full_conversation
+                and full_conversation[-1].role == "user"
+            ):
+                logger.debug(
+                    f"Appending {len(current_turn_parts)} extra parts to last user message for chat {chat_id} (SID: {sid})."
+                )
                 # Ensure parts is mutable list
                 if not isinstance(full_conversation[-1].parts, list):
                     full_conversation[-1].parts = list(full_conversation[-1].parts)
                 full_conversation[-1].parts.extend(current_turn_parts)
-            elif current_turn_parts: # Should not happen if user message was just saved, but handle defensively
-                 logger.warning(f"Current turn parts exist but last history item is not user for chat {chat_id} (SID: {sid}). Appending as new user turn.")
-                 full_conversation.append(Content(role="user", parts=current_turn_parts))
-
+            elif (
+                current_turn_parts
+            ):  # Should not happen if user message was just saved, but handle defensively
+                logger.warning(
+                    f"Current turn parts exist but last history item is not user for chat {chat_id} (SID: {sid}). Appending as new user turn."
+                )
+                full_conversation.append(Content(role="user", parts=current_turn_parts))
 
             logger.info(
                 f"Calling model.generate_content (non-streaming) for chat {chat_id} (SID: {sid})"
@@ -945,7 +954,7 @@ def _generate_chat_response_non_stream(
             system_prompt = f"""You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
             response = client.models.generate_content(
                 model=model_to_use,
-                contents=full_conversation, # Send the potentially modified history
+                contents=full_conversation,  # Send the potentially modified history
                 system_instruction=system_prompt,
             )
             logger.info(
@@ -1089,35 +1098,35 @@ def _generate_chat_response_non_stream(
             assistant_response_content = f"[Unexpected AI Error: {type(e).__name__}]"
             socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
 
-    finally:
-        # --- Save Assistant Response to DB ---
-        if (
-            assistant_response_content
-        ):  # Ensure there's content (even error messages)
-            logger.info(
-                f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
-            )
-            try:
-                # Assistant messages don't have attached_data in this context
-                save_success = database.add_message_to_db(
-                    chat_id,
-                    "assistant",
-                    assistant_response_content,
-                    attached_data_json=None,
+        finally:
+            # --- Save Assistant Response to DB ---
+            if (
+                assistant_response_content
+            ):  # Ensure there's content (even error messages)
+                logger.info(
+                    f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
                 )
-                if not save_success:
-                    logger.error(
-                        f"Failed to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
+                try:
+                    # Assistant messages don't have attached_data in this context
+                    save_success = database.add_message_to_db(
+                        chat_id,
+                        "assistant",
+                        assistant_response_content,
+                        attached_data_json=None,
                     )
-            except Exception as db_err:
-                logger.error(
-                    f"DB error saving non-streaming assistant message for chat {chat_id} (SID: {sid}): {db_err}",
-                    exc_info=True,
+                    if not save_success:
+                        logger.error(
+                            f"Failed to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
+                        )
+                except Exception as db_err:
+                    logger.error(
+                        f"DB error saving non-streaming assistant message for chat {chat_id} (SID: {sid}): {db_err}",
+                        exc_info=True,
+                    )
+            else:
+                logger.warning(
+                    f"No assistant content generated to save for non-streaming chat {chat_id} (SID: {sid})."
                 )
-        else:
-            logger.warning(
-                f"No assistant content generated to save for non-streaming chat {chat_id} (SID: {sid})."
-            )
 
         _cleanup_temp_files(
             temp_files_to_clean, f"non-streaming chat {chat_id} (SID: {sid})"
@@ -1187,15 +1196,25 @@ def _generate_chat_response_stream(
 
             # Construct conversation history. Append extra parts to the last user message if applicable.
             full_conversation = history
-            if current_turn_parts and full_conversation and full_conversation[-1].role == "user":
-                logger.debug(f"Appending {len(current_turn_parts)} extra parts to last user message for chat {chat_id} (SID: {sid}).")
+            if (
+                current_turn_parts
+                and full_conversation
+                and full_conversation[-1].role == "user"
+            ):
+                logger.debug(
+                    f"Appending {len(current_turn_parts)} extra parts to last user message for chat {chat_id} (SID: {sid})."
+                )
                 # Ensure parts is mutable list
                 if not isinstance(full_conversation[-1].parts, list):
                     full_conversation[-1].parts = list(full_conversation[-1].parts)
                 full_conversation[-1].parts.extend(current_turn_parts)
-            elif current_turn_parts: # Should not happen if user message was just saved, but handle defensively
-                 logger.warning(f"Current turn parts exist but last history item is not user for chat {chat_id} (SID: {sid}). Appending as new user turn.")
-                 full_conversation.append(Content(role="user", parts=current_turn_parts))
+            elif (
+                current_turn_parts
+            ):  # Should not happen if user message was just saved, but handle defensively
+                logger.warning(
+                    f"Current turn parts exist but last history item is not user for chat {chat_id} (SID: {sid}). Appending as new user turn."
+                )
+                full_conversation.append(Content(role="user", parts=current_turn_parts))
 
             # System prompt (currently unsupported by stream API, but keep for future)
             system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
@@ -1205,7 +1224,7 @@ def _generate_chat_response_stream(
             )
             response_iterator = client.models.generate_content_stream(
                 model=model_to_use,
-                contents=full_conversation, # Send the potentially modified history
+                contents=full_conversation,  # Send the potentially modified history
                 # system_instruction=system_prompt, # Still unsupported
             )
             logger.info(
@@ -1452,7 +1471,7 @@ def _prepare_chat_content(
     """
     logger.info(f"Preparing content for chat {chat_id} (SID: {sid})")
     history = []
-    current_turn_parts = [] # Parts for *additional* context (web, calendar, files)
+    current_turn_parts = []  # Parts for *additional* context (web, calendar, files)
     temp_files_to_clean = []
 
     def emit_prep_error(error_msg, is_cancel=False):
