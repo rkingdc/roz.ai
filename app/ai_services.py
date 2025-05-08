@@ -14,7 +14,7 @@ import tempfile
 import os
 import re
 import base64
-from . import database # Use alias to avoid conflict with db instance
+from . import database  # Use alias to avoid conflict with db instance
 from .plugins.web_search import perform_web_search  # Remove fetch_web_content import
 from google.api_core.exceptions import (
     GoogleAPIError,
@@ -268,7 +268,9 @@ def generate_summary(file_id):
 
     content_parts = []  # Renamed from 'parts' to avoid confusion with genai.types.Part
     temp_file_to_clean = None
-    prompt = f"Please provide a detailed summary of the attached file named '{filename}'."
+    prompt = (
+        f"Please provide a detailed summary of the attached file named '{filename}'."
+    )
     response = None  # Initialize response to None
 
     try:
@@ -727,7 +729,7 @@ def generate_chat_response(
     socketio=None,
     sid=None,
     is_cancelled_callback: Callable[[], bool] = lambda: False,
-    message_attachments_metadata=None, # Add new parameter for metadata
+    message_attachments_metadata=None,  # Add new parameter for metadata
 ):
     """
     Generates a chat response using the Gemini API via the client.
@@ -808,30 +810,55 @@ def generate_chat_response(
     # This happens *before* preparing content for the AI, using the metadata passed in.
     user_message_content_for_db = user_message
     if not user_message_content_for_db and message_attachments_metadata:
-        user_message_content_for_db = "[User sent attachments]" # Placeholder if only files sent
+        user_message_content_for_db = (
+            "[User sent attachments]"  # Placeholder if only files sent
+        )
 
-    if user_message_content_for_db: # Save if there's text OR attachments
-        logger.info(f"Attempting to save user message for chat {chat_id} (SID: {sid}) with attachments metadata.")
+    if user_message_content_for_db:  # Save if there's text OR attachments
+        logger.info(
+            f"Attempting to save user message for chat {chat_id} (SID: {sid}) with attachments metadata."
+        )
         try:
             save_success = database.add_message_to_db(
                 chat_id=chat_id,
                 role="user",
                 content=user_message_content_for_db,
                 # Pass the received metadata directly
-                attached_data_json=message_attachments_metadata if message_attachments_metadata else None
+                attached_data_json=(
+                    message_attachments_metadata
+                    if message_attachments_metadata
+                    else None
+                ),
             )
             if not save_success:
-                logger.error(f"Failed to save user message for chat {chat_id} (SID: {sid}) to database.")
+                logger.error(
+                    f"Failed to save user message for chat {chat_id} (SID: {sid}) to database."
+                )
                 # Decide if we should stop or continue if user message save fails
                 # For now, let's emit an error and stop.
-                socketio.emit("task_error", {"error": "[Error: Failed to save your message to the database]"}, room=sid)
+                socketio.emit(
+                    "task_error",
+                    {"error": "[Error: Failed to save your message to the database]"},
+                    room=sid,
+                )
                 return
             else:
-                 logger.info(f"Successfully saved user message for chat {chat_id} (SID: {sid}) with attachments metadata.")
+                logger.info(
+                    f"Successfully saved user message for chat {chat_id} (SID: {sid}) with attachments metadata."
+                )
         except Exception as db_err:
-            logger.error(f"Database error saving user message for chat {chat_id} (SID: {sid}): {db_err}", exc_info=True)
-            socketio.emit("task_error", {"error": f"[Error: Database error saving your message ({type(db_err).__name__})]"}, room=sid)
-            return # Stop if DB error saving user message
+            logger.error(
+                f"Database error saving user message for chat {chat_id} (SID: {sid}): {db_err}",
+                exc_info=True,
+            )
+            socketio.emit(
+                "task_error",
+                {
+                    "error": f"[Error: Database error saving your message ({type(db_err).__name__})]"
+                },
+                room=sid,
+            )
+            return  # Stop if DB error saving user message
 
     # --- Main Logic ---
     # This part needs to be structured differently depending on streaming
@@ -842,9 +869,9 @@ def generate_chat_response(
     preparation_result = _prepare_chat_content(
         client=client,
         chat_id=chat_id,
-        user_message=user_message, # Pass original user message for context prep
-        attached_files=attached_files, # Pass raw attached file refs
-        session_files=session_files, # Pass raw session file data
+        user_message=user_message,  # Pass original user message for context prep
+        attached_files=attached_files,  # Pass raw attached file refs
+        session_files=session_files,  # Pass raw session file data
         calendar_context=calendar_context,
         web_search_enabled=web_search_enabled,
         socketio=socketio,  # Pass socketio
@@ -905,7 +932,7 @@ def generate_chat_response(
             temp_files_to_clean=temp_files_to_clean,
             socketio=socketio,
             sid=sid,
-            is_cancelled_callback=is_cancelled_callback, # Pass callback here too
+            is_cancelled_callback=is_cancelled_callback,  # Pass callback here too
         )
 
 
@@ -943,7 +970,7 @@ def _generate_chat_response_non_stream(
         )
         # Save cancellation message and cleanup (handled in finally block)
         # No return here, let finally block handle saving and cleanup
-    else: # Only proceed if not cancelled before API call
+    else:  # Only proceed if not cancelled before API call
         try:
             # --- Call Gemini API (Non-Streaming) ---
             # Construct conversation history. Only add the final user Content if parts exist.
@@ -970,7 +997,9 @@ def _generate_chat_response_non_stream(
             )
 
             # --- Process Non-Streaming Response ---
-            logger.debug(f"Non-streaming raw response object (SID: {sid}): {response!r}")
+            logger.debug(
+                f"Non-streaming raw response object (SID: {sid}): {response!r}"
+            )
 
             # Check for safety issues first
             if response.prompt_feedback and response.prompt_feedback.block_reason:
@@ -979,7 +1008,9 @@ def _generate_chat_response_non_stream(
                     f"Non-streaming response blocked by safety settings for chat {chat_id} (SID: {sid}). Reason: {reason}"
                 )
                 assistant_response_content = f"[AI Safety Error: Request blocked due to safety settings (Reason: {reason})]"
-                socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
+                socketio.emit(
+                    "task_error", {"error": assistant_response_content}, room=sid
+                )
             # Check candidates and extract text
             elif (
                 response.candidates
@@ -1015,7 +1046,9 @@ def _generate_chat_response_non_stream(
                     f"Non-streaming response for chat {chat_id} (SID: {sid}) did not produce usable content. Response: {response!r}"
                 )
                 finish_reason = "UNKNOWN"
-                if response.candidates and hasattr(response.candidates[0], "finish_reason"):
+                if response.candidates and hasattr(
+                    response.candidates[0], "finish_reason"
+                ):
                     finish_reason = response.candidates[0].finish_reason.name
                 # Check prompt feedback again
                 if response.prompt_feedback and response.prompt_feedback.block_reason:
@@ -1023,7 +1056,9 @@ def _generate_chat_response_non_stream(
                     assistant_response_content = f"[AI Safety Error: Request blocked (Reason: {reason}, Finish Reason: {finish_reason})]"
                 else:
                     assistant_response_content = f"[AI Error: The AI did not return any content (Finish Reason: {finish_reason})]"
-                socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
+                socketio.emit(
+                    "task_error", {"error": assistant_response_content}, room=sid
+                )
 
         # --- Error Handling for Non-Streaming API Call ---
         except InvalidArgument as e:
@@ -1069,16 +1104,12 @@ def _generate_chat_response_non_stream(
             if "api key not valid" in err_str:
                 assistant_response_content = "[Error: Invalid Gemini API Key]"
             elif "permission denied" in err_str:
-                assistant_response_content = (
-                    f"[AI Error: Permission denied for model. Check API key permissions.]"
-                )
+                assistant_response_content = f"[AI Error: Permission denied for model. Check API key permissions.]"
             elif "resource has been exhausted" in err_str or "429" in str(e):
                 logger.warning(
                     f"Quota/Rate limit hit for non-streaming chat {chat_id} (SID: {sid})."
                 )
-                assistant_response_content = (
-                    "[AI Error: API quota or rate limit exceeded. Please try again later.]"
-                )
+                assistant_response_content = "[AI Error: API quota or rate limit exceeded. Please try again later.]"
             elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
                 logger.warning(
                     f"API error indicates safety block for non-streaming chat {chat_id} (SID: {sid}): {e}"
@@ -1102,16 +1133,21 @@ def _generate_chat_response_non_stream(
             assistant_response_content = f"[Unexpected AI Error: {type(e).__name__}]"
             socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
 
-    finally:
-        # --- Save Assistant Response to DB ---
-        if assistant_response_content:  # Ensure there's content (even error messages)
-            logger.info(
-                f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
-            )
+        finally:
+            # --- Save Assistant Response to DB ---
+            if (
+                assistant_response_content
+            ):  # Ensure there's content (even error messages)
+                logger.info(
+                    f"Attempting to save non-streaming assistant message for chat {chat_id} (SID: {sid})."
+                )
             try:
                 # Assistant messages don't have attached_data in this context
                 save_success = database.add_message_to_db(
-                    chat_id, "assistant", assistant_response_content, attached_data_json=None
+                    chat_id,
+                    "assistant",
+                    assistant_response_content,
+                    attached_data_json=None,
                 )
                 if not save_success:
                     logger.error(
@@ -1122,10 +1158,10 @@ def _generate_chat_response_non_stream(
                     f"DB error saving non-streaming assistant message for chat {chat_id} (SID: {sid}): {db_err}",
                     exc_info=True,
                 )
-        else:
-            logger.warning(
-                f"No assistant content generated to save for non-streaming chat {chat_id} (SID: {sid})."
-            )
+            else:
+                logger.warning(
+                    f"No assistant content generated to save for non-streaming chat {chat_id} (SID: {sid})."
+                )
 
         _cleanup_temp_files(
             temp_files_to_clean, f"non-streaming chat {chat_id} (SID: {sid})"
@@ -1158,7 +1194,7 @@ def _generate_chat_response_stream(
             socketio.emit("task_error", {"error": error_msg}, room=sid)
             emitted_error = True
 
-    cancelled_during_streaming = False # Initialize BEFORE the try block
+    cancelled_during_streaming = False  # Initialize BEFORE the try block
 
     try:
         # --- Cancellation Check ---
@@ -1178,7 +1214,7 @@ def _generate_chat_response_stream(
             )
             # Save cancellation message and cleanup (handled in finally block)
             # No return here, let finally block handle saving and cleanup
-        else: # Only proceed if not cancelled before API call
+        else:  # Only proceed if not cancelled before API call
             # --- Call Gemini API (Streaming) ---
             # Determine model (ensure 'models/' prefix) - Moved model determination here
             raw_model_name = current_app.config.get(
@@ -1489,33 +1525,45 @@ def _prepare_chat_content(
             msg_parts = []
             if msg.get("content"):
                 msg_parts.append(Part(text=msg["content"]))
-            
+
             # Add parts for attachments stored in the message's attached_data
             # This assumes attached_data stores a list of dicts like {filename, mimetype, file_id, type}
             # We only need filename and type for context here, not the full file content again.
-            db_attachments = msg.get("attachments", []) 
+            db_attachments = msg.get("attachments", [])
             if db_attachments:
                 attachment_texts = []
                 for att in db_attachments:
-                    att_type = att.get('type', 'file') # Default to 'file' if type missing
-                    att_name = att.get('filename', 'Unknown File')
-                    if att_type == 'session':
-                        attachment_texts.append(f"[User attached session file: {att_name}]")
-                    elif att_type == 'summary':
-                         attachment_texts.append(f"[User attached summary of file: {att_name}]")
-                    elif att_type == 'full':
-                         attachment_texts.append(f"[User attached full content of file: {att_name}]")
-                    else: # Handle 'file' type from potentially saved session files
-                         attachment_texts.append(f"[User attached file: {att_name}]")
+                    att_type = att.get(
+                        "type", "file"
+                    )  # Default to 'file' if type missing
+                    att_name = att.get("filename", "Unknown File")
+                    if att_type == "session":
+                        attachment_texts.append(
+                            f"[User attached session file: {att_name}]"
+                        )
+                    elif att_type == "summary":
+                        attachment_texts.append(
+                            f"[User attached summary of file: {att_name}]"
+                        )
+                    elif att_type == "full":
+                        attachment_texts.append(
+                            f"[User attached full content of file: {att_name}]"
+                        )
+                    else:  # Handle 'file' type from potentially saved session files
+                        attachment_texts.append(f"[User attached file: {att_name}]")
 
                 if attachment_texts:
-                     # Combine attachment info into one text part for history simplicity
-                     msg_parts.append(Part(text="\n".join(attachment_texts)))
+                    # Combine attachment info into one text part for history simplicity
+                    msg_parts.append(Part(text="\n".join(attachment_texts)))
 
-            if msg_parts: # Only add history turn if there are parts (text or attachment info)
+            if (
+                msg_parts
+            ):  # Only add history turn if there are parts (text or attachment info)
                 history.append(Content(role=role, parts=msg_parts))
             else:
-                 logger.warning(f"Skipping history message with no parts for chat {chat_id}: Role={role}")
+                logger.warning(
+                    f"Skipping history message with no parts for chat {chat_id}: Role={role}"
+                )
 
         logger.info(f"Prepared {len(history)} history turns for chat {chat_id}.")
 
@@ -1556,7 +1604,9 @@ def _prepare_chat_content(
             for file_detail in attached_files:
                 file_id = file_detail.get("id")
                 attachment_type = file_detail.get("type")
-                frontend_filename = file_detail.get("filename", f"File ID {file_id}") # Use filename from metadata if available
+                frontend_filename = file_detail.get(
+                    "filename", f"File ID {file_id}"
+                )  # Use filename from metadata if available
                 logger.debug(
                     f"Processing attached file reference: ID={file_id}, Type={attachment_type}, Name={frontend_filename}"
                 )
@@ -1592,33 +1642,35 @@ def _prepare_chat_content(
                             )
                         )
                         continue
-                    
+
                     # Check content specifically if 'full' type was requested
                     if include_content and not db_file_details.get("content"):
-                         logger.warning(
+                        logger.warning(
                             f"Could not get content for attached file_id {file_id} ('{frontend_filename}') requested as 'full' in chat {chat_id}."
                         )
-                         current_turn_parts.append(
+                        current_turn_parts.append(
                             Part(
                                 text=f"[System: Error retrieving content for attached file '{frontend_filename}']"
                             )
                         )
-                         continue
-
+                        continue
 
                     filename = db_file_details["filename"]
                     mimetype = db_file_details["mimetype"]
 
-
                     if attachment_type == "summary":
-                        summary = get_or_generate_summary(file_id) # This handles DB fetch or generation
+                        summary = get_or_generate_summary(
+                            file_id
+                        )  # This handles DB fetch or generation
                         current_turn_parts.append(
                             Part(
                                 text=f"--- Summary of file '{filename}' ---\n{summary}\n--- End of Summary ---"
                             )
                         )
                     elif attachment_type == "full":
-                        content_blob = db_file_details["content"] # Content was included
+                        content_blob = db_file_details[
+                            "content"
+                        ]  # Content was included
                         supported_mimetypes = (
                             "image/",
                             "audio/",
@@ -1940,7 +1992,9 @@ def _prepare_chat_content(
         # This ensures context items come before the actual user query text.
         if user_message:
             current_turn_parts.append(Part(text=user_message))
-        elif not current_turn_parts and not history: # Add placeholder only if absolutely nothing else exists for the turn
+        elif (
+            not current_turn_parts and not history
+        ):  # Add placeholder only if absolutely nothing else exists for the turn
             current_turn_parts.append(
                 Part(text="[User provided no text, only attachments or context.]")
             )
@@ -2065,7 +2119,7 @@ def clean_up_transcript(raw_transcript: str) -> str:
 
     # Determine model (use default or a specific one for cleaning if configured)
     raw_model_name = current_app.config.get(
-        "DEFAULT_MODEL", 
+        "DEFAULT_MODEL",
     )
     model_to_use = (
         f"models/{raw_model_name}"
