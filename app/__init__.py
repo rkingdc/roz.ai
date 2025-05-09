@@ -75,12 +75,13 @@ def create_app(test_config=None):
     # ai_services.configure_gemini(app) # Uncomment and adjust if needed
 
     # --- Register Blueprints ---
-    from .routes import main_routes, chat_routes, file_routes # Keep existing routes
+    from .routes import main_routes, chat_routes, file_routes, search_routes # Keep existing routes, add search_routes
     app.register_blueprint(main_routes.bp)
     app.register_blueprint(chat_routes.bp)
     app.register_blueprint(file_routes.bp)
+    app.register_blueprint(search_routes.bp) # Register the search blueprint
     # Note: Logging registration message moved below after all blueprints attempted
-    logger.info("Registered blueprints: main, chat_api, file_api")
+    logger.info("Registered blueprints: main, chat_api, file_api, search_api")
 
     # --- Register Calendar Blueprint ---
     try:
