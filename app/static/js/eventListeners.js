@@ -1121,6 +1121,28 @@ export function setupEventListeners() {
         state.setNoteSearchResults([]); // Clear search results in state
         state.setIsNoteSearchActive(false); // Hide search bar & restore notes list via state change
     });
+
+    // Listener for typing in the search input
+    if (elements.notesSearchInput) {
+        const debouncedSearch = debounce(async () => {
+            const query = elements.notesSearchInput.value.trim();
+            state.setNoteSearchQuery(query); // Update state with the current query
+
+            if (query) {
+                // Ensure search mode is active if there's a query
+                if (!state.isNoteSearchActive) {
+                    state.setIsNoteSearchActive(true);
+                }
+                await api.searchNotes(query); // Perform the search
+            } else {
+                // If query is empty, deactivate search mode and clear results
+                state.setNoteSearchResults([]);
+                state.setIsNoteSearchActive(false); // This will trigger UI to show normal notes list
+            }
+        }, 300); // Debounce for 300ms
+
+        elements.notesSearchInput.addEventListener('input', debouncedSearch);
+    }
     // -----------------------------
 }
 
