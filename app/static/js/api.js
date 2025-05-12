@@ -1351,3 +1351,40 @@ export async function loadInitialNotesData() {
         else await startNewNote();
     }
 }
+
+/**
+ * Searches notes via the backend API.
+ * @param {string} query - The search term.
+ */
+export async function searchNotes(query) {
+    if (state.isLoading) {
+        console.warn("API searchNotes: Search cancelled, application is busy.");
+        return;
+    }
+    if (!query || query.trim() === "") {
+        state.setNoteSearchResults([]); // Clear results if query is empty
+        // state.setIsNoteSearchActive(false); // Optionally deactivate search on empty query
+        return;
+    }
+
+    setLoading(true, `Searching notes for "${query}"...`);
+    state.setNoteSearchQuery(query); // Update query state
+
+    try {
+        const response = await fetch(`/api/search/notes?q=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
+            throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+        }
+        const results = await response.json();
+        state.setNoteSearchResults(results);
+        // state.setIsNoteSearchActive(true); // Ensure search mode is active
+        setStatus(`Found ${results.length} note(s).`);
+    } catch (error) {
+        console.error('Error searching notes:', error);
+        setStatus(`Error searching notes: ${error.message}`, true);
+        state.setNoteSearchResults([]); // Clear results on error
+    } finally {
+        setLoading(false);
+    }
+}
