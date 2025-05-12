@@ -1106,6 +1106,22 @@ export function setupEventListeners() {
         }, 300);
         elements.notesTextarea.addEventListener('input', debouncedTocUpdate);
     }
+
+    // --- Notes Search Listeners ---
+    elements.notesSearchIconBtn?.addEventListener('click', () => {
+        state.setIsNoteSearchActive(true); // Show the search bar via state change
+        // Focus is handled by the state change handler in ui.js (toggleNotesSearchBarUI)
+    });
+
+    elements.notesSearchClearBtn?.addEventListener('click', () => {
+        if (elements.notesSearchInput) {
+            elements.notesSearchInput.value = ''; // Clear the input field UI
+        }
+        state.setNoteSearchQuery(''); // Clear search query in state
+        state.setNoteSearchResults([]); // Clear search results in state
+        state.setIsNoteSearchActive(false); // Hide search bar & restore notes list via state change
+    });
+    // -----------------------------
 }
 
 function subscribeStateChangeListeners() {
@@ -1145,6 +1161,12 @@ function subscribeStateChangeListeners() {
     state.subscribe('currentViewingFileContent', ui.handleStateChange_currentViewingFileContent);
     state.subscribe('currentViewingFileMimetype', ui.handleStateChange_currentViewingFileMimetype);
     state.subscribe('currentViewingFileIsBase64', ui.handleStateChange_currentViewingFileIsBase64);
+
+    // --- Notes Search State Subscriptions ---
+    state.subscribe('isNoteSearchActive', ui.handleStateChange_isNoteSearchActive);
+    state.subscribe('noteSearchQuery', ui.handleStateChange_noteSearchQuery);
+    state.subscribe('noteSearchResults', ui.handleStateChange_noteSearchResults);
+    // ------------------------------------
 
 
     elements.chatbox?.addEventListener('click', (event) => {
