@@ -668,7 +668,7 @@ export function renderSavedNotes() {
     // If note search is active, this function should not clear and re-render the normal list.
     // The rendering of search results will be handled by a different function.
     if (state.isNoteSearchActive) {
-        console.log("[DEBUG] renderSavedNotes: Search is active, skipping normal render.");
+        console.log("[UI DEBUG] renderSavedNotes: Search is active, skipping normal render.");
         return;
     }
 
@@ -2196,22 +2196,22 @@ export function autoResizeTextarea(textareaElement) {
 export function toggleNotesSearchBarUI() {
     const { notesSearchBarContainer, notesSearchInput } = elements;
     if (!notesSearchBarContainer) {
-        console.warn("[UI DEBUG] Notes search bar container not found for UI toggle.");
+        console.warn("[UI DEBUG] Notes search bar container (#notes-search-bar-container) not found for UI toggle.");
         return;
     }
     const show = state.isNoteSearchActive; // Read from state
-    console.log(`[UI DEBUG] toggleNotesSearchBarUI called. Show: ${show}. Current classes: ${notesSearchBarContainer.className}`);
+    console.log(`[UI DEBUG] toggleNotesSearchBarUI called. Attempting to ${show ? 'show' : 'hide'} search bar. Element found: ${!!notesSearchBarContainer}. Current classes: ${notesSearchBarContainer.className}`);
 
     if (show) {
         notesSearchBarContainer.classList.remove('hidden');
-        console.log(`[UI DEBUG] notesSearchBarContainer 'hidden' class REMOVED. New classes: ${notesSearchBarContainer.className}`);
+        console.log(`[UI DEBUG] notesSearchBarContainer 'hidden' class REMOVED. New classes: ${notesSearchBarContainer.className}. Visible: ${!notesSearchBarContainer.classList.contains('hidden')}`);
         if (notesSearchInput) {
             notesSearchInput.focus();
             console.log("[UI DEBUG] Focused notesSearchInput.");
         }
     } else {
         notesSearchBarContainer.classList.add('hidden');
-        console.log(`[UI DEBUG] notesSearchBarContainer 'hidden' class ADDED. New classes: ${notesSearchBarContainer.className}`);
+        console.log(`[UI DEBUG] notesSearchBarContainer 'hidden' class ADDED. New classes: ${notesSearchBarContainer.className}. Visible: ${!notesSearchBarContainer.classList.contains('hidden')}`);
         if (notesSearchInput && document.activeElement === notesSearchInput) {
             notesSearchInput.blur();
             console.log("[UI DEBUG] Blurred notesSearchInput.");
@@ -2224,40 +2224,33 @@ export function handleStateChange_isNoteSearchActive() {
     console.log(`[UI DEBUG] handleStateChange_isNoteSearchActive called. New state: ${state.isNoteSearchActive}`);
     toggleNotesSearchBarUI(); // Update visibility based on state
     if (state.isNoteSearchActive) {
-        // When search becomes active, clear the normal notes list and prepare for search results
-        // (or render search results if they already exist)
-        console.log("[UI DEBUG] Note search is active. UI should show search results area.");
+        console.log("[UI DEBUG] Note search is active. UI should show search results area (or prepare for it).");
         if (elements.savedNotesList) {
             // Placeholder until renderNoteSearchResults is implemented
             // elements.savedNotesList.innerHTML = '<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Searching...</p>';
         }
     } else {
-        // When search becomes inactive, restore the normal notes list
         console.log("[UI DEBUG] Note search is inactive. UI should show normal notes list.");
         renderSavedNotes(); // Re-render the original list of notes
         if (elements.notesSearchInput) {
-            elements.notesSearchInput.value = ''; // Clear input field when search becomes inactive
-            console.log("[UI DEBUG] Cleared notesSearchInput value.");
+            elements.notesSearchInput.value = ''; 
+            console.log("[UI DEBUG] Cleared notesSearchInput value because search is now inactive.");
         }
     }
 }
 
 export function handleStateChange_noteSearchQuery() {
-    // This could update the input field if the query is set programmatically,
-    // but typically the input field drives this state.
     if (elements.notesSearchInput && elements.notesSearchInput.value !== state.noteSearchQuery) {
         elements.notesSearchInput.value = state.noteSearchQuery;
     }
-    console.log(`[UI DEBUG] Note search query updated to: "${state.noteSearchQuery}"`);
-    // Actual search triggering will happen in eventListeners.js based on input events.
+    console.log(`[UI DEBUG] Note search query state updated to: "${state.noteSearchQuery}"`);
 }
 
 export function handleStateChange_noteSearchResults() {
-    // This will be the primary trigger for rendering search results in Step 8.
-    console.log("[UI DEBUG] Note search results updated:", state.noteSearchResults);
+    console.log("[UI DEBUG] Note search results state updated:", state.noteSearchResults);
     if (state.isNoteSearchActive) {
-        // TODO: Call renderNoteSearchResults() here in a later step.
-        // For now, just log or update a placeholder.
+        // This is where renderNoteSearchResults() will be called in Step 8.
+        // For now, this log confirms the state update is received.
         if (elements.savedNotesList) {
             // Example placeholder:
             // elements.savedNotesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Found ${state.noteSearchResults.length} results. (Render pending)</p>`;
