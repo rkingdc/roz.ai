@@ -2196,22 +2196,32 @@ export function autoResizeTextarea(textareaElement) {
 export function toggleNotesSearchBarUI() {
     const { notesSearchBarContainer, notesSearchInput } = elements;
     if (!notesSearchBarContainer) {
-        console.warn("Notes search bar container not found for UI toggle.");
+        console.warn("[UI DEBUG] Notes search bar container not found for UI toggle.");
         return;
     }
     const show = state.isNoteSearchActive; // Read from state
-    notesSearchBarContainer.classList.toggle('hidden', !show);
+    console.log(`[UI DEBUG] toggleNotesSearchBarUI called. Show: ${show}. Current classes: ${notesSearchBarContainer.className}`);
 
-    if (show && notesSearchInput) {
-        notesSearchInput.focus();
-    } else if (!show && notesSearchInput && document.activeElement === notesSearchInput) {
-        // If hiding and the input still has focus, blur it
-        notesSearchInput.blur();
+    if (show) {
+        notesSearchBarContainer.classList.remove('hidden');
+        console.log(`[UI DEBUG] notesSearchBarContainer 'hidden' class REMOVED. New classes: ${notesSearchBarContainer.className}`);
+        if (notesSearchInput) {
+            notesSearchInput.focus();
+            console.log("[UI DEBUG] Focused notesSearchInput.");
+        }
+    } else {
+        notesSearchBarContainer.classList.add('hidden');
+        console.log(`[UI DEBUG] notesSearchBarContainer 'hidden' class ADDED. New classes: ${notesSearchBarContainer.className}`);
+        if (notesSearchInput && document.activeElement === notesSearchInput) {
+            notesSearchInput.blur();
+            console.log("[UI DEBUG] Blurred notesSearchInput.");
+        }
     }
 }
 
 // --- Notes Search State Handlers ---
 export function handleStateChange_isNoteSearchActive() {
+    console.log(`[UI DEBUG] handleStateChange_isNoteSearchActive called. New state: ${state.isNoteSearchActive}`);
     toggleNotesSearchBarUI(); // Update visibility based on state
     if (state.isNoteSearchActive) {
         // When search becomes active, clear the normal notes list and prepare for search results
@@ -2227,6 +2237,7 @@ export function handleStateChange_isNoteSearchActive() {
         renderSavedNotes(); // Re-render the original list of notes
         if (elements.notesSearchInput) {
             elements.notesSearchInput.value = ''; // Clear input field when search becomes inactive
+            console.log("[UI DEBUG] Cleared notesSearchInput value.");
         }
     }
 }

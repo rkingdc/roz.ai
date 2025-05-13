@@ -1108,40 +1108,57 @@ export function setupEventListeners() {
     }
 
     // --- Notes Search Listeners ---
-    elements.notesSearchIconBtn?.addEventListener('click', () => {
-        state.setIsNoteSearchActive(true); // Show the search bar via state change
-        // Focus is handled by the state change handler in ui.js (toggleNotesSearchBarUI)
-    });
+    if (elements.notesSearchIconBtn) {
+        elements.notesSearchIconBtn.addEventListener('click', () => {
+            console.log("[EVENT DEBUG] Notes search icon clicked."); // ADDED LOG
+            state.setIsNoteSearchActive(true); // Show the search bar via state change
+            // Focus is handled by the state change handler in ui.js (toggleNotesSearchBarUI)
+        });
+    } else {
+        console.warn("[EVENT DEBUG] notesSearchIconBtn not found during listener setup.");
+    }
 
-    elements.notesSearchClearBtn?.addEventListener('click', () => {
-        if (elements.notesSearchInput) {
-            elements.notesSearchInput.value = ''; // Clear the input field UI
-        }
-        state.setNoteSearchQuery(''); // Clear search query in state
-        state.setNoteSearchResults([]); // Clear search results in state
-        state.setIsNoteSearchActive(false); // Hide search bar & restore notes list via state change
-    });
+
+    if (elements.notesSearchClearBtn) {
+        elements.notesSearchClearBtn.addEventListener('click', () => {
+            console.log("[EVENT DEBUG] Notes search clear button clicked."); // ADDED LOG
+            if (elements.notesSearchInput) {
+                elements.notesSearchInput.value = ''; // Clear the input field UI
+            }
+            state.setNoteSearchQuery(''); // Clear search query in state
+            state.setNoteSearchResults([]); // Clear search results in state
+            state.setIsNoteSearchActive(false); // Hide search bar & restore notes list via state change
+        });
+    } else {
+        console.warn("[EVENT DEBUG] notesSearchClearBtn not found during listener setup.");
+    }
+
 
     // Listener for typing in the search input
     if (elements.notesSearchInput) {
         const debouncedSearch = debounce(async () => {
             const query = elements.notesSearchInput.value.trim();
+            console.log(`[EVENT DEBUG] Debounced search triggered. Query: "${query}"`); // ADDED LOG
             state.setNoteSearchQuery(query); // Update state with the current query
 
             if (query) {
                 // Ensure search mode is active if there's a query
                 if (!state.isNoteSearchActive) {
+                    console.log("[EVENT DEBUG] Query exists, ensuring search mode is active."); // ADDED LOG
                     state.setIsNoteSearchActive(true);
                 }
                 await api.searchNotes(query); // Perform the search
             } else {
                 // If query is empty, deactivate search mode and clear results
+                console.log("[EVENT DEBUG] Query is empty, deactivating search mode."); // ADDED LOG
                 state.setNoteSearchResults([]);
                 state.setIsNoteSearchActive(false); // This will trigger UI to show normal notes list
             }
         }, 300); // Debounce for 300ms
 
         elements.notesSearchInput.addEventListener('input', debouncedSearch);
+    } else {
+        console.warn("[EVENT DEBUG] notesSearchInput not found during listener setup.");
     }
     // -----------------------------
 }
