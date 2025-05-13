@@ -42,6 +42,12 @@ export const elements = {
     currentNoteNameInput: null,
     saveNoteNameButton: null, // Reference for the note name save button (matches HTML ID)
     currentNoteIdDisplay: null,
+    // --- Notes Search Elements ---
+    notesSearchIconBtn: null,
+    notesSearchBarContainer: null,
+    notesSearchInput: null,
+    notesSearchClearBtn: null,
+    // ---------------------------
 
     // Plugins Sidebar Elements
     pluginsSidebar: null,
@@ -254,6 +260,17 @@ export function populateElements() {
     elements.notesTocToggle = document.getElementById('notes-toc-toggle');
     elements.notesTocList = document.getElementById('notes-toc-list');
     elements.toastContainer = document.getElementById('toast-container'); // *** ADDED ***
+
+    // --- Populate Notes Search Elements ---
+    elements.notesSearchIconBtn = document.getElementById('notes-search-icon-btn');
+    console.log('[DOM DEBUG] notesSearchIconBtn:', elements.notesSearchIconBtn); // ADDED LOG
+    elements.notesSearchBarContainer = document.getElementById('notes-search-bar-container');
+    console.log('[DOM DEBUG] notesSearchBarContainer:', elements.notesSearchBarContainer); // ADDED LOG
+    elements.notesSearchInput = document.getElementById('notes-search-input');
+    console.log('[DOM DEBUG] notesSearchInput:', elements.notesSearchInput); // ADDED LOG
+    elements.notesSearchClearBtn = document.getElementById('notes-search-clear-btn');
+    console.log('[DOM DEBUG] notesSearchClearBtn:', elements.notesSearchClearBtn); // ADDED LOG
+    // ------------------------------------
 
 
     // Basic check
