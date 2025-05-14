@@ -203,11 +203,21 @@ function initializeListJsForTables(containerElement, baseId) {
         // 5. Initialize List.js for this table.
         if (valueNames.length > 0) {
             try {
-                new List(listJsContainerId, {
+                const listInstance = new List(listJsContainerId, {
                     valueNames: valueNames
-                    // item: '<tr>' // List.js usually infers this for <tr>s within a .list (tbody)
+                    // item: 'tr' // Optional: explicitly define the item tag name
                 });
-                console.log(`[UI.js List.js] Initialized for table ${tableIndex} in wrapper ${listJsContainerId}`);
+                console.log(`[UI.js List.js] Initialized for table ${tableIndex} in wrapper ${listJsContainerId}. List.js instance:`, listInstance);
+                if (listInstance.items && listInstance.items.length > 0) {
+                    console.log(`[UI.js List.js] Found ${listInstance.items.length} items (rows).`);
+                    // Log values of the first item for inspection
+                    console.log(`[UI.js List.js] Values for first item:`, listInstance.items[0].values());
+                    if (listInstance.items.length > 1) {
+                         console.log(`[UI.js List.js] Values for second item (if exists):`, listInstance.items[1].values());
+                    }
+                } else {
+                    console.warn(`[UI.js List.js] List.js initialized but found 0 items in ${listJsContainerId}. Check .list class on tbody and item structure.`);
+                }
             } catch (e) {
                 console.error(`[UI.js List.js] Error initializing for table ${tableIndex} in ${listJsContainerId}:`, e);
             }

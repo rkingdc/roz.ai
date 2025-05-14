@@ -1797,20 +1797,10 @@
 }
 
 /* Default state, no sort or neutral indicator (optional) */
-/* For example, a double arrow or just space */
-.sort:not(.asc):not(.desc)::after { /* MODIFIED: Uncommented and changed for debugging */
-    content: ' S '; /* Make it very obvious text */
-    opacity: 1 !important;
-    color: white !important; /* Ensure visibility */
-    background-color: red !important; /* Ensure visibility */
-    padding: 1px 3px !important;
-    font-size: 10px !important; /* Ensure it's not too big or small */
-    line-height: 1 !important;
-    /* Ensure it's not pushed out of view if th is small */
-    right: 2px !important; 
-    top: 50% !important;
-    transform: translateY(-50%) !important;
-    z-index: 100; /* Ensure it's on top */
+/* For example, a double arrow or just space. Can be empty if no default indicator is desired. */
+.sort:not(.asc):not(.desc)::after {
+    content: ''; /* Or '↕' for a neutral indicator, or remove if no default indicator */
+    /* opacity: 0.5; */ /* If using a neutral indicator */
 }
 
 .sort.asc::after {
