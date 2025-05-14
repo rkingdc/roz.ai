@@ -218,9 +218,15 @@ export function updateLoadingState() {
     if (elements.micButtonNotes) elements.micButtonNotes.disabled = isGloballyLoading;
     if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = isGloballyLoading;
     if (elements.longRecButtonNotes) elements.longRecButtonNotes.disabled = isGloballyLoading;
-    if (elements.notesSearchIconBtn) elements.notesSearchIconBtn.disabled = isGloballyLoading; // Disable search icon if loading
-    if (elements.notesSearchInput) elements.notesSearchInput.disabled = isGloballyLoading; // Disable search input if loading
-    if (elements.notesSearchClearBtn) elements.notesSearchClearBtn.disabled = isGloballyLoading; // Disable search clear if loading
+    
+    // Notes Search Elements - only disable if not in active search mode
+    if (elements.notesSearchIconBtn) elements.notesSearchIconBtn.disabled = isGloballyLoading;
+    if (elements.notesSearchInput && !state.isNoteSearchActive) { // Only disable if not actively searching
+        elements.notesSearchInput.disabled = isGloballyLoading;
+    } else if (elements.notesSearchInput && state.isNoteSearchActive) {
+        elements.notesSearchInput.disabled = false; // Ensure it's enabled if search is active
+    }
+    if (elements.notesSearchClearBtn) elements.notesSearchClearBtn.disabled = isGloballyLoading;
  
     document.querySelectorAll('.list-item').forEach(item => {
         if (isGloballyLoading) {
@@ -2224,11 +2230,8 @@ export function handleStateChange_isNoteSearchActive() {
     console.log(`[UI DEBUG] handleStateChange_isNoteSearchActive called. New state: ${state.isNoteSearchActive}`);
     toggleNotesSearchBarUI(); // Update visibility based on state
     if (state.isNoteSearchActive) {
-        console.log("[UI DEBUG] Note search is active. UI should show search results area (or prepare for it).");
-        if (elements.savedNotesList) {
-            // Placeholder until renderNoteSearchResults is implemented
-            // elements.savedNotesList.innerHTML = '<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Searching...</p>';
-        }
+        console.log("[UI DEBUG] Note search is active. Rendering search results or placeholder.");
+        renderNoteSearchResults(); // Render results or "type to search"
     } else {
         console.log("[UI DEBUG] Note search is inactive. UI should show normal notes list.");
         renderSavedNotes(); // Re-render the original list of notes
@@ -2244,17 +2247,91 @@ export function handleStateChange_noteSearchQuery() {
         elements.notesSearchInput.value = state.noteSearchQuery;
     }
     console.log(`[UI DEBUG] Note search query state updated to: "${state.noteSearchQuery}"`);
+    // If search is active and query changes, re-render (might show "no results" or new results)
+    if (state.isNoteSearchActive) {
+        renderNoteSearchResults();
+    }
 }
 
 export function handleStateChange_noteSearchResults() {
     console.log("[UI DEBUG] Note search results state updated:", state.noteSearchResults);
     if (state.isNoteSearchActive) {
-        // This is where renderNoteSearchResults() will be called in Step 8.
-        // For now, this log confirms the state update is received.
-        if (elements.savedNotesList) {
-            // Example placeholder:
-            // elements.savedNotesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Found ${state.noteSearchResults.length} results. (Render pending)</p>`;
-        }
+        renderNoteSearchResults(); // Render the new results
     }
 }
+
+/**
+ * Renders the note search results or appropriate messages in the savedNotesList element.
+ */
+export function renderNoteSearchResults() {
+    const { savedNotesList } = elements;
+    if (!savedNotesList) {
+        console.error("[UI DEBUG] savedNotesList element not found for rendering search results.");
+        return;
+    }
+
+    savedNotesList.innerHTML = ''; // Clear previous content (either normal notes or old search results)
+
+    if (!state.isNoteSearchActive) {
+        // This case should ideally be handled by handleStateChange_isNoteSearchActive calling renderSavedNotes
+        console.warn("[UI DEBUG] renderNoteSearchResults called but search is not active. Rendering normal notes list.");
+        renderSavedNotes();
+        return;
+    }
+
+    const results = state.noteSearchResults;
+    const query = state.noteSearchQuery;
+
+    if (query && results.length === 0) {
+        savedNotesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No results found for "${escapeHtml(query)}".</p>`;
+    } else if (results.length > 0) {
+        results.forEach(note => {
+            const item = document.createElement('div');
+            item.classList.add('note-search-result-item'); // Use class from style.css
+            item.dataset.noteId = note.id;
+
+            const nameDiv = document.createElement('div');
+            nameDiv.classList.add('name');
+            nameDiv.textContent = note.name || `Note ${note.id}`;
+            nameDiv.title = note.name || `Note ${note.id}`;
+
+            const dateDiv = document.createElement('div');
+            dateDiv.classList.add('date');
+            try {
+                const date = new Date(note.last_saved_at);
+                const now = new Date();
+                const yesterday = new Date(now);
+                yesterday.setDate(now.getDate() - 1);
+                if (date.toDateString() === now.toDateString()) {
+                    dateDiv.textContent = `Today, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+                } else if (date.toDateString() === yesterday.toDateString()) {
+                    dateDiv.textContent = `Yesterday, ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+                } else {
+                    dateDiv.textContent = date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+                }
+            } catch (e) {
+                dateDiv.textContent = 'Invalid Date';
+            }
+            
+
+            const snippetDiv = document.createElement('div');
+            snippetDiv.classList.add('snippet');
+            // The snippet from the backend already contains <b> tags for highlighting
+            snippetDiv.innerHTML = note.snippet || 'No snippet available.'; 
+
+            item.appendChild(nameDiv);
+            item.appendChild(dateDiv);
+            item.appendChild(snippetDiv);
+            savedNotesList.appendChild(item);
+        });
+    } else if (query) {
+        // This case is covered by the (query && results.length === 0) above, but as a fallback.
+        savedNotesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No results found.</p>`;
+    } else {
+        // No query yet, but search is active
+        savedNotesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Type to search notes...</p>`;
+    }
+    console.log(`[UI DEBUG] Rendered ${results.length} note search results for query "${query}".`);
+}
+
 // ---------------------------------
