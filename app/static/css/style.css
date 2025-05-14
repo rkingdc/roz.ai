@@ -1820,7 +1820,7 @@
 /* Styling for the List.js search input */
 .list-js-search {
     display: block; /* Make it a block element to take full width of its container */
-    width: calc(100% - 1rem); /* Adjust width to account for padding */
+    width: 60%; /* Make search bar take up 60% of its container's width */
     padding: 0.5rem;
     margin: 0.5rem 0.5rem 0.75rem 0.5rem; /* Add some margin around it */
     border: 1px solid var(--rz-input-border);
