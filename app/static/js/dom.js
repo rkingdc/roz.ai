@@ -49,6 +49,14 @@ export const elements = {
     notesSearchClearBtn: null,
     // ---------------------------
 
+    // --- Chat Search Elements (similar to notes) ---
+    chatSearchIconBtn: null,
+    chatSearchBarContainer: null,
+    chatSearchInput: null,
+    chatSearchClearBtn: null,
+    chatSearchResultsContainer: null,
+    // ---------------------------
+
     // Plugins Sidebar Elements
     pluginsSidebar: null,
     pluginsToggleTab: null, // Renamed from pluginsToggleButton
@@ -272,6 +280,14 @@ export function populateElements() {
     console.log('[DOM DEBUG] notesSearchClearBtn:', elements.notesSearchClearBtn); // ADDED LOG
     // ------------------------------------
 
+    // --- Populate Chat Search Elements ---
+    elements.chatSearchIconBtn = document.getElementById('chat-search-icon-btn');
+    console.log('[DOM DEBUG] chatSearchIconBtn:', elements.chatSearchIconBtn); // ADDED LOG
+    elements.chatSearchBarContainer = document.getElementById('chat-search-bar-container');
+    elements.chatSearchInput = document.getElementById('chat-search-input');
+    elements.chatSearchClearBtn = document.getElementById('chat-search-clear-btn');
+    elements.chatSearchResultsContainer = document.getElementById('chat-search-results-container');
+    // -----------------------------------
 
     // Basic check
     if (!elements.bodyElement || !elements.statusBar || !elements.chatbox) {
