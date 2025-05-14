@@ -1721,3 +1721,53 @@
     background-color: rgba(255, 250, 241, 0.2); /* Subtle white background on active */
 }
 /* --- End Notes Search UI Styles --- */
+
+/* --- Chat Search UI Styles --- */
+/* Basic styling for chat search results - adjust as needed */
+.chat-search-result-item {
+    /* Similar to .note-search-result-item or .list-item */
+    display: flex; /* Added to match .note-search-result-item */
+    flex-direction: column; /* Added to match .note-search-result-item */
+    padding: 0.5rem 0.6rem; /* Match .note-search-result-item */
+    border-bottom: 1px solid var(--rz-frame); /* Match .note-search-result-item */
+    cursor: pointer;
+    transition: background-color 0.2s;
+    color: var(--rz-sidebar-text); /* Match .note-search-result-item */
+}
+.chat-search-result-item:hover {
+    background-color: var(--rz-sidebar-hover-bg); /* Match .note-search-result-item */
+}
+.chat-search-result-item .font-semibold { /* Chat Name - specific to how it's rendered in ui.js */
+    font-weight: 500; /* Match .note-search-result-item .name */
+    font-size: 0.9rem; /* Match .note-search-result-item .name */
+    margin-bottom: 0.15rem; /* Match .note-search-result-item .name */
+    color: inherit; /* Match .note-search-result-item .name */
+    overflow: hidden; /* Match .note-search-result-item .name */
+    text-overflow: ellipsis; /* Match .note-search-result-item .name */
+    white-space: nowrap; /* Match .note-search-result-item .name */
+}
+.chat-search-result-item .text-xs { /* Snippet and Timestamp - specific to how it's rendered in ui.js */
+    font-size: 0.75rem; /* Match .note-search-result-item .snippet */
+    color: var(--rz-tab-background-text); /* Match .note-search-result-item .snippet */
+    line-height: 1.4; /* Match .note-search-result-item .snippet */
+}
+.chat-search-result-item .line-clamp-2 { /* For snippet */
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.chat-search-result-item .opacity-75 { /* For timestamp */
+    opacity: 0.75;
+}
+
+
+/* Styling for highlighted message */
+.highlight-message {
+    background-color: #fff3cd !important; /* A light yellow, !important to override other message styles */
+    border: 1px solid #ffeeba !important;
+    /* border-radius: 0.5rem; /* Match message bubble rounding - already on .message */
+    transition: background-color 0.5s ease-out, border-color 0.5s ease-out;
+}
+/* --- End Chat Search UI Styles --- */
