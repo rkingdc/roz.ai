@@ -1185,6 +1185,56 @@ export function setupEventListeners() {
         console.warn("[EVENT DEBUG] notesSearchInput not found during listener setup.");
     }
     // -----------------------------
+
+    // --- Chat Search Listeners ---
+    console.log("[EVENT DEBUG] Setting up Chat Search Listeners. chatSearchIconBtn element:", elements.chatSearchIconBtn); // ADDED LOG
+    if (elements.chatSearchIconBtn) {
+        elements.chatSearchIconBtn.addEventListener('click', () => {
+            console.log("[EVENT DEBUG] Chat search icon clicked.");
+            state.setIsChatSearchActive(true); // Activate search mode
+        });
+    } else {
+        console.warn("[EVENT DEBUG] chatSearchIconBtn not found during listener setup.");
+    }
+
+    if (elements.chatSearchClearBtn) {
+        elements.chatSearchClearBtn.addEventListener('click', () => {
+            console.log("[EVENT DEBUG] Chat search clear button clicked.");
+            if (elements.chatSearchInput) {
+                elements.chatSearchInput.value = '';
+            }
+            state.setChatSearchQuery('');
+            state.setChatSearchResults([]);
+            state.setIsChatSearchActive(false); // Deactivate search mode
+        });
+    } else {
+        console.warn("[EVENT DEBUG] chatSearchClearBtn not found during listener setup.");
+    }
+
+    if (elements.chatSearchInput) {
+        const debouncedChatSearch = debounce(async () => {
+            const query = elements.chatSearchInput.value.trim();
+            console.log(`[EVENT DEBUG] Debounced chat search triggered. Query: "${query}"`);
+            state.setChatSearchQuery(query);
+
+            if (query) {
+                if (!state.isChatSearchActive) {
+                    console.log("[EVENT DEBUG] Chat query exists, ensuring chat search mode is active.");
+                    state.setIsChatSearchActive(true);
+                }
+                await api.searchChatMessages(query);
+            } else {
+                console.log("[EVENT DEBUG] Chat query is empty, deactivating chat search mode.");
+                state.setChatSearchResults([]);
+                state.setIsChatSearchActive(false);
+            }
+        }, 300);
+
+        elements.chatSearchInput.addEventListener('input', debouncedChatSearch);
+    } else {
+        console.warn("[EVENT DEBUG] chatSearchInput not found during listener setup.");
+    }
+    // -----------------------------
 }
 
 function subscribeStateChangeListeners() {
@@ -1230,6 +1280,13 @@ function subscribeStateChangeListeners() {
     state.subscribe('noteSearchQuery', ui.handleStateChange_noteSearchQuery);
     state.subscribe('noteSearchResults', ui.handleStateChange_noteSearchResults);
     // ------------------------------------
+
+    // --- Chat Search State Subscriptions ---
+    state.subscribe('isChatSearchActive', ui.handleStateChange_isChatSearchActive);
+    state.subscribe('chatSearchQuery', ui.handleStateChange_chatSearchQuery);
+    state.subscribe('chatSearchResults', ui.handleStateChange_chatSearchResults);
+    state.subscribe('targetMessageIdToScroll', ui.handleStateChange_targetMessageIdToScroll);
+    // -----------------------------------
 
 
     elements.chatbox?.addEventListener('click', (event) => {
