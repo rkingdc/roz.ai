@@ -2259,6 +2259,166 @@ export function handleStateChange_noteSearchResults() {
     }
 }
 
+
+// --- Chat Search State Handlers ---
+export function handleStateChange_isChatSearchActive() {
+    console.log(`[UI DEBUG] handleStateChange_isChatSearchActive called. New state: ${state.isChatSearchActive}`);
+    toggleChatSearchBarUI(); // Update visibility based on state
+    if (state.isChatSearchActive) {
+        console.log("[UI DEBUG] Chat search is active. Rendering search results or placeholder.");
+        renderChatSearchResults(); 
+    } else {
+        console.log("[UI DEBUG] Chat search is inactive. UI should show normal chat list.");
+        renderSavedChats(); // Re-render the original list of chats
+        if (elements.chatSearchInput) {
+            elements.chatSearchInput.value = ''; 
+            console.log("[UI DEBUG] Cleared chatSearchInput value because search is now inactive.");
+        }
+    }
+}
+
+export function handleStateChange_chatSearchQuery() {
+    if (elements.chatSearchInput && elements.chatSearchInput.value !== state.chatSearchQuery) {
+        elements.chatSearchInput.value = state.chatSearchQuery;
+    }
+    console.log(`[UI DEBUG] Chat search query state updated to: "${state.chatSearchQuery}"`);
+    if (state.isChatSearchActive) {
+        renderChatSearchResults();
+    }
+}
+
+export function handleStateChange_chatSearchResults() {
+    console.log("[UI DEBUG] Chat search results state updated:", state.chatSearchResults);
+    if (state.isChatSearchActive) {
+        renderChatSearchResults(); 
+    }
+}
+
+export function handleStateChange_targetMessageIdToScroll() {
+    // This state change is primarily handled by renderChatHistory when a chat is loaded.
+    // No direct UI update here, but log for debugging.
+    if (state.targetMessageIdToScroll) {
+        console.log(`[UI DEBUG] Target message ID to scroll set to: ${state.targetMessageIdToScroll}. Scrolling will occur on next chat history render.`);
+    }
+}
+
+/**
+ * Shows or hides the chat search bar based on the state.isChatSearchActive.
+ */
+export function toggleChatSearchBarUI() {
+    const { chatSearchBarContainer, chatSearchInput, savedChatsList, chatSearchResultsContainer } = elements;
+    if (!chatSearchBarContainer) {
+        console.warn("[UI DEBUG] Chat search bar container (#chat-search-bar-container) not found for UI toggle.");
+        return;
+    }
+    const showSearch = state.isChatSearchActive;
+
+    if (showSearch) {
+        chatSearchBarContainer.classList.remove('hidden');
+        if (chatSearchInput) {
+            chatSearchInput.focus();
+        }
+        if (savedChatsList) savedChatsList.classList.add('hidden');
+        if (chatSearchResultsContainer) chatSearchResultsContainer.classList.remove('hidden');
+    } else {
+        chatSearchBarContainer.classList.add('hidden');
+        if (chatSearchInput && document.activeElement === chatSearchInput) {
+            chatSearchInput.blur();
+        }
+        if (savedChatsList) savedChatsList.classList.remove('hidden');
+        if (chatSearchResultsContainer) chatSearchResultsContainer.classList.add('hidden');
+    }
+}
+
+
+/**
+ * Renders the chat search results or appropriate messages in the chatSearchResultsContainer element.
+ */
+export function renderChatSearchResults() {
+    const { chatSearchResultsContainer, savedChatsList } = elements;
+    console.log(`[UI RENDER DEBUG] renderChatSearchResults called. isChatSearchActive: ${state.isChatSearchActive}, Query: "${state.chatSearchQuery}", Results length: ${state.chatSearchResults.length}`);
+
+    if (!chatSearchResultsContainer) {
+        console.error("[UI RENDER DEBUG] chatSearchResultsContainer element not found.");
+        return;
+    }
+
+    chatSearchResultsContainer.innerHTML = ''; 
+
+    if (!state.isChatSearchActive) {
+        console.warn("[UI RENDER DEBUG] renderChatSearchResults called but chat search is not active. Hiding results container.");
+        chatSearchResultsContainer.classList.add('hidden');
+        if (savedChatsList) savedChatsList.classList.remove('hidden');
+        return;
+    }
+    
+    chatSearchResultsContainer.classList.remove('hidden');
+    if (savedChatsList) savedChatsList.classList.add('hidden');
+
+    const results = state.chatSearchResults;
+    const query = state.chatSearchQuery;
+
+    if (query && results.length === 0) {
+        chatSearchResultsContainer.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No messages found for "${escapeHtml(query)}".</p>`;
+    } else if (results.length > 0) {
+        results.forEach(result => {
+            const item = document.createElement('div');
+            item.classList.add('list-item', 'chat-search-result-item'); // Use classes from style.css
+            item.dataset.chatId = result.chat_id;
+            item.dataset.messageId = result.id; 
+
+            const chatNameDiv = document.createElement('div');
+            chatNameDiv.classList.add('font-semibold'); // Style from style.css
+            chatNameDiv.textContent = result.chat_name || `Chat ${result.chat_id}`;
+            chatNameDiv.title = result.chat_name || `Chat ${result.chat_id}`;
+
+            const snippetDiv = document.createElement('div');
+            snippetDiv.classList.add('text-xs', 'line-clamp-2'); // Style from style.css
+            snippetDiv.innerHTML = result.snippet || 'No snippet available.'; 
+
+            const timestampDiv = document.createElement('div');
+            timestampDiv.classList.add('text-xs', 'opacity-75'); // Style from style.css
+            try {
+                timestampDiv.textContent = new Date(result.timestamp).toLocaleString();
+            } catch (e) {
+                timestampDiv.textContent = 'Invalid Date';
+            }
+
+            item.appendChild(chatNameDiv);
+            item.appendChild(snippetDiv);
+            item.appendChild(timestampDiv);
+
+            item.addEventListener('click', async () => {
+                const chatId = parseInt(item.dataset.chatId);
+                const messageId = parseInt(item.dataset.messageId);
+                
+                console.log(`[UI DEBUG] Chat search result clicked. ChatID: ${chatId}, MessageID: ${messageId}`);
+
+                const apiModule = await import('./api.js');
+                
+                state.setIsLoading(true, "Loading chat...");
+                state.setTargetMessageIdToScroll(messageId); 
+                state.setIsChatSearchActive(false); 
+
+                try {
+                    await apiModule.loadChat(chatId); 
+                } catch (error) {
+                    console.error(`Error loading chat ${chatId} from search result:`, error);
+                    state.setStatusMessage(`Error loading chat: ${error.message}`, true);
+                    state.setTargetMessageIdToScroll(null); 
+                } finally {
+                    state.setIsLoading(false);
+                }
+            });
+            chatSearchResultsContainer.appendChild(item);
+        });
+    } else if (query) {
+        chatSearchResultsContainer.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No messages found.</p>`;
+    } else {
+        chatSearchResultsContainer.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Type to search messages...</p>`;
+    }
+}
+
 /**
  * Renders the note search results or appropriate messages in the savedNotesList element.
  */
