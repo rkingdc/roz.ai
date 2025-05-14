@@ -9,7 +9,7 @@ PIP := $(VENV_DIR)/bin/pip3 # Changed to pip3
 RUN_FILE := run.py
 # SCHEMA_FILE := app/schema.sql # No longer needed, schema managed by migrations
 REQUIREMENTS_FILE := requirements.txt
-PROD_DB := assistant_chat_v8.db
+PROD_DB := assistant_chat_v10.db
 TEST_DIR := tests
 LINT_DIR := app tests
 # Use a timestamp for the release directory name

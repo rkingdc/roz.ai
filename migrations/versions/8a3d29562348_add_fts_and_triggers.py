@@ -23,6 +23,7 @@ def upgrade():
     op.execute("""
         CREATE VIRTUAL TABLE IF NOT EXISTS message_fts USING fts5(
             content,
+            tokenize=porter,
             content='messages',
             content_rowid='id'
         )
@@ -32,6 +33,7 @@ def upgrade():
     op.execute("""
         CREATE VIRTUAL TABLE IF NOT EXISTS note_fts USING fts5(
             content,
+    tokenize=porter,
             content='notes',
             content_rowid='id'
         )
@@ -41,6 +43,7 @@ def upgrade():
     op.execute("""
         CREATE VIRTUAL TABLE IF NOT EXISTS file_fts USING fts5(
             summary,
+    tokenize=porter,
             content='files',
             content_rowid='id'
         )
