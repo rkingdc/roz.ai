@@ -1,4 +1,5 @@
 // js/config.js
+import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js';
 
 // LocalStorage Keys
 export const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';

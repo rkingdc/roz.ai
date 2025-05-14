@@ -411,7 +411,7 @@ function addMessageToDom(messageObject) {
     } else {
          const messageContentDiv = document.createElement('div'); // Create a div for main content
          if (typeof marked !== 'undefined') {
-             let rawHtml = marked.parse(content || ''); // Ensure content is not null
+             let rawHtml = marked.parse(content || '', { renderer: markedRenderer, ...config.markedOptions }); // Ensure content is not null
              const tempContainer = document.createElement('div');
              tempContainer.innerHTML = rawHtml;
              const codeBlocks = tempContainer.querySelectorAll('pre > code.language-xml, pre > code.language-drawio');
@@ -1616,7 +1616,7 @@ export function updateNotesPreview() {
             _renderActiveH1SectionUI();
         } else {
             if (typeof marked !== 'undefined') {
-                const rawHtml = marked.parse(state.noteContent || '', { renderer: markedRenderer });
+                const rawHtml = marked.parse(state.noteContent || '', { renderer: markedRenderer, ...config.markedOptions });
                 notesPreview.innerHTML = rawHtml;
                 notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
                 waitForGraphViewerAndProcess();
@@ -1647,7 +1647,7 @@ function _renderActiveH1SectionUI() {
     contentContainer.innerHTML = '';
 
     if (typeof marked !== 'undefined') {
-        const rawHtml = marked.parse(section.rawMarkdownContent || '', { renderer: markedRenderer });
+        const rawHtml = marked.parse(section.rawMarkdownContent || '', { renderer: markedRenderer, ...config.markedOptions });
         const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
         contentContainer.appendChild(collapsibleFragment);
         waitForGraphViewerAndProcess();
