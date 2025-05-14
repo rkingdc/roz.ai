@@ -13,6 +13,7 @@ export let savedChats = [];
 export let chatHistory = [];
 export let currentChatName = '';
 export let currentChatModel = ''; // Default model or from config
+export let currentChatMode = 'chat'; // <<< ADDED: Default chat mode
 export let processingChatId = null; // ID of the chat currently being processed (e.g., for streaming response)
 export let isRecording = false;
 export let isSocketConnected = false; // Track WebSocket connection status
@@ -133,6 +134,7 @@ export function notifyAll() {
     notify('savedChats', savedChats);
     notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, history: chatHistory });
     notify('chatHistory', chatHistory);
+    notify('currentChatMode', currentChatMode); // <<< ADDED: Notify for currentChatMode
     notify('processingChatId', processingChatId);
     notify('isRecording', isRecording);
     notify('isSocketConnected', isSocketConnected);
@@ -355,6 +357,13 @@ export function setCurrentChatId(id) {
     if (currentChatId !== id) {
         currentChatId = id;
         notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, history: chatHistory });
+    }
+}
+
+export function setCurrentChatMode(mode) { // <<< ADDED FUNCTION
+    if (currentChatMode !== mode) {
+        currentChatMode = mode;
+        notify('currentChatMode', currentChatMode);
     }
 }
 
