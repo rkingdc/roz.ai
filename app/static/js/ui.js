@@ -203,11 +203,12 @@ function initializeListJsForTables(containerElement, baseId) {
         // 5. Initialize List.js for this table.
         if (valueNames.length > 0) {
             try {
-                const listInstance = new List(listJsContainerId, {
+                // Pass the wrapper DOM element directly instead of its ID
+                const listInstance = new List(wrapper, {
                     valueNames: valueNames
                     // item: 'tr' // Optional: explicitly define the item tag name
                 });
-                console.log(`[UI.js List.js] Initialized for table ${tableIndex} in wrapper ${listJsContainerId}. List.js instance:`, listInstance);
+                console.log(`[UI.js List.js] Initialized for table ${tableIndex} using wrapper element. List.js instance:`, listInstance);
                 if (listInstance.items && listInstance.items.length > 0) {
                     console.log(`[UI.js List.js] Found ${listInstance.items.length} items (rows).`);
                     // Log values of the first item for inspection
