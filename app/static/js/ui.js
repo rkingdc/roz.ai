@@ -219,12 +219,11 @@ export function updateLoadingState() {
     if (elements.cleanupTranscriptButtonNotes) elements.cleanupTranscriptButtonNotes.disabled = isGloballyLoading;
     if (elements.longRecButtonNotes) elements.longRecButtonNotes.disabled = isGloballyLoading;
     
-    // Notes Search Elements - only disable if not in active search mode
+    // Notes Search Elements
     if (elements.notesSearchIconBtn) elements.notesSearchIconBtn.disabled = isGloballyLoading;
-    if (elements.notesSearchInput && !state.isNoteSearchActive) { // Only disable if not actively searching
-        elements.notesSearchInput.disabled = isGloballyLoading;
-    } else if (elements.notesSearchInput && state.isNoteSearchActive) {
-        elements.notesSearchInput.disabled = false; // Ensure it's enabled if search is active
+    if (elements.notesSearchInput) {
+        // Keep search input enabled if search is active, otherwise disable based on global loading
+        elements.notesSearchInput.disabled = state.isNoteSearchActive ? false : isGloballyLoading;
     }
     if (elements.notesSearchClearBtn) elements.notesSearchClearBtn.disabled = isGloballyLoading;
  
@@ -2265,29 +2264,34 @@ export function handleStateChange_noteSearchResults() {
  */
 export function renderNoteSearchResults() {
     const { savedNotesList } = elements;
+    console.log(`[UI RENDER DEBUG] renderNoteSearchResults called. isNoteSearchActive: ${state.isNoteSearchActive}, Query: "${state.noteSearchQuery}", Results length: ${state.noteSearchResults.length}`);
+
     if (!savedNotesList) {
-        console.error("[UI DEBUG] savedNotesList element not found for rendering search results.");
+        console.error("[UI RENDER DEBUG] savedNotesList element not found for rendering search results.");
         return;
     }
 
-    savedNotesList.innerHTML = ''; // Clear previous content (either normal notes or old search results)
+    console.log("[UI RENDER DEBUG] Clearing savedNotesList.innerHTML");
+    savedNotesList.innerHTML = ''; 
 
     if (!state.isNoteSearchActive) {
-        // This case should ideally be handled by handleStateChange_isNoteSearchActive calling renderSavedNotes
-        console.warn("[UI DEBUG] renderNoteSearchResults called but search is not active. Rendering normal notes list.");
-        renderSavedNotes();
+        console.warn("[UI RENDER DEBUG] renderNoteSearchResults called but search is not active. Aborting render and calling renderSavedNotes.");
+        renderSavedNotes(); 
         return;
     }
 
     const results = state.noteSearchResults;
     const query = state.noteSearchQuery;
+    console.log(`[UI RENDER DEBUG] Processing query: "${query}", Results:`, JSON.parse(JSON.stringify(results)));
 
     if (query && results.length === 0) {
+        console.log(`[UI RENDER DEBUG] No results found for "${query}".`);
         savedNotesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No results found for "${escapeHtml(query)}".</p>`;
     } else if (results.length > 0) {
-        results.forEach(note => {
+        console.log(`[UI RENDER DEBUG] Rendering ${results.length} results.`);
+        results.forEach((note, index) => {
             const item = document.createElement('div');
-            item.classList.add('note-search-result-item'); // Use class from style.css
+            item.classList.add('note-search-result-item'); 
             item.dataset.noteId = note.id;
 
             const nameDiv = document.createElement('div');
@@ -2313,25 +2317,24 @@ export function renderNoteSearchResults() {
                 dateDiv.textContent = 'Invalid Date';
             }
             
-
             const snippetDiv = document.createElement('div');
             snippetDiv.classList.add('snippet');
-            // The snippet from the backend already contains <b> tags for highlighting
             snippetDiv.innerHTML = note.snippet || 'No snippet available.'; 
 
             item.appendChild(nameDiv);
             item.appendChild(dateDiv);
             item.appendChild(snippetDiv);
             savedNotesList.appendChild(item);
+            console.log(`[UI RENDER DEBUG] Appended result item ${index}: ${note.name}`);
         });
     } else if (query) {
-        // This case is covered by the (query && results.length === 0) above, but as a fallback.
+        console.log(`[UI RENDER DEBUG] Query exists but no results (fallback). Query: "${query}"`);
         savedNotesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No results found.</p>`;
     } else {
-        // No query yet, but search is active
+        console.log(`[UI RENDER DEBUG] No query, search active. Displaying "Type to search...".`);
         savedNotesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Type to search notes...</p>`;
     }
-    console.log(`[UI DEBUG] Rendered ${results.length} note search results for query "${query}".`);
+    console.log(`[UI RENDER DEBUG] Finished renderNoteSearchResults. savedNotesList.childElementCount: ${savedNotesList.childElementCount}`);
 }
 
 // ---------------------------------

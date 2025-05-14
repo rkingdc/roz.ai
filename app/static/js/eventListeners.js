@@ -133,7 +133,8 @@ export function setupEventListeners() {
                 currentId = state.currentNoteId;
                 idAttribute = 'noteId';
                 loadItemFunction = api.loadNote; // Use loadNote API function
-                itemClass = '.note-list-item';
+                // Check if search is active to navigate search results or normal notes
+                itemClass = state.isNoteSearchActive ? '.note-search-result-item' : '.note-list-item';
             } else {
                 // Not on a tab with a navigable list
                 return;
@@ -147,12 +148,21 @@ export function setupEventListeners() {
 
             // Get all list items
             items = Array.from(listElement.querySelectorAll(itemClass));
+            if (items.length === 0) { // No items of the specified class
+                console.log(`[DEBUG] Keyboard navigation: No items with class ${itemClass} found.`);
+                return;
+            }
+
 
             // If no item is currently selected, find the index of the first/last item
             let currentIndex = -1;
-            if (currentId !== null) {
+            if (currentId !== null && !state.isNoteSearchActive) { // Only use currentId if not in search mode for notes
                  currentIndex = items.findIndex(item => parseInt(item.dataset[idAttribute]) === currentId);
+            } else if (state.isNoteSearchActive) {
+                // For search results, we might need a different way to track active/selected item if any
+                // For now, assume no specific item is "active" in search results for keyboard nav start
             }
+
 
             let newIndex = currentIndex;
 
@@ -178,12 +188,12 @@ export function setupEventListeners() {
                 const newId = parseInt(newItem.dataset[idAttribute]);
 
                 // Load the new item using the API function
-                if (loadItemFunction) {
+                if (loadItemFunction && !isNaN(newId)) {
                     console.log(`[DEBUG] Keyboard navigation: Loading new ${idAttribute} ${newId}`);
                     loadItemFunction(newId); // Call the API function
                     // State update and UI rendering will happen via API's state changes
                 } else {
-                     console.error(`API function to load ${idAttribute} is not available.`);
+                     console.error(`API function to load ${idAttribute} is not available or ID is NaN.`);
                 }
             } else {
                 // Boundary reached (top or bottom) - do nothing
@@ -1008,23 +1018,40 @@ export function setupEventListeners() {
         if (event.target === elements.markdownTipsModal) ui.hideModal(elements.markdownTipsModal);
     });
 
+    // Delegated listener for saved notes list (normal notes and search results)
     elements.savedNotesList?.addEventListener('click', async (event) => {
-        const listItem = event.target.closest('.note-list-item');
+        const listItem = event.target.closest('.note-list-item, .note-search-result-item');
         if (!listItem) return;
+
         const noteId = parseInt(listItem.dataset.noteId);
-        if (isNaN(noteId) || noteId === state.currentNoteId) return;
-        await api.loadNote(noteId);
+        if (isNaN(noteId)) return;
+
+        // If it's a normal note item, check if it's already current
+        if (listItem.classList.contains('note-list-item') && noteId === state.currentNoteId && !state.isNoteSearchActive) {
+            return;
+        }
+        
+        // If it's a search result, load the note.
+        // The search results will remain visible until search is explicitly exited.
+        await api.loadNote(noteId); 
+        // If a search result was clicked, we might want to consider if search mode should automatically exit.
+        // For now, per plan, search results remain until 'x' is clicked.
     });
+
+    // Delegated listener for delete buttons in saved notes list (normal view only)
     elements.savedNotesList?.addEventListener('click', async (event) => {
-        const deleteButton = event.target.closest('.delete-btn');
+        const deleteButton = event.target.closest('.note-list-item .delete-btn'); // Only target delete buttons in normal list items
         if (!deleteButton) return;
-        event.stopPropagation();
+        event.stopPropagation(); 
+        
         const listItem = deleteButton.closest('.note-list-item');
         if (!listItem) return;
         const noteId = parseInt(listItem.dataset.noteId);
         if (isNaN(noteId)) return;
+        
         await api.handleDeleteNote(noteId);
     });
+
 
     elements.noteHistoryList?.addEventListener('click', async (event) => {
         const listItem = event.target.closest('.history-list-item');
@@ -1110,9 +1137,8 @@ export function setupEventListeners() {
     // --- Notes Search Listeners ---
     if (elements.notesSearchIconBtn) {
         elements.notesSearchIconBtn.addEventListener('click', () => {
-            console.log("[EVENT DEBUG] Notes search icon clicked."); // ADDED LOG
-            state.setIsNoteSearchActive(true); // Show the search bar via state change
-            // Focus is handled by the state change handler in ui.js (toggleNotesSearchBarUI)
+            console.log("[EVENT DEBUG] Notes search icon clicked."); 
+            state.setIsNoteSearchActive(true); 
         });
     } else {
         console.warn("[EVENT DEBUG] notesSearchIconBtn not found during listener setup.");
@@ -1121,13 +1147,13 @@ export function setupEventListeners() {
 
     if (elements.notesSearchClearBtn) {
         elements.notesSearchClearBtn.addEventListener('click', () => {
-            console.log("[EVENT DEBUG] Notes search clear button clicked."); // ADDED LOG
+            console.log("[EVENT DEBUG] Notes search clear button clicked."); 
             if (elements.notesSearchInput) {
-                elements.notesSearchInput.value = ''; // Clear the input field UI
+                elements.notesSearchInput.value = ''; 
             }
-            state.setNoteSearchQuery(''); // Clear search query in state
-            state.setNoteSearchResults([]); // Clear search results in state
-            state.setIsNoteSearchActive(false); // Hide search bar & restore notes list via state change
+            state.setNoteSearchQuery(''); 
+            state.setNoteSearchResults([]); 
+            state.setIsNoteSearchActive(false); 
         });
     } else {
         console.warn("[EVENT DEBUG] notesSearchClearBtn not found during listener setup.");
@@ -1138,23 +1164,21 @@ export function setupEventListeners() {
     if (elements.notesSearchInput) {
         const debouncedSearch = debounce(async () => {
             const query = elements.notesSearchInput.value.trim();
-            console.log(`[EVENT DEBUG] Debounced search triggered. Query: "${query}"`); // ADDED LOG
-            state.setNoteSearchQuery(query); // Update state with the current query
+            console.log(`[EVENT DEBUG] Debounced search triggered. Query: "${query}"`); 
+            state.setNoteSearchQuery(query); 
 
             if (query) {
-                // Ensure search mode is active if there's a query
                 if (!state.isNoteSearchActive) {
-                    console.log("[EVENT DEBUG] Query exists, ensuring search mode is active."); // ADDED LOG
+                    console.log("[EVENT DEBUG] Query exists, ensuring search mode is active."); 
                     state.setIsNoteSearchActive(true);
                 }
-                await api.searchNotes(query); // Perform the search
+                await api.searchNotes(query); 
             } else {
-                // If query is empty, deactivate search mode and clear results
-                console.log("[EVENT DEBUG] Query is empty, deactivating search mode."); // ADDED LOG
+                console.log("[EVENT DEBUG] Query is empty, deactivating search mode."); 
                 state.setNoteSearchResults([]);
-                state.setIsNoteSearchActive(false); // This will trigger UI to show normal notes list
+                state.setIsNoteSearchActive(false); 
             }
-        }, 300); // Debounce for 300ms
+        }, 300); 
 
         elements.notesSearchInput.addEventListener('input', debouncedSearch);
     } else {
