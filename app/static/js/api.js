@@ -31,11 +31,9 @@ let permanentListenersAttached = false; // Flag to ensure permanent listeners ar
 export function initializeWebSocketConnection() {
     // Only proceed if socket doesn't exist or is disconnected
     if (socket && socket.connected) {
-        console.log("[DEBUG] WebSocket connection already active.");
         return; // Already connected
     }
     if (socket && socket.connecting) {
-        console.log("[DEBUG] WebSocket connection attempt already in progress.");
         return; // Connection attempt in progress
     }
 
@@ -45,7 +43,6 @@ export function initializeWebSocketConnection() {
         return; // Cannot proceed
     }
 
-    console.log("[DEBUG] Initializing WebSocket connection...");
     setStatus("Connecting to server...");
     state.setIsSocketConnected(false); // Assume disconnected until 'connect' event
     permanentListenersAttached = false; // Reset listener flag for new connection attempt
@@ -86,8 +83,6 @@ function initializeSocketListeners() {
     if (!socket || permanentListenersAttached) {
         return; // Don't attach if no socket or already attached
     }
-
-    console.log("[DEBUG] Initializing permanent SocketIO listeners.");
 
     // --- Connection Handling ---
     socket.on('connect', () => {
@@ -161,7 +156,6 @@ function initializeSocketListeners() {
             setStatus("Received empty response.", true);
         }
         if (state.processingChatId !== null) {
-             console.log(`[DEBUG] chat_response received. Clearing processingChatId: ${state.processingChatId}`);
              state.setProcessingChatId(null);
         }
     });
@@ -170,7 +164,6 @@ function initializeSocketListeners() {
         if (data.chunk !== undefined) {
             const lastMessage = state.chatHistory.length > 0 ? state.chatHistory[state.chatHistory.length - 1] : null;
             if (!lastMessage || lastMessage.role === 'user' || (lastMessage.role === 'assistant' && lastMessage.isError)) { // Also add new if last was error
-                console.log("[DEBUG] stream_chunk: Adding initial assistant message placeholder.");
                 // If backend sends attachments with the first chunk (unlikely but possible)
                 state.addMessageToHistory({ role: 'assistant', content: data.chunk, attachments: data.attachments || [] });
             } else {
@@ -183,7 +176,6 @@ function initializeSocketListeners() {
         console.log("Received stream end signal:", data.message);
         setStatus("Assistant finished streaming.");
         if (state.processingChatId !== null) {
-             console.log(`[DEBUG] stream_end received. Clearing processingChatId: ${state.processingChatId}`);
              state.setProcessingChatId(null);
         }
         loadSavedChats();
@@ -202,7 +194,6 @@ function initializeSocketListeners() {
             setStatus("Received empty report.", true);
         }
         if (state.processingChatId !== null) {
-             console.log(`[DEBUG] deep_research_result received. Clearing processingChatId: ${state.processingChatId}`);
              state.setProcessingChatId(null);
         }
     });
@@ -213,7 +204,6 @@ function initializeSocketListeners() {
         state.addMessageToHistory({ role: 'assistant', content: errorMessage, isError: true, attachments: [] });
         setStatus("Error processing request.", true);
         if (state.processingChatId !== null) {
-             console.log(`[DEBUG] task_error received. Clearing processingChatId: ${state.processingChatId}`);
              state.setProcessingChatId(null);
         }
     });
@@ -255,7 +245,6 @@ function initializeSocketListeners() {
 }
 
 function handlePromptImproved({ original, improved }) {
-    console.log(`[DEBUG] Received prompt_improved. Original: "${original.substring(0, 50)}...", Improved: "${improved.substring(0, 50)}..."`);
     const currentHistory = state.chatHistory;
     let lastUserMessageIndex = -1;
     for (let i = currentHistory.length - 1; i >= 0; i--) {
@@ -267,7 +256,6 @@ function handlePromptImproved({ original, improved }) {
 
     if (lastUserMessageIndex !== -1) {
         if (currentHistory[lastUserMessageIndex].content === original) {
-            console.log(`[DEBUG] Found matching user message at index ${lastUserMessageIndex}. Updating content.`);
             const newHistory = currentHistory.map((message, index) => {
                 if (index === lastUserMessageIndex) {
                     return { ...message, content: improved, rawContent: improved }; // Update rawContent too
@@ -276,10 +264,10 @@ function handlePromptImproved({ original, improved }) {
             });
             state.setChatHistory(newHistory);
         } else {
-            console.warn(`[DEBUG] Found last user message at index ${lastUserMessageIndex}, but content did not match original prompt. Original in state: "${currentHistory[lastUserMessageIndex].content.substring(0, 50)}..."`);
+            console.warn(`Found last user message at index ${lastUserMessageIndex}, but content did not match original prompt. Original in state: "${currentHistory[lastUserMessageIndex].content.substring(0, 50)}..."`);
         }
     } else {
-        console.warn("[DEBUG] Could not find the last user message in history to update for 'prompt_improved'.");
+        console.warn("Could not find the last user message in history to update for 'prompt_improved'.");
     }
 }
 
@@ -329,12 +317,10 @@ export function connectTranscriptionSocket(languageCode = 'en-US', audioFormat =
         initializeWebSocketConnection();
 
         if (socket && socket.connected) {
-            console.log("[DEBUG] connectTranscriptionSocket: Socket already connected. Proceeding.");
             setStatus("Initializing transcription stream...");
             socket.once('transcription_started', handleStarted);
             socket.once('transcription_error', handleError);
             socket.once('disconnect', handleDisconnectError);
-            console.log("[DEBUG] Emitting start_transcription on existing socket.");
             socket.emit('start_transcription', { languageCode, audioFormat });
         } else {
             const errorMsg = socket ? "WebSocket is still connecting, please try again shortly." : "WebSocket connection failed to initialize.";
@@ -413,7 +399,6 @@ export function disconnectTranscriptionSocket() {
 
 export async function transcribeLongAudio(audioBlob, languageCode = 'en-US') {
     const transcribingToastId = showToast("Transcribing recorded audio...", { autoClose: false, type: 'info' });
-    console.log(`[DEBUG] transcribeLongAudio: Showing transcribing toast ID: ${transcribingToastId}`);
 
     const formData = new FormData();
     formData.append('audio_blob', audioBlob, `long_recording.${MIME_TYPE.split('/')[1].split(';')[0]}`);
@@ -425,7 +410,6 @@ export async function transcribeLongAudio(audioBlob, languageCode = 'en-US') {
             method: 'POST',
             body: formData,
         });
-        console.log(`[DEBUG] transcribeLongAudio: Removing transcribing toast ID: ${transcribingToastId}`);
         removeToast(transcribingToastId);
 
         if (!response.ok) {
@@ -839,7 +823,6 @@ export async function loadChat(chatId) {
             const lastCurrentMsg = currentHistory[currentHistory.length - 1];
             const lastFetchedMsg = fetchedHistory[fetchedHistory.length - 1];
             if (lastCurrentMsg.role === 'assistant' && lastFetchedMsg.role === 'assistant' && lastCurrentMsg.content === lastFetchedMsg.content) {
-                console.log(`[DEBUG] loadChat(${chatId}): Last message matches current state. Skipping history update to prevent duplication.`);
                 historyNeedsUpdate = false;
             }
         }
@@ -848,7 +831,6 @@ export async function loadChat(chatId) {
         state.setCurrentChatName(data.details.name || '');
         state.setCurrentChatModel(data.details.model_name || '');
         if (historyNeedsUpdate) {
-            console.log(`[DEBUG] loadChat(${chatId}): Updating chat history state.`);
             state.setChatHistory(fetchedHistory);
         }
         state.setCurrentChatMode('chat');
@@ -975,10 +957,7 @@ export function sendMessage() {
         improve_prompt: state.isImprovePromptEnabled,
     };
 
-    console.log(`[DEBUG] >>>>> Preparing to emit 'send_chat_message'. Socket state: connected=${socket?.connected}, id=${socket?.id}`);
-    console.log(`[DEBUG] Emitting 'send_chat_message' with payload:`, payload);
     socket.emit('send_chat_message', payload);
-    console.log(`[DEBUG] <<<<< Finished emitting 'send_chat_message'.`);
 
     // Clear all staged attachments from the input area state
     state.clearAllCurrentMessageAttachments();
@@ -997,7 +976,6 @@ export function cancelChatGeneration() {
         setStatus("Cannot cancel: Not connected to the server.", true);
         return;
     }
-    console.log(`[DEBUG] Emitting 'cancel_generation' for Chat ID: ${processingId}`);
     socket.emit('cancel_generation', { chat_id: processingId });
     setStatus("Requesting cancellation...");
 }
@@ -1110,7 +1088,6 @@ export async function loadSavedNotes() {
 }
 
 export async function startNewNote() {
-    console.log(`[DEBUG] startNewNote called.`);
     if (state.isLoading) return;
     setLoading(true, "Creating Note");
     state.setCurrentNoteId(null);
@@ -1121,11 +1098,9 @@ export async function startNewNote() {
         const response = await fetch('/api/notes', { method: 'POST' });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const newNote = await response.json();
-        console.log(`[DEBUG] startNewNote: Received new note ID ${newNote.id}. Loading it...`);
         await loadNote(newNote.id);
         await loadSavedNotes();
         setStatus(`New note created (ID: ${newNote.id}).`);
-        console.log(`[DEBUG] startNewNote: Successfully created and loaded note ${newNote.id}.`);
     } catch (error) {
         console.error('Error starting new note:', error);
         setStatus("Error creating new note.", true);
@@ -1135,7 +1110,6 @@ export async function startNewNote() {
 }
 
 export async function loadNote(noteId) {
-    console.log(`[DEBUG] loadNote(${noteId}) called.`);
     if (state.isLoading) return;
     setLoading(true, "Loading Note");
     state.setNoteContent('');
@@ -1387,7 +1361,6 @@ export async function searchNotes(query) {
         setLoading(false);
         // Re-focus the search input if search is still active
         if (state.isNoteSearchActive && elements.notesSearchInput) {
-            console.log("[API DEBUG] searchNotes finished, re-focusing notesSearchInput.");
             elements.notesSearchInput.focus();
         }
     }
@@ -1427,7 +1400,6 @@ export async function searchChatMessages(query) {
         setLoading(false);
         // Re-focus the search input if search is still active
         if (state.isChatSearchActive && elements.chatSearchInput) {
-            console.log("[API DEBUG] searchChatMessages finished, re-focusing chatSearchInput.");
             elements.chatSearchInput.focus();
         }
     }
