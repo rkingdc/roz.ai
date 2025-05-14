@@ -63,7 +63,25 @@
             </div>
             {# Added overflow-y-auto here - REMOVED below #}
             <div class="flex flex-col min-h-0 flex-grow sidebar-section-container">
-                <h3 class="text-lg font-medium mb-1 border-t border-rz-sidebar-border pt-3 flex-shrink-0 whitespace-nowrap">Saved Chats</h3>
+                <!-- START: Chat Search UI -->
+                <div class="flex items-center justify-between mb-1 border-t border-rz-sidebar-border pt-3 flex-shrink-0 whitespace-nowrap">
+                    <h3 class="text-lg font-medium">Saved Chats</h3>
+                    <button id="chat-search-icon-btn" class="p-1 text-rz-sidebar-text hover:text-white focus:outline-none" title="Search Messages">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                <div id="chat-search-bar-container" class="hidden mb-2 p-1 bg-rz-frame rounded border border-rz-sidebar-border">
+                    <div class="flex items-center gap-1">
+                        <input type="text" id="chat-search-input" class="chat-name-input flex-grow text-sm min-w-0" placeholder="Search messages...">
+                        <button id="chat-search-clear-btn" class="btn btn-icon p-1.5 text-rz-sidebar-text hover:text-white focus:outline-none" title="Clear Search">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <!-- END: Chat Search UI -->
+                <div id="chat-search-results-container" class="sidebar-list hidden">
+                    <!-- Chat search results will be populated here -->
+                </div>
                 <div id="saved-chats-list" class="sidebar-list">
                     <p class="text-rz-sidebar-text opacity-75 text-sm p-1">Loading chats...</p>
                 </div>
