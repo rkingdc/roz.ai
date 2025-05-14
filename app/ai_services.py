@@ -951,7 +951,15 @@ def _generate_chat_response_non_stream(
             logger.info(
                 f"Calling model.generate_content (non-streaming) for chat {chat_id} (SID: {sid})"
             )
-            system_prompt = f"""You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
+            system_prompt = f"""You are a helpful assistant. Please format your responses using Markdown.
+
+Prioritize using Markdown tables when presenting data, comparisons, or structured information that is well-suited for rows and columns.
+
+Use Markdown headings (starting with H2 for main sections, then H3, H4, etc., for sub-sections) to clearly structure and organize the content.
+
+Reserve bold text *only* for highlighting specific key terms, concepts, or important phrases *within* the text, not for section titles or organization.
+
+Your goal is to make the response clear, well-organized, and easy to read, leveraging Markdown elements effectively for structure and data presentation. """
             response = client.models.generate_content(
                 model=model_to_use,
                 contents=full_conversation,  # Send the potentially modified history
@@ -1217,7 +1225,15 @@ def _generate_chat_response_stream(
                 full_conversation.append(Content(role="user", parts=current_turn_parts))
 
             # System prompt (currently unsupported by stream API, but keep for future)
-            system_prompt = """You are a helpful assistant. Please format your responses using Markdown. Use headings (H1 to H6) to structure longer answers and use bold text selectively to highlight key information or terms. Your goal is to make the response clear and easy to read."""
+            system_prompt = """You are a helpful assistant. Please format your responses using Markdown.
+
+Prioritize using Markdown tables when presenting data, comparisons, or structured information that is well-suited for rows and columns.
+
+Use Markdown headings (starting with H2 for main sections, then H3, H4, etc., for sub-sections) to clearly structure and organize the content.
+
+Reserve bold text *only* for highlighting specific key terms, concepts, or important phrases *within* the text, not for section titles or organization.
+
+Your goal is to make the response clear, well-organized, and easy to read, leveraging Markdown elements effectively for structure and data presentation."""
 
             logger.info(
                 f"Calling model.generate_content_stream for chat {chat_id} (SID: {sid})"
