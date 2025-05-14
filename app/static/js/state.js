@@ -134,7 +134,7 @@ export function notifyAll() {
     notify('savedChats', savedChats);
     notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, history: chatHistory });
     notify('chatHistory', chatHistory);
-    notify('currentChatMode', currentChatMode); // <<< ADDED: Notify for currentChatMode
+    notify('currentChatMode', currentChatMode);
     notify('processingChatId', processingChatId);
     notify('isRecording', isRecording);
     notify('isSocketConnected', isSocketConnected);
@@ -332,6 +332,12 @@ export function removeUploadedFile(fileId) {
     }
 }
 
+export function setAttachedFiles(files) { // <<< NEW FUNCTION
+    // Ensure files is an array, default to empty array if not
+    attachedFiles = Array.isArray(files) ? files : [];
+    notify('attachedFiles', attachedFiles);
+}
+
 export function setCalendarContext(context) {
     if (calendarContext !== context) { // Basic check, might need deep comparison for objects
         calendarContext = context;
@@ -360,7 +366,7 @@ export function setCurrentChatId(id) {
     }
 }
 
-export function setCurrentChatMode(mode) { // <<< ADDED FUNCTION
+export function setCurrentChatMode(mode) {
     if (currentChatMode !== mode) {
         currentChatMode = mode;
         notify('currentChatMode', currentChatMode);
