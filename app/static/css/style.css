@@ -1798,10 +1798,20 @@
 
 /* Default state, no sort or neutral indicator (optional) */
 /* For example, a double arrow or just space */
-/* .sort:not(.asc):not(.desc)::after {
-    content: '↕';
-    opacity: 0.5;
-} */
+.sort:not(.asc):not(.desc)::after { /* MODIFIED: Uncommented and changed for debugging */
+    content: ' S '; /* Make it very obvious text */
+    opacity: 1 !important;
+    color: white !important; /* Ensure visibility */
+    background-color: red !important; /* Ensure visibility */
+    padding: 1px 3px !important;
+    font-size: 10px !important; /* Ensure it's not too big or small */
+    line-height: 1 !important;
+    /* Ensure it's not pushed out of view if th is small */
+    right: 2px !important; 
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    z-index: 100; /* Ensure it's on top */
+}
 
 .sort.asc::after {
     content: '▲'; /* Up arrow for ascending sort */
