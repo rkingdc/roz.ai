@@ -618,6 +618,34 @@ export function setNoteHistory(history) {
     notify('noteHistory', noteHistory);
 }
 
+// --- Chat Search Setters ---
+export function setChatSearchResults(results) {
+    chatSearchResults = Array.isArray(results) ? results : [];
+    notify('chatSearchResults', chatSearchResults);
+}
+
+export function setIsChatSearchActive(isActive) {
+    if (isChatSearchActive !== isActive) {
+        isChatSearchActive = isActive;
+        notify('isChatSearchActive', isChatSearchActive);
+    }
+}
+
+export function setChatSearchQuery(query) {
+    if (chatSearchQuery !== query) {
+        chatSearchQuery = query;
+        notify('chatSearchQuery', chatSearchQuery);
+    }
+}
+
+export function setTargetMessageIdToScroll(messageId) {
+    if (targetMessageIdToScroll !== messageId) {
+        targetMessageIdToScroll = messageId;
+        notify('targetMessageIdToScroll', targetMessageIdToScroll);
+    }
+}
+// --- End Chat Search Setters ---
+
 export function setIsNoteSearchActive(isActive) {
     if (isNoteSearchActive !== isActive) {
         isNoteSearchActive = isActive;
