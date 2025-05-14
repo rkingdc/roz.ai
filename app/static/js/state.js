@@ -25,6 +25,7 @@ export let isLongRecordingActive = false; // For non-streaming long recordings
 export let lastLongTranscript = null; // Stores the result of the last long recording
 export let recordingTimerInterval = null; // Timer for long recording duration
 export let longRecordingStartTime = null; // Start time for long recording
+export let longRecordingToastId = null; // ID of the persistent toast for long recording
 
 // Notes State
 export let savedNotes = [];
@@ -148,6 +149,7 @@ export function notifyAll() {
     notify('streamingTranscript', { finalized: finalizedTranscript, interim: currentInterimTranscript, context: recordingContext });
     notify('isLongRecordingActive', isLongRecordingActive);
     notify('lastLongTranscript', lastLongTranscript);
+    notify('longRecordingToastId', longRecordingToastId);
 
     notify('savedNotes', savedNotes);
     notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
@@ -596,6 +598,13 @@ export function setLastLongTranscript(transcript) {
     if (lastLongTranscript !== transcript) {
         lastLongTranscript = transcript;
         notify('lastLongTranscript', lastLongTranscript);
+    }
+}
+
+export function setLongRecordingToastId(toastId) { // <<< NEW FUNCTION
+    if (longRecordingToastId !== toastId) {
+        longRecordingToastId = toastId;
+        notify('longRecordingToastId', longRecordingToastId);
     }
 }
 
