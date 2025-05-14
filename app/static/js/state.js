@@ -13,7 +13,7 @@ export let savedChats = [];
 export let chatHistory = [];
 export let currentChatName = '';
 export let currentChatModel = ''; // Default model or from config
-export let currentChatMode = 'chat'; // <<< ADDED: Default chat mode
+export let currentChatMode = 'chat';
 export let processingChatId = null; // ID of the chat currently being processed (e.g., for streaming response)
 export let isRecording = false;
 export let isSocketConnected = false; // Track WebSocket connection status
@@ -183,7 +183,7 @@ export function notifyAll() {
 }
 
 
-// --- Setter Functions (Alphabetical Order) ---
+// --- Setter Functions (Alphabetical Order, with new additions at the end or in logical groups) ---
 
 export function addAttachedFile(file) {
     // Ensure file is not already attached (check by id and type)
@@ -195,14 +195,12 @@ export function addAttachedFile(file) {
 }
 
 export function addSavedChat(chat) {
-    // Check if chat already exists to prevent duplicates if API call is repeated
     const index = savedChats.findIndex(c => c.id === chat.id);
     if (index === -1) {
         savedChats.push(chat);
     } else {
-        savedChats[index] = chat; // Update if exists
+        savedChats[index] = chat;
     }
-    // Sort by last_updated_at descending after adding/updating
     savedChats.sort((a, b) => new Date(b.last_updated_at) - new Date(a.last_updated_at));
     notify('savedChats', savedChats);
 }
@@ -212,14 +210,13 @@ export function addSavedNote(note) {
     if (index === -1) {
         savedNotes.push(note);
     } else {
-        savedNotes[index] = note; // Update if exists
+        savedNotes[index] = note;
     }
     savedNotes.sort((a, b) => new Date(b.last_saved_at) - new Date(a.last_saved_at));
     notify('savedNotes', savedNotes);
 }
 
 export function addMessageToHistory(message) {
-    // Ensure message has role and content
     if (!message || typeof message.role === 'undefined' || typeof message.content === 'undefined') {
         console.error("Attempted to add invalid message to history:", message);
         return;
@@ -240,16 +237,55 @@ export function addUploadedFile(file) {
     if (index === -1) {
         uploadedFiles.push(file);
     } else {
-        uploadedFiles[index] = file; // Update if exists
+        uploadedFiles[index] = file;
     }
-    // Sort by uploaded_at descending
     uploadedFiles.sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at));
     notify('uploadedFiles', uploadedFiles);
 }
 
-export function clearAttachedFiles() {
+export function appendContentToLastMessage(chunk) { // <<< NEW FUNCTION
+    if (chatHistory.length > 0) {
+        const lastMessage = chatHistory[chatHistory.length - 1];
+        if (lastMessage.role === 'assistant' && !lastMessage.isError) {
+            lastMessage.content += chunk;
+            notify('chatHistory', chatHistory);
+        } else {
+            console.warn("appendContentToLastMessage: Last message not suitable for appending or is an error message.", lastMessage);
+            // Potentially, one could add a new assistant message here if the last one isn't suitable,
+            // but the calling logic in api.js already handles creating a new message if needed.
+        }
+    }
+}
+
+export function appendFinalizedTranscript(segment) { // <<< NEW FUNCTION
+    if (segment) {
+        finalizedTranscript += (finalizedTranscript ? " " : "") + segment;
+        streamingTranscript = finalizedTranscript ? `${finalizedTranscript} ${currentInterimTranscript}`.trim() : currentInterimTranscript;
+        notify('streamingTranscript', { finalized: finalizedTranscript, interim: currentInterimTranscript, context: recordingContext });
+    }
+}
+
+export function clearAllCurrentMessageAttachments() { // <<< NEW FUNCTION
+    let notifiedAttached = false;
+    let notifiedSession = false;
+
     if (attachedFiles.length > 0) {
         attachedFiles.length = 0; // Modifies in place
+        notify('attachedFiles', attachedFiles);
+        notifiedAttached = true;
+    }
+    if (sessionFile !== null) {
+        sessionFile = null;
+        notify('sessionFile', sessionFile);
+        notifiedSession = true;
+    }
+    // If neither was changed, no need to log anything specific.
+    // Individual notifications are sufficient.
+}
+
+export function clearAttachedFiles() {
+    if (attachedFiles.length > 0) {
+        attachedFiles.length = 0;
         notify('attachedFiles', attachedFiles);
     }
 }
@@ -270,7 +306,6 @@ export function clearCurrentViewingFile() {
     if (currentViewingFileIsBase64 !== false) { currentViewingFileIsBase64 = false; changed = true; }
 
     if (changed) {
-        // Notify individual properties if needed, or a general 'currentViewingFileCleared' event
         notify('currentViewingFileId', currentViewingFileId);
         notify('currentViewingFilename', currentViewingFilename);
         notify('currentViewingFileContent', currentViewingFileContent);
@@ -332,14 +367,13 @@ export function removeUploadedFile(fileId) {
     }
 }
 
-export function setAttachedFiles(files) { // <<< NEW FUNCTION
-    // Ensure files is an array, default to empty array if not
+export function setAttachedFiles(files) {
     attachedFiles = Array.isArray(files) ? files : [];
     notify('attachedFiles', attachedFiles);
 }
 
 export function setCalendarContext(context) {
-    if (calendarContext !== context) { // Basic check, might need deep comparison for objects
+    if (calendarContext !== context) {
         calendarContext = context;
         notify('calendarContext', calendarContext);
     }
@@ -353,8 +387,6 @@ export function setCalendarContextActive(active) {
 }
 
 export function setChatHistory(history) {
-    // Potentially do a deep compare if just assigning the array reference
-    // For now, assume it's a new array or significantly different
     chatHistory = history;
     notify('chatHistory', chatHistory);
 }
@@ -383,7 +415,7 @@ export function setCurrentChatModel(model) {
 export function setCurrentChatName(name) {
     if (currentChatName !== name) {
         currentChatName = name;
-        notify('currentChatName', currentChatName); // Specific notification for just the name
+        notify('currentChatName', currentChatName);
         notify('currentChat', { id: currentChatId, name: currentChatName, model: currentChatModel, history: chatHistory });
     }
 }
@@ -398,7 +430,7 @@ export function setCurrentEditingFileId(id) {
 export function setCurrentInterimTranscript(transcript) {
     if (currentInterimTranscript !== transcript) {
         currentInterimTranscript = transcript;
-        streamingTranscript = finalizedTranscript ? `${finalizedTranscript} ${currentInterimTranscript}` : currentInterimTranscript;
+        streamingTranscript = finalizedTranscript ? `${finalizedTranscript} ${currentInterimTranscript}`.trim() : currentInterimTranscript;
         notify('streamingTranscript', { finalized: finalizedTranscript, interim: currentInterimTranscript, context: recordingContext });
     }
 }
@@ -427,7 +459,7 @@ export function setCurrentNoteMode(mode) {
 export function setCurrentNoteName(name) {
     if (currentNoteName !== name) {
         currentNoteName = name;
-        notify('currentNoteName', currentNoteName); // Specific notification for just the name
+        notify('currentNoteName', currentNoteName);
         notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
     }
 }
@@ -448,7 +480,6 @@ export function setCurrentViewingFile(id, filename, content, mimetype, isBase64)
     if (currentViewingFileIsBase64 !== isBase64) { currentViewingFileIsBase64 = isBase64; changed = true; }
 
     if (changed) {
-        // Notify individual properties as UI components might listen to specific ones
         notify('currentViewingFileId', currentViewingFileId);
         notify('currentViewingFilename', currentViewingFilename);
         notify('currentViewingFileContent', currentViewingFileContent);
@@ -467,7 +498,7 @@ export function setDeepResearchEnabled(enabled) {
 export function setFinalizedTranscript(transcript) {
     if (finalizedTranscript !== transcript) {
         finalizedTranscript = transcript;
-        streamingTranscript = finalizedTranscript ? `${finalizedTranscript} ${currentInterimTranscript}` : currentInterimTranscript;
+        streamingTranscript = finalizedTranscript ? `${finalizedTranscript} ${currentInterimTranscript}`.trim() : currentInterimTranscript;
         notify('streamingTranscript', { finalized: finalizedTranscript, interim: currentInterimTranscript, context: recordingContext });
     }
 }
@@ -491,10 +522,10 @@ export function setIsLoading(loading, message = null) {
         isLoading = loading;
         notify('isLoading', isLoading);
     }
-    if (message) { // Optionally update status message when setting loading state
-        setStatusMessage(message, isErrorStatus); // Keep current error status unless specified
-    } else if (!loading && statusMessage.startsWith("Loading")) { // If loading finished and status was "Loading..."
-        setStatusMessage("Idle"); // Reset to Idle
+    if (message) {
+        setStatusMessage(message, isErrorStatus);
+    } else if (!loading && statusMessage.startsWith("Loading")) {
+        setStatusMessage("Idle");
     }
 }
 
@@ -557,14 +588,13 @@ export function setLastLongTranscript(transcript) {
 export function setLongRecordingStartTime(time) {
     if (longRecordingStartTime !== time) {
         longRecordingStartTime = time;
-        // No direct notification for this, it's used internally for the timer
     }
 }
 
 export function setNoteContent(content) {
     if (noteContent !== content) {
         noteContent = content;
-        notify('noteContent', noteContent); // Specific notification for just the content
+        notify('noteContent', noteContent);
         notify('currentNote', { id: currentNoteId, name: currentNoteName, content: noteContent });
     }
 }
@@ -574,7 +604,6 @@ export function setNoteHistory(history) {
     notify('noteHistory', noteHistory);
 }
 
-// --- Notes Search Setters ---
 export function setIsNoteSearchActive(isActive) {
     if (isNoteSearchActive !== isActive) {
         isNoteSearchActive = isActive;
@@ -590,11 +619,9 @@ export function setNoteSearchQuery(query) {
 }
 
 export function setNoteSearchResults(results) {
-    // For arrays, ensure it's a new reference or perform a deep comparison if necessary
     noteSearchResults = results;
     notify('noteSearchResults', noteSearchResults);
 }
-// --------------------------
 
 export function setProcessingChatId(id) {
     if (processingChatId !== id) {
@@ -603,23 +630,20 @@ export function setProcessingChatId(id) {
     }
 }
 
-export function setRecordingContext(context) { // 'chat' or 'notes'
+export function setRecordingContext(context) {
     if (recordingContext !== context) {
         recordingContext = context;
-        // No direct notification for context, it's used by streamingTranscript
     }
 }
 
 export function setRecordingTimerInterval(intervalId) {
     if (recordingTimerInterval !== intervalId) {
         recordingTimerInterval = intervalId;
-        // No direct notification for this, it's an internal timer ID
     }
 }
 
 export function setSavedChats(chats) {
     savedChats = chats;
-    // Sort by last_updated_at descending
     savedChats.sort((a, b) => new Date(b.last_updated_at) - new Date(a.last_updated_at));
     notify('savedChats', savedChats);
 }
@@ -631,7 +655,7 @@ export function setSavedNotes(notes) {
 }
 
 export function setSessionFile(file) {
-    if (sessionFile !== file) { // This might need a deep compare if file objects are complex
+    if (sessionFile !== file) {
         sessionFile = file;
         notify('sessionFile', sessionFile);
     }
@@ -654,7 +678,6 @@ export function setSummaryContent(content) {
 
 export function setUploadedFiles(files) {
     uploadedFiles = files;
-    // Sort by uploaded_at descending
     uploadedFiles.sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at));
     notify('uploadedFiles', uploadedFiles);
 }
@@ -670,13 +693,10 @@ export function updateChatInSavedChats(chatId, updatedData) {
     const index = savedChats.findIndex(c => c.id === chatId);
     if (index !== -1) {
         savedChats[index] = { ...savedChats[index], ...updatedData };
-        // Re-sort if last_updated_at changed
         if (updatedData.last_updated_at) {
             savedChats.sort((a, b) => new Date(b.last_updated_at) - new Date(a.last_updated_at));
         }
         notify('savedChats', savedChats);
-
-        // If the updated chat is the current chat, also update currentChatName/Model if they changed
         if (currentChatId === chatId) {
             if (updatedData.name && currentChatName !== updatedData.name) {
                 setCurrentChatName(updatedData.name);
@@ -700,8 +720,6 @@ export function updateNoteInSavedNotes(noteId, updatedData) {
             if (updatedData.name && currentNoteName !== updatedData.name) {
                 setCurrentNoteName(updatedData.name);
             }
-            // If content is part of updatedData and it's the current note, update noteContent
-            // This is usually handled by a separate setNoteContent call after save
         }
     }
 }
@@ -710,7 +728,6 @@ export function updateUploadedFile(fileId, updatedData) {
     const index = uploadedFiles.findIndex(f => f.id === fileId);
     if (index !== -1) {
         uploadedFiles[index] = { ...uploadedFiles[index], ...updatedData };
-        // Re-sort if uploaded_at changed (though unlikely for an update)
         if (updatedData.uploaded_at) {
             uploadedFiles.sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at));
         }
@@ -721,10 +738,10 @@ export function updateUploadedFile(fileId, updatedData) {
 export function updateLastMessageInHistory(updatedContent, newAttachments = null) {
     if (chatHistory.length > 0) {
         const lastMessage = chatHistory[chatHistory.length - 1];
-        lastMessage.content = updatedContent; // Update content
-        if (newAttachments !== null) { // Optionally update attachments
+        lastMessage.content = updatedContent;
+        if (newAttachments !== null) {
             lastMessage.attachments = newAttachments;
         }
-        notify('chatHistory', chatHistory); // Notify that history has changed
+        notify('chatHistory', chatHistory);
     }
 }
