@@ -1357,13 +1357,13 @@ export async function loadInitialNotesData() {
  * @param {string} query - The search term.
  */
 export async function searchNotes(query) {
-    if (state.isLoading) {
-        console.warn("API searchNotes: Search cancelled, application is busy.");
+    if (state.isLoading && !state.isNoteSearchActive) { // Allow search even if globally loading, if it's a note search
+        console.warn("API searchNotes: Search cancelled, application is busy with non-search task.");
         return;
     }
     if (!query || query.trim() === "") {
         state.setNoteSearchResults([]); // Clear results if query is empty
-        // state.setIsNoteSearchActive(false); // Optionally deactivate search on empty query
+        // state.setIsNoteSearchActive(false); // Deactivating search on empty query is handled by eventListener
         return;
     }
 
@@ -1378,7 +1378,6 @@ export async function searchNotes(query) {
         }
         const results = await response.json();
         state.setNoteSearchResults(results);
-        // state.setIsNoteSearchActive(true); // Ensure search mode is active
         setStatus(`Found ${results.length} note(s).`);
     } catch (error) {
         console.error('Error searching notes:', error);
@@ -1386,5 +1385,10 @@ export async function searchNotes(query) {
         state.setNoteSearchResults([]); // Clear results on error
     } finally {
         setLoading(false);
+        // Re-focus the search input if search is still active
+        if (state.isNoteSearchActive && elements.notesSearchInput) {
+            console.log("[API DEBUG] searchNotes finished, re-focusing notesSearchInput.");
+            elements.notesSearchInput.focus();
+        }
     }
 }
