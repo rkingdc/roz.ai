@@ -1,5 +1,10 @@
 // js/ui.js
 
+// Assuming List.js is loaded globally, e.g., via a CDN.
+// If you are using ES modules for List.js, you might use:
+// import List from 'list.js';
+const List = window.List;
+
 // This module handles UI updates and interactions.
 // It reads from the state module and updates the DOM via the elements module.
 // It does NOT directly manipulate the DOM or call UI rendering functions.
@@ -118,6 +123,98 @@ function makeHeadingsCollapsible(htmlString) {
     });
 
     return resultFragment;
+}
+
+
+/**
+ * Finds all tables within a given container element and initializes List.js for them.
+ * Ensures that each table has a proper structure (thead, tbody) and prepares it
+ * by adding necessary classes and attributes for List.js.
+ * @param {HTMLElement} containerElement - The parent element containing the tables.
+ * @param {string} baseId - A base string to create unique IDs for List.js instances.
+ */
+function initializeListJsForTables(containerElement, baseId) {
+    if (!containerElement) {
+        console.warn(`[UI.js List.js] initializeListJsForTables called with null containerElement for baseId: ${baseId}`);
+        return;
+    }
+    if (typeof List === 'undefined') {
+        console.warn("[UI.js List.js] List.js library is not defined. Skipping table initialization.");
+        return;
+    }
+
+    const tables = containerElement.querySelectorAll('table');
+    if (tables.length === 0) {
+        return; // No tables to process
+    }
+
+    console.log(`[UI.js List.js] Found ${tables.length} table(s) to process in container for baseId: ${baseId}`);
+
+    tables.forEach((table, tableIndex) => {
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+
+        if (!thead || !tbody) {
+            console.warn(`[UI.js List.js] Table ${tableIndex} in ${baseId} lacks thead or tbody, skipping List.js initialization.`);
+            return;
+        }
+
+        // 1. Create a unique ID for the List.js container (wrapper div).
+        const listJsContainerId = `${baseId}-table-${tableIndex}-listjs`;
+
+        // 2. Create a new wrapper div for this table.
+        // This ensures a clean environment for each List.js instance, especially during re-renders.
+        const wrapper = document.createElement('div');
+        wrapper.id = listJsContainerId;
+        wrapper.classList.add('list-js-initialized-container'); // For styling or identification
+
+        // Replace the table with the wrapper, and move the table into the wrapper.
+        if (table.parentNode) {
+            table.parentNode.insertBefore(wrapper, table);
+        }
+        wrapper.appendChild(table); // table is now a child of wrapper
+
+        // 3. Prepare valueNames from header cells and add sort classes/attributes.
+        const headerCells = thead.querySelectorAll('th');
+        const valueNames = [];
+        headerCells.forEach((th, colIndex) => {
+            // Use a simple, predictable valueName based on column index.
+            const valueName = `col-${colIndex}`;
+            valueNames.push(valueName);
+
+            th.classList.add('sort'); // Class for List.js to identify sortable headers.
+            th.dataset.sort = valueName; // Links header to the data via valueName.
+            th.style.cursor = 'pointer'; // Visual cue for sortable header.
+
+            // Add corresponding class to each td in this column for all rows in tbody.
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(row => {
+                const cell = row.children[colIndex]; // Get td by index.
+                if (cell) {
+                    // List.js uses these classes on <td>s to find the content for sorting.
+                    cell.classList.add(valueName);
+                }
+            });
+        });
+
+        // 4. Add the 'list' class to tbody. List.js uses this to find the item rows (<tr>).
+        tbody.classList.add('list');
+
+        // 5. Initialize List.js for this table.
+        if (valueNames.length > 0) {
+            try {
+                new List(listJsContainerId, {
+                    valueNames: valueNames
+                    // item: '<tr>' // List.js usually infers this for <tr>s within a .list (tbody)
+                });
+                console.log(`[UI.js List.js] Initialized for table ${tableIndex} in wrapper ${listJsContainerId}`);
+            } catch (e) {
+                console.error(`[UI.js List.js] Error initializing for table ${tableIndex} in ${listJsContainerId}:`, e);
+            }
+        } else {
+            console.warn(`[UI.js List.js] No valueNames generated for table ${tableIndex} in ${listJsContainerId}. List.js not initialized.`);
+        }
+    });
 }
 
 
@@ -437,6 +534,11 @@ function addMessageToDom(messageObject) {
              rawHtml = tempContainer.innerHTML;
              const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
              messageContentDiv.appendChild(collapsibleFragment);
+
+             // Initialize List.js for any tables within the message content
+             const messageIdForTable = messageObject.id || `msg-${Date.now()}`;
+             initializeListJsForTables(messageContentDiv, `chat-${messageIdForTable}`);
+
              setTimeout(() => { waitForGraphViewerAndProcess(); }, 50);
          } else {
              messageContentDiv.textContent = content || ''; // Fallback, ensure content is not null
@@ -1613,12 +1715,23 @@ export function updateNotesPreview() {
             contentContainer.id = 'note-h1-content-container';
             contentContainer.className = 'note-h1-content prose prose-sm max-w-none';
             notesPreview.appendChild(contentContainer);
-            _renderActiveH1SectionUI();
+            _renderActiveH1SectionUI(); // This will call initializeListJsForTables internally for the H1 section
         } else {
+            // This is for when there are no H1 tabs, content directly in notesPreview
             if (typeof marked !== 'undefined') {
                 const rawHtml = marked.parse(state.noteContent || '', { renderer: markedRenderer, ...config.markedOptions });
-                notesPreview.innerHTML = rawHtml;
+                // notesPreview.innerHTML = rawHtml; // Original line
+                const tempDiv = document.createElement('div'); // Use a temporary div for processing
+                tempDiv.innerHTML = rawHtml;
+                // Assuming makeHeadingsCollapsible should also run here if headings are present without H1 tabs
+                const processedFragment = makeHeadingsCollapsible(tempDiv.innerHTML);
+                notesPreview.appendChild(processedFragment);
+
                 notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
+
+                // Call the helper function for tables in notesPreview
+                initializeListJsForTables(notesPreview, `note-${state.currentNoteId || 'current'}`);
+
                 waitForGraphViewerAndProcess();
                 generateAndRenderToc(state.noteContent || '');
             } else {
@@ -1650,6 +1763,11 @@ function _renderActiveH1SectionUI() {
         const rawHtml = marked.parse(section.rawMarkdownContent || '', { renderer: markedRenderer, ...config.markedOptions });
         const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
         contentContainer.appendChild(collapsibleFragment);
+
+        // Initialize List.js for tables within the active H1 section's content
+        const activeIndex = state.currentNoteActiveH1SectionIndex; // Get current index for unique ID
+        initializeListJsForTables(contentContainer, `note-${state.currentNoteId || 'current'}-h1section-${activeIndex}`);
+
         waitForGraphViewerAndProcess();
         generateAndRenderToc(section.rawMarkdownContent || '');
     } else {
