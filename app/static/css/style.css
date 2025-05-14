@@ -1762,6 +1762,12 @@
     opacity: 0.75;
 }
 
+.chat-search-result-item .line-clamp-2 b { /* Style for highlighted terms in chat search snippets */
+    font-weight: bold;
+    color: var(--rz-toolbar-text); /* Gold for highlighted terms */
+    background-color: rgba(176, 146, 87, 0.1); /* Very subtle gold background */
+}
+
 
 /* Styling for highlighted message */
 .highlight-message {
