@@ -67,6 +67,13 @@ export let noteSearchQuery = '';
 export let noteSearchResults = [];
 // --------------------------
 
+// --- Chat Search State ---
+export let chatSearchResults = [];
+export let isChatSearchActive = false;
+export let chatSearchQuery = '';
+export let targetMessageIdToScroll = null; // Stores message_id to scroll to
+// -------------------------
+
 
 // --- Internal State for Notifications ---
 const listeners = new Map();
@@ -177,6 +184,13 @@ export function notifyAll() {
     notify('isNoteSearchActive', isNoteSearchActive);
     notify('noteSearchQuery', noteSearchQuery);
     notify('noteSearchResults', noteSearchResults);
+    // ---------------------------------------
+
+    // --- Notify for new chat search states ---
+    notify('chatSearchResults', chatSearchResults);
+    notify('isChatSearchActive', isChatSearchActive);
+    notify('chatSearchQuery', chatSearchQuery);
+    notify('targetMessageIdToScroll', targetMessageIdToScroll);
     // ---------------------------------------
 
     notificationsEnabled = wasEnabled; // Restore original notification state
