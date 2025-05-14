@@ -1777,3 +1777,43 @@
     transition: background-color 0.5s ease-out, border-color 0.5s ease-out;
 }
 /* --- End Chat Search UI Styles --- */
+
+/* --- List.js Table Sorting Styles --- */
+.sort {
+    cursor: pointer;
+    padding-right: 20px !important; /* Make space for an arrow, !important if needed to override other th padding */
+    position: relative;
+}
+
+.sort::after {
+    content: ''; /* Default empty content */
+    position: absolute;
+    right: 5px; /* Position of the arrow */
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.8em; /* Size of the arrow character */
+    line-height: 1;
+    color: var(--rz-toolbar-text); /* Arrow color, matches theme */
+}
+
+/* Default state, no sort or neutral indicator (optional) */
+/* For example, a double arrow or just space */
+/* .sort:not(.asc):not(.desc)::after {
+    content: '↕';
+    opacity: 0.5;
+} */
+
+.sort.asc::after {
+    content: '▲'; /* Up arrow for ascending sort */
+}
+
+.sort.desc::after {
+    content: '▼'; /* Down arrow for descending sort */
+}
+
+/* Optional: Style for the wrapper List.js might use or you create */
+.list-js-initialized-container {
+    /* Add any specific styling if needed, e.g., margin or border */
+    /* margin-bottom: 1rem; */
+}
+/* --- End List.js Table Sorting Styles --- */
