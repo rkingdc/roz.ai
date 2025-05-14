@@ -172,7 +172,19 @@ function initializeListJsForTables(containerElement, baseId) {
         if (table.parentNode) {
             table.parentNode.insertBefore(wrapper, table);
         }
-        wrapper.appendChild(table); // table is now a child of wrapper
+        // wrapper.appendChild(table); // table is now a child of wrapper // MOVED: append table after search input
+
+        // Create and add a search input for this table
+        const searchInput = document.createElement('input');
+        searchInput.type = 'search';
+        searchInput.classList.add('list-js-search'); // Use a specific class for styling
+        searchInput.placeholder = 'Search this table...';
+        // Add the 'search' class that List.js looks for
+        searchInput.classList.add('search'); 
+        
+        wrapper.appendChild(searchInput); // Add search input before the table in the wrapper
+        wrapper.appendChild(table); // table is now a child of wrapper, after search input
+
 
         // 3. Prepare valueNames from header cells and add sort classes/attributes.
         const headerCells = thead.querySelectorAll('th');
