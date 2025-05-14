@@ -1392,3 +1392,43 @@ export async function searchNotes(query) {
         }
     }
 }
+
+/**
+ * Searches chat messages via the backend API.
+ * @param {string} query - The search term.
+ */
+export async function searchChatMessages(query) {
+    if (state.isLoading && !state.isChatSearchActive) { // Allow search even if globally loading, if it's a chat search
+        console.warn("API searchChatMessages: Search cancelled, application is busy with non-search task.");
+        return;
+    }
+    if (!query || query.trim() === "") {
+        state.setChatSearchResults([]); // Clear results if query is empty
+        return;
+    }
+
+    setLoading(true, `Searching messages for "${query}"...`);
+    state.setChatSearchQuery(query); // Update query state
+
+    try {
+        const response = await fetch(`/api/search/messages?q=${encodeURIComponent(query)}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
+            throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+        }
+        const results = await response.json();
+        state.setChatSearchResults(results);
+        setStatus(`Found ${results.length} message(s).`);
+    } catch (error) {
+        console.error('Error searching messages:', error);
+        setStatus(`Error searching messages: ${error.message}`, true);
+        state.setChatSearchResults([]); // Clear results on error
+    } finally {
+        setLoading(false);
+        // Re-focus the search input if search is still active
+        if (state.isChatSearchActive && elements.chatSearchInput) {
+            console.log("[API DEBUG] searchChatMessages finished, re-focusing chatSearchInput.");
+            elements.chatSearchInput.focus();
+        }
+    }
+}
