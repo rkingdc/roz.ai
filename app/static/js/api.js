@@ -436,7 +436,6 @@ export async function transcribeLongAudio(audioBlob, languageCode = 'en-US') {
     } catch (error) {
         console.error('Network or other error during long transcription:', error);
         if (transcribingToastId) {
-             console.log(`[DEBUG] transcribeLongAudio (catch): Removing transcribing toast ID: ${transcribingToastId}`);
              removeToast(transcribingToastId);
         }
         showToast(`Transcription Error: ${error.message}`, { type: 'error' });
