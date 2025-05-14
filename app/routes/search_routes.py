@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from app.database import search_notes # Assuming search_notes is the correct function name
+from app.database import search_notes, search_messages # Assuming search_notes is the correct function name
 
 # Define a Blueprint for search-related routes
 # We'll prefix routes from this blueprint with /api (similar to other API routes)
@@ -36,6 +36,32 @@ def handle_search_notes():
     except Exception as e:
         current_app.logger.error(f"Error during note search for term '{search_term}': {e}", exc_info=True)
         return jsonify({"error": "An error occurred while searching notes."}), 500
+
+
+@bp.route('/messages', methods=['GET'])
+def handle_search_messages():
+    """
+    Searches chat messages based on a query term.
+    Expects a 'q' query parameter.
+    Example: /api/search/messages?q=mysearchterm
+    """
+    search_term = request.args.get('q', None)
+
+    if not search_term or len(search_term.strip()) == 0:
+        return jsonify([]), 200
+
+    try:
+        # Assuming search_messages function takes the search term and optionally a limit.
+        results = search_messages(search_term=search_term)
+        
+        # The search_messages function is expected to return a list of dictionaries.
+        # Each dictionary should contain at least 'id' (message_id), 'chat_id', 'chat_name', 'snippet', 'timestamp'.
+        # Example: [{'id': 1, 'chat_id': 1, 'chat_name': 'My Chat', 'snippet': '...found term...', 'timestamp': '2023-01-01T10:00:00Z'}]
+        
+        return jsonify(results), 200
+    except Exception as e:
+        current_app.logger.error(f"Error during message search for term '{search_term}': {e}", exc_info=True)
+        return jsonify({"error": "An error occurred while searching messages."}), 500
 
 # To make this blueprint active, it needs to be registered in your main app factory (create_app function in app/__init__.py)
 # Example in app/__init__.py:
