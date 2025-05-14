@@ -641,24 +641,39 @@ def search_messages(search_term: str, limit: int = 10):
             logger.debug(f"No messages found for search term: '{search_term}'")
             return []
 
-        # Fetch Message objects based on the IDs
-        messages = db.session.query(Message).filter(Message.id.in_(message_ids)).all()
+        # Fetch Message objects based on the IDs, and eagerly load their related Chat objects
+        # to ensure chat.name is available without extra queries per message.
+        messages = db.session.query(Message).options(db.joinedload(Message.chat)).filter(Message.id.in_(message_ids)).all()
         messages_dict = {msg.id: msg for msg in messages}
 
-        # Construct final list, ordered by FTS rank, including snippets
+        # Construct final list, ordered by FTS rank, including snippets and chat_name
         ordered_results_with_details = []
         for res_item in ranked_results:
             msg = messages_dict.get(res_item['id'])
-            if msg:
+            if msg and msg.chat: # Ensure message and its chat relationship exist
                 ordered_results_with_details.append({
                     'id': msg.id,
                     'chat_id': msg.chat_id,
+                    'chat_name': msg.chat.name, # Get chat name from the related Chat object
                     'role': msg.role,
                     'content': msg.content,
-                    'snippet': res_item['snippet'], # Add snippet here
+                    'snippet': res_item['snippet'], 
                     'timestamp': msg.timestamp,
                     'attachments': msg.attached_data or []
                 })
+            elif msg: # Fallback if chat relationship is somehow missing (should not happen with joinedload)
+                logger.warning(f"Message ID {msg.id} found but its chat relationship is missing. Chat ID: {msg.chat_id}")
+                ordered_results_with_details.append({
+                    'id': msg.id,
+                    'chat_id': msg.chat_id,
+                    'chat_name': f"Chat {msg.chat_id}", # Fallback name
+                    'role': msg.role,
+                    'content': msg.content,
+                    'snippet': res_item['snippet'],
+                    'timestamp': msg.timestamp,
+                    'attachments': msg.attached_data or []
+                })
+
 
         logger.info(f"Found {len(ordered_results_with_details)} messages for search term: '{search_term}'")
         return ordered_results_with_details
