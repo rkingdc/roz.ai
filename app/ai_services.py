@@ -13,7 +13,7 @@ from google.genai.types import (
     Schema,
     Type,
 )
-import json # For serializing tool responses if needed
+import json  # For serializing tool responses if needed
 
 from flask import current_app, g  # Import g for request context caching
 import tempfile
@@ -21,7 +21,10 @@ import os
 import re
 import base64
 from . import database  # Use alias to avoid conflict with db instance
-from .plugins.web_search import perform_web_search, fetch_web_content # Added fetch_web_content
+from .plugins.web_search import (
+    perform_web_search,
+    fetch_web_content,
+)  # Added fetch_web_content
 from google.api_core.exceptions import (
     GoogleAPIError,
     DeadlineExceeded,
@@ -56,7 +59,9 @@ WEB_SEARCH_TOOL = Tool(
             ),
             parameters=Schema(
                 type=Type.OBJECT,
-                properties={"query": Schema(type=Type.STRING, description="The search query")},
+                properties={
+                    "query": Schema(type=Type.STRING, description="The search query")
+                },
                 required=["query"],
             ),
         )
@@ -76,7 +81,9 @@ WEB_SCRAPE_TOOL = Tool(
             ),
             parameters=Schema(
                 type=Type.OBJECT,
-                properties={"url": Schema(type=Type.STRING, description="The URL to scrape")},
+                properties={
+                    "url": Schema(type=Type.STRING, description="The URL to scrape")
+                },
                 required=["url"],
             ),
         )
@@ -692,7 +699,7 @@ def generate_chat_response(
         # Ensure cleanup happens even if preparation fails/cancels
         # temp_files_to_clean would be the third element if preparation_result was not None
         _cleanup_temp_files(
-            [], # If prep failed, assume no temp files from it, or handle if it can return partial
+            [],  # If prep failed, assume no temp files from it, or handle if it can return partial
             f"chat {chat_id} (SID: {sid}) after prep failure/cancel",
         )
         return  # Stop execution
@@ -724,7 +731,7 @@ def generate_chat_response(
             socketio=socketio,
             sid=sid,
             is_cancelled_callback=is_cancelled_callback,
-            web_search_enabled=web_search_enabled, # Pass this flag
+            web_search_enabled=web_search_enabled,  # Pass this flag
         )
     else:
         _generate_chat_response_non_stream(
@@ -737,7 +744,7 @@ def generate_chat_response(
             socketio=socketio,
             sid=sid,
             is_cancelled_callback=is_cancelled_callback,
-            web_search_enabled=web_search_enabled, # Pass this flag
+            web_search_enabled=web_search_enabled,  # Pass this flag
         )
 
 
@@ -752,29 +759,36 @@ def _generate_chat_response_non_stream(
     socketio,
     sid,
     is_cancelled_callback: Callable[[], bool],
-    web_search_enabled: bool, # New parameter
+    web_search_enabled: bool,  # New parameter
 ):
     """Internal helper to generate a full chat response and emit it via SocketIO. Checks for cancellation. Handles tool calls."""
     logger.info(
         f"_generate_chat_response_non_stream called for chat {chat_id} (SID: {sid}), WebSearch: {web_search_enabled}"
     )
     assistant_response_content = None  # To store the final content for DB saving
-    MAX_TOOL_ITERATIONS = 5 # Max number of tool call iterations to prevent infinite loops
+    MAX_TOOL_ITERATIONS = (
+        5  # Max number of tool call iterations to prevent infinite loops
+    )
 
     # Construct initial conversation history.
     # current_turn_parts from _prepare_chat_content are for non-tool context (e.g. direct file uploads, calendar)
     # These are appended to the last user message if it exists, or form a new user turn.
     # The user's actual text message is already part of the 'history' from the DB.
-    current_conversation_history = list(history) # Make a mutable copy
+    current_conversation_history = list(history)  # Make a mutable copy
 
     if current_turn_parts:
-        if current_conversation_history and current_conversation_history[-1].role == "user":
+        if (
+            current_conversation_history
+            and current_conversation_history[-1].role == "user"
+        ):
             logger.debug(
                 f"Appending {len(current_turn_parts)} initial context parts to last user message for chat {chat_id} (SID: {sid})."
             )
             # Ensure parts is mutable list
             if not isinstance(current_conversation_history[-1].parts, list):
-                current_conversation_history[-1].parts = list(current_conversation_history[-1].parts)
+                current_conversation_history[-1].parts = list(
+                    current_conversation_history[-1].parts
+                )
             current_conversation_history[-1].parts.extend(current_turn_parts)
         else:
             # If history is empty or last turn isn't user, add these parts as a new user turn.
@@ -782,34 +796,36 @@ def _generate_chat_response_non_stream(
             logger.info(
                 f"Adding {len(current_turn_parts)} initial context parts as a new user turn for chat {chat_id} (SID: {sid})."
             )
-            current_conversation_history.append(Content(role="user", parts=current_turn_parts))
-
+            current_conversation_history.append(
+                Content(role="user", parts=current_turn_parts)
+            )
 
     system_prompt_parts = [
         "You are a helpful assistant. Please format your responses using Markdown.",
         "Prioritize using Markdown tables when presenting data, comparisons, or structured information that is well-suited for rows and columns.",
         "Use Markdown headings (starting with H2 for main sections, then H3, H4, etc., for sub-sections) to clearly structure and organize the content.",
         "Reserve bold text *only* for highlighting specific key terms, concepts, or important phrases *within* the text, not for section titles or organization.",
-        "Your goal is to make the response clear, well-organized, and easy to read, leveraging Markdown elements effectively for structure and data presentation."
+        "Your goal is to make the response clear, well-organized, and easy to read, leveraging Markdown elements effectively for structure and data presentation.",
     ]
     if web_search_enabled:
-        system_prompt_parts.extend([
-            "\n--- Web Tool Instructions ---",
-            "You have access to tools for web searching ('web_search') and scraping specific URLs ('scrape_url').",
-            "1. If you need to find information on the web, first use 'web_search' with a concise query.",
-            "2. Review the search results (title, link, snippet).",
-            "3. If a specific link looks promising, use 'scrape_url' with that link to get its content.",
-            "4. Scraped HTML text and transcribed PDF text will be provided to you. PDFs are automatically transcribed.",
-            "5. Scraped content is saved to the system, and you'll receive a 'saved_file_id' for it. You can mention this ID if relevant.",
-            "When using information from scraped web content:",
-            "  - Cite the source URL (e.g., 'According to [URL]...').",
-            "  - If the content was from a PDF, mention that (e.g., 'The PDF from [URL] states...').",
-            "  - At the end of your response, list the primary URLs you used under a 'Sources:' heading.",
-            "Do not try to access URLs directly or invent content for URLs you haven't scraped.",
-            "--- End Web Tool Instructions ---"
-        ])
+        system_prompt_parts.extend(
+            [
+                "\n--- Web Tool Instructions ---",
+                "You have access to tools for web searching ('web_search') and scraping specific URLs ('scrape_url').",
+                "1. If you need to find information on the web, first use 'web_search' with a concise query.",
+                "2. Review the search results (title, link, snippet).",
+                "3. If a specific link looks promising, use 'scrape_url' with that link to get its content.",
+                "4. Scraped HTML text and transcribed PDF text will be provided to you. PDFs are automatically transcribed.",
+                "5. Scraped content is saved to the system, and you'll receive a 'saved_file_id' for it. You can mention this ID if relevant.",
+                "When using information from scraped web content:",
+                "  - Cite the source URL (e.g., 'According to [URL]...').",
+                "  - If the content was from a PDF, mention that (e.g., 'The PDF from [URL] states...').",
+                "  - At the end of your response, list the primary URLs you used under a 'Sources:' heading.",
+                "Do not try to access URLs directly or invent content for URLs you haven't scraped.",
+                "--- End Web Tool Instructions ---",
+            ]
+        )
     final_system_prompt = "\n\n".join(system_prompt_parts)
-
 
     for iteration in range(MAX_TOOL_ITERATIONS):
         if is_cancelled_callback():
@@ -822,14 +838,16 @@ def _generate_chat_response_non_stream(
                 {"message": "Cancelled by user.", "chat_id": chat_id},
                 room=sid,
             )
-            break # Exit loop, will go to finally
+            break  # Exit loop, will go to finally
 
         try:
             logger.info(
                 f"Calling model.generate_content (non-streaming, Iteration {iteration}) for chat {chat_id} (SID: {sid})"
             )
-            
-            tools_to_provide = [WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL] if web_search_enabled else None
+
+            tools_to_provide = (
+                [WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL] if web_search_enabled else None
+            )
 
             response = client.models.generate_content(
                 model=model_to_use,
@@ -851,14 +869,20 @@ def _generate_chat_response_non_stream(
                     f"Non-streaming response blocked by safety settings (Iteration {iteration}) for chat {chat_id} (SID: {sid}). Reason: {reason}"
                 )
                 assistant_response_content = f"[AI Safety Error: Request blocked due to safety settings (Reason: {reason})]"
-                socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
-                break # Exit loop
+                socketio.emit(
+                    "task_error", {"error": assistant_response_content}, room=sid
+                )
+                break  # Exit loop
 
             candidate = response.candidates[0]
-            if not candidate.content.parts: # Should not happen if not blocked
-                logger.warning(f"No content parts in candidate for chat {chat_id}, iteration {iteration}.")
+            if not candidate.content.parts:  # Should not happen if not blocked
+                logger.warning(
+                    f"No content parts in candidate for chat {chat_id}, iteration {iteration}."
+                )
                 assistant_response_content = "[AI Error: No content parts in response]"
-                socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
+                socketio.emit(
+                    "task_error", {"error": assistant_response_content}, room=sid
+                )
                 break
 
             # Check for function call
@@ -868,8 +892,10 @@ def _generate_chat_response_non_stream(
                 function_name = fc.name
                 function_args = fc.args
 
-                logger.info(f"Tool call requested: {function_name} with args {dict(function_args)} (Iteration {iteration})")
-                
+                logger.info(
+                    f"Tool call requested: {function_name} with args {dict(function_args)} (Iteration {iteration})"
+                )
+
                 # Append LLM's function call to history
                 current_conversation_history.append(candidate.content)
 
@@ -877,33 +903,56 @@ def _generate_chat_response_non_stream(
                 tool_error = None
 
                 if is_cancelled_callback():
-                    logger.info(f"Tool execution cancelled before calling {function_name} for chat {chat_id}.")
+                    logger.info(
+                        f"Tool execution cancelled before calling {function_name} for chat {chat_id}."
+                    )
                     tool_error = "[AI Info: Tool execution cancelled by user.]"
                     # Emit cancellation confirmation
                     socketio.emit(
                         "generation_cancelled",
-                        {"message": "Cancelled by user during tool execution.", "chat_id": chat_id},
+                        {
+                            "message": "Cancelled by user during tool execution.",
+                            "chat_id": chat_id,
+                        },
                         room=sid,
                     )
-                
+
                 elif function_name == "web_search":
                     try:
                         query = function_args["query"]
-                        socketio.emit("status_update", {"message": f"Performing web search for: {query[:50]}..."}, room=sid)
-                        search_results = perform_web_search(query) # This is from app.plugins.web_search
+                        socketio.emit(
+                            "status_update",
+                            {"message": f"Performing web search for: {query[:50]}..."},
+                            room=sid,
+                        )
+                        search_results = perform_web_search(
+                            query
+                        )  # This is from app.plugins.web_search
                         tool_response_data = {"results": search_results}
-                        logger.info(f"Tool 'web_search' executed. Results: {len(search_results)} items.")
+                        logger.info(
+                            f"Tool 'web_search' executed. Results: {len(search_results)} items."
+                        )
                     except Exception as e:
-                        logger.error(f"Error executing 'web_search' tool: {e}", exc_info=True)
-                        tool_error = f"[Tool Error: web_search failed - {type(e).__name__}]"
+                        logger.error(
+                            f"Error executing 'web_search' tool: {e}", exc_info=True
+                        )
+                        tool_error = (
+                            f"[Tool Error: web_search failed - {type(e).__name__}]"
+                        )
 
                 elif function_name == "scrape_url":
                     try:
                         url_to_scrape = function_args["url"]
-                        socketio.emit("status_update", {"message": f"Scraping URL: {url_to_scrape[:70]}..."}, room=sid)
-                        
+                        socketio.emit(
+                            "status_update",
+                            {"message": f"Scraping URL: {url_to_scrape[:70]}..."},
+                            room=sid,
+                        )
+
                         # Call fetch_web_content from app.plugins.web_search
-                        scraped_data = perform_web_search.fetch_web_content(url_to_scrape) # Corrected: fetch_web_content is not directly under perform_web_search
+                        scraped_data = perform_web_search.fetch_web_content(
+                            url_to_scrape
+                        )  # Corrected: fetch_web_content is not directly under perform_web_search
                         # Actually, it should be: from .plugins.web_search import fetch_web_content
                         # And called as: fetch_web_content(url_to_scrape)
                         # For now, assuming it's accessible. Will fix if direct import is better.
@@ -914,7 +963,7 @@ def _generate_chat_response_non_stream(
                         # So it should be: from app.plugins.web_search import fetch_web_content
                         # This needs to be added at the top of ai_services.py
                         # For now, I'll write the logic assuming `fetch_web_content` is callable.
-                        
+
                         # Corrected call:
                         # from app.plugins.web_search import fetch_web_content (needs to be added to imports)
                         # scraped_data = fetch_web_content(url_to_scrape)
@@ -929,7 +978,11 @@ def _generate_chat_response_non_stream(
                         # Placeholder for now:
                         # scraped_data = {"type": "error", "content": "fetch_web_content not callable yet"}
                         # Actual call (assuming fetch_web_content is imported from app.plugins.web_search):
-                        scraped_data = current_app.extensions['socketio'].http_session.app.plugins_web_search_fetch_web_content(url_to_scrape)
+                        scraped_data = current_app.extensions[
+                            "socketio"
+                        ].http_session.app.plugins_web_search_fetch_web_content(
+                            url_to_scrape
+                        )
                         # This is getting complicated. The simplest is to import it directly.
                         # I will add `from app.plugins.web_search import fetch_web_content` later.
                         # For now, let's assume `web_search.fetch_web_content` if `web_search` is the module import.
@@ -938,7 +991,7 @@ def _generate_chat_response_non_stream(
                         # I will need to ask the user to add `app/plugins/web_search.py` to chat or modify its import.
                         # For now, I will proceed with the logic and assume `fetch_web_content` can be called.
                         # Let's assume `from app.plugins.web_search import fetch_web_content` will be added.
-                        
+
                         # To make this work for now, I'll use the existing `perform_web_search` object
                         # and call its attribute if it were a class, but it's not.
                         # I will have to assume `fetch_web_content` is imported.
@@ -947,57 +1000,95 @@ def _generate_chat_response_non_stream(
                         # SIMPLIFIED: I will just write the call as `fetch_web_content(url_to_scrape)`
                         # and the user will need to ensure the import `from app.plugins.web_search import fetch_web_content`
                         # is added to `app/ai_services.py`. I will make a note of this.
-                        
+
                         scraped_data_content = scraped_data.get("content")
                         scraped_data_type = scraped_data.get("type")
                         saved_file_id = None
 
-                        if scraped_data_type == "pdf" and isinstance(scraped_data_content, bytes):
-                            socketio.emit("status_update", {"message": f"Transcribing PDF: {scraped_data.get('filename', 'PDF')}..."}, room=sid)
-                            transcribed_text = transcribe_pdf_bytes(scraped_data_content, scraped_data.get("filename", "scraped.pdf"))
-                            if not transcribed_text.startswith(("[Error", "[System Note")):
+                        if scraped_data_type == "pdf" and isinstance(
+                            scraped_data_content, bytes
+                        ):
+                            socketio.emit(
+                                "status_update",
+                                {
+                                    "message": f"Transcribing PDF: {scraped_data.get('filename', 'PDF')}..."
+                                },
+                                room=sid,
+                            )
+                            transcribed_text = transcribe_pdf_bytes(
+                                scraped_data_content,
+                                scraped_data.get("filename", "scraped.pdf"),
+                            )
+                            if not transcribed_text.startswith(
+                                ("[Error", "[System Note")
+                            ):
                                 # Save transcribed text
                                 saved_file_id = database.save_file_record_to_db(
                                     filename=f"transcribed_{scraped_data.get('filename', 'document.txt')}",
-                                    content_blob=transcribed_text.encode('utf-8'),
-                                    mimetype='text/plain',
-                                    filesize=len(transcribed_text.encode('utf-8'))
+                                    content_blob=transcribed_text.encode("utf-8"),
+                                    mimetype="text/plain",
+                                    filesize=len(transcribed_text.encode("utf-8")),
                                 )
-                                scraped_data["content"] = transcribed_text # Replace PDF bytes with text
-                                scraped_data["type"] = "transcribed_pdf_text" # Update type
-                                logger.info(f"PDF '{scraped_data.get('filename')}' transcribed and saved as file ID {saved_file_id}.")
+                                scraped_data["content"] = (
+                                    transcribed_text  # Replace PDF bytes with text
+                                )
+                                scraped_data["type"] = (
+                                    "transcribed_pdf_text"  # Update type
+                                )
+                                logger.info(
+                                    f"PDF '{scraped_data.get('filename')}' transcribed and saved as file ID {saved_file_id}."
+                                )
                             else:
-                                logger.warning(f"PDF transcription failed for {scraped_data.get('filename')}: {transcribed_text}")
-                                scraped_data["content"] = f"[Transcription Failed: {transcribed_text}]"
+                                logger.warning(
+                                    f"PDF transcription failed for {scraped_data.get('filename')}: {transcribed_text}"
+                                )
+                                scraped_data["content"] = (
+                                    f"[Transcription Failed: {transcribed_text}]"
+                                )
                                 # Optionally save original PDF if transcription fails but scrape was ok
                                 # saved_file_id = database.save_file_record_to_db(...)
-                        
-                        elif scraped_data_type == "html" and isinstance(scraped_data_content, str):
-                             # Save HTML text
+
+                        elif scraped_data_type == "html" and isinstance(
+                            scraped_data_content, str
+                        ):
+                            # Save HTML text
                             saved_file_id = database.save_file_record_to_db(
-                                filename=secure_filename(f"scraped_{url_to_scrape.split('/')[-1] or 'page'}.html"),
-                                content_blob=scraped_data_content.encode('utf-8'),
-                                mimetype='text/html',
-                                filesize=len(scraped_data_content.encode('utf-8'))
+                                filename=secure_filename(
+                                    f"scraped_{url_to_scrape.split('/')[-1] or 'page'}.html"
+                                ),
+                                content_blob=scraped_data_content.encode("utf-8"),
+                                mimetype="text/html",
+                                filesize=len(scraped_data_content.encode("utf-8")),
                             )
-                            logger.info(f"HTML from '{url_to_scrape}' saved as file ID {saved_file_id}.")
+                            logger.info(
+                                f"HTML from '{url_to_scrape}' saved as file ID {saved_file_id}."
+                            )
 
                         # Prepare tool response data
                         tool_response_data = {
                             "url": url_to_scrape,
-                            "type": scraped_data.get("type"), # original or updated type
-                            "content": scraped_data.get("content"), # original or transcribed
-                            "filename": scraped_data.get("filename"), # if PDF
+                            "type": scraped_data.get(
+                                "type"
+                            ),  # original or updated type
+                            "content": scraped_data.get(
+                                "content"
+                            ),  # original or transcribed
+                            "filename": scraped_data.get("filename"),  # if PDF
                         }
                         if saved_file_id:
                             tool_response_data["saved_file_id"] = saved_file_id
-                        
+
                         logger.info(f"Tool 'scrape_url' executed for {url_to_scrape}.")
 
                     except Exception as e:
-                        logger.error(f"Error executing 'scrape_url' tool for {function_args.get('url')}: {e}", exc_info=True)
-                        tool_error = f"[Tool Error: scrape_url failed - {type(e).__name__}]"
-                
+                        logger.error(
+                            f"Error executing 'scrape_url' tool for {function_args.get('url')}: {e}",
+                            exc_info=True,
+                        )
+                        tool_error = (
+                            f"[Tool Error: scrape_url failed - {type(e).__name__}]"
+                        )
+
                 else:
                     logger.warning(f"Unknown tool requested: {function_name}")
                     tool_error = f"[System Error: Unknown tool '{function_name}']"
@@ -1006,22 +1097,23 @@ def _generate_chat_response_non_stream(
                 if tool_error:
                     function_response_part = Part.from_function_response(
                         name=function_name,
-                        response={"error": tool_error} # Send error back to LLM
+                        response={"error": tool_error},  # Send error back to LLM
                     )
                     # Optionally emit task_error to client if tool execution fails critically
                     socketio.emit("task_error", {"error": tool_error}, room=sid)
                 else:
                     function_response_part = Part.from_function_response(
-                        name=function_name,
-                        response=tool_response_data
+                        name=function_name, response=tool_response_data
                     )
-                
+
                 current_conversation_history.append(function_response_part)
                 # Continue to the next iteration of the loop to let LLM process tool response
 
             # No function call, LLM provided a direct text response
             else:
-                assistant_reply_parts = [p.text for p in candidate.content.parts if hasattr(p, "text")]
+                assistant_reply_parts = [
+                    p.text for p in candidate.content.parts if hasattr(p, "text")
+                ]
                 assistant_reply = "".join(assistant_reply_parts)
 
                 if assistant_reply.strip():
@@ -1029,14 +1121,20 @@ def _generate_chat_response_non_stream(
                         f"Successfully received full response text (length {len(assistant_reply)}, Iteration {iteration}) for chat {chat_id} (SID: {sid})."
                     )
                     assistant_response_content = assistant_reply
-                    socketio.emit("chat_response", {"reply": assistant_response_content}, room=sid)
+                    socketio.emit(
+                        "chat_response", {"reply": assistant_response_content}, room=sid
+                    )
                 else:
                     logger.warning(
                         f"Non-streaming response (Iteration {iteration}) for chat {chat_id} (SID: {sid}) was empty or whitespace."
                     )
-                    assistant_response_content = "[System Note: The AI returned an empty response.]"
-                    socketio.emit("chat_response", {"reply": assistant_response_content}, room=sid)
-                break # Exit loop, final response received
+                    assistant_response_content = (
+                        "[System Note: The AI returned an empty response.]"
+                    )
+                    socketio.emit(
+                        "chat_response", {"reply": assistant_response_content}, room=sid
+                    )
+                break  # Exit loop, final response received
 
         # --- Error Handling for Non-Streaming API Call ---
         # (This error handling is for the client.models.generate_content call itself)
@@ -1111,16 +1209,22 @@ def _generate_chat_response_non_stream(
             )
             assistant_response_content = f"[Unexpected AI Error: {type(e).__name__}]"
             socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
-            break # Exit loop on critical API error
+            break  # Exit loop on critical API error
 
     # Loop finished (either by break or max_iterations)
-    if iteration == MAX_TOOL_ITERATIONS -1 and not assistant_response_content:
-        logger.warning(f"Max tool iterations ({MAX_TOOL_ITERATIONS}) reached for chat {chat_id}. Emitting error.")
-        assistant_response_content = "[AI Error: Maximum tool iterations reached. Could not complete request.]"
+    if iteration == MAX_TOOL_ITERATIONS - 1 and not assistant_response_content:
+        logger.warning(
+            f"Max tool iterations ({MAX_TOOL_ITERATIONS}) reached for chat {chat_id}. Emitting error."
+        )
+        assistant_response_content = (
+            "[AI Error: Maximum tool iterations reached. Could not complete request.]"
+        )
         socketio.emit("task_error", {"error": assistant_response_content}, room=sid)
-    
+
     # --- Save Final Assistant Response to DB ---
-    if assistant_response_content:  # Ensure there's content (even error/cancellation messages)
+    if (
+        assistant_response_content
+    ):  # Ensure there's content (even error/cancellation messages)
         logger.info(
             f"Attempting to save final non-streaming assistant message for chat {chat_id} (SID: {sid})."
         )
@@ -1163,25 +1267,32 @@ def _generate_chat_response_stream(
     socketio,
     sid,
     is_cancelled_callback: Callable[[], bool],
-    web_search_enabled: bool, # New parameter
+    web_search_enabled: bool,  # New parameter
 ):
     """Internal helper that generates and emits chat response chunks via SocketIO. Checks for cancellation. Handles tool calls with streaming."""
     logger.info(
         f"_generate_chat_response_stream called for chat {chat_id} (SID: {sid}), WebSearch: {web_search_enabled}"
     )
     full_reply_content = ""  # Accumulate full reply for saving
-    emitted_error_or_cancel_final_signal = False # Tracks if a final error/cancel signal was sent, to prevent duplicate stream_end
-    MAX_TOOL_ITERATIONS = 5 # Max number of tool call iterations
+    emitted_error_or_cancel_final_signal = False  # Tracks if a final error/cancel signal was sent, to prevent duplicate stream_end
+    MAX_TOOL_ITERATIONS = 5  # Max number of tool call iterations
 
     # Construct initial conversation history (similar to non-streaming)
     current_conversation_history = list(history)
     if current_turn_parts:
-        if current_conversation_history and current_conversation_history[-1].role == "user":
+        if (
+            current_conversation_history
+            and current_conversation_history[-1].role == "user"
+        ):
             if not isinstance(current_conversation_history[-1].parts, list):
-                current_conversation_history[-1].parts = list(current_conversation_history[-1].parts)
+                current_conversation_history[-1].parts = list(
+                    current_conversation_history[-1].parts
+                )
             current_conversation_history[-1].parts.extend(current_turn_parts)
         else:
-            current_conversation_history.append(Content(role="user", parts=current_turn_parts))
+            current_conversation_history.append(
+                Content(role="user", parts=current_turn_parts)
+            )
 
     # System prompt (same as non-streaming)
     system_prompt_parts = [
@@ -1189,76 +1300,111 @@ def _generate_chat_response_stream(
         # ... (other general instructions)
     ]
     if web_search_enabled:
-        system_prompt_parts.extend([
-            "\n--- Web Tool Instructions ---",
-            "You have access to tools for web searching ('web_search') and scraping specific URLs ('scrape_url').",
-            # ... (detailed tool instructions as in non-streaming version)
-            "--- End Web Tool Instructions ---"
-        ])
-    final_system_prompt = "\n\n".join(system_prompt_parts) # Reconstruct the full system prompt from non-streaming version here.
+        system_prompt_parts.extend(
+            [
+                "\n--- Web Tool Instructions ---",
+                "You have access to tools for web searching ('web_search') and scraping specific URLs ('scrape_url').",
+                # ... (detailed tool instructions as in non-streaming version)
+                "--- End Web Tool Instructions ---",
+            ]
+        )
+    final_system_prompt = "\n\n".join(
+        system_prompt_parts
+    )  # Reconstruct the full system prompt from non-streaming version here.
     # For brevity in this diff, I'm not repeating the full prompt text. Assume it's the same as _generate_chat_response_non_stream.
 
     for iteration in range(MAX_TOOL_ITERATIONS):
         if is_cancelled_callback():
-            logger.info(f"Streaming generation cancelled before API call (Iteration {iteration}) for chat {chat_id}.")
+            logger.info(
+                f"Streaming generation cancelled before API call (Iteration {iteration}) for chat {chat_id}."
+            )
             full_reply_content = "[AI Info: Generation cancelled by user.]"
             socketio.emit("task_error", {"error": full_reply_content}, room=sid)
-            socketio.emit("generation_cancelled", {"message": "Cancelled by user.", "chat_id": chat_id}, room=sid)
+            socketio.emit(
+                "generation_cancelled",
+                {"message": "Cancelled by user.", "chat_id": chat_id},
+                room=sid,
+            )
             emitted_error_or_cancel_final_signal = True
-            break # Exit loop
+            break  # Exit loop
 
         try:
-            logger.info(f"Calling model.generate_content_stream (Iteration {iteration}) for chat {chat_id}.")
-            tools_to_provide = [WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL] if web_search_enabled else None
-            
+            logger.info(
+                f"Calling model.generate_content_stream (Iteration {iteration}) for chat {chat_id}."
+            )
+            tools_to_provide = (
+                [WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL] if web_search_enabled else None
+            )
+
             # GenerateContentConfig is needed for system_instruction and tools with streaming
             gen_config = GenerateContentConfig(
                 system_instruction=final_system_prompt,
-                tools=tools_to_provide # Pass tools via GenerateContentConfig
+                tools=tools_to_provide,  # Pass tools via GenerateContentConfig
             )
 
             response_iterator = client.models.generate_content_stream(
                 model=model_to_use,
                 contents=current_conversation_history,
                 # tools=tools_to_provide, # Removed from here
-                generation_config=gen_config,
+                config=gen_config,
             )
-            
-            logger.info(f"Streaming iterator received (Iteration {iteration}) for chat {chat_id}.")
+
+            logger.info(
+                f"Streaming iterator received (Iteration {iteration}) for chat {chat_id}."
+            )
 
             current_chunk_is_tool_call = False
-            accumulated_tool_call_parts = [] # For multi-part tool calls if they occur
+            accumulated_tool_call_parts = []  # For multi-part tool calls if they occur
 
             for chunk in response_iterator:
                 if is_cancelled_callback():
-                    logger.info(f"Streaming cancelled during chunk processing (Iteration {iteration}) for chat {chat_id}.")
+                    logger.info(
+                        f"Streaming cancelled during chunk processing (Iteration {iteration}) for chat {chat_id}."
+                    )
                     full_reply_content += "\n[AI Info: Generation cancelled by user.]"
-                    socketio.emit("generation_cancelled", {"message": "Cancelled by user.", "chat_id": chat_id}, room=sid)
+                    socketio.emit(
+                        "generation_cancelled",
+                        {"message": "Cancelled by user.", "chat_id": chat_id},
+                        room=sid,
+                    )
                     # Emit a final error/status to ensure client knows it's over
                     if not emitted_error_or_cancel_final_signal:
-                         socketio.emit("task_error", {"error": "[AI Info: Generation cancelled by user.]"}, room=sid)
+                        socketio.emit(
+                            "task_error",
+                            {"error": "[AI Info: Generation cancelled by user.]"},
+                            room=sid,
+                        )
                     emitted_error_or_cancel_final_signal = True
-                    break # Break from chunk loop
+                    break  # Break from chunk loop
 
                 # Process chunk for text, function call, or error
                 chunk_has_text = hasattr(chunk, "text") and chunk.text
-                chunk_has_fc = hasattr(chunk, "parts") and chunk.parts and hasattr(chunk.parts[0], "function_call") and chunk.parts[0].function_call
-                
+                chunk_has_fc = (
+                    hasattr(chunk, "parts")
+                    and chunk.parts
+                    and hasattr(chunk.parts[0], "function_call")
+                    and chunk.parts[0].function_call
+                )
+
                 if chunk_has_fc:
                     # This is how Gemini API sends tool calls in streaming
-                    logger.info(f"Stream chunk contains function_call part for chat {chat_id}.")
+                    logger.info(
+                        f"Stream chunk contains function_call part for chat {chat_id}."
+                    )
                     # The entire FunctionCall might be in one part or spread.
                     # Typically, it's in one part within the chunk.parts list.
-                    current_conversation_history.append(chunk.candidates[0].content) # Add LLM's turn with FC
-                    fc = chunk.parts[0].function_call 
+                    current_conversation_history.append(
+                        chunk.candidates[0].content
+                    )  # Add LLM's turn with FC
+                    fc = chunk.parts[0].function_call
                     # Proceed to tool execution logic (outside this inner chunk loop)
                     current_chunk_is_tool_call = True
-                    break # Break from chunk loop to handle tool call
+                    break  # Break from chunk loop to handle tool call
 
                 elif chunk_has_text:
                     socketio.emit("stream_chunk", {"chunk": chunk.text}, room=sid)
                     full_reply_content += chunk.text
-                
+
                 # Handle safety blocks from chunk.prompt_feedback or finish_reason in candidates
                 if chunk.prompt_feedback and chunk.prompt_feedback.block_reason:
                     reason = chunk.prompt_feedback.block_reason.name
@@ -1267,182 +1413,328 @@ def _generate_chat_response_stream(
                     socketio.emit("task_error", {"error": err_msg}, room=sid)
                     full_reply_content += f"\n{err_msg}"
                     emitted_error_or_cancel_final_signal = True
-                    break # from chunk loop
-                
-                if chunk.candidates and chunk.candidates[0].finish_reason.name == "SAFETY":
-                    err_msg = "[AI Safety Error: Stream finished due to safety settings]"
+                    break  # from chunk loop
+
+                if (
+                    chunk.candidates
+                    and chunk.candidates[0].finish_reason.name == "SAFETY"
+                ):
+                    err_msg = (
+                        "[AI Safety Error: Stream finished due to safety settings]"
+                    )
                     logger.warning(f"{err_msg} for chat {chat_id}")
                     socketio.emit("task_error", {"error": err_msg}, room=sid)
                     full_reply_content += f"\n{err_msg}"
                     emitted_error_or_cancel_final_signal = True
-                    break # from chunk loop
-            
-            if emitted_error_or_cancel_final_signal or current_chunk_is_tool_call: # If cancelled, error, or tool call
-                if current_chunk_is_tool_call: # Only proceed if it was a tool call, not error/cancel
+                    break  # from chunk loop
+
+            if (
+                emitted_error_or_cancel_final_signal or current_chunk_is_tool_call
+            ):  # If cancelled, error, or tool call
+                if (
+                    current_chunk_is_tool_call
+                ):  # Only proceed if it was a tool call, not error/cancel
                     # Handle tool call (logic similar to non-streaming)
-                    fc_part = current_conversation_history[-1].parts[0] # The FC part just added
+                    fc_part = current_conversation_history[-1].parts[
+                        0
+                    ]  # The FC part just added
                     fc = fc_part.function_call
                     function_name = fc.name
                     function_args = fc.args
-                    logger.info(f"Tool call from stream: {function_name} with args {dict(function_args)}")
+                    logger.info(
+                        f"Tool call from stream: {function_name} with args {dict(function_args)}"
+                    )
 
                     tool_response_data = None
                     tool_error = None
 
-                    if is_cancelled_callback(): # Check again before execution
-                        logger.info(f"Tool execution cancelled before calling {function_name} for chat {chat_id}.")
+                    if is_cancelled_callback():  # Check again before execution
+                        logger.info(
+                            f"Tool execution cancelled before calling {function_name} for chat {chat_id}."
+                        )
                         tool_error = "[AI Info: Tool execution cancelled by user.]"
-                        socketio.emit("generation_cancelled", {"message": "Cancelled by user during tool execution.", "chat_id": chat_id}, room=sid)
+                        socketio.emit(
+                            "generation_cancelled",
+                            {
+                                "message": "Cancelled by user during tool execution.",
+                                "chat_id": chat_id,
+                            },
+                            room=sid,
+                        )
                         emitted_error_or_cancel_final_signal = True
-
 
                     elif function_name == "web_search":
                         try:
                             query = function_args["query"]
-                            socketio.emit("status_update", {"message": f"Performing web search for: {query[:50]}..."}, room=sid)
+                            socketio.emit(
+                                "status_update",
+                                {
+                                    "message": f"Performing web search for: {query[:50]}..."
+                                },
+                                room=sid,
+                            )
                             search_results = perform_web_search(query)
                             tool_response_data = {"results": search_results}
                         except Exception as e:
-                            logger.error(f"Error executing 'web_search' (stream): {e}", exc_info=True)
-                            tool_error = f"[Tool Error: web_search failed - {type(e).__name__}]"
-                    
+                            logger.error(
+                                f"Error executing 'web_search' (stream): {e}",
+                                exc_info=True,
+                            )
+                            tool_error = (
+                                f"[Tool Error: web_search failed - {type(e).__name__}]"
+                            )
+
                     elif function_name == "scrape_url":
                         try:
                             url_to_scrape = function_args["url"]
-                            socketio.emit("status_update", {"message": f"Scraping URL: {url_to_scrape[:70]}..."}, room=sid)
+                            socketio.emit(
+                                "status_update",
+                                {"message": f"Scraping URL: {url_to_scrape[:70]}..."},
+                                room=sid,
+                            )
                             # IMPORTANT: Need to import fetch_web_content from app.plugins.web_search
                             # from app.plugins.web_search import fetch_web_content
-                            scraped_data = fetch_web_content(url_to_scrape) # Actual call
-                            
+                            scraped_data = fetch_web_content(
+                                url_to_scrape
+                            )  # Actual call
+
                             scraped_data_content = scraped_data.get("content")
                             scraped_data_type = scraped_data.get("type")
                             saved_file_id = None
 
-                            if scraped_data_type == "pdf" and isinstance(scraped_data_content, bytes):
-                                socketio.emit("status_update", {"message": f"Transcribing PDF: {scraped_data.get('filename', 'PDF')}..."}, room=sid)
-                                transcribed_text = transcribe_pdf_bytes(scraped_data_content, scraped_data.get("filename", "scraped.pdf"))
-                                if not transcribed_text.startswith(("[Error", "[System Note")):
+                            if scraped_data_type == "pdf" and isinstance(
+                                scraped_data_content, bytes
+                            ):
+                                socketio.emit(
+                                    "status_update",
+                                    {
+                                        "message": f"Transcribing PDF: {scraped_data.get('filename', 'PDF')}..."
+                                    },
+                                    room=sid,
+                                )
+                                transcribed_text = transcribe_pdf_bytes(
+                                    scraped_data_content,
+                                    scraped_data.get("filename", "scraped.pdf"),
+                                )
+                                if not transcribed_text.startswith(
+                                    ("[Error", "[System Note")
+                                ):
                                     saved_file_id = database.save_file_record_to_db(
                                         filename=f"transcribed_{scraped_data.get('filename', 'document.txt')}",
-                                        content_blob=transcribed_text.encode('utf-8'),
-                                        mimetype='text/plain',
-                                        filesize=len(transcribed_text.encode('utf-8'))
+                                        content_blob=transcribed_text.encode("utf-8"),
+                                        mimetype="text/plain",
+                                        filesize=len(transcribed_text.encode("utf-8")),
                                     )
                                     scraped_data["content"] = transcribed_text
                                     scraped_data["type"] = "transcribed_pdf_text"
                                 else:
-                                    scraped_data["content"] = f"[Transcription Failed: {transcribed_text}]"
-                            
-                            elif scraped_data_type == "html" and isinstance(scraped_data_content, str):
+                                    scraped_data["content"] = (
+                                        f"[Transcription Failed: {transcribed_text}]"
+                                    )
+
+                            elif scraped_data_type == "html" and isinstance(
+                                scraped_data_content, str
+                            ):
                                 saved_file_id = database.save_file_record_to_db(
-                                    filename=secure_filename(f"scraped_{url_to_scrape.split('/')[-1] or 'page'}.html"),
-                                    content_blob=scraped_data_content.encode('utf-8'),
-                                    mimetype='text/html',
-                                    filesize=len(scraped_data_content.encode('utf-8'))
+                                    filename=secure_filename(
+                                        f"scraped_{url_to_scrape.split('/')[-1] or 'page'}.html"
+                                    ),
+                                    content_blob=scraped_data_content.encode("utf-8"),
+                                    mimetype="text/html",
+                                    filesize=len(scraped_data_content.encode("utf-8")),
                                 )
-                            
+
                             tool_response_data = {
-                                "url": url_to_scrape, "type": scraped_data.get("type"),
-                                "content": scraped_data.get("content"), "filename": scraped_data.get("filename"),
+                                "url": url_to_scrape,
+                                "type": scraped_data.get("type"),
+                                "content": scraped_data.get("content"),
+                                "filename": scraped_data.get("filename"),
                             }
-                            if saved_file_id: tool_response_data["saved_file_id"] = saved_file_id
+                            if saved_file_id:
+                                tool_response_data["saved_file_id"] = saved_file_id
                         except Exception as e:
-                            logger.error(f"Error executing 'scrape_url' (stream) for {function_args.get('url')}: {e}", exc_info=True)
-                            tool_error = f"[Tool Error: scrape_url failed - {type(e).__name__}]"
+                            logger.error(
+                                f"Error executing 'scrape_url' (stream) for {function_args.get('url')}: {e}",
+                                exc_info=True,
+                            )
+                            tool_error = (
+                                f"[Tool Error: scrape_url failed - {type(e).__name__}]"
+                            )
                     else:
                         tool_error = f"[System Error: Unknown tool '{function_name}']"
 
                     if tool_error:
-                        function_response_part = Part.from_function_response(name=function_name, response={"error": tool_error})
-                        if not emitted_error_or_cancel_final_signal: # Avoid duplicate error signals
-                             socketio.emit("task_error", {"error": tool_error}, room=sid)
-                             emitted_error_or_cancel_final_signal = True
+                        function_response_part = Part.from_function_response(
+                            name=function_name, response={"error": tool_error}
+                        )
+                        if (
+                            not emitted_error_or_cancel_final_signal
+                        ):  # Avoid duplicate error signals
+                            socketio.emit("task_error", {"error": tool_error}, room=sid)
+                            emitted_error_or_cancel_final_signal = True
 
                     else:
-                        function_response_part = Part.from_function_response(name=function_name, response=tool_response_data)
-                    
+                        function_response_part = Part.from_function_response(
+                            name=function_name, response=tool_response_data
+                        )
+
                     current_conversation_history.append(function_response_part)
                     # Continue to next iteration of the outer loop for LLM to process tool response
-                    if emitted_error_or_cancel_final_signal: break # if tool execution itself was cancelled/errored critically
-                    continue # To next iteration of the main tool loop
+                    if emitted_error_or_cancel_final_signal:
+                        break  # if tool execution itself was cancelled/errored critically
+                    continue  # To next iteration of the main tool loop
 
             # If loop finished processing chunks and it wasn't a tool call, error, or cancellation
-            if not emitted_error_or_cancel_final_signal and not current_chunk_is_tool_call:
-                logger.info(f"Stream finished for chat {chat_id} (Iteration {iteration}). Emitting stream_end.")
+            if (
+                not emitted_error_or_cancel_final_signal
+                and not current_chunk_is_tool_call
+            ):
+                logger.info(
+                    f"Stream finished for chat {chat_id} (Iteration {iteration}). Emitting stream_end."
+                )
                 socketio.emit("stream_end", {"message": "Stream finished."}, room=sid)
                 # Final text response received, break from tool iteration loop
-                break 
-            
-            if emitted_error_or_cancel_final_signal: # If an error/cancel occurred in chunk loop
-                break # Break from main tool loop
+                break
+
+            if (
+                emitted_error_or_cancel_final_signal
+            ):  # If an error/cancel occurred in chunk loop
+                break  # Break from main tool loop
 
         # --- Error Handling for Streaming API Call (client.models.generate_content_stream call itself) ---
         except InvalidArgument as e:
-            logger.error(f"InvalidArgument error during streaming chat {chat_id} (Iter. {iteration}): {e}.", exc_info=True)
+            logger.error(
+                f"InvalidArgument error during streaming chat {chat_id} (Iter. {iteration}): {e}.",
+                exc_info=True,
+            )
             full_reply_content = f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
-            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
-            emitted_error_or_cancel_final_signal = True; break
-        except ValidationError as e: # Should be caught by Pydantic if request is malformed by SDK
-            logger.error(f"Data validation error calling streaming Gemini API for chat {chat_id} (Iter. {iteration}): {e}", exc_info=True)
+            if not emitted_error_or_cancel_final_signal:
+                socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True
+            break
+        except (
+            ValidationError
+        ) as e:  # Should be caught by Pydantic if request is malformed by SDK
+            logger.error(
+                f"Data validation error calling streaming Gemini API for chat {chat_id} (Iter. {iteration}): {e}",
+                exc_info=True,
+            )
             full_reply_content = f"[AI Error: Internal data format error. Check logs.]"
-            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
-            emitted_error_or_cancel_final_signal = True; break
+            if not emitted_error_or_cancel_final_signal:
+                socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True
+            break
         except DeadlineExceeded:
-            logger.error(f"Streaming Gemini API call timed out for chat {chat_id} (Iter. {iteration}).")
+            logger.error(
+                f"Streaming Gemini API call timed out for chat {chat_id} (Iter. {iteration})."
+            )
             full_reply_content = "[AI Error: The request timed out. Please try again.]"
-            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
-            emitted_error_or_cancel_final_signal = True; break
+            if not emitted_error_or_cancel_final_signal:
+                socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True
+            break
         except NotFound as e:
-            logger.error(f"Model for streaming chat {chat_id} (Iter. {iteration}) not found: {e}")
-            full_reply_content = f"[AI Error: Model '{model_to_use}' not found or access denied.]"
-            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
-            emitted_error_or_cancel_final_signal = True; break
+            logger.error(
+                f"Model for streaming chat {chat_id} (Iter. {iteration}) not found: {e}"
+            )
+            full_reply_content = (
+                f"[AI Error: Model '{model_to_use}' not found or access denied.]"
+            )
+            if not emitted_error_or_cancel_final_signal:
+                socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True
+            break
         except GoogleAPIError as e:
-            logger.error(f"Google API error for streaming chat {chat_id} (Iter. {iteration}): {e}", exc_info=False)
+            logger.error(
+                f"Google API error for streaming chat {chat_id} (Iter. {iteration}): {e}",
+                exc_info=False,
+            )
             err_str = str(e).lower()
-            if "api key not valid" in err_str: full_reply_content = "[Error: Invalid Gemini API Key]"
-            elif "permission denied" in err_str: full_reply_content = f"[AI Error: Permission denied for model.]"
-            elif "resource has been exhausted" in err_str or "429" in str(e): full_reply_content = "[AI Error: API quota or rate limit exceeded.]"
-            elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper(): full_reply_content = f"[AI Safety Error: Request/response blocked (Reason: SAFETY)]"
-            elif "internal error" in err_str or "500" in str(e): full_reply_content = "[AI Error: AI service internal error.]"
-            else: full_reply_content = f"[AI API Error: {type(e).__name__}]"
-            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
-            emitted_error_or_cancel_final_signal = True; break
+            if "api key not valid" in err_str:
+                full_reply_content = "[Error: Invalid Gemini API Key]"
+            elif "permission denied" in err_str:
+                full_reply_content = f"[AI Error: Permission denied for model.]"
+            elif "resource has been exhausted" in err_str or "429" in str(e):
+                full_reply_content = "[AI Error: API quota or rate limit exceeded.]"
+            elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
+                full_reply_content = (
+                    f"[AI Safety Error: Request/response blocked (Reason: SAFETY)]"
+                )
+            elif "internal error" in err_str or "500" in str(e):
+                full_reply_content = "[AI Error: AI service internal error.]"
+            else:
+                full_reply_content = f"[AI API Error: {type(e).__name__}]"
+            if not emitted_error_or_cancel_final_signal:
+                socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True
+            break
         except Exception as e:
-            logger.error(f"Unexpected error during streaming API interaction for chat {chat_id} (Iter. {iteration}): {e}", exc_info=True)
+            logger.error(
+                f"Unexpected error during streaming API interaction for chat {chat_id} (Iter. {iteration}): {e}",
+                exc_info=True,
+            )
             full_reply_content = f"[Unexpected AI Error: {type(e).__name__}]"
-            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
-            emitted_error_or_cancel_final_signal = True; break
-        
-        if emitted_error_or_cancel_final_signal: # If any error broke the inner chunk loop or API call
-             break # Break from main tool loop
+            if not emitted_error_or_cancel_final_signal:
+                socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True
+            break
+
+        if (
+            emitted_error_or_cancel_final_signal
+        ):  # If any error broke the inner chunk loop or API call
+            break  # Break from main tool loop
 
     # Loop finished
-    if iteration == MAX_TOOL_ITERATIONS -1 and not emitted_error_or_cancel_final_signal and not full_reply_content.strip(): # Check strip here
-        logger.warning(f"Max tool iterations ({MAX_TOOL_ITERATIONS}) reached for streaming chat {chat_id}.")
-        full_reply_content = "[AI Error: Maximum tool iterations reached. Could not complete request.]"
-        if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+    if (
+        iteration == MAX_TOOL_ITERATIONS - 1
+        and not emitted_error_or_cancel_final_signal
+        and not full_reply_content.strip()
+    ):  # Check strip here
+        logger.warning(
+            f"Max tool iterations ({MAX_TOOL_ITERATIONS}) reached for streaming chat {chat_id}."
+        )
+        full_reply_content = (
+            "[AI Error: Maximum tool iterations reached. Could not complete request.]"
+        )
+        if not emitted_error_or_cancel_final_signal:
+            socketio.emit("task_error", {"error": full_reply_content}, room=sid)
         emitted_error_or_cancel_final_signal = True
 
-    if not full_reply_content.strip() and not emitted_error_or_cancel_final_signal :
+    if not full_reply_content.strip() and not emitted_error_or_cancel_final_signal:
         # If loop finished, no text was streamed, and no specific error was sent
         full_reply_content = "[System Note: The AI did not return any streamable content after tool use or iterations.]"
-        logger.warning(f"Streaming for chat {chat_id} yielded no content. Saving placeholder.")
-        socketio.emit("task_error", {"error": full_reply_content}, room=sid) # Send a final signal
+        logger.warning(
+            f"Streaming for chat {chat_id} yielded no content. Saving placeholder."
+        )
+        socketio.emit(
+            "task_error", {"error": full_reply_content}, room=sid
+        )  # Send a final signal
         emitted_error_or_cancel_final_signal = True
 
-
     # --- Save Full Accumulated Reply to DB ---
-    if full_reply_content: # Save whatever was accumulated, including error/cancel messages
-        logger.info(f"Attempting to save final streamed assistant message for chat {chat_id}. Length: {len(full_reply_content)}")
+    if (
+        full_reply_content
+    ):  # Save whatever was accumulated, including error/cancel messages
+        logger.info(
+            f"Attempting to save final streamed assistant message for chat {chat_id}. Length: {len(full_reply_content)}"
+        )
         try:
-            save_success = database.add_message_to_db(chat_id, "assistant", full_reply_content, attached_data_json=None)
+            save_success = database.add_message_to_db(
+                chat_id, "assistant", full_reply_content, attached_data_json=None
+            )
             if not save_success:
-                logger.error(f"Failed to save final streamed assistant message for chat {chat_id}.")
+                logger.error(
+                    f"Failed to save final streamed assistant message for chat {chat_id}."
+                )
         except Exception as db_err:
-            logger.error(f"DB error saving final streamed assistant message for chat {chat_id}: {db_err}", exc_info=True)
+            logger.error(
+                f"DB error saving final streamed assistant message for chat {chat_id}: {db_err}",
+                exc_info=True,
+            )
     else:
-        logger.warning(f"No content (not even error/cancel) to save for streaming chat {chat_id}.")
+        logger.warning(
+            f"No content (not even error/cancel) to save for streaming chat {chat_id}."
+        )
 
     _cleanup_temp_files(temp_files_to_clean, f"streaming chat {chat_id} (SID: {sid})")
 
@@ -1470,7 +1762,9 @@ def _prepare_chat_content(
     # current_turn_parts are for *additional* context like calendar or pre-loaded files.
     # Web search and scraping results will be added to history via the tool loop.
     current_turn_parts = []
-    temp_files_to_clean = [] # Still needed for files attached directly to the user message
+    temp_files_to_clean = (
+        []
+    )  # Still needed for files attached directly to the user message
 
     def emit_prep_error(error_msg, is_cancel=False):
         log_level = logging.INFO if is_cancel else logging.ERROR
