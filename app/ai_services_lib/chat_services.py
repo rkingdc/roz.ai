@@ -1,4 +1,38 @@
+import base64
+import logging
+import os
+import tempfile
 from typing import Callable
+
+from flask import current_app, g
+import google.generativeai as genai
+from google.api_core.exceptions import (
+    GoogleAPIError,
+    ClientError,
+    InvalidArgument,
+    DeadlineExceeded,
+    NotFound,
+)
+from google.genai.types import (
+    Content,
+    Part,
+    FileData,
+    Blob,
+    GenerateContentConfig,
+    AutomaticFunctionCallingConfig,
+    Mode,
+)
+from pydantic_core import ValidationError
+from werkzeug.utils import secure_filename
+
+from .. import database
+from ..plugins.web_search import perform_web_search, fetch_web_content
+from .summary_services import get_or_generate_summary
+from .tool_definitions import WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL
+from .transcription_services import transcribe_pdf_bytes
+
+logger = logging.getLogger(__name__)
+
 
 # --- Chat Response Generation ---
 # This function now starts the process and uses helpers that emit results via SocketIO.
