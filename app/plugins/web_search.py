@@ -187,7 +187,7 @@ def fetch_web_content(url):
 def perform_web_search(query: str, num_results: int = 3):
     """
     Performs a web search using the Google Custom Search JSON API.
-    Fetched content (HTML/PDF) is saved to the database.
+    This version is intended for Automatic Function Calling (AFC).
 
     Args:
         query (str): The search query string.
@@ -201,7 +201,7 @@ def perform_web_search(query: str, num_results: int = 3):
               Returns an empty list or a list with error messages on failure.
     """
     logger.info(
-        f"Performing Google Custom Search for: '{query}' (requesting {num_results} results)"
+        f"Performing Google Custom Search for AFC: '{query}' (requesting {num_results} results)"
     )
 
     api_key = current_app.config.get("GOOGLE_API_KEY")
