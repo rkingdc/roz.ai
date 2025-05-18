@@ -359,6 +359,7 @@ def _generate_chat_response_stream(
 
                 if (
                     chunk.candidates
+                    and chunk.candidates[0].finish_reason
                     and chunk.candidates[0].finish_reason.name == "SAFETY"
                 ):
                     err_msg = (
