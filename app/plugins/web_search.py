@@ -9,8 +9,8 @@ from urllib.parse import urlparse # To parse URL for filename fallback
 from werkzeug.utils import secure_filename # To sanitize filenames
 import cgi # To parse Content-Disposition header
 
-# Import database function for saving files - MOVED INSIDE perform_web_search
-# from app.database import save_file_record_to_db
+from app.database import save_file_record_to_db # For AFC to save files
+from app.ai_services import transcribe_pdf_bytes # For AFC to transcribe PDFs
 
 
 # Configure logging
@@ -29,11 +29,13 @@ def fetch_web_content(url):
 
     Returns:
         dict: A dictionary containing:
-              - 'type': 'html', 'pdf', or 'error'
-              - 'content': Extracted text (for html), raw bytes (for pdf, currently unused downstream), or error message.
               - 'url': The original URL.
-              - 'filename': (for pdf type) The suggested filename for the PDF.
+              - 'type': 'html', 'transcribed_pdf_text', or 'error'.
+              - 'content': Extracted HTML text, transcribed PDF text, or an error message.
+              - 'filename': Original filename if applicable (especially for PDFs).
+              - 'saved_file_id': The ID of the saved file record in the database, if successful.
     """
+    saved_file_id = None # Initialize
     try:
         # Use stream=True to check headers before downloading the whole body
         response = requests.get(url, timeout=15, stream=True, headers={'User-Agent': 'MyWebApp/1.0'})
@@ -72,9 +74,33 @@ def fetch_web_content(url):
             # Ensure it has a .pdf extension if missing (common issue)
             if not filename.lower().endswith('.pdf'):
                 filename += ".pdf"
-            logger.info(f"Sanitized PDF filename: {filename}")
+            logger.info(f"Sanitized PDF filename for AFC: {filename}")
 
-            return {'type': 'pdf', 'content': pdf_bytes, 'url': url, 'filename': filename}
+            # Transcribe PDF using the imported function
+            logger.info(f"Transcribing PDF '{filename}' for AFC...")
+            transcribed_text = transcribe_pdf_bytes(pdf_bytes, filename) # from app.ai_services
+
+            if transcribed_text.startswith(("[Error", "[System Note")):
+                logger.warning(f"PDF transcription failed for '{filename}' during AFC: {transcribed_text}")
+                return {'type': 'error', 'content': f"PDF transcription failed: {transcribed_text}", 'url': url, 'filename': filename}
+
+            logger.info(f"Successfully transcribed PDF '{filename}' for AFC.")
+            # Save the transcribed text to DB
+            try:
+                transcribed_filename = f"transcribed_{filename}.txt"
+                content_bytes_to_save = transcribed_text.encode('utf-8')
+                mimetype_to_save = 'text/plain'
+                filesize_to_save = len(content_bytes_to_save)
+                saved_file_id = save_file_record_to_db(transcribed_filename, content_bytes_to_save, mimetype_to_save, filesize_to_save)
+                if saved_file_id:
+                    logger.info(f"Saved transcribed PDF text from {url} as file ID {saved_file_id} ({transcribed_filename}) for AFC.")
+                else:
+                    logger.error(f"Failed to save transcribed PDF text from {url} to database for AFC.")
+            except Exception as e_save:
+                logger.error(f"Exception saving transcribed PDF text from {url} to DB for AFC: {e_save}", exc_info=True)
+                # Continue without saved_file_id, but return content
+
+            return {'type': 'transcribed_pdf_text', 'content': transcribed_text, 'url': url, 'filename': filename, 'saved_file_id': saved_file_id}
 
         # --- HTML Handling ---
         # Proceed only if it's likely HTML (or unspecified, default to HTML attempt)
@@ -119,29 +145,46 @@ def fetch_web_content(url):
                 text = text.replace(chr(10), " ").replace(chr(13), " ") # Replace newlines within paragraphs with spaces
                 text = '\n'.join(line.strip() for line in text.splitlines() if line.strip()) # Remove leading/trailing whitespace from lines and remove empty lines
                 text = text.strip()
-                return {'type': 'html', 'content': text, 'url': url}
+
+                # Save the extracted HTML text to DB
+                try:
+                    base_filename = urlparse(url).path.split('/')[-1] or urlparse(url).netloc or "scraped_page"
+                    html_filename = secure_filename(f"{base_filename[:100]}.html")
+                    content_bytes_to_save = text.encode('utf-8')
+                    mimetype_to_save = 'text/html' # Or text/plain if we consider it purely extracted text
+                    filesize_to_save = len(content_bytes_to_save)
+                    saved_file_id = save_file_record_to_db(html_filename, content_bytes_to_save, mimetype_to_save, filesize_to_save)
+                    if saved_file_id:
+                        logger.info(f"Saved HTML content from {url} as file ID {saved_file_id} ({html_filename}) for AFC.")
+                    else:
+                        logger.error(f"Failed to save HTML content from {url} to database for AFC.")
+                except Exception as e_save:
+                    logger.error(f"Exception saving HTML content from {url} to DB for AFC: {e_save}", exc_info=True)
+                    # Continue without saved_file_id, but return content
+
+                return {'type': 'html', 'content': text, 'url': url, 'saved_file_id': saved_file_id}
             else:
                  # If no text could be extracted even if HTML structure was found
-                 return {'type': 'error', 'content': "Could not extract text content from HTML.", 'url': url}
+                 return {'type': 'error', 'content': "Could not extract text content from HTML.", 'url': url, 'saved_file_id': None}
 
         # --- Handle other content types ---
         else:
-            logger.warning(f"Unsupported Content-Type '{content_type}' at {url}. Skipping content extraction.")
-            return {'type': 'error', 'content': f"Unsupported content type: {content_type}", 'url': url}
+            logger.warning(f"Unsupported Content-Type '{content_type}' at {url}. Skipping content extraction for AFC.")
+            return {'type': 'error', 'content': f"Unsupported content type: {content_type}", 'url': url, 'saved_file_id': None}
 
     except requests.exceptions.Timeout:
-        logger.error(f"Timeout error fetching content from {url}")
-        return {'type': 'error', 'content': "Request timed out.", 'url': url}
+        logger.error(f"Timeout error fetching content from {url} for AFC.")
+        return {'type': 'error', 'content': "Request timed out.", 'url': url, 'saved_file_id': None}
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching content from {url}: {e}")
-        return {'type': 'error', 'content': f"Network or HTTP error: {e}", 'url': url}
+        logger.error(f"Error fetching content from {url} for AFC: {e}")
+        return {'type': 'error', 'content': f"Network or HTTP error: {e}", 'url': url, 'saved_file_id': None}
     except Exception as e:
         # Catch potential BeautifulSoup errors or others
-        logger.error(f"An unexpected error occurred while processing content from {url}: {e}", exc_info=True)
-        return {'type': 'error', 'content': f"An unexpected error occurred: {e}", 'url': url}
+        logger.error(f"An unexpected error occurred while processing content from {url} for AFC: {e}", exc_info=True)
+        return {'type': 'error', 'content': f"An unexpected error occurred: {e}", 'url': url, 'saved_file_id': None}
 
 
-def perform_web_search(query, num_results=3):
+def perform_web_search(query: str, num_results: int = 3):
     """
     Performs a web search using the Google Custom Search JSON API.
     Fetched content (HTML/PDF) is saved to the database.
@@ -165,11 +208,13 @@ def perform_web_search(query, num_results=3):
     cse_id = current_app.config.get("GOOGLE_CSE_ID")
 
     if not api_key:
-        logger.error("ERROR: GOOGLE_API_KEY not found in Flask config.")
-        return [{"type": "error", "content": "[System Error: Web search API key not configured]", "url": query}]
+        logger.error("ERROR: GOOGLE_API_KEY not found in Flask config for AFC search.")
+        # For AFC, return a structure that can be processed, or raise an error the SDK might catch.
+        # Returning an error message within the expected list structure might be best for the LLM.
+        return [{"title": "Search Error", "link": "", "snippet": "[System Error: Web search API key not configured]"}]
     if not cse_id:
-        logger.error("ERROR: GOOGLE_CSE_ID not found in Flask config.")
-        return [{"type": "error", "content": "[System Error: Web search Engine ID not configured]", "url": query}]
+        logger.error("ERROR: GOOGLE_CSE_ID not found in Flask config for AFC search.")
+        return [{"title": "Search Error", "link": "", "snippet": "[System Error: Web search Engine ID not configured]"}]
 
     # Ensure num_results is within the API limits (1-10)
     num_results = max(1, min(num_results, 10))
@@ -203,8 +248,8 @@ def perform_web_search(query, num_results=3):
         return search_results_processed
 
     except HttpError as e:
-        logger.error(f"ERROR during Google Custom Search API call: {e}")
-        return [{"type": "error", "content": f"[System Error: Web search failed. Reason: {e.resp.status} {e.resp.reason}]", "url": query}]
+        logger.error(f"ERROR during Google Custom Search API call for AFC: {e}")
+        return [{"title": "Search API Error", "link": "", "snippet": f"[System Error: Web search failed. Reason: {e.resp.status} {e.resp.reason}]"}]
     except Exception as e:
-        logger.error(f"An unexpected error occurred during web search: {e}", exc_info=True)
-        return [{"type": "error", "content": "[System Error: An unexpected error occurred during web search.]", "url": query}]
+        logger.error(f"An unexpected error occurred during web search for AFC: {e}", exc_info=True)
+        return [{"title": "Search Unexpected Error", "link": "", "snippet": "[System Error: An unexpected error occurred during web search.]"}]
