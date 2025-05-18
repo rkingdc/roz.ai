@@ -558,209 +558,12 @@ def get_or_generate_summary(file_id):
         return f"[Error retrieving or generating summary: {type(e).__name__}]"
 
 
-# --- Generate Search Query ---
-# Remove the decorator
-def generate_search_query(user_message: str, max_retries=1) -> str | None:
-    """
-    Uses the default LLM via client to generate a concise web search query.
-    """
-    logger.info("Entering generate_search_query.")
-
-    # --- AI Readiness Check (Moved from Decorator) ---
-    try:
-        # Check for Flask request context
-        try:
-            _ = (
-                current_app.config
-            )  # Simple check that raises RuntimeError if no context
-            logger.debug("generate_search_query: Flask request context is active.")
-        except RuntimeError:
-            logger.error(
-                "generate_search_query called outside of active Flask request context.",
-                exc_info=True,  # Log traceback
-            )
-            return None  # Return None as expected by the caller
-
-        api_key = current_app.config.get("API_KEY")
-        if not api_key:
-            logger.error("API_KEY is missing from current_app.config.")
-            return None  # Return None as expected by the caller
-
-        try:
-            # Use client caching via Flask's 'g' object if in request context
-            if "genai_client" not in g:
-                logger.info("Creating new genai.Client and caching in 'g'.")
-                g.genai_client = genai.Client(api_key=api_key)
-            else:
-                logger.debug("Using cached genai.Client from 'g'.")
-            client = g.genai_client
-            logger.info("Successfully obtained genai.Client for query generation.")
-        except (GoogleAPIError, ClientError, ValueError, Exception) as e:
-            logger.error(
-                f"Failed to initialize/get genai.Client for query: {e}", exc_info=True
-            )
-            if "api key not valid" in str(e).lower():
-                return None  # Return None
-            return None  # Return None
-
-    except Exception as e:
-        # Catch any unexpected errors during the readiness check itself
-        logger.error(
-            f"generate_search_query: Unexpected error during readiness check: {type(e).__name__} - {e}",
-            exc_info=True,
-        )
-        return None  # Return None as expected by the caller
-    # --- End AI Readiness Check ---
-
-    if not user_message or user_message.isspace():
-        logger.info("Cannot generate search query from empty user message.")
-        return None
-
-    # Use a specific model or the default one for this task
-    raw_model_name = current_app.config.get(
-        "QUERY_MODEL", current_app.config["DEFAULT_MODEL"]
-    )
-    model_name = (
-        f"models/{raw_model_name}"
-        if not raw_model_name.startswith("models/")
-        else raw_model_name
-    )
-    logger.info(f"Attempting to generate search query using model '{model_name}'...")
-
-    prompt = f"""Analyze the following user message and generate a concise and effective web search query (ideally 3-7 words) that would find information directly helpful in answering or augmenting the user's request.
-
-User Message:
-"{user_message}"
-
-Focus on the core information needed. Output *only* the raw search query string itself. Do not add explanations, quotation marks (unless essential for the search phrase), or any other surrounding text.
-
-Search Query:"""
-
-    retries = 0
-    while retries <= max_retries:
-        response = None  # Initialize response to None
-        try:
-            # Use the client.models attribute to generate content
-            # Query generation is NOT streamed
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-            )
-
-            # Check for blocked prompt before accessing text
-            if response.prompt_feedback and response.prompt_feedback.block_reason:
-                reason = response.prompt_feedback.block_reason.name
-                logger.warning(f"Prompt blocked for query gen, reason: {reason}")
-                return None  # Don't retry if blocked
-
-            # Extract text safely
-            generated_query = ""
-            if (
-                response.candidates
-                and hasattr(response.candidates[0], "content")
-                and hasattr(response.candidates[0].content, "parts")
-                and response.candidates[0].content.parts
-            ):
-                generated_query = "".join(
-                    part.text
-                    for part in response.candidates[0].content.parts
-                    if hasattr(part, "text")
-                ).strip()
-
-            # Clean the generated query
-            if generated_query:
-                logger.info(f"Raw query generated: '{generated_query}'")
-                generated_query = re.sub(
-                    r'^"|"$', "", generated_query
-                )  # Remove leading/trailing quotes
-                generated_query = re.sub(
-                    r"^\s*[-\*\d]+\.?\s*", "", generated_query
-                )  # Remove leading list markers
-                generated_query = re.sub(
-                    r"^(?:Search Query:|Here is a search query:|query:)\s*",
-                    "",
-                    generated_query,
-                    flags=re.IGNORECASE,
-                )  # Remove common prefixes
-                generated_query = generated_query.strip()  # Final strip
-
-                if generated_query:
-                    logger.info(f"Cleaned Search Query: '{generated_query}'")
-                    return generated_query
-                else:
-                    logger.warning(
-                        "LLM generated an empty search query after cleaning."
-                    )
-                    # Don't retry empty query, likely a model issue
-                    return None
-            else:
-                # Handle cases where response is empty or has unexpected structure
-                logger.warning(
-                    f"Query generation did not produce usable content. Response: {response!r}"
-                )
-                finish_reason = "UNKNOWN"
-                if response.candidates and hasattr(
-                    response.candidates[0], "finish_reason"
-                ):
-                    finish_reason = response.candidates[0].finish_reason.name
-                logger.warning(f"Query generation finish reason: {finish_reason}")
-                return None  # Don't retry if no content
-
-        except InvalidArgument as e:
-            logger.error(
-                f"InvalidArgument error during query generation: {e}.", exc_info=True
-            )
-            return None  # Don't retry
-        except TypeError as e:
-            logger.error(
-                f"TypeError during search query generation: {e}. Check SDK method signature.",
-                exc_info=True,
-            )
-            return None  # Don't retry SDK usage errors
-        except AttributeError as e:
-            logger.error(
-                f"AttributeError during search query generation: {e}. Check SDK usage.",
-                exc_info=True,
-            )
-            return None  # Don't retry SDK usage errors
-        except DeadlineExceeded:
-            logger.warning(
-                f"Search query generation timed out (Attempt {retries+1}/{max_retries+1})."
-            )
-            retries += 1
-        except NotFound as e:
-            logger.error(f"Model '{model_name}' not found for query generation: {e}")
-            return None  # Don't retry if model not found
-        except GoogleAPIError as e:
-            logger.error(
-                f"Google API error during search query generation (Attempt {retries+1}/{max_retries+1}): {e}"
-            )
-            err_str = str(e).lower()
-            if "api key not valid" in err_str:
-                logger.error(
-                    "API key invalid during search query generation. Aborting."
-                )
-                return None  # Don't retry if key is invalid
-            if "resource has been exhausted" in err_str or "429" in str(e):
-                logger.warning("Quota/Rate limit hit during query generation.")
-                # Could implement backoff here, but for now just retry once if allowed
-                retries += 1
-            # Safety check moved to response processing above
-            else:
-                # For other API errors, retry once if allowed
-                retries += 1
-        except Exception as e:
-            logger.error(
-                f"Unexpected error during search query generation (Attempt {retries+1}/{max_retries+1}): {e}",
-                exc_info=True,
-            )
-            retries += 1  # Retry unexpected errors once
-
-    logger.error(f"Search query generation failed after {max_retries+1} attempts.")
-    return None
+# --- Generate Search Query --- (REMOVED - Functionality to be handled by LLM Tool)
+# def generate_search_query(user_message: str, max_retries=1) -> str | None:
+#    ... (entire function content removed) ...
 
 
-# Removed _yield_streaming_error helper function
+# Removed _yield_streaming_error helper function (This comment line is also removed as part of the block)
 
 
 # --- Chat Response Generation ---
@@ -1571,131 +1374,74 @@ def _generate_chat_response_stream(
                 break # Break from main tool loop
 
         # --- Error Handling for Streaming API Call (client.models.generate_content_stream call itself) ---
-    except InvalidArgument as e:
-        logger.error(
-            f"InvalidArgument error during streaming chat {chat_id} (SID: {sid}): {e}.",
-            exc_info=True,
-        )
-        full_reply_content = f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
-        emit_error_once(full_reply_content)
-    except ValidationError as e:
-        logger.error(
-            f"Data validation error calling streaming Gemini API for chat {chat_id} (SID: {sid}): {e}",
-            exc_info=True,
-        )
+        except InvalidArgument as e:
+            logger.error(f"InvalidArgument error during streaming chat {chat_id} (Iter. {iteration}): {e}.", exc_info=True)
+            full_reply_content = f"[AI Error: Invalid argument or unsupported file type ({type(e).__name__}).]"
+            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True; break
+        except ValidationError as e: # Should be caught by Pydantic if request is malformed by SDK
+            logger.error(f"Data validation error calling streaming Gemini API for chat {chat_id} (Iter. {iteration}): {e}", exc_info=True)
+            full_reply_content = f"[AI Error: Internal data format error. Check logs.]"
+            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True; break
+        except DeadlineExceeded:
+            logger.error(f"Streaming Gemini API call timed out for chat {chat_id} (Iter. {iteration}).")
+            full_reply_content = "[AI Error: The request timed out. Please try again.]"
+            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True; break
+        except NotFound as e:
+            logger.error(f"Model for streaming chat {chat_id} (Iter. {iteration}) not found: {e}")
+            full_reply_content = f"[AI Error: Model '{model_to_use}' not found or access denied.]"
+            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True; break
+        except GoogleAPIError as e:
+            logger.error(f"Google API error for streaming chat {chat_id} (Iter. {iteration}): {e}", exc_info=False)
+            err_str = str(e).lower()
+            if "api key not valid" in err_str: full_reply_content = "[Error: Invalid Gemini API Key]"
+            elif "permission denied" in err_str: full_reply_content = f"[AI Error: Permission denied for model.]"
+            elif "resource has been exhausted" in err_str or "429" in str(e): full_reply_content = "[AI Error: API quota or rate limit exceeded.]"
+            elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper(): full_reply_content = f"[AI Safety Error: Request/response blocked (Reason: SAFETY)]"
+            elif "internal error" in err_str or "500" in str(e): full_reply_content = "[AI Error: AI service internal error.]"
+            else: full_reply_content = f"[AI API Error: {type(e).__name__}]"
+            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True; break
+        except Exception as e:
+            logger.error(f"Unexpected error during streaming API interaction for chat {chat_id} (Iter. {iteration}): {e}", exc_info=True)
+            full_reply_content = f"[Unexpected AI Error: {type(e).__name__}]"
+            if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+            emitted_error_or_cancel_final_signal = True; break
+        
+        if emitted_error_or_cancel_final_signal: # If any error broke the inner chunk loop or API call
+             break # Break from main tool loop
+
+    # Loop finished
+    if iteration == MAX_TOOL_ITERATIONS -1 and not emitted_error_or_cancel_final_signal and not full_reply_content.strip(): # Check strip here
+        logger.warning(f"Max tool iterations ({MAX_TOOL_ITERATIONS}) reached for streaming chat {chat_id}.")
+        full_reply_content = "[AI Error: Maximum tool iterations reached. Could not complete request.]"
+        if not emitted_error_or_cancel_final_signal: socketio.emit("task_error", {"error": full_reply_content}, room=sid)
+        emitted_error_or_cancel_final_signal = True
+
+    if not full_reply_content.strip() and not emitted_error_or_cancel_final_signal :
+        # If loop finished, no text was streamed, and no specific error was sent
+        full_reply_content = "[System Note: The AI did not return any streamable content after tool use or iterations.]"
+        logger.warning(f"Streaming for chat {chat_id} yielded no content. Saving placeholder.")
+        socketio.emit("task_error", {"error": full_reply_content}, room=sid) # Send a final signal
+        emitted_error_or_cancel_final_signal = True
+
+
+    # --- Save Full Accumulated Reply to DB ---
+    if full_reply_content: # Save whatever was accumulated, including error/cancel messages
+        logger.info(f"Attempting to save final streamed assistant message for chat {chat_id}. Length: {len(full_reply_content)}")
         try:
-            error_details = f"{e.errors()[0]['type']} on field '{'.'.join(map(str,e.errors()[0]['loc']))}'"
-        except Exception:
-            error_details = "Check logs."
-        full_reply_content = f"[AI Error: Internal data format error. {error_details}]"
-        emit_error_once(full_reply_content)
-    except DeadlineExceeded:
-        logger.error(
-            f"Streaming Gemini API call timed out for chat {chat_id} (SID: {sid})."
-        )
-        full_reply_content = "[AI Error: The request timed out. Please try again.]"
-        emit_error_once(full_reply_content)
-    except NotFound as e:
-        logger.error(f"Model for streaming chat {chat_id} (SID: {sid}) not found: {e}")
-        full_reply_content = (
-            f"[AI Error: Model '{model_to_use}' not found or access denied.]"
-        )
-        emit_error_once(full_reply_content)
-    except GoogleAPIError as e:
-        logger.error(
-            f"Google API error for streaming chat {chat_id} (SID: {sid}): {e}",
-            exc_info=False,
-        )
-        err_str = str(e).lower()
-        if "api key not valid" in err_str:
-            full_reply_content = "[Error: Invalid Gemini API Key]"
-        elif "permission denied" in err_str:
-            full_reply_content = (
-                f"[AI Error: Permission denied for model. Check API key permissions.]"
-            )
-        elif "resource has been exhausted" in err_str or "429" in str(e):
-            logger.warning(
-                f"Quota/Rate limit hit for streaming chat {chat_id} (SID: {sid})."
-            )
-            full_reply_content = (
-                "[AI Error: API quota or rate limit exceeded. Please try again later.]"
-            )
-        elif "prompt was blocked" in err_str or "SAFETY" in str(e).upper():
-            logger.warning(
-                f"API error indicates safety block for streaming chat {chat_id} (SID: {sid}): {e}"
-            )
-            full_reply_content = f"[AI Safety Error: Request or response blocked due to safety settings (Reason: SAFETY)]"
-        elif "internal error" in err_str or "500" in str(e):
-            logger.error(
-                f"Internal server error from Gemini API for streaming chat {chat_id} (SID: {sid}): {e}"
-            )
-            full_reply_content = (
-                "[AI Error: The AI service encountered an internal error.]"
-            )
-        else:
-            full_reply_content = f"[AI API Error: {type(e).__name__}]"
-        emit_error_once(full_reply_content)
-    except Exception as e:
-        logger.error(
-            f"Unexpected error during streaming Gemini API interaction for chat {chat_id} (SID: {sid}): {e}",
-            exc_info=True,
-        )
-        full_reply_content = f"[Unexpected AI Error: {type(e).__name__}]"
-        emit_error_once(full_reply_content)
-    finally:
-        # --- Save Full Accumulated Reply to DB ---
-        # Ensure we save something, even if it's just an error message, cancellation note, or placeholder
-        if (
-            not full_reply_content.strip() and not cancelled_during_streaming
-        ):  # Check cancel flag too
-            if (
-                not emitted_error
-            ):  # If no specific error was emitted, save a generic note
-                full_reply_content = "[System Note: The AI did not return any content.]"
-                logger.warning(
-                    f"Streaming for chat {chat_id} (SID: {sid}) yielded no content. Saving placeholder."
-                )
-            else:
-                # If an error was emitted, full_reply_content might still be empty if the error happened early.
-                # We rely on the emitted error message for the user, and save a generic note here.
-                full_reply_content = (
-                    "[System Note: An error occurred during streaming.]"
-                    if emitted_error
-                    else "[AI Info: Generation cancelled by user.]"
-                )
-                logger.warning(
-                    f"Saving placeholder/cancellation note for chat {chat_id} (SID: {sid}) after streaming error/cancellation."
-                )
+            save_success = database.add_message_to_db(chat_id, "assistant", full_reply_content, attached_data_json=None)
+            if not save_success:
+                logger.error(f"Failed to save final streamed assistant message for chat {chat_id}.")
+        except Exception as db_err:
+            logger.error(f"DB error saving final streamed assistant message for chat {chat_id}: {db_err}", exc_info=True)
+    else:
+        logger.warning(f"No content (not even error/cancel) to save for streaming chat {chat_id}.")
 
-        # Only attempt DB save if there's content (including error/cancel messages)
-        if full_reply_content:
-            logger.info(
-                f"Attempting to save final streamed assistant message for chat {chat_id} (SID: {sid}). Length: {len(full_reply_content)}"
-            )
-            try:
-                # Assistant messages don't have attached_data in this context
-                save_success = database.add_message_to_db(
-                    chat_id, "assistant", full_reply_content, attached_data_json=None
-                )
-                if not save_success:
-                    logger.error(
-                        f"Failed to save final streamed assistant message for chat {chat_id} (SID: {sid})."
-                    )
-            except Exception as db_err:
-                logger.error(
-                    f"DB error saving final streamed assistant message for chat {chat_id} (SID: {sid}): {db_err}",
-                    exc_info=True,
-                )
-        else:
-            logger.warning(
-                f"No content (not even error/cancel) to save for chat {chat_id} (SID: {sid})."
-            )
-
-        # --- DUPLICATE SAVE BLOCK REMOVED ---
-
-        _cleanup_temp_files(
-            temp_files_to_clean, f"streaming chat {chat_id} (SID: {sid})"
-        )
+    _cleanup_temp_files(temp_files_to_clean, f"streaming chat {chat_id} (SID: {sid})")
 
 
 # --- Helper Function to Prepare History and Content Parts ---
