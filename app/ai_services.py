@@ -13,6 +13,7 @@ from google.genai.types import (
     Schema,
     Type,
     AutomaticFunctionCallingConfig, # Import for AFC
+    Mode,                             # Import for AFC Mode enum
 )
 import json  # For serializing tool responses if needed
 import functools # For partial
@@ -827,7 +828,7 @@ def _generate_chat_response_stream(
                 system_instruction=final_system_prompt,
                 tools=tools_to_provide,  # Pass tools via GenerateContentConfig
                 # Explicitly disable AFC to handle function calls manually
-                automatic_function_calling=AutomaticFunctionCallingConfig(mode=AutomaticFunctionCallingConfig.Mode.NONE)
+                automatic_function_calling=AutomaticFunctionCallingConfig(mode=Mode.NONE)
             )
 
             response_iterator = client.models.generate_content_stream(
