@@ -246,6 +246,7 @@ def _generate_chat_response_stream(
                 "You have access to tools for web searching ('web_search') and scraping specific URLs ('scrape_url').",
                 "IMPORTANT: When you use information obtained from 'web_search' or 'scrape_url', you MUST cite your sources.",
                 "Review the search results or scraped content carefully. Only cite the specific URLs (from the 'link' field in search results or the original URL for scraped content) that directly contributed to your answer.",
+                "If the snippets from 'web_search' are ambiguous or insufficient to fully answer the query, use the 'scrape_url' tool on the most promising URLs from the search results to get more detailed content before formulating your response.",
                 "Do not cite all search results if only some were used.",
                 "Present citations clearly, for example, by listing them at the end of your response or embedding them as inline Markdown links (e.g., [source](URL)).",
                 # ... (detailed tool instructions as in non-streaming version)
