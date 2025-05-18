@@ -281,7 +281,7 @@ def _generate_chat_response_stream(
                 system_instruction=final_system_prompt,
                 tools=tools_to_provide,  # Pass tools via GenerateContentConfig
                 # Explicitly disable AFC to handle function calls manually
-                automatic_function_calling=AutomaticFunctionCallingConfig(mode=Mode.NONE)
+                automatic_function_calling=AutomaticFunctionCallingConfig(disable=True)
             )
 
             response_iterator = client.models.generate_content_stream(
