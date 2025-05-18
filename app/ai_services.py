@@ -848,12 +848,17 @@ def _generate_chat_response_non_stream(
             tools_to_provide = (
                 [WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL] if web_search_enabled else None
             )
+            
+            gen_config_non_stream = GenerateContentConfig(
+                tools=tools_to_provide,
+                system_instruction=final_system_prompt,
+                automatic_function_calling=genai.types.AutomaticFunctionCallingConfig(disable=True)
+            )
 
             response = client.models.generate_content(
                 model=model_to_use,
                 contents=current_conversation_history,
-                tools=tools_to_provide,
-                system_instruction=final_system_prompt,
+                generation_config=gen_config_non_stream, # Pass the config object
             )
             logger.info(
                 f"Non-streaming generate_content call returned (Iteration {iteration}) for chat {chat_id} (SID: {sid})."
@@ -1340,6 +1345,7 @@ def _generate_chat_response_stream(
             gen_config = GenerateContentConfig(
                 system_instruction=final_system_prompt,
                 tools=tools_to_provide,  # Pass tools via GenerateContentConfig
+                automatic_function_calling=genai.types.AutomaticFunctionCallingConfig(disable=True)
             )
 
             response_iterator = client.models.generate_content_stream(
