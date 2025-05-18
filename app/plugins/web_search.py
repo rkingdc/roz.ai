@@ -9,8 +9,7 @@ from urllib.parse import urlparse # To parse URL for filename fallback
 from werkzeug.utils import secure_filename # To sanitize filenames
 import cgi # To parse Content-Disposition header
 
-from app.database import save_file_record_to_db # For AFC to save files
-from app.ai_services import transcribe_pdf_bytes # For AFC to transcribe PDFs
+# Imports for save_file_record_to_db and transcribe_pdf_bytes will be moved into fetch_web_content
 
 
 # Configure logging
@@ -35,6 +34,10 @@ def fetch_web_content(url):
               - 'filename': Original filename if applicable (especially for PDFs).
               - 'saved_file_id': The ID of the saved file record in the database, if successful.
     """
+    # Moved imports here to break circular dependency
+    from app.database import save_file_record_to_db
+    from app.ai_services import transcribe_pdf_bytes
+
     saved_file_id = None # Initialize
     try:
         # Use stream=True to check headers before downloading the whole body
