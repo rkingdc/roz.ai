@@ -1,3 +1,5 @@
+from typing import Callable
+
 # --- Chat Response Generation ---
 # This function now starts the process and uses helpers that emit results via SocketIO.
 # It no longer returns a generator or a string directly.
