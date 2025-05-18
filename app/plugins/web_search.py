@@ -146,7 +146,7 @@ def fetch_web_content(url):
         return {'type': 'error', 'content': f"An unexpected error occurred: {e}", 'url': url} # Removed saved_file_id
 
 
-def perform_web_search(query: str, num_results: int = 3):
+def perform_web_search(query: str, num_results: int = 10):
     """
     Performs a web search using the Google Custom Search JSON API.
     This version is intended for Automatic Function Calling (AFC).
