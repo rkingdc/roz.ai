@@ -530,7 +530,9 @@ def _generate_chat_response_stream(
                             name=function_name, response=tool_response_data
                         )
 
-                    current_conversation_history.append(function_response_part)
+                    # Wrap the function response Part in a Content object with role 'tool'
+                    tool_response_content = Content(role="tool", parts=[function_response_part])
+                    current_conversation_history.append(tool_response_content)
                     # Continue to next iteration of the outer loop for LLM to process tool response
                     if emitted_error_or_cancel_final_signal:
                         break  # if tool execution itself was cancelled/errored critically
