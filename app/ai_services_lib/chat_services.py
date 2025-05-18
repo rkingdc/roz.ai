@@ -5,7 +5,7 @@ import tempfile
 from typing import Callable
 
 from flask import current_app, g
-import google.generativeai as genai
+from google import genai # Changed import
 from google.api_core.exceptions import (
     GoogleAPIError,
     ClientError,
