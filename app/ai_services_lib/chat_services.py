@@ -320,30 +320,28 @@ def _generate_chat_response_stream(
                     break  # Break from chunk loop
 
                 # Process chunk for text, function call, or error
-                chunk_has_text = hasattr(chunk, "text") and chunk.text
-                chunk_has_fc = (
-                    hasattr(chunk, "parts")
-                    and chunk.parts
-                    and hasattr(chunk.parts[0], "function_call")
-                    and chunk.parts[0].function_call
-                )
-
-                if chunk_has_fc:
-                    # This is how Gemini API sends tool calls in streaming
+                # Prioritize function call detection using the chunk's `function_calls` property.
+                if hasattr(chunk, "function_calls") and chunk.function_calls:
                     logger.info(
-                        f"Stream chunk contains function_call part for chat {chat_id}."
+                        f"Stream chunk contains function_call(s) via chunk.function_calls for chat {chat_id}."
                     )
-                    # The entire FunctionCall might be in one part or spread.
-                    # Typically, it's in one part within the chunk.parts list.
-                    current_conversation_history.append(
-                        chunk.candidates[0].content
-                    )  # Add LLM's turn with FC
-                    fc = chunk.parts[0].function_call
-                    # Proceed to tool execution logic (outside this inner chunk loop)
+                    # The model's turn, including the function call, is in chunk.candidates[0].content.
+                    # This needs to be appended to history for the tool processing logic later.
+                    if chunk.candidates and chunk.candidates[0].content:
+                        current_conversation_history.append(chunk.candidates[0].content)
+                        logger.debug(f"Appended candidate content to history for tool call: {chunk.candidates[0].content}")
+                    else:
+                        # This case is unlikely if chunk.function_calls is populated,
+                        # as the property itself derives from candidates[0].content.
+                        # Log an error as this indicates an unexpected state.
+                        logger.error(
+                            "CRITICAL: chunk.function_calls is populated but chunk.candidates[0].content is missing. Tool call processing may fail."
+                        )
+
                     current_chunk_is_tool_call = True
                     break  # Break from chunk loop to handle tool call
 
-                elif chunk_has_text:
+                elif hasattr(chunk, "text") and chunk.text: # Process text only if not a function call
                     socketio.emit("stream_chunk", {"chunk": chunk.text}, room=sid)
                     full_reply_content += chunk.text
 
@@ -378,10 +376,21 @@ def _generate_chat_response_stream(
                     current_chunk_is_tool_call
                 ):  # Only proceed if it was a tool call, not error/cancel
                     # Handle tool call (logic similar to non-streaming)
-                    fc_part = current_conversation_history[-1].parts[
-                        0
-                    ]  # The FC part just added
-                    fc = fc_part.function_call
+                    # The last item in history should be the Content object from the model containing the function call.
+                    model_turn_with_fc = current_conversation_history[-1]
+                    if not (hasattr(model_turn_with_fc, "function_calls") and model_turn_with_fc.function_calls):
+                        logger.error(
+                            "CRITICAL: Expected function_calls in the last history item for tool processing, but not found."
+                        )
+                        # This indicates a problem with history append or chunk structure.
+                        # Emit an error and stop further processing in this iteration.
+                        tool_error_msg = "[System Error: Failed to extract function call for tool execution.]"
+                        socketio.emit("task_error", {"error": tool_error_msg}, room=sid)
+                        full_reply_content += f"\n{tool_error_msg}"
+                        emitted_error_or_cancel_final_signal = True
+                        break # Break from the outer tool processing loop
+
+                    fc = model_turn_with_fc.function_calls[0] # Use the first function call
                     function_name = fc.name
                     function_args = fc.args
                     logger.info(
