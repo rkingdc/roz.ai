@@ -1097,8 +1097,29 @@ def _prepare_chat_content(
 
 
 # --- Helper Function to Clean Up Temporary Files ---
-# (No changes needed in _cleanup_temp_files)
-# _cleanup_temp_files remains here as it's used by _prepare_chat_content which is still in this file.
+def _cleanup_temp_files(temp_files: list, context_msg: str):
+    """Helper to delete temporary files, with logging."""
+    if not temp_files:
+        return
+    logger.info(f"Cleaning up {len(temp_files)} temporary files for: {context_msg}")
+    for temp_file_path in temp_files:
+        try:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+                logger.debug(f"Successfully removed temp file: {temp_file_path}")
+            else:
+                logger.warning(
+                    f"Temp file not found for cleanup (already removed?): {temp_file_path}"
+                )
+        except OSError as e:
+            logger.error(
+                f"Error removing temp file {temp_file_path}: {e}", exc_info=True
+            )
+        except Exception as e:
+            logger.error(
+                f"Unexpected error removing temp file {temp_file_path}: {e}",
+                exc_info=True,
+            )
 
 # --- Transcript Cleaning --- has been moved to app/ai_services_lib/transcription_services.py
 
