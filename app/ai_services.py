@@ -30,6 +30,7 @@ from .plugins.web_search import (
 )  # Added fetch_web_content
 from .ai_services_lib.generation_services import generate_text # Import generate_text
 from .ai_services_lib.llm_factory import llm_factory, prompt_improver # Import llm_factory and prompt_improver
+from .ai_services_lib.transcription_services import clean_up_transcript, transcribe_pdf_bytes # Import transcription services
 from google.api_core.exceptions import (
     GoogleAPIError,
     DeadlineExceeded,
