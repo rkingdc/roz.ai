@@ -1,8 +1,6 @@
 import google.genai as genai
-# from google.genai.types import Part, Content # Not directly used by generate_text, but by client.models.generate_content response
 from google.api_core.exceptions import (
     GoogleAPIError,
-    DeadlineExceeded,
     ClientError,
     NotFound,
     InvalidArgument,
