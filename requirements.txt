@@ -16,7 +16,7 @@ google-auth==2.39.0
 google-auth-httplib2==0.2.0
 google-cloud-speech==2.26.1 # Added Google Cloud Speech API library
 google-auth-oauthlib==1.2.1
-google-generativeai==0.8.5
+google-genai # Changed from google-generativeai
 googleapis-common-protos==1.70.0
 grpcio==1.71.0
 grpcio-status==1.71.0
