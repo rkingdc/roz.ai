@@ -7,6 +7,7 @@ from google.genai.types import (
     Content,
     Blob,  # Import Blob for inline data
     FileData,  # Import FileData for referencing uploaded files
+    GenerateContentConfig,
 )
 
 from flask import current_app, g  # Import g for request context caching
@@ -1241,6 +1242,9 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
             response_iterator = client.models.generate_content_stream(
                 model=model_to_use,
                 contents=full_conversation,  # Send the potentially modified history
+                config=GenerateContentConfig(
+                    system_instruction=system_prompt
+        ),
                 # system_instruction=system_prompt, # Still unsupported
             )
             logger.info(
