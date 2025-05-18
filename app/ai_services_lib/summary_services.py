@@ -8,7 +8,7 @@ from flask import current_app, g  # Import g for request context caching
 import tempfile
 import os
 
-from . import database  # Use alias to avoid conflict with db instance
+from .. import database  # Use alias to avoid conflict with db instance
 
 from google.api_core.exceptions import (
     GoogleAPIError,
