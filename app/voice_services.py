@@ -1,20 +1,19 @@
 import logging
-import uuid # For generating unique filenames
-from google.cloud import speech, storage # Import storage client
+import uuid  # For generating unique filenames
+from google.cloud import speech, storage  # Import storage client
 from google.api_core.exceptions import (
     GoogleAPICallError,
-    NotFound,
     InvalidArgument,
     OutOfRange,
 )
-import os
-from flask import current_app, g  # Import g for potential context caching if needed
+
+from flask import current_app
 import threading
 import queue  # For passing audio chunks between threads
-from datetime import datetime, timedelta # Import datetime and timedelta
 
 # Import the new cleanup function
 from app.ai_services import clean_up_transcript
+
 # Import the socketio instance directly from the app package
 from app import socketio
 
@@ -24,11 +23,6 @@ logger = logging.getLogger(__name__)
 # Key: session ID (sid), Value: queue.Queue
 audio_queues = {}
 _queue_lock = threading.Lock()
-
-# Ensure credentials are set (the library often picks up the env var automatically)
-# You might need to explicitly point to the credentials file if the env var isn't set
-# before the app starts, though relying on the standard env var is preferred.
-# Example: client = speech.SpeechClient.from_service_account_json(current_app.config['GOOGLE_APPLICATION_CREDENTIALS'])
 
 
 def transcribe_audio(
@@ -65,7 +59,7 @@ def transcribe_audio(
             # Explicitly set channel count based on error message (WebM header indicates 2)
             audio_channel_count=2,
             # enable_separate_recognition_per_channel=True, # Keep removed for now, add back if needed after fixing channel count
-            model="latest_long", # Optional: Specify model for better accuracy in some cases
+            model="latest_long",  # Optional: Specify model for better accuracy in some cases
             # enable_automatic_punctuation=True, # Optional: Add punctuation
         )
 
@@ -122,7 +116,9 @@ def transcribe_audio(
 
 
 # --- NEW: Non-Streaming Transcription Function ---
-def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", encoding: str = "WEBM_OPUS") -> str | None:
+def transcribe_audio_file(
+    audio_bytes: bytes, language_code: str = "en-US", encoding: str = "WEBM_OPUS"
+) -> str | None:
     """
     Transcribes a complete audio file using Google Cloud Speech-to-Text non-streaming API.
 
@@ -135,13 +131,15 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
     Returns:
         The full transcript string, or None if transcription fails.
     """
-    logger.info(f"Starting non-streaming transcription for audio ({len(audio_bytes)} bytes), encoding: {encoding}")
+    logger.info(
+        f"Starting non-streaming transcription for audio ({len(audio_bytes)} bytes), encoding: {encoding}"
+    )
 
     gcs_uri = None
     gcs_blob_name = None
     storage_client = None
     bucket = None
-    blob = None # Keep blob reference for setting expiration
+    blob = None  # Keep blob reference for setting expiration
 
     try:
         # --- Upload audio to GCS ---
@@ -151,32 +149,41 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
             raise ValueError("GCS bucket name not configured.")
         # --- ADD Check for invalid bucket name format ---
         if "://" in gcs_bucket_name:
-            logger.error(f"Invalid GCS_BUCKET_NAME format: '{gcs_bucket_name}'. It should not contain '://'. Please check environment variable.")
+            logger.error(
+                f"Invalid GCS_BUCKET_NAME format: '{gcs_bucket_name}'. It should not contain '://'. Please check environment variable."
+            )
             raise ValueError("Invalid GCS bucket name format.")
         # ---------------------------------------------
 
-        storage_client = storage.Client() # Assumes GOOGLE_APPLICATION_CREDENTIALS
+        storage_client = storage.Client()  # Assumes GOOGLE_APPLICATION_CREDENTIALS
         bucket = storage_client.bucket(gcs_bucket_name)
 
         # Generate a unique blob name
-        gcs_blob_name = f"audio-transcripts-temp/{uuid.uuid4()}.webm" # Store in a subfolder
-        blob = bucket.blob(gcs_blob_name) # Assign to blob variable
+        gcs_blob_name = (
+            f"audio-transcripts-temp/{uuid.uuid4()}.webm"  # Store in a subfolder
+        )
+        blob = bucket.blob(gcs_blob_name)  # Assign to blob variable
 
         logger.info(f"Uploading audio to GCS: gs://{gcs_bucket_name}/{gcs_blob_name}")
         # Upload the bytes directly
-        blob.upload_from_string(audio_bytes, content_type='audio/webm') # Specify content type
+        blob.upload_from_string(
+            audio_bytes, content_type="audio/webm"
+        )  # Specify content type
         gcs_uri = f"gs://{gcs_bucket_name}/{gcs_blob_name}"
         logger.info("Audio uploaded successfully to GCS.")
         # --- End GCS Upload ---
 
-
-        client = speech.SpeechClient() # Speech client
+        client = speech.SpeechClient()  # Speech client
 
         # Determine the correct RecognitionConfig.AudioEncoding based on the input string
         try:
-            google_encoding = getattr(speech.RecognitionConfig.AudioEncoding, encoding.upper())
+            google_encoding = getattr(
+                speech.RecognitionConfig.AudioEncoding, encoding.upper()
+            )
         except AttributeError:
-            logger.error(f"Unsupported audio encoding string for Google API: {encoding}")
+            logger.error(
+                f"Unsupported audio encoding string for Google API: {encoding}"
+            )
             # Fallback or raise error - Returning None is safer than guessing
             return None
 
@@ -187,7 +194,7 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         config = speech.RecognitionConfig(
             encoding=google_encoding,
             language_code=language_code,
-            model='latest_long',
+            model="latest_long",
             # sample_rate_hertz=48000, # Example: Add if needed for your encoding (e.g., LINEAR16)
             # --- FIX: Explicitly set channel count to match WEBM header ---
             audio_channel_count=2,
@@ -200,7 +207,9 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         audio = speech.RecognitionAudio(uri=gcs_uri)
         # ------------------------------------
 
-        logger.info(f"Sending GCS URI ({gcs_uri}) to Google Speech-to-Text API (long_running_recognize)...")
+        logger.info(
+            f"Sending GCS URI ({gcs_uri}) to Google Speech-to-Text API (long_running_recognize)..."
+        )
         operation = client.long_running_recognize(config=config, audio=audio)
         logger.info("Waiting for long-running transcription operation to complete...")
 
@@ -210,26 +219,35 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         try:
             # Use google.api_core.exceptions.TimeoutError if needed, but standard TimeoutError should work
             from concurrent.futures import TimeoutError
+
             response = operation.result(timeout=1800)
             logger.info("Long-running transcription operation finished.")
         except TimeoutError:
-            logger.error("Timeout waiting for long-running transcription operation to complete.")
+            logger.error(
+                "Timeout waiting for long-running transcription operation to complete."
+            )
             # Optionally try to cancel the operation: operation.cancel()
             return None
         except Exception as op_error:
-            logger.error(f"Error during long-running transcription operation: {op_error}", exc_info=True)
+            logger.error(
+                f"Error during long-running transcription operation: {op_error}",
+                exc_info=True,
+            )
             return None
-
 
         if not response.results:
             logger.warning("Long-running transcription response contained no results.")
-            return "" # Return empty string if no speech detected
+            return ""  # Return empty string if no speech detected
 
         # Concatenate results if multiple are returned (unlikely for recognize but safe)
         full_transcript = " ".join(
-            result.alternatives[0].transcript for result in response.results if result.alternatives
+            result.alternatives[0].transcript
+            for result in response.results
+            if result.alternatives
         )
-        logger.info(f"Non-streaming transcription successful. Transcript length: {len(full_transcript)}")
+        logger.info(
+            f"Non-streaming transcription successful. Transcript length: {len(full_transcript)}"
+        )
 
         # Return raw transcript for now
         return full_transcript.strip()
@@ -241,7 +259,9 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         )
         return None
     except GoogleAPICallError as e:
-        logger.error(f"Google Speech API call failed during non-streaming: {e}", exc_info=True)
+        logger.error(
+            f"Google Speech API call failed during non-streaming: {e}", exc_info=True
+        )
         return None
     except Exception as e:
         logger.error(f"Error during non-streaming transcription: {e}", exc_info=True)
@@ -260,7 +280,7 @@ def transcribe_audio_file(audio_bytes: bytes, language_code: str = "en-US", enco
         #     except Exception as delete_err:
         #         logger.error(f"Failed to delete temporary GCS file {gcs_blob_name}: {delete_err}", exc_info=True)
         # --- End REMOVED GCS Cleanup ---
-        pass # Keep the finally block but remove the deletion logic
+        pass  # Keep the finally block but remove the deletion logic
 
 
 # --- Streaming Transcription ---
@@ -404,9 +424,9 @@ def _google_listen_print_loop(
         # Pass the streaming_config object directly as the 'config' argument.
         # The 'requests' generator will yield only the audio chunks.
         responses = client.streaming_recognize(
-            config=streaming_config, # Pass the config object here
+            config=streaming_config,  # Pass the config object here
             requests=requests,
-            timeout=STREAM_LIMIT_SECONDS + 10
+            timeout=STREAM_LIMIT_SECONDS + 10,
         )  # Add buffer to timeout
 
         # Process responses from Google
@@ -427,13 +447,25 @@ def _google_listen_print_loop(
 
             # Display interim results, but don't store them permanently yet
             if not result.is_final:
-                logger.debug(f"SID {sid} - Emitting Interim transcript: {transcript}") # Add specific log
+                logger.debug(
+                    f"SID {sid} - Emitting Interim transcript: {transcript}"
+                )  # Add specific log
                 # Use socketio.emit directly
-                socketio.emit('transcript_update', {'transcript': transcript, 'is_final': False}, room=sid)
+                socketio.emit(
+                    "transcript_update",
+                    {"transcript": transcript, "is_final": False},
+                    room=sid,
+                )
             else:
-                logger.info(f"SID {sid} - Emitting Final transcript: {transcript}") # Add specific log
+                logger.info(
+                    f"SID {sid} - Emitting Final transcript: {transcript}"
+                )  # Add specific log
                 # Use socketio.emit directly
-                socketio.emit('transcript_update', {'transcript': transcript, 'is_final': True}, room=sid)
+                socketio.emit(
+                    "transcript_update",
+                    {"transcript": transcript, "is_final": True},
+                    room=sid,
+                )
                 # Here you could potentially trigger the LLM cleanup if desired,
                 # but it would happen *after* this final segment is received.
                 # For now, we just send the final raw segment.
@@ -445,20 +477,30 @@ def _google_listen_print_loop(
         # Stream limit reached
         logger.warning(f"Google API stream limit likely reached for SID {sid}: {e}")
         # Use socketio.emit directly
-        socketio.emit('transcription_error', {'error': "Transcription stream duration limit reached."}, room=sid)
+        socketio.emit(
+            "transcription_error",
+            {"error": "Transcription stream duration limit reached."},
+            room=sid,
+        )
     except GoogleAPICallError as e:
         logger.error(
             f"Google API call error during streaming for SID {sid}: {e}", exc_info=True
         )
         # Use socketio.emit directly
-        socketio.emit('transcription_error', {'error': f"Google API Error: {e}"}, room=sid)
+        socketio.emit(
+            "transcription_error", {"error": f"Google API Error: {e}"}, room=sid
+        )
     except Exception as e:
         logger.error(
             f"Unexpected error in Google listener loop for SID {sid}: {e}",
             exc_info=True,
         )
         # Use socketio.emit directly
-        socketio.emit('transcription_error', {'error': f"Unexpected Transcription Error: {e}"}, room=sid)
+        socketio.emit(
+            "transcription_error",
+            {"error": f"Unexpected Transcription Error: {e}"},
+            room=sid,
+        )
     finally:
         # Clean up the audio queue associated with this SID
         with _queue_lock:
@@ -481,10 +523,16 @@ def _google_listen_print_loop(
         # Emit a final completion signal AFTER cleanup attempt
         try:
             # Use socketio.emit directly
-            socketio.emit('transcription_complete', {'message': 'Transcription processing finished.'}, room=sid)
+            socketio.emit(
+                "transcription_complete",
+                {"message": "Transcription processing finished."},
+                room=sid,
+            )
             logger.info(f"Emitted transcription_complete for SID: {sid}")
         except Exception as emit_err:
-            logger.error(f"Error emitting transcription_complete for SID {sid}: {emit_err}")
+            logger.error(
+                f"Error emitting transcription_complete for SID {sid}: {emit_err}"
+            )
 
         logger.info(f"Google listener loop finished for SID: {sid}")
 
