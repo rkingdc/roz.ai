@@ -376,21 +376,21 @@ def _generate_chat_response_stream(
                     current_chunk_is_tool_call
                 ):  # Only proceed if it was a tool call, not error/cancel
                     # Handle tool call (logic similar to non-streaming)
-                    # The last item in history should be the Content object from the model containing the function call.
-                    model_turn_with_fc = current_conversation_history[-1]
-                    if not (hasattr(model_turn_with_fc, "function_calls") and model_turn_with_fc.function_calls):
+                    # The 'chunk' variable from the inner loop (which broke due to function_calls)
+                    # still holds the GenerateContentResponse containing the function call.
+                    if not (hasattr(chunk, "function_calls") and chunk.function_calls):
+                        # This should ideally not happen if current_chunk_is_tool_call is true
+                        # and the detection logic for setting it was correct.
                         logger.error(
-                            "CRITICAL: Expected function_calls in the last history item for tool processing, but not found."
+                            "CRITICAL: current_chunk_is_tool_call is true, but the 'chunk' object from stream lacks 'function_calls'."
                         )
-                        # This indicates a problem with history append or chunk structure.
-                        # Emit an error and stop further processing in this iteration.
-                        tool_error_msg = "[System Error: Failed to extract function call for tool execution.]"
+                        tool_error_msg = "[System Error: Inconsistent state for tool call extraction.]"
                         socketio.emit("task_error", {"error": tool_error_msg}, room=sid)
                         full_reply_content += f"\n{tool_error_msg}"
                         emitted_error_or_cancel_final_signal = True
                         break # Break from the outer tool processing loop
-
-                    fc = model_turn_with_fc.function_calls[0] # Use the first function call
+                    
+                    fc = chunk.function_calls[0] # Use the first function call directly from the stream chunk
                     function_name = fc.name
                     function_args = fc.args
                     logger.info(
