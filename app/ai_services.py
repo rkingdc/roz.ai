@@ -28,6 +28,7 @@ from .plugins.web_search import (
     perform_web_search,
     fetch_web_content,
 )  # Added fetch_web_content
+from .ai_services_lib.generation_services import generate_text # Import generate_text
 from google.api_core.exceptions import (
     GoogleAPIError,
     DeadlineExceeded,
