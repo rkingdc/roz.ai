@@ -9,8 +9,7 @@ from urllib.parse import urlparse # To parse URL for filename fallback
 from werkzeug.utils import secure_filename # To sanitize filenames
 import cgi # To parse Content-Disposition header
 
-# Imports for save_file_record_to_db and transcribe_pdf_bytes will be moved into fetch_web_content
-
+# Imports for save_file_record_to_db and transcribe_pdf_bytes are removed as they are no longer used.
 
 # Configure logging
 import logging
@@ -34,11 +33,10 @@ def fetch_web_content(url):
               - 'filename': Original filename if applicable (especially for PDFs).
               - 'saved_file_id': The ID of the saved file record in the database, if successful.
     """
-    # Moved imports here to break circular dependency
-    from app.database import save_file_record_to_db
-    from app.ai_services import transcribe_pdf_bytes
+    # Imports for save_file_record_to_db and transcribe_pdf_bytes are removed
+    # as they are no longer used directly in this function with manual tool calling.
 
-    saved_file_id = None # Initialize
+    saved_file_id = None # Initialize - though this won't be set here anymore
     try:
         # Use stream=True to check headers before downloading the whole body
         response = requests.get(url, timeout=15, stream=True, headers={'User-Agent': 'MyWebApp/1.0'})
@@ -77,33 +75,10 @@ def fetch_web_content(url):
             # Ensure it has a .pdf extension if missing (common issue)
             if not filename.lower().endswith('.pdf'):
                 filename += ".pdf"
-            logger.info(f"Sanitized PDF filename for AFC: {filename}")
+            logger.info(f"Sanitized PDF filename: {filename}") # Removed "for AFC"
 
-            # Transcribe PDF using the imported function
-            logger.info(f"Transcribing PDF '{filename}' for AFC...")
-            transcribed_text = transcribe_pdf_bytes(pdf_bytes, filename) # from app.ai_services
-
-            if transcribed_text.startswith(("[Error", "[System Note")):
-                logger.warning(f"PDF transcription failed for '{filename}' during AFC: {transcribed_text}")
-                return {'type': 'error', 'content': f"PDF transcription failed: {transcribed_text}", 'url': url, 'filename': filename}
-
-            logger.info(f"Successfully transcribed PDF '{filename}' for AFC.")
-            # Save the transcribed text to DB
-            try:
-                transcribed_filename = f"transcribed_{filename}.txt"
-                content_bytes_to_save = transcribed_text.encode('utf-8')
-                mimetype_to_save = 'text/plain'
-                filesize_to_save = len(content_bytes_to_save)
-                saved_file_id = save_file_record_to_db(transcribed_filename, content_bytes_to_save, mimetype_to_save, filesize_to_save)
-                if saved_file_id:
-                    logger.info(f"Saved transcribed PDF text from {url} as file ID {saved_file_id} ({transcribed_filename}) for AFC.")
-                else:
-                    logger.error(f"Failed to save transcribed PDF text from {url} to database for AFC.")
-            except Exception as e_save:
-                logger.error(f"Exception saving transcribed PDF text from {url} to DB for AFC: {e_save}", exc_info=True)
-                # Continue without saved_file_id, but return content
-
-            return {'type': 'transcribed_pdf_text', 'content': transcribed_text, 'url': url, 'filename': filename, 'saved_file_id': saved_file_id}
+            # Return raw PDF bytes; transcription and saving will be handled by the caller (ai_services)
+            return {'type': 'pdf', 'content': pdf_bytes, 'url': url, 'filename': filename}
 
         # --- HTML Handling ---
         # Proceed only if it's likely HTML (or unspecified, default to HTML attempt)
@@ -148,43 +123,27 @@ def fetch_web_content(url):
                 text = text.replace(chr(10), " ").replace(chr(13), " ") # Replace newlines within paragraphs with spaces
                 text = '\n'.join(line.strip() for line in text.splitlines() if line.strip()) # Remove leading/trailing whitespace from lines and remove empty lines
                 text = text.strip()
-
-                # Save the extracted HTML text to DB
-                try:
-                    base_filename = urlparse(url).path.split('/')[-1] or urlparse(url).netloc or "scraped_page"
-                    html_filename = secure_filename(f"{base_filename[:100]}.html")
-                    content_bytes_to_save = text.encode('utf-8')
-                    mimetype_to_save = 'text/html' # Or text/plain if we consider it purely extracted text
-                    filesize_to_save = len(content_bytes_to_save)
-                    saved_file_id = save_file_record_to_db(html_filename, content_bytes_to_save, mimetype_to_save, filesize_to_save)
-                    if saved_file_id:
-                        logger.info(f"Saved HTML content from {url} as file ID {saved_file_id} ({html_filename}) for AFC.")
-                    else:
-                        logger.error(f"Failed to save HTML content from {url} to database for AFC.")
-                except Exception as e_save:
-                    logger.error(f"Exception saving HTML content from {url} to DB for AFC: {e_save}", exc_info=True)
-                    # Continue without saved_file_id, but return content
-
-                return {'type': 'html', 'content': text, 'url': url, 'saved_file_id': saved_file_id}
+                # DB saving will be handled by the caller (ai_services)
+                return {'type': 'html', 'content': text, 'url': url} # Removed saved_file_id
             else:
                  # If no text could be extracted even if HTML structure was found
-                 return {'type': 'error', 'content': "Could not extract text content from HTML.", 'url': url, 'saved_file_id': None}
+                 return {'type': 'error', 'content': "Could not extract text content from HTML.", 'url': url} # Removed saved_file_id
 
         # --- Handle other content types ---
         else:
-            logger.warning(f"Unsupported Content-Type '{content_type}' at {url}. Skipping content extraction for AFC.")
-            return {'type': 'error', 'content': f"Unsupported content type: {content_type}", 'url': url, 'saved_file_id': None}
+            logger.warning(f"Unsupported Content-Type '{content_type}' at {url}. Skipping content extraction.") # Removed "for AFC"
+            return {'type': 'error', 'content': f"Unsupported content type: {content_type}", 'url': url} # Removed saved_file_id
 
     except requests.exceptions.Timeout:
-        logger.error(f"Timeout error fetching content from {url} for AFC.")
-        return {'type': 'error', 'content': "Request timed out.", 'url': url, 'saved_file_id': None}
+        logger.error(f"Timeout error fetching content from {url}") # Removed "for AFC"
+        return {'type': 'error', 'content': "Request timed out.", 'url': url} # Removed saved_file_id
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error fetching content from {url} for AFC: {e}")
-        return {'type': 'error', 'content': f"Network or HTTP error: {e}", 'url': url, 'saved_file_id': None}
+        logger.error(f"Error fetching content from {url}: {e}") # Removed "for AFC"
+        return {'type': 'error', 'content': f"Network or HTTP error: {e}", 'url': url} # Removed saved_file_id
     except Exception as e:
         # Catch potential BeautifulSoup errors or others
-        logger.error(f"An unexpected error occurred while processing content from {url} for AFC: {e}", exc_info=True)
-        return {'type': 'error', 'content': f"An unexpected error occurred: {e}", 'url': url, 'saved_file_id': None}
+        logger.error(f"An unexpected error occurred while processing content from {url}: {e}", exc_info=True) # Removed "for AFC"
+        return {'type': 'error', 'content': f"An unexpected error occurred: {e}", 'url': url} # Removed saved_file_id
 
 
 def perform_web_search(query: str, num_results: int = 3):
