@@ -826,7 +826,8 @@ def _generate_chat_response_stream(
             gen_config = GenerateContentConfig(
                 system_instruction=final_system_prompt,
                 tools=tools_to_provide,  # Pass tools via GenerateContentConfig
-                automatic_function_calling=genai.types.AutomaticFunctionCallingConfig(disable=True)
+                # AFC is enabled by default when Python functions are provided as tools.
+                # automatic_function_calling=genai.types.AutomaticFunctionCallingConfig(disable=True) # This line removed to enable AFC
             )
 
             response_iterator = client.models.generate_content_stream(
