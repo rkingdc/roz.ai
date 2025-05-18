@@ -849,16 +849,17 @@ def _generate_chat_response_non_stream(
                 [WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL] if web_search_enabled else None
             )
             
-            gen_config_non_stream = GenerateContentConfig(
+            # Consolidate all config into one object for the 'config' parameter
+            gen_config_non_stream = genai.types.GenerateContentConfig(
                 tools=tools_to_provide,
-                system_instruction=final_system_prompt,
+                system_instruction=final_system_prompt, # system_instruction is part of GenerateContentConfig
                 automatic_function_calling=genai.types.AutomaticFunctionCallingConfig(disable=True)
             )
 
             response = client.models.generate_content(
                 model=model_to_use,
                 contents=current_conversation_history,
-                generation_config=gen_config_non_stream, # Pass the config object
+                config=gen_config_non_stream, # Use 'config' parameter name
             )
             logger.info(
                 f"Non-streaming generate_content call returned (Iteration {iteration}) for chat {chat_id} (SID: {sid})."
