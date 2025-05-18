@@ -151,13 +151,12 @@ def perform_web_search(query, num_results=3):
         num_results (int): The desired number of search results (max 10 per request).
 
     Returns:
-        list: A list of dictionaries, where each dictionary contains title, link, snippet,
-              fetch_result (with type, content, url, [filename]), and potentially saved_file_id.
+        list: A list of dictionaries, where each dictionary contains:
+              - 'title': The title of the search result.
+              - 'link': The URL of the search result.
+              - 'snippet': A snippet of text from the search result.
               Returns an empty list or a list with error messages on failure.
     """
-    # Moved import here to break circular dependency
-    from app.database import save_file_record_to_db
-
     logger.info(
         f"Performing Google Custom Search for: '{query}' (requesting {num_results} results)"
     )
@@ -190,55 +189,16 @@ def perform_web_search(query, num_results=3):
             link = item.get("link", "no link")
             snippet = item.get("snippet", "No Snippet Available").replace(chr(10), ' ').replace(chr(13), ' ')
 
-            logger.info(f"Fetching content for result {i+1}: {link}")
-            fetch_result = fetch_web_content(link)
-
-            saved_file_id = None
-            if fetch_result['type'] == 'html' and fetch_result['content']:
-                html_text = fetch_result['content']
-                # Create a filename from title or URL
-                base_filename = title if title != "No Title" else urlparse(link).path.split('/')[-1]
-                if not base_filename: # if path is like '/'
-                    base_filename = urlparse(link).netloc
-                html_filename = secure_filename(f"{base_filename[:100]}.html")
-
-                content_bytes = html_text.encode('utf-8')
-                mimetype = 'text/html'
-                filesize = len(content_bytes)
-                try:
-                    saved_file_id = save_file_record_to_db(html_filename, content_bytes, mimetype, filesize)
-                    if saved_file_id:
-                        logger.info(f"Saved HTML content from {link} as file ID {saved_file_id} ({html_filename})")
-                    else:
-                        logger.error(f"Failed to save HTML content from {link} to database.")
-                except Exception as e_save:
-                    logger.error(f"Exception saving HTML content from {link} to DB: {e_save}", exc_info=True)
-
-            elif fetch_result['type'] == 'pdf' and fetch_result['content']:
-                pdf_bytes = fetch_result['content']
-                pdf_filename = fetch_result['filename'] # Already secured
-                mimetype = 'application/pdf'
-                filesize = len(pdf_bytes)
-                try:
-                    saved_file_id = save_file_record_to_db(pdf_filename, pdf_bytes, mimetype, filesize)
-                    if saved_file_id:
-                        logger.info(f"Saved PDF content from {link} as file ID {saved_file_id} ({pdf_filename})")
-                    else:
-                        logger.error(f"Failed to save PDF content from {link} to database.")
-                except Exception as e_save:
-                    logger.error(f"Exception saving PDF content from {link} to DB: {e_save}", exc_info=True)
+            # Content fetching and saving are no longer done here.
+            # These will be handled by the "scrape_url" tool if the LLM decides to use it.
 
             result_data = {
                 'title': title,
                 'link': link,
                 'snippet': snippet,
-                'fetch_result': fetch_result, # Contains type, content, url, [filename]
             }
-            if saved_file_id:
-                result_data['saved_file_id'] = saved_file_id
-
             search_results_processed.append(result_data)
-            logger.info(f"  - Processed Result {i+1}: {title} ({fetch_result['type']}) - Saved File ID: {saved_file_id}")
+            logger.info(f"  - Found Result {i+1}: {title}")
 
         return search_results_processed
 
