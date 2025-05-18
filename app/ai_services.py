@@ -1211,13 +1211,16 @@ def _generate_chat_response_stream(
             logger.info(f"Calling model.generate_content_stream (Iteration {iteration}) for chat {chat_id}.")
             tools_to_provide = [WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL] if web_search_enabled else None
             
-            # GenerateContentConfig is needed for system_instruction with streaming
-            gen_config = GenerateContentConfig(system_instruction=final_system_prompt)
+            # GenerateContentConfig is needed for system_instruction and tools with streaming
+            gen_config = GenerateContentConfig(
+                system_instruction=final_system_prompt,
+                tools=tools_to_provide # Pass tools via GenerateContentConfig
+            )
 
             response_iterator = client.models.generate_content_stream(
                 model=model_to_use,
                 contents=current_conversation_history,
-                tools=tools_to_provide,
+                # tools=tools_to_provide, # Removed from here
                 generation_config=gen_config,
             )
             
