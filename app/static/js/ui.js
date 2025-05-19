@@ -21,8 +21,7 @@ import { markedRenderer } from './config.js'; // Import the custom renderer from
 // Module-level variable to store parsed H1 sections for the current note
 let _currentNoteH1Sections = [];
 
-// No direct imports of api.js here to break the cycle.
-// Event listeners will import api functions dynamically when needed.
+import * as api from './api.js'; // Import API functions
 
 /**
  * Waits for GraphViewer to be available and then processes diagrams.
@@ -1487,12 +1486,12 @@ export function updatePluginUI() {
         return;
     }
     const activeTab = state.currentTab;
-    const showFilesPlugin = activeTab === 'chat';
-    elements.filePluginSection.classList.toggle('hidden', !showFilesPlugin);
-    const showCalendarPlugin = activeTab === 'chat';
-    elements.calendarPluginSection.classList.toggle('hidden', !showCalendarPlugin);
-    const showHistoryPlugin = activeTab === 'notes';
-    elements.historyPluginSection.classList.toggle('hidden', !showHistoryPlugin);
+    const showFilesPlugin = activeTab === 'chat'; // Files plugin only for chat
+    if (elements.filePluginSection) elements.filePluginSection.classList.toggle('hidden', !showFilesPlugin);
+    const showCalendarPlugin = activeTab === 'chat'; // Calendar plugin only for chat
+    if (elements.calendarPluginSection) elements.calendarPluginSection.classList.toggle('hidden', !showCalendarPlugin);
+    const showHistoryPlugin = activeTab === 'notes'; // History plugin only for notes
+    if (elements.historyPluginSection) elements.historyPluginSection.classList.toggle('hidden', !showHistoryPlugin);
 
     if (showFilesPlugin) {
         renderUploadedFiles();
@@ -1568,43 +1567,87 @@ export function renderChatInputArea() {
 
 
 /**
- * Switches between the Chat and Notes tabs (updates UI visibility).
- * @param {'chat' | 'notes'} tab - The desired tab ('chat' or 'notes').
+ * Switches between the Chat, Notes, and TODO tabs (updates UI visibility).
+ * @param {'chat' | 'notes' | 'todo'} tab - The desired tab.
  */
 export function switchTab(tab) {
     const {
-        chatNavButton, notesNavButton, chatSection, notesSection,
+        chatNavButton, notesNavButton, // Sidebar nav buttons
+        chatTabButton, notesTabButton, todoTabButton, filesTabButton, searchTabButton, // Main header nav buttons
+        chatSection, notesSection, todoSection, // Main content sections (todoSection was todoTabContent)
+        filesTabContent, searchTabContent, // Other main content sections
         chatSidebarContent, notesSidebarContent, modelSelectorContainer,
         notesModeElements, inputArea
     } = elements;
 
-    if (!chatNavButton || !notesNavButton || !chatSection || !notesSection ||
-        !chatSidebarContent || !notesSidebarContent || !modelSelectorContainer ||
-        !notesModeElements || !inputArea ) {
-        console.error("Missing elements for tab switching.");
+    // Check for essential elements for basic tab switching
+    if (!chatTabButton || !notesTabButton || !todoTabButton || !filesTabButton || !searchTabButton ||
+        !chatSection || !notesSection || !todoSection || !filesTabContent || !searchTabContent) {
+        console.error("Missing essential elements for tab switching in main content or header.", {
+            chatTabButton, notesTabButton, todoTabButton, filesTabButton, searchTabButton,
+            chatSection, notesSection, todoSection, filesTabContent, searchTabContent
+        });
         return;
     }
 
-    chatNavButton.classList.toggle('active', tab === 'chat');
-    notesNavButton.classList.toggle('active', tab === 'notes');
-    if (chatSection) chatSection.classList.toggle('hidden', tab !== 'chat');
-    if (notesSection) notesSection.classList.toggle('hidden', tab !== 'notes');
-    if (chatSidebarContent) chatSidebarContent.classList.toggle('hidden', tab !== 'chat');
-    if (notesSidebarContent) notesSidebarContent.classList.toggle('hidden', tab !== 'notes');
-    if (modelSelectorContainer) modelSelectorContainer.classList.toggle('hidden', tab === 'notes');
-    if (notesModeElements) notesModeElements.classList.toggle('hidden', tab === 'chat');
-    if (inputArea) inputArea.classList.toggle('hidden', tab !== 'chat');
 
-    renderCurrentChatDetails();
-    renderCurrentNoteDetails();
+    // Main navigation tab buttons in the header
+    const mainNavTabs = [
+        { button: elements.chatTabButton, name: 'chat', content: elements.chatSection },
+        { button: elements.notesTabButton, name: 'notes', content: elements.notesSection },
+        { button: elements.todoTabButton, name: 'todo', content: elements.todoSection },
+        { button: elements.filesTabButton, name: 'files', content: elements.filesTabContent },
+        { button: elements.searchTabButton, name: 'search', content: elements.searchTabContent }
+    ];
+
+    mainNavTabs.forEach(navTab => {
+        if (navTab.button) {
+            if (navTab.name === tab) {
+                navTab.button.classList.add('bg-[--rz-accent-default]', 'text-white');
+                navTab.button.classList.remove('text-[--rz-text-tertiary]', 'hover:text-[--rz-text-primary]');
+            } else {
+                navTab.button.classList.remove('bg-[--rz-accent-default]', 'text-white');
+                navTab.button.classList.add('text-[--rz-text-tertiary]', 'hover:text-[--rz-text-primary]');
+            }
+        }
+        // Toggle content visibility
+        if (navTab.content) {
+            navTab.content.classList.toggle('hidden', navTab.name !== tab);
+        } else {
+            console.warn(`Content area for tab '${navTab.name}' not found in elements object.`);
+        }
+    });
+    
+    // Sidebar navigation (Chat/Notes) - these are secondary to the main tabs now
+    if (elements.chatNavButton) elements.chatNavButton.classList.toggle('active', tab === 'chat');
+    if (elements.notesNavButton) elements.notesNavButton.classList.toggle('active', tab === 'notes');
+    // No specific sidebar nav button for TODO yet, main tabs handle it.
+
+    // Toggle sidebar content visibility
+    if (elements.chatSidebarContent) elements.chatSidebarContent.classList.toggle('hidden', tab !== 'chat');
+    if (elements.notesSidebarContent) elements.notesSidebarContent.classList.toggle('hidden', tab !== 'notes');
+    // TODO: Add a sidebar section for TODOs if needed in the future
+
+    // Toggle header elements specific to certain tabs
+    if (elements.modelSelectorContainer) elements.modelSelectorContainer.classList.toggle('hidden', tab !== 'chat');
+    if (elements.notesModeElements) elements.notesModeElements.classList.toggle('hidden', tab !== 'notes');
+    if (elements.inputArea) elements.inputArea.classList.toggle('hidden', tab !== 'chat');
+
+
+    renderCurrentChatDetails(); // Safe to call, checks elements internally
+    renderCurrentNoteDetails(); // Safe to call, checks elements internally
 
     if (tab === 'chat') {
         renderChatHistory();
-    } else {
+    } else if (tab === 'notes') {
         renderNoteContent();
         setNoteMode(state.currentNoteMode);
+    } else if (tab === 'todo') {
+        renderTodoList(); 
+        resetTodoForm();  
+        // api.loadTodoItems() is called by eventListeners.js when tab is switched.
     }
-    updatePluginUI();
+    updatePluginUI(); 
     updateNotesCleanupButtonState();
     updateChatCleanupButtonState();
 }
@@ -2639,3 +2682,253 @@ export function renderNoteSearchResults() {
 }
 
 // ---------------------------------
+
+// --- TODO List UI Functions ---
+
+/**
+ * Clears the TODO form fields and resets the hidden ID input.
+ */
+export function resetTodoForm() {
+    if (!elements.todoForm) return;
+    elements.todoForm.reset(); // Resets form to default values
+    if (elements.todoIdInput) elements.todoIdInput.value = ''; // Clear hidden ID
+    if (elements.todoFormSaveButton) elements.todoFormSaveButton.textContent = 'Save Task'; // Updated text
+    state.setCurrentTodoItem(null); // Clear current editing item from state
+}
+
+/**
+ * Populates the TODO form with data from a given TODO item for editing.
+ * @param {object} todoItem - The TODO item data.
+ */
+export function populateTodoForm(todoItem) {
+    if (!elements.todoForm || !todoItem) {
+        resetTodoForm(); // If no item, ensure form is clear
+        return;
+    }
+    if (elements.todoIdInput) elements.todoIdInput.value = todoItem.id;
+    if (elements.todoNameInput) elements.todoNameInput.value = todoItem.name;
+    if (elements.todoDetailsInput) elements.todoDetailsInput.value = todoItem.details || '';
+    if (elements.todoCategoryInput) elements.todoCategoryInput.value = todoItem.category || '';
+    if (elements.todoPriorityInput) elements.todoPriorityInput.value = todoItem.priority;
+    if (elements.todoStatusInput) elements.todoStatusInput.value = todoItem.status;
+    if (elements.todoDueDateInput) {
+        // Ensure due_date is in YYYY-MM-DD format for the input[type="date"]
+        elements.todoDueDateInput.value = todoItem.due_date ? todoItem.due_date.split('T')[0] : '';
+    }
+    if (elements.todoFormSaveButton) elements.todoFormSaveButton.textContent = 'Update Task'; // Updated text
+    elements.todoNameInput?.focus();
+    elements.todoNameInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+
+/**
+ * Renders the list of TODO items from the state into the todoListContainer.
+ */
+export function renderTodoList() {
+    if (!elements.todoListContainer) {
+        console.error("TODO list container element not found.");
+        return;
+    }
+    elements.todoListContainer.innerHTML = ''; // Clear current list
+
+    const todos = state.todoItems;
+
+    if (state.isLoadingTodos) {
+        elements.todoListContainer.innerHTML = '<p class="text-[--rz-text-muted] text-center py-4">Loading TODO items...</p>';
+        return;
+    }
+
+    if (!todos || todos.length === 0) {
+        elements.todoListContainer.innerHTML = '<p class="text-[--rz-text-muted] text-center py-4">No TODO items yet. Add one above!</p>';
+        return;
+    }
+
+    // Sort by status (pending, in-progress, completed), then by due date (nulls last, earlier dates first), then by priority (high, medium, low)
+    const priorityOrder = { high: 1, medium: 2, low: 3, default: 4 };
+    const statusOrder = { pending: 1, 'in-progress': 2, completed: 3, default: 4 };
+
+    const sortedTodos = [...todos].sort((a, b) => {
+        // Status: pending first, then in-progress, then completed
+        const statusA = statusOrder[a.status] || statusOrder.default;
+        const statusB = statusOrder[b.status] || statusOrder.default;
+        if (statusA !== statusB) {
+            return statusA - statusB;
+        }
+
+        // Due date: nulls last, earlier dates first
+        const dateA = a.due_date ? new Date(a.due_date + 'T00:00:00') : null; // Ensure local date parsing
+        const dateB = b.due_date ? new Date(b.due_date + 'T00:00:00') : null; // Ensure local date parsing
+
+        if (dateA && dateB) {
+            if (dateA.getTime() !== dateB.getTime()) return dateA - dateB;
+        } else if (dateA) {
+            return -1; // a has date, b does not, a comes first
+        } else if (dateB) {
+            return 1;  // b has date, a does not, b comes first
+        }
+        // Priority: high, medium, low
+        const priorityA = priorityOrder[a.priority] || priorityOrder.default;
+        const priorityB = priorityOrder[b.priority] || priorityOrder.default;
+        return priorityA - priorityB;
+    });
+
+
+    sortedTodos.forEach(todo => {
+        const itemEl = document.createElement('div');
+        itemEl.className = `todo-item p-5 mb-4 rounded-xl shadow-lg border flex flex-col md:flex-row md:items-start gap-4 transition-all duration-150 ease-in-out ${getTodoItemBgColor(todo.status, todo.due_date)}`;
+        itemEl.dataset.todoId = todo.id;
+
+        // Main content block (Name, Details, Category)
+        const mainContent = document.createElement('div');
+        mainContent.className = 'flex-grow min-w-0'; // Added min-w-0 for flexbox truncation
+
+        const nameEl = document.createElement('h4');
+        nameEl.className = `text-xl font-semibold break-words ${todo.status === 'completed' ? 'line-through text-gray-500 dark:text-gray-400' : 'text-[--rz-text-primary]'}`;
+        nameEl.textContent = todo.name;
+        mainContent.appendChild(nameEl);
+
+        if (todo.details) {
+            const detailsEl = document.createElement('p');
+            detailsEl.className = `text-sm mt-2 break-words ${todo.status === 'completed' ? 'text-gray-400 dark:text-gray-500' : 'text-[--rz-text-secondary]'}`;
+            // Simple whitespace preservation for newlines in details
+            detailsEl.style.whiteSpace = 'pre-wrap';
+            detailsEl.textContent = todo.details;
+            mainContent.appendChild(detailsEl);
+        }
+        if (todo.category) {
+            const categoryEl = document.createElement('p');
+            categoryEl.className = `text-xs mt-3 inline-block px-3 py-1 rounded-full font-medium bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200`;
+            categoryEl.textContent = todo.category;
+            mainContent.appendChild(categoryEl);
+        }
+        
+        itemEl.appendChild(mainContent);
+
+        // Info block (Priority, Status, Due Date) - Aligned to the right on larger screens
+        const infoBlock = document.createElement('div');
+        infoBlock.className = 'flex flex-col md:items-end md:text-right space-y-2 md:space-y-1 md:w-52 flex-shrink-0 mt-4 md:mt-0'; // Adjusted width and spacing
+
+        const priorityEl = document.createElement('span');
+        priorityEl.className = `text-xs font-semibold px-3 py-1 rounded-full ${getPriorityBadgeColor(todo.priority)}`;
+        priorityEl.textContent = `P: ${todo.priority.charAt(0).toUpperCase() + todo.priority.slice(1)}`;
+        infoBlock.appendChild(priorityEl);
+        
+        const statusEl = document.createElement('span');
+        statusEl.className = `text-xs font-semibold px-3 py-1 rounded-full ${getStatusBadgeColor(todo.status)}`;
+        statusEl.textContent = todo.status.charAt(0).toUpperCase() + todo.status.slice(1).replace('-', ' ');
+        infoBlock.appendChild(statusEl);
+
+        if (todo.due_date) {
+            const dueDateEl = document.createElement('p');
+            const dueDate = new Date(todo.due_date + 'T00:00:00'); // Ensure date is parsed as local
+            dueDateEl.className = `text-sm font-medium ${getDueDateColor(todo.due_date, todo.status)}`;
+            dueDateEl.textContent = `Due: ${dueDate.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}`;
+            infoBlock.appendChild(dueDateEl);
+        }
+        
+        itemEl.appendChild(infoBlock);
+
+        // Actions block (Edit, Delete) - Always at the end
+        const actionsEl = document.createElement('div');
+        actionsEl.className = 'flex items-center space-x-3 mt-4 md:mt-0 md:ml-6 flex-shrink-0';
+
+        const editButton = document.createElement('button');
+        editButton.className = 'btn btn-icon btn-sm text-[--rz-text-secondary] hover:text-[--rz-accent-default] p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700';
+        editButton.innerHTML = '<i class="fas fa-edit fa-fw"></i>'; // Added fa-fw for fixed width
+        editButton.title = "Edit TODO";
+        editButton.addEventListener('click', () => {
+            state.setCurrentTodoItem(todo); 
+        });
+
+        const deleteButton = document.createElement('button');
+        deleteButton.className = 'btn btn-icon btn-sm text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/50';
+        deleteButton.innerHTML = '<i class="fas fa-trash-alt fa-fw"></i>'; // Added fa-fw
+        deleteButton.title = "Delete TODO";
+        deleteButton.addEventListener('click', async () => {
+            await api.deleteTodoItem(todo.id);
+        });
+        
+        actionsEl.appendChild(editButton);
+        actionsEl.appendChild(deleteButton);
+        itemEl.appendChild(actionsEl);
+
+        elements.todoListContainer.appendChild(itemEl);
+    });
+}
+
+function getTodoItemBgColor(status, dueDateStr) {
+    if (status === 'completed') {
+        return 'bg-green-50 border-green-300 dark:bg-green-900/50 dark:border-green-700 opacity-70 hover:opacity-100';
+    }
+    if (dueDateStr) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dueDate = new Date(dueDateStr + 'T00:00:00'); 
+
+        if (dueDate < today) {
+            return 'bg-red-50 border-red-300 dark:bg-red-900/50 dark:border-red-700 hover:shadow-red-200/50'; 
+        } else if (dueDate.getTime() === today.getTime()) {
+            return 'bg-yellow-50 border-yellow-300 dark:bg-yellow-900/50 dark:border-yellow-700 hover:shadow-yellow-200/50'; 
+        }
+    }
+    return 'bg-white border-[--rz-border-light] dark:bg-gray-800 dark:border-gray-700 hover:shadow-indigo-100/50'; 
+}
+
+function getPriorityBadgeColor(priority) {
+    switch (priority) {
+        case 'high': return 'bg-red-100 text-red-800 dark:bg-red-700 dark:text-red-100 border border-red-300 dark:border-red-600';
+        case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-100 border border-yellow-300 dark:border-yellow-600';
+        case 'low': return 'bg-blue-100 text-blue-800 dark:bg-blue-700 dark:text-blue-100 border border-blue-300 dark:border-blue-600';
+        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-100 border border-gray-300 dark:border-gray-500';
+    }
+}
+
+function getStatusBadgeColor(status) {
+     switch (status) {
+        case 'pending': return 'bg-orange-100 text-orange-800 dark:bg-orange-700 dark:text-orange-100 border border-orange-300 dark:border-orange-600';
+        case 'in-progress': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-700 dark:text-indigo-100 border border-indigo-300 dark:border-indigo-600';
+        case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-700 dark:text-green-100 border border-green-300 dark:border-green-600';
+        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-100 border border-gray-300 dark:border-gray-500';
+    }
+}
+
+function getDueDateColor(dueDateStr, status) {
+    if (status === 'completed') {
+        return 'text-gray-500 dark:text-gray-400';
+    }
+    if (dueDateStr) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dueDate = new Date(dueDateStr + 'T00:00:00');
+
+        if (dueDate < today) return 'text-red-600 dark:text-red-400 font-bold'; 
+        if (dueDate.getTime() === today.getTime()) return 'text-yellow-600 dark:text-yellow-400 font-bold'; 
+    }
+    return 'text-[--rz-text-muted] dark:text-gray-400'; 
+}
+
+
+// --- TODO State Change Handlers ---
+export function handleStateChange_todoItems() {
+    renderTodoList();
+}
+
+export function handleStateChange_currentTodoItem() {
+    populateTodoForm(state.currentTodoItem);
+}
+
+export function handleStateChange_isLoadingTodos() {
+    if (state.isLoadingTodos && elements.todoListContainer) {
+        elements.todoListContainer.innerHTML = '<p class="text-[--rz-text-muted] text-center py-4">Loading TODO items...</p>';
+    }
+    // Disable form elements if loading TODOs or globally loading
+    const formShouldBeDisabled = state.isLoadingTodos || state.isLoading;
+    if (elements.todoForm) {
+        const formElements = elements.todoForm.elements;
+        for (let i = 0; i < formElements.length; i++) {
+            formElements[i].disabled = formShouldBeDisabled;
+        }
+    }
+}
+
+// --- End TODO List UI Functions ---

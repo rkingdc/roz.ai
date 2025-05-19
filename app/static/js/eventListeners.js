@@ -966,19 +966,34 @@ export function setupEventListeners() {
     elements.chatNavButton?.addEventListener('click', () => {
         handleTabSwitchClick('chat');
     });
-    elements.notesNavButton?.addEventListener('click', () => {
+    elements.notesNavButton?.addEventListener('click', () => { // Sidebar nav
         handleTabSwitchClick('notes');
     });
+    // Main header tab buttons
+    elements.chatTabButton?.addEventListener('click', () => handleTabSwitchClick('chat'));
+    elements.notesTabButton?.addEventListener('click', () => handleTabSwitchClick('notes'));
+    elements.todoTabButton?.addEventListener('click', () => handleTabSwitchClick('todo'));
+    elements.filesTabButton?.addEventListener('click', () => handleTabSwitchClick('files'));
+    elements.searchTabButton?.addEventListener('click', () => handleTabSwitchClick('search'));
+
 
     async function handleTabSwitchClick(tab) {
-        if (state.currentTab === tab) return;
-        state.setCurrentTab(tab);
+        if (state.currentTab === tab) return; // Don't re-process if already on the tab
+
+        state.setCurrentTab(tab); // This will trigger ui.switchTab via state subscription
         localStorage.setItem(config.ACTIVE_TAB_KEY, tab);
+
+        // Load initial data for the selected tab if it's one of the core data tabs
+        // Other tabs like 'files' or 'search' might not need initial data load here,
+        // or their content is loaded on demand.
         if (tab === 'chat') {
             await api.loadInitialChatData();
-        } else {
+        } else if (tab === 'notes') {
             await api.loadInitialNotesData();
+        } else if (tab === 'todo') {
+            await api.loadTodoItems(); // Load TODO items when switching to the TODO tab
         }
+        // For 'files' and 'search', content is typically loaded via user interaction within those tabs.
     }
 
     // --- Notes Interactions ---
@@ -1288,6 +1303,11 @@ function subscribeStateChangeListeners() {
     state.subscribe('targetMessageIdToScroll', ui.handleStateChange_targetMessageIdToScroll);
     // -----------------------------------
 
+    // --- TODO State Subscriptions ---
+    state.subscribe('todoItems', ui.handleStateChange_todoItems);
+    state.subscribe('currentTodoItem', ui.handleStateChange_currentTodoItem);
+    state.subscribe('isLoadingTodos', ui.handleStateChange_isLoadingTodos);
+    // ------------------------------
 
     elements.chatbox?.addEventListener('click', (event) => {
         const copyButton = event.target.closest('.copy-message-button');
@@ -1362,3 +1382,52 @@ function handleCalendarToggleChange() {
     state.setCalendarContextActive(isActive);
     localStorage.setItem('calendarContextActive', isActive);
 }
+
+// --- TODO Form Event Handlers and Listeners ---
+async function handleTodoFormSubmit(event) {
+    event.preventDefault();
+    if (!elements.todoForm) return;
+
+    const id = elements.todoIdInput?.value;
+    const name = elements.todoNameInput?.value.trim();
+    const details = elements.todoDetailsInput?.value.trim();
+    const category = elements.todoCategoryInput?.value.trim();
+    const priority = elements.todoPriorityInput?.value;
+    const status = elements.todoStatusInput?.value;
+    const dueDate = elements.todoDueDateInput?.value || null;
+
+    if (!name) {
+        showToast("Task name is required.", { type: 'warning' });
+        elements.todoNameInput?.focus();
+        return;
+    }
+
+    const todoData = { name, details, category, priority, status, due_date: dueDate };
+
+    let success = false;
+    if (id) {
+        const updatedTodo = await api.updateTodoItem(parseInt(id), todoData);
+        if (updatedTodo) success = true;
+    } else {
+        const newTodo = await api.createTodoItem(todoData);
+        if (newTodo) success = true;
+    }
+
+    if (success) {
+        ui.resetTodoForm(); 
+    }
+}
+
+function handleTodoFormClear() {
+    ui.resetTodoForm(); 
+    state.setCurrentTodoItem(null); 
+}
+
+// Attach listeners for TODO form
+if (elements.todoForm) {
+    elements.todoForm.addEventListener('submit', handleTodoFormSubmit);
+}
+if (elements.todoFormClearButton) {
+    elements.todoFormClearButton.addEventListener('click', handleTodoFormClear);
+}
+// --- End TODO Form Event Handlers and Listeners ---

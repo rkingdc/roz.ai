@@ -60,13 +60,16 @@ async function initializeApp() {
 
 
         // Load data for the initial tab based on persisted ID or default
-        if (state.currentTab === 'chat') { // Use getter
-             await api.loadInitialChatData(); // Updates state (currentChatId, chatHistory, attachedFiles, uploadedFiles, etc.)
-             // UI updates triggered by state changes within loadInitialChatData (loadChat, startNewChat)
-        } else { // state.currentTab === 'notes' // Use getter
-             await api.loadInitialNotesData(); // Updates state (currentNoteId, noteContent, uploadedFiles, etc.)
-             // UI updates triggered by state changes within loadInitialNotesData (loadNote, startNewNote)
+        if (state.currentTab === 'chat') {
+             await api.loadInitialChatData();
+        } else if (state.currentTab === 'notes') {
+             await api.loadInitialNotesData();
+        } else if (state.currentTab === 'todo') {
+            // Ensure TODO items are loaded if TODO is the initial tab
+            await api.loadTodoItems();
         }
+        // For 'files' and 'search' tabs, data is typically loaded on demand via user interaction within the tab,
+        // so no specific initial data load might be needed here unless desired.
 
 
         // --- Final Initial UI Render ---
@@ -98,7 +101,7 @@ function loadPersistedStates() {
 
     // Load initial tab
     const storedTab = localStorage.getItem(config.ACTIVE_TAB_KEY);
-    state.setCurrentTab((storedTab === 'chat' || storedTab === 'notes') ? storedTab : 'chat');
+    state.setCurrentTab((storedTab === 'chat' || storedTab === 'notes' || storedTab === 'todo' || storedTab === 'files' || storedTab === 'search') ? storedTab : 'chat');
 
     // Load current IDs (will be used by loadInitialData)
     const persistedChatId = localStorage.getItem('currentChatId');
