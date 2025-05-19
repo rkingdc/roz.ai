@@ -1458,8 +1458,11 @@ if (todoFormClearButtonElement) {
         });
     }
 
-    if (elements.closeTodoModalButton) {
-        elements.closeTodoModalButton.addEventListener('click', () => {
+    const closeTodoModalButtonElement = document.getElementById('close-todo-modal-button');
+    console.log('[EVENT DEBUG] Setting up TODO Modal close button listener. closeTodoModalButtonElement (re-fetched):', closeTodoModalButtonElement);
+    if (closeTodoModalButtonElement) {
+        closeTodoModalButtonElement.addEventListener('click', () => {
+            console.log('[EVENT DEBUG] TODO Modal close button CLICKED.');
             ui.hideModal(elements.todoModal);
         });
     }
