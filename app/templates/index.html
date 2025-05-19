@@ -314,50 +314,7 @@
                             <i class="fas fa-plus mr-2"></i>New Task
                         </button>
                     </div>
-                    <!-- Form will be moved to a modal -->
-                    <div class="flex-grow overflow-y-auto bg-[--rz-background-light] p-6 rounded-xl shadow-xl border border-[--rz-border-light]">
-                        <input type="hidden" id="todo-id"> <!-- This hidden input is part of the form, but form is moved. It will be part of the modal form. -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label for="todo-name" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Task Name <span class="text-red-500">*</span></label>
-                                <input type="text" id="todo-name" name="name" required class="input-field" placeholder="e.g., Finish project report">
-                            </div>
-                            <div>
-                                <label for="todo-due-date" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Due Date</label>
-                                <input type="date" id="todo-due-date" name="due_date" class="input-field">
-                            </div>
-                        </div>
-                        <div class="mt-6">
-                            <label for="todo-details" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Details</label>
-                            <textarea id="todo-details" name="details" rows="3" class="input-field" placeholder="Add more details about the task..."></textarea>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                            <div>
-                                <label for="todo-category" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Category</label>
-                                <input type="text" id="todo-category" name="category" class="input-field" placeholder="e.g., Work, Personal">
-                            </div>
-                            <div>
-                                <label for="todo-priority" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Priority</label>
-                                <select id="todo-priority" name="priority" class="input-field">
-                                    <option value="low">Low</option>
-                                    <option value="medium" selected>Medium</option>
-                                    <option value="high">High</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label for="todo-status" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Status</label>
-                                <select id="todo-status" name="status" class="input-field">
-                                    <option value="pending" selected>Pending</option>
-                                    <option value="in-progress">In Progress</option>
-                                    <option value="completed">Completed</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="mt-8 flex items-center justify-end space-x-4">
-                            <button type="button" id="todo-form-clear-button" class="btn btn-outline">Clear Form</button>
-                            <button type="submit" id="todo-form-save-button" class="btn btn-primary">Save Task</button>
-                        </div>
-                    </form>
+                    <!-- The form is now in the modal. This area is for displaying the list of tasks. -->
                     <div class="flex-grow overflow-y-auto bg-[--rz-background-light] p-6 rounded-xl shadow-xl border border-[--rz-border-light]">
                          <div class="flex justify-between items-center mb-6">
                             <h3 class="text-2xl font-semibold text-[--rz-text-primary]">Current Tasks</h3>
