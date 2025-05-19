@@ -337,6 +337,7 @@ export function populateElements() {
     // elements.todoTabButton is populated with other main nav tab buttons
     elements.todoSection = document.getElementById('todo-tab-content'); // Already populated above
     elements.newTaskButton = document.getElementById('new-task-button');
+    console.log('[DOM DEBUG] Attempting to get new-task-button. Result:', elements.newTaskButton); // ADDED LOG
     elements.todoModal = document.getElementById('todo-modal');
     elements.todoModalTitle = document.getElementById('todo-modal-title');
     elements.closeTodoModalButton = document.getElementById('close-todo-modal-button');
