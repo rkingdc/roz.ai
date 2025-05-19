@@ -122,6 +122,26 @@ class NoteHistory(db.Model):
     note = db.relationship("Note", back_populates="history")
 
 
+class TodoItem(db.Model):
+    __tablename__ = "todo_items"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    details = db.Column(db.Text, nullable=True)
+    category = db.Column(db.String(100), nullable=True)
+    priority = db.Column(db.String(50), nullable=False, default="medium") # e.g., 'high', 'medium', 'low'
+    status = db.Column(db.String(50), nullable=False, default="pending") # e.g., 'pending', 'in-progress', 'completed'
+    due_date = db.Column(db.Date, nullable=True) # Using Date for due_date, can be DateTime if time is needed
+    created_at = db.Column(
+        db.DateTime(timezone=True), nullable=False, default=default_utcnow
+    )
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=default_utcnow,
+        onupdate=default_utcnow,
+    )
+
+
 # FTS5 Virtual Table Definitions
 
 # For Message content
