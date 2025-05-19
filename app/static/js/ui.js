@@ -1552,16 +1552,25 @@ export function updateCalendarStatus() {
 export function renderChatInputArea() {
     const {
         fileUploadSessionLabel, webSearchToggleLabel, webSearchToggle, calendarToggle,
-        deepResearchToggleLabel, deepResearchToggle, improvePromptToggleLabel, improvePromptToggle
+        deepResearchToggleLabel, deepResearchToggle, improvePromptToggleLabel, improvePromptToggle,
+        inputArea // Added inputArea to hide the whole thing
     } = elements;
 
-    if (fileUploadSessionLabel) fileUploadSessionLabel.classList.toggle('hidden', false);
+    const isChatTab = state.currentTab === 'chat';
+
+    if (inputArea) inputArea.classList.toggle('hidden', !isChatTab);
+
+    if (!isChatTab) return; // Don't update individual controls if not on chat tab
+
+    // These elements are inside inputArea, so their visibility is already handled.
+    // Keeping these checks for logical completeness or if layout changes.
+    if (fileUploadSessionLabel) fileUploadSessionLabel.classList.toggle('hidden', !isChatTab);
     if (calendarToggle) calendarToggle.checked = state.isCalendarContextActive;
-    if (webSearchToggleLabel) webSearchToggleLabel.classList.toggle('hidden', false);
+    if (webSearchToggleLabel) webSearchToggleLabel.classList.toggle('hidden', !isChatTab);
     if (webSearchToggle) webSearchToggle.checked = state.isWebSearchEnabled;
-    if (deepResearchToggleLabel) deepResearchToggleLabel.classList.toggle('hidden', false);
+    if (deepResearchToggleLabel) deepResearchToggleLabel.classList.toggle('hidden', !isChatTab);
     if (deepResearchToggle) deepResearchToggle.checked = state.isDeepResearchEnabled;
-    if (improvePromptToggleLabel) improvePromptToggleLabel.classList.toggle('hidden', false);
+    if (improvePromptToggleLabel) improvePromptToggleLabel.classList.toggle('hidden', !isChatTab);
     if (improvePromptToggle) improvePromptToggle.checked = state.isImprovePromptEnabled;
 }
 
