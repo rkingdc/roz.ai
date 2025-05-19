@@ -1382,6 +1382,7 @@ function handleCalendarToggleChange() {
 // --- TODO Form Event Handlers and Listeners ---
 async function handleTodoFormSubmit(event) {
     event.preventDefault();
+    console.log("[EVENT DEBUG] handleTodoFormSubmit: event.preventDefault() called."); // ADDED LOG
     if (!elements.todoForm) return;
 
     const id = elements.todoIdInput?.value;
