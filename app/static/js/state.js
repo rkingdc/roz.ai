@@ -75,6 +75,12 @@ export let chatSearchQuery = '';
 export let targetMessageIdToScroll = null; // Stores message_id to scroll to
 // -------------------------
 
+// --- TODO List State ---
+export let todoItems = []; // Array of {id, name, details, category, priority, status, due_date, created_at, updated_at}
+export let currentTodoItem = null; // The todo item currently being edited, or null
+export let isLoadingTodos = false;
+// -----------------------
+
 
 // --- Internal State for Notifications ---
 const listeners = new Map();
@@ -113,6 +119,61 @@ function notify(eventType, data) {
         });
     }
 }
+
+// --- TODO List Setters ---
+export function setTodoItems(items) {
+    todoItems = Array.isArray(items) ? items : [];
+    notify('todoItems', todoItems);
+}
+
+export function addTodoItemToState(item) {
+    // Avoid duplicates if item already exists (e.g., from a rapid re-fetch)
+    const index = todoItems.findIndex(t => t.id === item.id);
+    if (index === -1) {
+        todoItems.push(item);
+    } else {
+        todoItems[index] = item; // Update if exists
+    }
+    // Optionally, sort after adding. Depends on desired behavior.
+    // todoItems.sort((a, b) => new Date(a.due_date || '9999-12-31') - new Date(b.due_date || '9999-12-31'));
+    notify('todoItems', todoItems);
+}
+
+export function updateTodoItemInState(updatedItem) {
+    const index = todoItems.findIndex(t => t.id === updatedItem.id);
+    if (index !== -1) {
+        todoItems[index] = { ...todoItems[index], ...updatedItem };
+        // Optionally, re-sort
+        notify('todoItems', todoItems);
+    } else {
+        // If not found, could add it or log a warning
+        console.warn(`updateTodoItemInState: Item with ID ${updatedItem.id} not found in state. Adding it.`);
+        addTodoItemToState(updatedItem);
+    }
+}
+
+export function removeTodoItemFromState(itemId) {
+    const initialLength = todoItems.length;
+    todoItems = todoItems.filter(t => t.id !== itemId);
+    if (todoItems.length !== initialLength) {
+        notify('todoItems', todoItems);
+    }
+}
+
+export function setCurrentTodoItem(item) {
+    if (currentTodoItem !== item) { // Basic check, could be more robust for objects
+        currentTodoItem = item;
+        notify('currentTodoItem', currentTodoItem);
+    }
+}
+
+export function setIsLoadingTodos(loading) {
+    if (isLoadingTodos !== loading) {
+        isLoadingTodos = loading;
+        notify('isLoadingTodos', isLoadingTodos);
+    }
+}
+// --- End TODO List Setters ---
 
 /**
  * Subscribes a listener function to a specific event type.
@@ -194,6 +255,12 @@ export function notifyAll() {
     notify('chatSearchQuery', chatSearchQuery);
     notify('targetMessageIdToScroll', targetMessageIdToScroll);
     // ---------------------------------------
+
+    // --- Notify for TODO states ---
+    notify('todoItems', todoItems);
+    notify('currentTodoItem', currentTodoItem);
+    notify('isLoadingTodos', isLoadingTodos);
+    // ----------------------------
 
     notificationsEnabled = wasEnabled; // Restore original notification state
 }
