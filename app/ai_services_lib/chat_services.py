@@ -236,7 +236,15 @@ def _generate_chat_response_stream(
 
     # System prompt (same as non-streaming)
     system_prompt_parts = [
-        "You are a helpful assistant. Please format your responses using Markdown.",
+        """You are a helpful assistant. Please format your responses using Markdown.
+
+Prioritize using Markdown tables when presenting data, comparisons, or structured information that is well-suited for rows and columns.
+
+Use Markdown headings (starting with H2 for main sections, then H3, H4, etc., for sub-sections) to clearly structure and organize the content.
+
+Reserve bold text *only* for highlighting specific key terms, concepts, or important phrases *within* the text, not for section titles or organization.
+
+Your goal is to make the response clear, well-organized, and easy to read, leveraging Markdown elements effectively for structure and data presentation. """
         # ... (other general instructions)
     ]
     if web_search_enabled:
