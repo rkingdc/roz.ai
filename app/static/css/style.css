@@ -929,7 +929,7 @@
 }
 
 /* Button Group Styling */
- .btn-group-left, .btn-group-right {
+ .btn-group-left, .btn-group-middle, .btn-group-right {
      padding: 0.3rem 0.8rem; /* Adjust padding for smaller header buttons */
      font-size: 0.8rem; /* Slightly smaller font */
      border: 1px solid var(--rz-button-outline-border);
@@ -947,12 +947,19 @@
      border-bottom-right-radius: 0.375rem;
      border-left-width: 0.5px; /* Make left border thinner */
 }
+ .btn-group-middle {
+    border-radius: 0; /* Middle buttons have no rounding */
+    border-left-width: 0.5px;
+    border-right-width: 0.5px;
+}
  .btn-group-left:hover:not(.active):not(:disabled),
+ .btn-group-middle:hover:not(.active):not(:disabled),
  .btn-group-right:hover:not(.active):not(:disabled) {
      background-color: var(--rz-button-secondary-hover-bg); /* Use secondary hover */
      border-color: var(--rz-button-outline-border); /* Keep border color consistent on hover */
 }
  .btn-group-left.active,
+ .btn-group-middle.active,
  .btn-group-right.active {
      background-color: var(--rz-toolbar-text); /* Use dark goldenrod bg for active */
      color: var(--rz-toolbar-field); /* Use deep maroon text for active */
