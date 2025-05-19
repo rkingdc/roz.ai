@@ -329,6 +329,22 @@ export function populateElements() {
     elements.chatSearchResultsContainer = document.getElementById('chat-search-results-container');
     // -----------------------------------
 
+    // --- Populate Specific TODO Tab Elements ---
+    // elements.todoTabButton is populated with other main nav tab buttons
+    // elements.todoSection (pointing to todo-tab-content) is populated with other main content sections
+    elements.todoForm = document.getElementById('todo-form');
+    elements.todoIdInput = document.getElementById('todo-id');
+    elements.todoNameInput = document.getElementById('todo-name');
+    elements.todoDueDateInput = document.getElementById('todo-due-date');
+    elements.todoDetailsInput = document.getElementById('todo-details');
+    elements.todoCategoryInput = document.getElementById('todo-category');
+    elements.todoPriorityInput = document.getElementById('todo-priority');
+    elements.todoStatusInput = document.getElementById('todo-status');
+    elements.todoFormClearButton = document.getElementById('todo-form-clear-button');
+    elements.todoFormSaveButton = document.getElementById('todo-form-save-button');
+    elements.todoListContainer = document.getElementById('todo-list-container');
+    // --- End Populate Specific TODO Tab Elements ---
+
     // Basic check
     if (!elements.bodyElement || !elements.statusBar || !elements.chatbox) {
         console.error("Core DOM elements not found! Application might not work correctly.");
