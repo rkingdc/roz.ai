@@ -1408,7 +1408,9 @@ async function handleTodoFormSubmit(event) {
     }
 
     if (success) {
-        ui.resetTodoForm(); 
+        ui.resetTodoForm();
+        ui.hideModal(elements.todoModal); // Hide modal on success
+        await api.loadTodoItems(); // Re-fetch and render the updated list
     }
 }
 
