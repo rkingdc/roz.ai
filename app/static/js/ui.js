@@ -2701,8 +2701,19 @@ export function resetTodoForm() {
     if (!elements.todoForm) return;
     elements.todoForm.reset(); // Resets form to default values
     if (elements.todoIdInput) elements.todoIdInput.value = ''; // Clear hidden ID
-    if (elements.todoFormSaveButton) elements.todoFormSaveButton.textContent = 'Save Task'; // Updated text
+    if (elements.todoFormSaveButton) elements.todoFormSaveButton.textContent = 'Save Task';
+    if (elements.todoModalTitle) elements.todoModalTitle.textContent = 'Add New Task'; // Set title for new task
     state.setCurrentTodoItem(null); // Clear current editing item from state
+
+    // Explicitly enable form elements
+    const formElements = elements.todoForm.elements;
+    for (let i = 0; i < formElements.length; i++) {
+        formElements[i].disabled = false;
+    }
+    // Reset dropdown styles
+    if (elements.todoCategoryInput) updateTodoDropdownStyles(elements.todoCategoryInput);
+    if (elements.todoPriorityInput) updateTodoDropdownStyles(elements.todoPriorityInput);
+    if (elements.todoStatusInput) updateTodoDropdownStyles(elements.todoStatusInput);
 }
 
 /**
@@ -2725,8 +2736,20 @@ export function populateTodoForm(todoItem) {
         elements.todoDueDateInput.value = todoItem.due_date ? todoItem.due_date.split('T')[0] : '';
     }
     if (elements.todoFormSaveButton) elements.todoFormSaveButton.textContent = 'Update Task'; // Updated text
-    elements.todoNameInput?.focus();
-    elements.todoNameInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (elements.todoModalTitle) elements.todoModalTitle.textContent = 'Edit Task'; // Set modal title for editing
+    
+    showModal(elements.todoModal); // Show the modal with the populated form
+
+    // Focus after modal is shown, slight delay might be needed if modal transition is slow
+    setTimeout(() => {
+        elements.todoNameInput?.focus();
+        // Scrolling into view might not be necessary if modal centers form
+    }, 50); // Small delay to ensure modal is visible before focus
+
+    // Apply styles to dropdowns after setting their values
+    if (elements.todoCategoryInput) updateTodoDropdownStyles(elements.todoCategoryInput);
+    if (elements.todoPriorityInput) updateTodoDropdownStyles(elements.todoPriorityInput);
+    if (elements.todoStatusInput) updateTodoDropdownStyles(elements.todoStatusInput);
 }
 
 

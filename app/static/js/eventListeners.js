@@ -1424,4 +1424,29 @@ if (elements.todoForm) {
 if (elements.todoFormClearButton) {
     elements.todoFormClearButton.addEventListener('click', handleTodoFormClear);
 }
+
+    // --- TODO Modal and New Task Button Listeners ---
+    if (elements.newTaskButton) {
+        elements.newTaskButton.addEventListener('click', () => {
+            ui.resetTodoForm(); // This will now enable fields and set modal title
+            ui.showModal(elements.todoModal);
+            if (elements.todoNameInput) { // Focus the name input
+                setTimeout(() => elements.todoNameInput.focus(), 50); // Slight delay for modal
+            }
+        });
+    }
+
+    if (elements.closeTodoModalButton) {
+        elements.closeTodoModalButton.addEventListener('click', () => {
+            ui.hideModal(elements.todoModal);
+        });
+    }
+
+    if (elements.todoModal) {
+        elements.todoModal.addEventListener('click', (event) => {
+            if (event.target === elements.todoModal) { // Click on backdrop
+                ui.hideModal(elements.todoModal);
+            }
+        });
+    }
 // --- End TODO Form Event Handlers and Listeners ---

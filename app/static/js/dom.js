@@ -161,7 +161,11 @@ export const elements = {
 
     // TODO Tab Elements (declarations were already correct here, ensuring no unintended changes)
     // todoTabButton: null, // Already declared with main nav buttons
-    // todoSection: null, // Already declared with main content sections
+    todoSection: null, // This is todo-tab-content
+    newTaskButton: null,
+    todoModal: null,
+    todoModalTitle: null,
+    closeTodoModalButton: null,
     todoForm: null,
     todoIdInput: null,
     todoNameInput: null,
@@ -331,8 +335,11 @@ export function populateElements() {
 
     // --- Populate Specific TODO Tab Elements ---
     // elements.todoTabButton is populated with other main nav tab buttons
-    // elements.todoSection (pointing to todo-tab-content) is populated with other main content sections
-    // elements.todoSection = document.getElementById('todo-tab-content'); // Already populated above
+    elements.todoSection = document.getElementById('todo-tab-content'); // Already populated above
+    elements.newTaskButton = document.getElementById('new-task-button');
+    elements.todoModal = document.getElementById('todo-modal');
+    elements.todoModalTitle = document.getElementById('todo-modal-title');
+    elements.closeTodoModalButton = document.getElementById('close-todo-modal-button');
     elements.todoForm = document.getElementById('todo-form');
     elements.todoIdInput = document.getElementById('todo-id');
     elements.todoNameInput = document.getElementById('todo-name');
