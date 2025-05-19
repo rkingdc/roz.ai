@@ -11,6 +11,14 @@ VALID_SORT_FIELDS = ['name', 'category', 'priority', 'status', 'due_date', 'crea
 VALID_STATUS_VALUES = ['pending', 'in-progress', 'completed', 'not started', 'paused', 'blocked']
 VALID_PRIORITY_VALUES = ['low', 'medium', 'high', 'backlog']
 
+@bp.route('/options', methods=['GET'])
+def get_todo_options():
+    logger.info("Received request for TODO options.")
+    return jsonify({
+        'status_values': VALID_STATUS_VALUES,
+        'priority_values': VALID_PRIORITY_VALUES
+    }), 200
+
 @bp.route('', methods=['POST'])
 def create_todo():
     data = request.get_json()
