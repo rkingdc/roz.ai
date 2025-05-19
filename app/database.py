@@ -788,10 +788,12 @@ def create_new_todo_item(name, details=None, category=None, priority="medium", s
         due_date=due_date  # Assumed to be a date object or None
         # created_at and updated_at have defaults
     )
+    logger.debug(f"TodoItem object created: ID (before commit)={new_todo.id}, Name='{new_todo.name}'")
     try:
         db.session.add(new_todo)
+        logger.debug(f"TodoItem ID {new_todo.id} added to session.")
         if _commit_session():
-            logger.info(f"Successfully created new todo item with ID: {new_todo.id}, Name: '{new_todo.name}'")
+            logger.info(f"Successfully created and committed new todo item with ID: {new_todo.id}, Name: '{new_todo.name}'")
             return {
                 'id': new_todo.id,
                 'name': new_todo.name,
@@ -804,9 +806,10 @@ def create_new_todo_item(name, details=None, category=None, priority="medium", s
                 'updated_at': new_todo.updated_at.isoformat()
             }
         else:
+            logger.error(f"Failed to commit session for new todo item '{new_todo.name}'. _commit_session returned False.")
             return None  # Commit failed
     except SQLAlchemyError as e:
-        logger.error(f"Database error creating new todo item: {e}", exc_info=True)
+        logger.error(f"SQLAlchemyError during add/commit for new todo item '{new_todo.name}': {e}", exc_info=True)
         db.session.rollback()
         return None
 
