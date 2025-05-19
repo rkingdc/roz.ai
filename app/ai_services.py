@@ -18,6 +18,7 @@ from .ai_services_lib.chat_services import (
 from .ai_services_lib.summary_services import (
     get_or_generate_summary,
     generate_summary,
+    generate_note_diff_summary,
 )  # Import summary services
 from .ai_services_lib.tool_definitions import (
     WEB_SEARCH_TOOL,

@@ -356,3 +356,67 @@ def generate_summary(file_id):
                 )
 
 
+# --- Note Diff Summary Generation ---
+def generate_note_diff_summary(previous_content_str: str, current_content_str: str):
+    """
+    Generates a summary of differences between two versions of note content.
+    Placeholder implementation.
+    """
+    logger.info(
+        f"Entering generate_note_diff_summary. Prev content len: {len(previous_content_str)}, Curr content len: {len(current_content_str)}"
+    )
+
+    # --- AI Readiness Check (Similar to generate_summary) ---
+    # This would be needed for a full AI implementation.
+    # For a placeholder, we can skip the full client setup if not making an API call.
+    # However, to be consistent and ready for future AI integration,
+    # it's good practice to include it.
+    try:
+        try:
+            _ = current_app.config
+        except RuntimeError:
+            logger.error(
+                "generate_note_diff_summary called outside of active Flask request context.",
+                exc_info=True,
+            )
+            return "[Error: AI Service called outside request context]"
+
+        api_key = current_app.config.get("API_KEY")
+        if not api_key:
+            logger.error("API_KEY is missing from current_app.config for note diff.")
+            return "[Error: AI Service API Key not configured]"
+
+        # Client setup (can be simplified if no actual API call is made by placeholder)
+        # if "genai_client" not in g:
+        #     g.genai_client = genai.Client(api_key=api_key)
+        # client = g.genai_client
+        # logger.info("Successfully obtained genai.Client for note diff summary (placeholder).")
+
+    except Exception as e:
+        logger.error(
+            f"generate_note_diff_summary: Unexpected error during readiness check: {type(e).__name__} - {e}",
+            exc_info=True,
+        )
+        return f"[CRITICAL Unexpected Error during AI Service readiness check: {type(e).__name__}]"
+    # --- End AI Readiness Check ---
+
+    # Placeholder logic:
+    if previous_content_str == current_content_str:
+        logger.info("Note content unchanged, returning '[No changes detected in content]'")
+        return "[No changes detected in content]"
+    elif not previous_content_str and current_content_str:
+        logger.info("Content added, returning '[Content added]'")
+        return "[Content added]"
+    elif previous_content_str and not current_content_str:
+        logger.info("Content removed, returning '[Content removed]'")
+        return "[Content removed]"
+    else:
+        # This is where a real AI call would summarize the diff.
+        # For now, a generic "modified" message.
+        # prompt = f"Summarize the changes from this old text:\n{previous_content_str}\n\nTo this new text:\n{current_content_str}"
+        # response = client.models.generate_content(model="<your-chosen-model>", contents=[prompt])
+        # summary = response.text
+        logger.info("Content modified, returning placeholder '[Content modified (AI summary pending)]'")
+        return "[Content modified (AI summary pending)]"
+
+
