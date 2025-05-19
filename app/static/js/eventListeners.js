@@ -1413,7 +1413,15 @@ async function handleTodoFormSubmit(event) {
     if (success) {
         ui.resetTodoForm();
         ui.hideModal(elements.todoModal); // Hide modal on success
-        await api.loadTodoItems(); // Re-fetch and render the updated list
+        if (id) { // If 'id' exists, it was an update operation
+            await api.loadTodoItems(); // Re-fetch for updates (e.g., if sorting changes)
+        } else {
+            // For new items, api.createTodoItem already called state.addTodoItemToState.
+            // This should trigger a re-render of the list via state notification.
+            // We avoid an immediate full reload here to prevent fetching potentially stale data
+            // if the database commit for the new item isn't instantly visible to a subsequent GET.
+            console.log("[EVENT DEBUG] New TODO item created, relying on optimistic update from state.addTodoItemToState.");
+        }
     }
 }
 
