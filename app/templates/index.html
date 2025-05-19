@@ -306,11 +306,17 @@
             <!-- End Notes Tab Content -->
 
             <!-- TODO Tab Content -->
-            <div id="todo-tab-content" class="tab-content hidden h-full p-6 bg-[--rz-background-default]">
-                <div class="flex flex-col h-full max-w-4xl mx-auto">
-                    <h2 class="text-3xl font-bold text-[--rz-text-primary] mb-8 text-center">My TODO List</h2>
-                    <form id="todo-form" class="mb-10 p-6 bg-[--rz-background-light] rounded-xl shadow-xl border border-[--rz-border-light]">
-                        <input type="hidden" id="todo-id">
+            <div id="todo-tab-content" class="tab-content hidden p-6 bg-[--rz-background-default]">
+                <div class="flex flex-col"> <!-- Removed h-full, max-w-4xl, mx-auto -->
+                    <div class="flex justify-between items-center mb-8">
+                        <h2 class="text-3xl font-bold text-[--rz-text-primary] text-center">My TODO List</h2>
+                        <button id="new-task-button" class="btn btn-primary">
+                            <i class="fas fa-plus mr-2"></i>New Task
+                        </button>
+                    </div>
+                    <!-- Form will be moved to a modal -->
+                    <div class="flex-grow overflow-y-auto bg-[--rz-background-light] p-6 rounded-xl shadow-xl border border-[--rz-border-light]">
+                        <input type="hidden" id="todo-id"> <!-- This hidden input is part of the form, but form is moved. It will be part of the modal form. -->
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label for="todo-name" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Task Name <span class="text-red-500">*</span></label>
@@ -657,6 +663,70 @@ function greet(name) {
             </div>
         </div>
     </div>
+
+    <!-- TODO Task Modal -->
+    <div id="todo-modal" class="modal">
+        <div class="modal-content max-w-4xl w-full"> <!-- Increased max-width for wider modal -->
+            <div class="modal-header">
+                <h3 id="todo-modal-title" class="modal-title">Add New Task</h3>
+                <button class="close-btn" id="close-todo-modal-button" title="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="todo-form">
+                    <input type="hidden" id="todo-id">
+                    <div class="space-y-6"> <!-- Use space-y for vertical spacing of sections -->
+                        <div> <!-- Full width for Task Name -->
+                            <label for="todo-name" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Task Name <span class="text-red-500">*</span></label>
+                            <input type="text" id="todo-name" name="name" required class="input-field text-lg w-full" placeholder="e.g., Finish project report"> <!-- Added w-full -->
+                        </div>
+                        <div> <!-- Full width for Due Date -->
+                            <label for="todo-due-date" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Due Date</label>
+                            <input type="date" id="todo-due-date" name="due_date" class="input-field w-full"> <!-- Added w-full -->
+                        </div>
+                        <div> <!-- Full width for Details -->
+                            <label for="todo-details" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Details</label>
+                            <textarea id="todo-details" name="details" rows="3" class="input-field w-full" placeholder="Add more details about the task..."></textarea> <!-- Added w-full -->
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6"> <!-- New grid for Category, Priority, Status -->
+                            <div>
+                            <label for="todo-category" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Category</label>
+                            <select id="todo-category" name="category" class="input-field">
+                                <option value="">Select Category</option>
+                                <option value="Platform &amp; Product">Platform & Product</option>
+                                <option value="Security">Security</option>
+                                <option value="Sales &amp; Marketing">Sales & Marketing</option>
+                                <option value="Demo">Demo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="todo-priority" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Priority</label>
+                            <select id="todo-priority" name="priority" class="input-field">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                                <option value="backlog">Backlog</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="todo-status" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Status</label>
+                            <select id="todo-status" name="status" class="input-field">
+                                <option value="not started" selected>Not started</option>
+                                <option value="in progress">In progress</option>
+                                <option value="complete">Complete</option>
+                                <option value="paused">Paused</option>
+                                <option value="blocked">Blocked</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer mt-8 flex items-center justify-end space-x-4"> <!-- Added modal-footer class -->
+                        <button type="button" id="todo-form-clear-button" class="btn btn-outline">Clear Form</button>
+                        <button type="submit" id="todo-form-save-button" class="btn btn-primary">Save Task</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- End TODO Task Modal -->
 
     <!-- Toast Notification Container -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2 w-auto max-w-sm">
