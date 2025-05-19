@@ -124,6 +124,10 @@ export async function startRecording(context) {
 
         // Make the onstop handler async to await the backend confirmation
         mediaRecorder.onstop = async () => {
+            // Use the 'context' parameter from the outer scope of startRecording
+            // This ensures we use the context of the specific recording session,
+            // even if global state.recordingContext was cleared by an intervening error.
+            const recordingContextOnStop = context;
 
             try {
                 // Signal end of audio stream and wait for backend confirmation
@@ -135,10 +139,6 @@ export async function startRecording(context) {
             }
 
             // --- Now process the final transcript AFTER waiting ---
-
-            // --- Read context BEFORE resetting state ---
-            const recordingContextOnStop = state.recordingContext;
-            // -----------------------------------------
 
             // Get the final combined transcript from the new state variables
             const finalized = state.finalizedTranscript;
@@ -177,7 +177,7 @@ export async function startRecording(context) {
                 clearInterval(recordingTimerInterval);
                 recordingTimerInterval = null;
             }
-            resetProgressRing(); // Reset the visual progress
+            resetProgressRing(recordingContextOnStop); // Reset the visual progress using the captured context
             // --------------------------------------------
 
             // Reset recording state *after* processing transcript and context
@@ -205,7 +205,7 @@ export async function startRecording(context) {
                 clearInterval(recordingTimerInterval);
                 recordingTimerInterval = null;
             }
-            resetProgressRing();
+            resetProgressRing(context); // Use the `context` from startRecording's scope
             // -----------------------------------------
             stopMediaStreamTracks(); // Clean up stream tracks
             api.disconnectTranscriptionSocket(); // Disconnect socket on media recorder error
@@ -257,6 +257,7 @@ export async function startRecording(context) {
             clearInterval(recordingTimerInterval);
             recordingTimerInterval = null;
         }
+        resetProgressRing(context); // Reset ring using the attempted context
         // --------------------------------------------
         console.error("[ERROR] Error during recording setup:", error);
         if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
@@ -288,7 +289,9 @@ export function stopRecording() {
     if (!state.isRecording || !mediaRecorder) {
         console.warn("[WARN] stopRecording called but not recording or mediaRecorder not initialized.");
         // Timer is already cleared above. Reset progress ring just in case.
-        resetProgressRing();
+        // If !state.isRecording, state.recordingContext is likely null.
+        // If state.isRecording but !mediaRecorder, use current context.
+        resetProgressRing(state.recordingContext);
         return;
     }
 
@@ -308,17 +311,16 @@ export function stopRecording() {
         mediaRecorder = null; // Ensure reference is cleared
         // --- Reset Progress Ring ---
         // Timer is cleared at the start of the function now.
-        resetProgressRing();
+        resetProgressRing(null); // Context was cleared by setIsRecording(false) above
         // -------------------------
     }
 }
 
 /** Helper function to reset the progress ring UI */
-function resetProgressRing() {
+function resetProgressRing(contextToUse) {
     // Reset progress ring on the button that was active *during* recording
-    // Use recordingContext from state as it might be cleared soon
-    const context = state.recordingContext;
-    const progressRingElement = (context === 'chat' ? elements.micButton : elements.micButtonNotes)?.querySelector('.mic-progress-ring');
+    // Use the provided contextToUse argument.
+    const progressRingElement = (contextToUse === 'chat' ? elements.micButton : elements.micButtonNotes)?.querySelector('.mic-progress-ring');
     const progressArc = progressRingElement?.querySelector('.progress-ring-arc');
     if (progressRingElement && progressArc) {
          const radius = parseFloat(progressArc.getAttribute('r'));
