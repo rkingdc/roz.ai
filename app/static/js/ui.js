@@ -3247,11 +3247,35 @@ export function handleStateChange_currentTodoItem() {
 }
 
 export function handleStateChange_isLoadingTodos() {
-    if (state.isLoadingTodos && elements.todoListContainer) {
-        elements.todoListContainer.innerHTML = '<p class="text-[--rz-text-muted] text-center py-4">Loading TODO items...</p>';
+    const placeholder = document.getElementById('todo-list-placeholder');
+    const listElement = elements.todoListContainer ? elements.todoListContainer.querySelector('.list') : null;
+
+    if (state.isLoadingTodos) {
+        if (placeholder) {
+            placeholder.textContent = 'Loading TODO items...';
+            placeholder.classList.remove('hidden');
+        }
+        if (listElement) {
+            listElement.classList.add('hidden'); // Hide the actual list
+        }
+        if (todoListJS) { // If List.js is initialized
+            todoListJS.clear(); // Clear items from List.js instance
+        }
+    } else {
+        // When loading is false, renderTodoList will be triggered by a subsequent todoItems update.
+        // renderTodoList will then handle showing the list or the "no items" placeholder.
+        // No direct action on placeholder/list visibility is needed here for the 'false' case.
     }
+
     // Disable form elements if loading TODOs or globally loading
     const formShouldBeDisabled = state.isLoadingTodos || state.isLoading;
+
+    // Also disable sort controls when loading
+    const sortControls = [elements.todoSortPriority, elements.todoSortDueDate, elements.todoSortCategory];
+    sortControls.forEach(control => {
+        if (control) control.disabled = formShouldBeDisabled;
+    });
+
     if (elements.todoForm) {
         const formElements = elements.todoForm.elements;
         for (let i = 0; i < formElements.length; i++) {
