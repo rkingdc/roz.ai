@@ -1365,6 +1365,139 @@ export async function searchNotes(query) {
     }
 }
 
+// --- TODO API Functions ---
+
+/**
+ * Loads all TODO items from the backend.
+ * @param {string} sortBy - Field to sort by.
+ * @param {string} sortOrder - 'asc' or 'desc'.
+ */
+export async function loadTodoItems(sortBy = 'due_date', sortOrder = 'asc') {
+    if (state.isLoadingTodos) return;
+    state.setIsLoadingTodos(true);
+    setLoading(true, "Loading TODO items..."); // Use global loading for now
+
+    try {
+        const response = await fetch(`/api/todos?sort_by=${sortBy}&sort_order=${sortOrder}`);
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
+            throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+        }
+        const todos = await response.json();
+        state.setTodoItems(todos);
+        setStatus("TODO items loaded.");
+    } catch (error) {
+        console.error('Error loading TODO items:', error);
+        setStatus(`Error loading TODO items: ${error.message}`, true);
+        state.setTodoItems([]); // Clear items on error
+    } finally {
+        state.setIsLoadingTodos(false);
+        setLoading(false);
+    }
+}
+
+/**
+ * Creates a new TODO item.
+ * @param {object} todoData - The data for the new TODO item.
+ * Expected fields: name, details, category, priority, status, due_date (YYYY-MM-DD string or null).
+ */
+export async function createTodoItem(todoData) {
+    if (state.isLoading) return null;
+    setLoading(true, "Creating TODO item...");
+
+    try {
+        const response = await fetch('/api/todos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(todoData),
+        });
+        const newTodo = await response.json(); // Must await before checking response.ok for JSON body
+        if (!response.ok) {
+            throw new Error(newTodo.error || `HTTP error! Status: ${response.status}`);
+        }
+        state.addTodoItemToState(newTodo); // Add to local state
+        setStatus("TODO item created successfully.");
+        showToast("TODO item created!", { type: 'success' });
+        return newTodo;
+    } catch (error) {
+        console.error('Error creating TODO item:', error);
+        setStatus(`Error creating TODO item: ${error.message}`, true);
+        showToast(`Error: ${error.message}`, { type: 'error' });
+        return null;
+    } finally {
+        setLoading(false);
+    }
+}
+
+/**
+ * Updates an existing TODO item.
+ * @param {number} todoId - The ID of the TODO item to update.
+ * @param {object} todoData - The data to update.
+ * Can include: name, details, category, priority, status, due_date (YYYY-MM-DD string or null).
+ */
+export async function updateTodoItem(todoId, todoData) {
+    if (state.isLoading) return null;
+    setLoading(true, `Updating TODO item ${todoId}...`);
+
+    try {
+        const response = await fetch(`/api/todos/${todoId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(todoData),
+        });
+        const updatedTodo = await response.json(); // Must await before checking response.ok
+        if (!response.ok) {
+            throw new Error(updatedTodo.error || `HTTP error! Status: ${response.status}`);
+        }
+        state.updateTodoItemInState(updatedTodo); // Update in local state
+        setStatus(`TODO item ${todoId} updated.`);
+        showToast("TODO item updated!", { type: 'success' });
+        return updatedTodo;
+    } catch (error) {
+        console.error(`Error updating TODO item ${todoId}:`, error);
+        setStatus(`Error updating TODO item: ${error.message}`, true);
+        showToast(`Error: ${error.message}`, { type: 'error' });
+        return null;
+    } finally {
+        setLoading(false);
+    }
+}
+
+/**
+ * Deletes a TODO item.
+ * @param {number} todoId - The ID of the TODO item to delete.
+ */
+export async function deleteTodoItem(todoId) {
+    if (state.isLoading) return false;
+    if (!confirm("Are you sure you want to delete this TODO item?")) {
+        return false;
+    }
+    setLoading(true, `Deleting TODO item ${todoId}...`);
+
+    try {
+        const response = await fetch(`/api/todos/${todoId}`, {
+            method: 'DELETE',
+        });
+        // No JSON body expected for a successful DELETE by default, but check if API sends one
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
+            throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+        }
+        state.removeTodoItemFromState(todoId); // Remove from local state
+        setStatus(`TODO item ${todoId} deleted.`);
+        showToast("TODO item deleted!", { type: 'info' });
+        return true;
+    } catch (error) {
+        console.error(`Error deleting TODO item ${todoId}:`, error);
+        setStatus(`Error deleting TODO item: ${error.message}`, true);
+        showToast(`Error: ${error.message}`, { type: 'error' });
+        return false;
+    } finally {
+        setLoading(false);
+    }
+}
+// --- End TODO API Functions ---
+
 /**
  * Searches chat messages via the backend API.
  * @param {string} query - The search term.
