@@ -158,6 +158,21 @@ export const elements = {
     chatNavButton: null,
     notesNavButton: null,
     toastContainer: null, // *** ADDED: Toast Container ***
+
+    // TODO Tab Elements (declarations were already correct here, ensuring no unintended changes)
+    // todoTabButton: null, // Already declared with main nav buttons
+    // todoSection: null, // Already declared with main content sections
+    todoForm: null,
+    todoIdInput: null,
+    todoNameInput: null,
+    todoDueDateInput: null,
+    todoDetailsInput: null,
+    todoCategoryInput: null,
+    todoPriorityInput: null,
+    todoStatusInput: null,
+    todoFormClearButton: null,
+    todoFormSaveButton: null,
+    todoListContainer: null,
 };
 
 /**
