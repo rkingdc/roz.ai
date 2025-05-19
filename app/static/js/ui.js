@@ -1590,17 +1590,18 @@ export function switchTab(tab) {
     } = elements;
 
     // Check for essential elements for basic tab switching
-    if (!chatTabButton || !notesTabButton || !todoTabButton || !filesTabButton || !searchTabButton ||
+    // Note: chatNavButton and notesNavButton are the old sidebar buttons, not the main tabs.
+    // The main tab buttons are chatTabButton, notesTabButton, etc.
+    if (!elements.chatTabButton || !elements.notesTabButton || !elements.todoTabButton || !elements.filesTabButton || !elements.searchTabButton ||
         !chatSection || !notesSection || !todoSection || !filesTabContent || !searchTabContent) {
-        console.error("Missing essential elements for tab switching in main content or header.", {
-            chatTabButton, notesTabButton, todoTabButton, filesTabButton, searchTabButton,
+        console.error("Missing essential elements for tab switching in main content or sidebar navigation.", {
+            chatTabButton: elements.chatTabButton, notesTabButton: elements.notesTabButton, todoTabButton: elements.todoTabButton, filesTabButton: elements.filesTabButton, searchTabButton: elements.searchTabButton,
             chatSection, notesSection, todoSection, filesTabContent, searchTabContent
         });
         return;
     }
 
-
-    // Main navigation tab buttons in the header
+    // Main navigation tab buttons (now in the sidebar)
     const mainNavTabs = [
         { button: elements.chatTabButton, name: 'chat', content: elements.chatSection },
         { button: elements.notesTabButton, name: 'notes', content: elements.notesSection },
@@ -1611,13 +1612,8 @@ export function switchTab(tab) {
 
     mainNavTabs.forEach(navTab => {
         if (navTab.button) {
-            if (navTab.name === tab) {
-                navTab.button.classList.add('bg-[--rz-accent-default]', 'text-white');
-                navTab.button.classList.remove('text-[--rz-text-tertiary]', 'hover:text-[--rz-text-primary]');
-            } else {
-                navTab.button.classList.remove('bg-[--rz-accent-default]', 'text-white');
-                navTab.button.classList.add('text-[--rz-text-tertiary]', 'hover:text-[--rz-text-primary]');
-            }
+            // Use the 'active' class for styling the selected tab button in the sidebar group
+            navTab.button.classList.toggle('active', navTab.name === tab);
         }
         // Toggle content visibility
         if (navTab.content) {
@@ -1627,12 +1623,13 @@ export function switchTab(tab) {
         }
     });
     
-    // Sidebar navigation (Chat/Notes) - these are secondary to the main tabs now
-    if (elements.chatNavButton) elements.chatNavButton.classList.toggle('active', tab === 'chat');
-    if (elements.notesNavButton) elements.notesNavButton.classList.toggle('active', tab === 'notes');
-    // No specific sidebar nav button for TODO yet, main tabs handle it.
+    // The old chatNavButton and notesNavButton are effectively replaced by the new tab group.
+    // Their specific 'active' class toggling for primary navigation is no longer needed here,
+    // as the loop above handles the 'active' state for the new main tab buttons.
+    // if (elements.chatNavButton) elements.chatNavButton.classList.toggle('active', tab === 'chat'); // This might be redundant now
+    // if (elements.notesNavButton) elements.notesNavButton.classList.toggle('active', tab === 'notes'); // This might be redundant now
 
-    // Toggle sidebar content visibility
+    // Toggle sidebar content visibility (e.g., chat list vs notes list)
     if (elements.chatSidebarContent) elements.chatSidebarContent.classList.toggle('hidden', tab !== 'chat');
     if (elements.notesSidebarContent) elements.notesSidebarContent.classList.toggle('hidden', tab !== 'notes');
     // TODO: Add a sidebar section for TODOs if needed in the future

@@ -963,13 +963,7 @@ export function setupEventListeners() {
 
 
     // --- Tab Navigation ---
-    elements.chatNavButton?.addEventListener('click', () => {
-        handleTabSwitchClick('chat');
-    });
-    elements.notesNavButton?.addEventListener('click', () => { // Sidebar nav
-        handleTabSwitchClick('notes');
-    });
-    // Main header tab buttons
+    // Listeners for the main tab buttons (now in the sidebar)
     elements.chatTabButton?.addEventListener('click', () => handleTabSwitchClick('chat'));
     elements.notesTabButton?.addEventListener('click', () => handleTabSwitchClick('notes'));
     elements.todoTabButton?.addEventListener('click', () => handleTabSwitchClick('todo'));

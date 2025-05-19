@@ -35,15 +35,23 @@
         <!-- Moved button group here -->
         <div class="flex items-center justify-between mb-4 whitespace-nowrap">
              <h2 class="text-xl font-semibold">roz.ai</h2>
-             <div class="inline-flex rounded-md shadow-sm" role="group">
-                {# Changed classes to use custom btn-group styles #}
-                <button type="button" id="chat-nav-btn" class="btn-group-left active">
+             <nav id="main-nav-tabs" class="inline-flex rounded-md shadow-sm" role="group" aria-label="Tabs">
+                <button type="button" id="chat-tab-button" data-tab="chat" class="btn-group-left active">
                   Chat
                 </button>
-                <button type="button" id="notes-nav-btn" class="btn-group-right">
+                <button type="button" id="notes-tab-button" data-tab="notes" class="btn-group-middle">
                   Notes
                 </button>
-            </div>
+                <button type="button" id="todo-tab-button" data-tab="todo" class="btn-group-middle">
+                  TODO
+                </button>
+                <button type="button" id="files-tab-button" data-tab="files" class="btn-group-middle">
+                  Files
+                </button>
+                <button type="button" id="search-tab-button" data-tab="search" class="btn-group-right">
+                  Search
+                </button>
+            </nav>
         </div>
         <!-- End button group -->
 
@@ -161,25 +169,9 @@
         {# Removed border-bottom border-gray-300 #}
         <header class="bg-rz-header text-white p-4 flex justify-between items-center flex-wrap flex-shrink-0">
             <!-- Removed h1 "roz.ai" -->
-            <!-- Left Area (Main Navigation Tabs) -->
+            <!-- Left Area (Now empty, main nav is in sidebar) -->
             <div class="flex items-center">
-                <nav id="main-nav-tabs" class="flex space-x-1" aria-label="Tabs">
-                    <button id="chat-tab-button" class="px-4 py-2 text-sm font-medium text-white bg-[--rz-accent-default] rounded-md focus:outline-none" data-tab="chat">
-                        Chat
-                    </button>
-                    <button id="notes-tab-button" class="px-4 py-2 text-sm font-medium text-[--rz-text-tertiary] hover:text-[--rz-text-primary] focus:outline-none focus:ring-2 focus:ring-[--rz-accent-Muted] focus:ring-offset-2 focus:ring-offset-[--rz-background-dark] transition-colors duration-150 ease-in-out" data-tab="notes">
-                        Notes
-                    </button>
-                    <button id="todo-tab-button" class="px-4 py-2 text-sm font-medium text-[--rz-text-tertiary] hover:text-[--rz-text-primary] focus:outline-none focus:ring-2 focus:ring-[--rz-accent-Muted] focus:ring-offset-2 focus:ring-offset-[--rz-background-dark] transition-colors duration-150 ease-in-out" data-tab="todo">
-                        TODO
-                    </button>
-                    <button id="files-tab-button" class="px-4 py-2 text-sm font-medium text-[--rz-text-tertiary] hover:text-[--rz-text-primary] focus:outline-none focus:ring-2 focus:ring-[--rz-accent-Muted] focus:ring-offset-2 focus:ring-offset-[--rz-background-dark] transition-colors duration-150 ease-in-out" data-tab="files">
-                        Files
-                    </button>
-                    <button id="search-tab-button" class="px-4 py-2 text-sm font-medium text-[--rz-text-tertiary] hover:text-[--rz-text-primary] focus:outline-none focus:ring-2 focus:ring-[--rz-accent-Muted] focus:ring-offset-2 focus:ring-offset-[--rz-background-dark] transition-colors duration-150 ease-in-out" data-tab="search">
-                        Search
-                    </button>
-                </nav>
+                <!-- Optional: Logo or Title here if main nav is moved -->
             </div>
 
             <!-- Center Area (Model Selector OR Notes Mode Elements) -->
