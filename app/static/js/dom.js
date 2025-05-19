@@ -273,7 +273,7 @@ export function populateElements() {
     // Populate Main Tab Content Sections
     elements.chatSection = document.getElementById('chat-tab-content');
     elements.notesSection = document.getElementById('notes-tab-content');
-    // elements.todoSection is populated below with todo-tab-content
+    elements.todoSection = document.getElementById('todo-tab-content'); // Populate here
     elements.filesTabContent = document.getElementById('files-tab-content');
     elements.searchTabContent = document.getElementById('search-tab-content');
 
@@ -332,6 +332,7 @@ export function populateElements() {
     // --- Populate Specific TODO Tab Elements ---
     // elements.todoTabButton is populated with other main nav tab buttons
     // elements.todoSection (pointing to todo-tab-content) is populated with other main content sections
+    // elements.todoSection = document.getElementById('todo-tab-content'); // Already populated above
     elements.todoForm = document.getElementById('todo-form');
     elements.todoIdInput = document.getElementById('todo-id');
     elements.todoNameInput = document.getElementById('todo-name');
