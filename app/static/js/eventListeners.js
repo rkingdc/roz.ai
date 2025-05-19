@@ -1475,4 +1475,33 @@ if (todoFormClearButtonElement) {
             }
         });
     }
+
+// --- TODO Sort Controls Event Listeners ---
+function handleTodoSortChange(event) {
+    const changedSelect = event.target;
+    const sortKey = changedSelect.dataset.sortKey;
+    const sortDirection = changedSelect.value; // "asc", "desc", or "" for default
+
+    if (sortDirection === "") {
+        // If "Default" is selected for this dropdown, reset to overall default sort
+        state.setTodoSortCriteria('default', 'asc');
+    } else {
+        // A specific sort is chosen for this key
+        state.setTodoSortCriteria(sortKey, sortDirection);
+    }
+
+    // The ui.handleStateChange_todoSortCriteria will update all select elements
+    // based on the new state.todoSortKey and state.todoSortDirection.
+}
+
+if (elements.todoSortPriority) {
+    elements.todoSortPriority.addEventListener('change', handleTodoSortChange);
+}
+if (elements.todoSortDueDate) {
+    elements.todoSortDueDate.addEventListener('change', handleTodoSortChange);
+}
+if (elements.todoSortCategory) {
+    elements.todoSortCategory.addEventListener('change', handleTodoSortChange);
+}
+// --- End TODO Sort Controls Event Listeners ---
 // --- End TODO Form Event Handlers and Listeners ---
