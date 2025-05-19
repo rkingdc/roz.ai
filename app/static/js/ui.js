@@ -3239,4 +3239,43 @@ export function handleStateChange_todoPriorityOptions() {
     }
 }
 
+// --- TODO Sort Criteria State Change Handler ---
+export function handleStateChange_todoSortCriteria() {
+    // This state change (e.g., from eventListeners.js) should trigger a sort.
+    if (!todoListJS) {
+        initializeTodoListJS(); // Ensure List.js is initialized
+        if (!todoListJS) {
+            console.error("Cannot sort: List.js for TODOs is not initialized.");
+            renderTodoList(); // Fallback to full re-render if List.js failed
+            return;
+        }
+    }
+
+    const { todoSortKey, todoSortDirection } = state;
+
+    // Update the select dropdowns to reflect the current sort state
+    if (elements.todoSortPriority) elements.todoSortPriority.value = (todoSortKey === 'priority') ? todoSortDirection : "";
+    if (elements.todoSortDueDate) elements.todoSortDueDate.value = (todoSortKey === 'due_date') ? todoSortDirection : "";
+    if (elements.todoSortCategory) elements.todoSortCategory.value = (todoSortKey === 'category') ? todoSortDirection : "";
+
+    if (todoSortKey === 'default') {
+        // List.js doesn't have a multi-level "default" sort.
+        // We need to re-render the list with items pre-sorted by our default criteria.
+        renderTodoList(); // This will handle the default sort by pre-sorting the array.
+    } else {
+        let listJsSortKey = '';
+        if (todoSortKey === 'priority') listJsSortKey = 'prioritySort';
+        else if (todoSortKey === 'due_date') listJsSortKey = 'dueDateSort';
+        else if (todoSortKey === 'category') listJsSortKey = 'category'; // Assuming 'category' is a direct valueName
+        // Add other mappings if needed, e.g., 'status' -> 'statusSort'
+
+        if (listJsSortKey) {
+            console.log(`List.js sorting by: ${listJsSortKey}, order: ${todoSortDirection}`);
+            todoListJS.sort(listJsSortKey, { order: todoSortDirection });
+        } else {
+            console.warn(`Unknown sort key for List.js: ${todoSortKey}. Clearing List.js sort.`);
+            todoListJS.sort(); // Clear sort or sort by default if key is unknown
+        }
+    }
+}
 // --- End TODO List UI Functions ---
