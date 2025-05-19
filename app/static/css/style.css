@@ -933,8 +933,8 @@
      padding: 0.3rem 0.8rem; /* Adjust padding for smaller header buttons */
      font-size: 0.8rem; /* Slightly smaller font */
      border: 1px solid var(--rz-button-outline-border); /* Gold border */
-     background-color: var(--rz-toolbar-opaque); /* Medium purple background for inactive */
-     color: var(--rz-toolbar-field); /* Dark maroon text for inactive */
+     background-color: var(--rz-button-secondary-bg); /* Reverted: Dark purple/frame background for inactive */
+     color: var(--rz-button-secondary-text); /* Reverted: Gold text for inactive */
      transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out;
 }
  .btn-group-left {
