@@ -1271,6 +1271,7 @@ export function renderAttachedAndSessionFiles() {
  * @returns {boolean} True if the modal was shown, false otherwise.
  */
 export function showModal(modalElement, requiredPlugin = null, requiredTab = null) {
+    console.log('[UI DEBUG] showModal called. Modal Element ID:', modalElement ? modalElement.id : 'null'); // Log entry and element ID
 
     if (!modalElement) {
         console.error("Modal element not found.");
@@ -1288,6 +1289,7 @@ export function showModal(modalElement, requiredPlugin = null, requiredTab = nul
 
 
     modalElement.classList.add('show');
+    console.log('[UI DEBUG] showModal: Added "show" class. Modal classes:', modalElement.className); // Log classes after adding 'show'
     if (elements.bodyElement) elements.bodyElement.classList.add('modal-open');
     // Update state ONLY for file content modal, as other modals might have their own state flags
     if (modalElement.id === 'file-content-modal') {
