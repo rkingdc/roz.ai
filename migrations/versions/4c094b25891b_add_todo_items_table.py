@@ -30,34 +30,26 @@ def upgrade():
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_todo_items'))
     )
-    op.drop_table('message_fts_docsize')
-    op.drop_table('note_fts_idx')
-    op.drop_table('file_fts_docsize')
-    op.drop_table('note_fts_config')
-    op.drop_table('note_fts_data')
-    op.drop_table('file_fts_config')
-    op.drop_table('note_fts_docsize')
-    op.drop_table('message_fts_config')
-    op.drop_table('message_fts_data')
-    op.drop_table('file_fts_idx')
-    op.drop_table('file_fts_data')
-    op.drop_table('message_fts_idx')
+    # Removed incorrect drop_table operations for FTS tables
     with op.batch_alter_table('file_fts', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('rowid', sa.Integer(), nullable=False))
+        # batch_op.add_column(sa.Column('rowid', sa.Integer(), nullable=False)) # Incorrect for FTS
+        pass # No changes needed for file_fts structure by Alembic
 
     with op.batch_alter_table('files', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_files_filename'), ['filename'], unique=False)
         batch_op.create_index(batch_op.f('ix_files_uploaded_at'), ['uploaded_at'], unique=False)
 
     with op.batch_alter_table('message_fts', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('rowid', sa.Integer(), nullable=False))
+        # batch_op.add_column(sa.Column('rowid', sa.Integer(), nullable=False)) # Incorrect for FTS
+        pass # No changes needed for message_fts structure by Alembic
 
     with op.batch_alter_table('messages', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_messages_chat_id'), ['chat_id'], unique=False)
         batch_op.create_index(batch_op.f('ix_messages_timestamp'), ['timestamp'], unique=False)
 
     with op.batch_alter_table('note_fts', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('rowid', sa.Integer(), nullable=False))
+        # batch_op.add_column(sa.Column('rowid', sa.Integer(), nullable=False)) # Incorrect for FTS
+        pass # No changes needed for note_fts structure by Alembic
 
     with op.batch_alter_table('note_history', schema=None) as batch_op:
         batch_op.create_index(batch_op.f('ix_note_history_note_id'), ['note_id'], unique=False)
@@ -79,23 +71,27 @@ def downgrade():
         batch_op.drop_index(batch_op.f('ix_note_history_note_id'))
 
     with op.batch_alter_table('note_fts', schema=None) as batch_op:
-        batch_op.drop_column('rowid')
+        # batch_op.drop_column('rowid') # Incorrect for FTS
+        pass # No changes needed for note_fts structure by Alembic
 
     with op.batch_alter_table('messages', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_messages_timestamp'))
         batch_op.drop_index(batch_op.f('ix_messages_chat_id'))
 
     with op.batch_alter_table('message_fts', schema=None) as batch_op:
-        batch_op.drop_column('rowid')
+        # batch_op.drop_column('rowid') # Incorrect for FTS
+        pass # No changes needed for message_fts structure by Alembic
 
     with op.batch_alter_table('files', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_files_uploaded_at'))
         batch_op.drop_index(batch_op.f('ix_files_filename'))
 
     with op.batch_alter_table('file_fts', schema=None) as batch_op:
-        batch_op.drop_column('rowid')
+        # batch_op.drop_column('rowid') # Incorrect for FTS
+        pass # No changes needed for file_fts structure by Alembic
 
-    op.create_table('message_fts_idx',
+    # Removed incorrect create_table operations for FTS tables
+    # op.create_table('message_fts_idx', # Removed
     sa.Column('segid', sa.NullType(), nullable=False),
     sa.Column('term', sa.NullType(), nullable=False),
     sa.Column('pgno', sa.NullType(), nullable=True),
