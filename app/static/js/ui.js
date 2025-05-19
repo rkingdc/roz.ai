@@ -2864,6 +2864,23 @@ export function populateTodoForm(todoItem) {
  * Renders the list of TODO items from the state into the todoListContainer.
  */
 export function renderTodoList() {
+    // Only render if the TODO tab is active and the container element exists.
+    if (state.currentTab !== 'todo') {
+        // console.log("[UI.js] renderTodoList: TODO tab not active, skipping render.");
+        // If List.js was initialized from a previous active session on this tab, clear its items.
+        if (todoListJS) {
+            todoListJS.clear();
+        }
+        // Ensure the placeholder is visible if the tab is not active and the list might have content.
+        const placeholderElement = document.getElementById('todo-list-placeholder');
+        if (placeholderElement) {
+             // You might want a specific message or just ensure it's clear / default.
+             // For now, let's assume if the tab is not active, this function shouldn't alter the placeholder
+             // unless specifically designed to reset it.
+        }
+        return;
+    }
+
     if (!elements.todoListContainer) {
         console.error("TODO list container element not found.");
         return;
