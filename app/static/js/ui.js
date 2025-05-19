@@ -2909,9 +2909,16 @@ export function renderTodoList() {
     }
 
     if (!todoListJS) {
-        console.error("List.js instance for TODOs is not initialized.");
-        // Fallback to manual rendering if List.js fails (optional, or just error out)
-        elements.todoListContainer.querySelector('.list').innerHTML = '<p class="text-red-500">Error: TODO list UI component failed to load.</p>';
+        console.error("List.js instance for TODOs is not initialized. The '.list' child element might be missing or DOM not ready.");
+        // Fallback: Display error directly in todoListContainer if .list is not found
+        if (elements.todoListContainer) { // Check if the main container exists
+            const listElement = elements.todoListContainer.querySelector('.list');
+            if (listElement) { // If .list exists but List.js init failed for other reasons
+                listElement.innerHTML = '<p class="text-red-500">Error: TODO list UI component failed to load.</p>';
+            } else { // If .list itself is missing
+                elements.todoListContainer.innerHTML = '<p class="text-red-500">Error: TODO list structure incomplete (.list missing). Cannot initialize UI.</p>';
+            }
+        }
         return;
     }
 
