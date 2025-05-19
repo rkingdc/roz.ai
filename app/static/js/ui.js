@@ -1517,7 +1517,11 @@ export function updatePluginUI() {
     }
     const anyPluginSectionVisible = showFilesPlugin || showCalendarPlugin || showHistoryPlugin;
     if (elements.pluginsSidebar) elements.pluginsSidebar.classList.toggle('hidden', !anyPluginSectionVisible);
-    if (elements.pluginsToggleTab) elements.pluginsToggleTab.classList.toggle('hidden', !anyPluginSectionVisible);
+    // Ensure the toggle tab is always potentially visible (not hidden by this JS logic)
+    // Its actual display (collapsed or not) is handled by its 'collapsed' class and CSS.
+    if (elements.pluginsToggleTab) {
+        elements.pluginsToggleTab.classList.remove('hidden');
+    }
     renderChatInputArea();
 }
 
