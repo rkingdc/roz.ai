@@ -2694,6 +2694,59 @@ export function renderNoteSearchResults() {
 
 // ---------------------------------
 
+/**
+ * Updates the visual style of a TODO form dropdown based on its selected value.
+ * @param {HTMLSelectElement} selectElement - The select element to style.
+ */
+export function updateTodoDropdownStyles(selectElement) {
+    if (!selectElement) return;
+
+    const currentValue = selectElement.value.toLowerCase();
+    const selectId = selectElement.id;
+
+    // Define base classes to remove (adjust if your base 'input-field' has more complex styling)
+    const classesToRemove = [
+        'border-gray-300', 'dark:border-gray-600', // Default border
+        'bg-gray-50', 'dark:bg-gray-700',         // Default background
+        'text-gray-900', 'dark:text-white',       // Default text
+        // Priority classes
+        'border-red-500', 'bg-red-50', 'text-red-700', 'dark:border-red-400', 'dark:bg-red-900/50', 'dark:text-red-300',
+        'border-yellow-500', 'bg-yellow-50', 'text-yellow-700', 'dark:border-yellow-400', 'dark:bg-yellow-900/50', 'dark:text-yellow-300',
+        'border-blue-500', 'bg-blue-50', 'text-blue-700', 'dark:border-blue-400', 'dark:bg-blue-900/50', 'dark:text-blue-300',
+        'border-gray-500', 'bg-gray-100', 'text-gray-800', 'dark:border-gray-500', 'dark:bg-gray-700', 'dark:text-gray-300', // For backlog/default priority
+        // Status classes
+        'border-green-500', 'bg-green-50', 'text-green-700', 'dark:border-green-400', 'dark:bg-green-900/50', 'dark:text-green-300', // Complete
+        'border-indigo-500', 'bg-indigo-50', 'text-indigo-700', 'dark:border-indigo-400', 'dark:bg-indigo-900/50', 'dark:text-indigo-300', // In Progress
+        'border-pink-500', 'bg-pink-50', 'text-pink-700', 'dark:border-pink-400', 'dark:bg-pink-900/50', 'dark:text-pink-300', // Blocked
+        'border-orange-500', 'bg-orange-50', 'text-orange-700', 'dark:border-orange-400', 'dark:bg-orange-900/50', 'dark:text-orange-300', // Paused (using orange as example)
+        // Category classes (example, can be expanded)
+        'border-purple-500', 'bg-purple-50', 'text-purple-700', 'dark:border-purple-400', 'dark:bg-purple-900/50', 'dark:text-purple-300'
+    ];
+    selectElement.classList.remove(...classesToRemove);
+    // Ensure base input-field class remains if it's separate and provides other essential styles
+    selectElement.classList.add('input-field'); // Re-add if it was removed by spread
+
+    let newClasses = ['border-gray-300', 'dark:border-gray-600']; // Default border
+
+    if (selectId === 'todo-priority') {
+        if (currentValue === 'high') newClasses = ['border-red-500', 'bg-red-50', 'text-red-700', 'dark:border-red-400', 'dark:bg-red-900/50', 'dark:text-red-300'];
+        else if (currentValue === 'medium') newClasses = ['border-yellow-500', 'bg-yellow-50', 'text-yellow-700', 'dark:border-yellow-400', 'dark:bg-yellow-900/50', 'dark:text-yellow-300'];
+        else if (currentValue === 'low') newClasses = ['border-blue-500', 'bg-blue-50', 'text-blue-700', 'dark:border-blue-400', 'dark:bg-blue-900/50', 'dark:text-blue-300'];
+        else if (currentValue === 'backlog') newClasses = ['border-gray-500', 'bg-gray-100', 'text-gray-800', 'dark:border-gray-500', 'dark:bg-gray-700', 'dark:text-gray-300'];
+    } else if (selectId === 'todo-status') {
+        if (currentValue === 'complete') newClasses = ['border-green-500', 'bg-green-50', 'text-green-700', 'dark:border-green-400', 'dark:bg-green-900/50', 'dark:text-green-300'];
+        else if (currentValue === 'in progress') newClasses = ['border-indigo-500', 'bg-indigo-50', 'text-indigo-700', 'dark:border-indigo-400', 'dark:bg-indigo-900/50', 'dark:text-indigo-300'];
+        else if (currentValue === 'blocked') newClasses = ['border-pink-500', 'bg-pink-50', 'text-pink-700', 'dark:border-pink-400', 'dark:bg-pink-900/50', 'dark:text-pink-300'];
+        else if (currentValue === 'paused') newClasses = ['border-orange-500', 'bg-orange-50', 'text-orange-700', 'dark:border-orange-400', 'dark:bg-orange-900/50', 'dark:text-orange-300'];
+        // 'not started' will use default border/bg
+    } else if (selectId === 'todo-category') {
+        // Example: Style 'Security' category differently
+        if (currentValue === 'security') newClasses = ['border-purple-500', 'bg-purple-50', 'text-purple-700', 'dark:border-purple-400', 'dark:bg-purple-900/50', 'dark:text-purple-300'];
+        // Add more category styles as needed
+    }
+    selectElement.classList.add(...newClasses);
+}
+
 // --- TODO List UI Functions ---
 
 /**
