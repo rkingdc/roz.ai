@@ -81,6 +81,8 @@ export let currentTodoItem = null; // The todo item currently being edited, or n
 export let isLoadingTodos = false;
 export let todoStatusOptions = []; // NEW: To store valid status options from backend
 export let todoPriorityOptions = []; // NEW: To store valid priority options from backend
+export let todoSortKey = 'default'; // 'default', 'priority', 'due_date', 'category'
+export let todoSortDirection = 'asc'; // 'asc', 'desc'
 // -----------------------
 
 
@@ -185,6 +187,21 @@ export function setTodoPriorityOptions(options) {
     todoPriorityOptions = Array.isArray(options) ? options : [];
     notify('todoPriorityOptions', todoPriorityOptions);
 }
+
+export function setTodoSortCriteria(key, direction) {
+    let changed = false;
+    if (todoSortKey !== key) {
+        todoSortKey = key;
+        changed = true;
+    }
+    if (todoSortDirection !== direction) {
+        todoSortDirection = direction;
+        changed = true;
+    }
+    if (changed) {
+        notify('todoSortCriteria', { key: todoSortKey, direction: todoSortDirection });
+    }
+}
 // --- End TODO List Setters ---
 
 /**
@@ -274,6 +291,7 @@ export function notifyAll() {
     notify('isLoadingTodos', isLoadingTodos);
     notify('todoStatusOptions', todoStatusOptions); // NEW
     notify('todoPriorityOptions', todoPriorityOptions); // NEW
+    notify('todoSortCriteria', { key: todoSortKey, direction: todoSortDirection }); // NEW
     // ----------------------------
 
     notificationsEnabled = wasEnabled; // Restore original notification state

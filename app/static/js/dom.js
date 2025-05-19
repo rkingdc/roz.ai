@@ -177,6 +177,9 @@ export const elements = {
     todoFormClearButton: null,
     todoFormSaveButton: null,
     todoListContainer: null,
+    todoSortPriority: null, // NEW
+    todoSortDueDate: null,  // NEW
+    todoSortCategory: null, // NEW
 };
 
 /**
@@ -352,6 +355,9 @@ export function populateElements() {
     elements.todoFormClearButton = document.getElementById('todo-form-clear-button');
     elements.todoFormSaveButton = document.getElementById('todo-form-save-button');
     elements.todoListContainer = document.getElementById('todo-list-container');
+    elements.todoSortPriority = document.getElementById('todo-sort-priority'); // NEW
+    elements.todoSortDueDate = document.getElementById('todo-sort-due-date');   // NEW
+    elements.todoSortCategory = document.getElementById('todo-sort-category'); // NEW
     // --- End Populate Specific TODO Tab Elements ---
 
     // Basic check

@@ -1303,6 +1303,7 @@ function subscribeStateChangeListeners() {
     state.subscribe('isLoadingTodos', ui.handleStateChange_isLoadingTodos);
     state.subscribe('todoStatusOptions', ui.handleStateChange_todoStatusOptions); // NEW
     state.subscribe('todoPriorityOptions', ui.handleStateChange_todoPriorityOptions); // NEW
+    state.subscribe('todoSortCriteria', ui.handleStateChange_todoSortCriteria); // NEW
     // ------------------------------
 
     elements.chatbox?.addEventListener('click', (event) => {
