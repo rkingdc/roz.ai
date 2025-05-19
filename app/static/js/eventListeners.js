@@ -1423,11 +1423,16 @@ function handleTodoFormClear() {
 }
 
 // Attach listeners for TODO form
-if (elements.todoForm) {
-    elements.todoForm.addEventListener('submit', handleTodoFormSubmit);
+const todoFormElement = document.getElementById('todo-form');
+console.log("[EVENT DEBUG] Attaching submit listener to TODO form. todoFormElement (re-fetched):", todoFormElement);
+if (todoFormElement) {
+    todoFormElement.addEventListener('submit', handleTodoFormSubmit);
 }
-if (elements.todoFormClearButton) {
-    elements.todoFormClearButton.addEventListener('click', handleTodoFormClear);
+
+const todoFormClearButtonElement = document.getElementById('todo-form-clear-button');
+console.log("[EVENT DEBUG] Attaching click listener to TODO form clear button. todoFormClearButtonElement (re-fetched):", todoFormClearButtonElement);
+if (todoFormClearButtonElement) {
+    todoFormClearButtonElement.addEventListener('click', handleTodoFormClear);
 }
 
     // --- TODO Modal and New Task Button Listeners ---
