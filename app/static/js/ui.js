@@ -2887,9 +2887,17 @@ export function renderTodoList() {
     }
 
     const placeholder = document.getElementById('todo-list-placeholder');
+    const listUiElement = elements.todoListContainer ? elements.todoListContainer.querySelector('.list') : null; // Renamed to avoid conflict
 
     if (state.isLoadingTodos) {
-        if (placeholder) placeholder.textContent = 'Loading TODO items...';
+        // This state is primarily managed by handleStateChange_isLoadingTodos.
+        // This block ensures that if renderTodoList is called directly while still loading,
+        // the UI correctly reflects the loading state.
+        if (placeholder) {
+            placeholder.textContent = 'Loading TODO items...';
+            placeholder.classList.remove('hidden');
+        }
+        if (listUiElement) listUiElement.classList.add('hidden');
         if (todoListJS) todoListJS.clear();
         return;
     }
@@ -2897,12 +2905,18 @@ export function renderTodoList() {
     const todos = state.todoItems;
 
     if (!todos || todos.length === 0) {
-        if (placeholder) placeholder.textContent = 'No TODO items yet. Add one above!';
+        if (placeholder) {
+            placeholder.textContent = 'No TODO items yet. Add one above!';
+            placeholder.classList.remove('hidden');
+        }
+        if (listUiElement) listUiElement.classList.add('hidden');
         if (todoListJS) todoListJS.clear();
         return;
     }
 
-    if (placeholder) placeholder.textContent = ''; // Clear placeholder if there are items
+    // If we have todos and are not loading:
+    if (placeholder) placeholder.classList.add('hidden'); // Hide placeholder
+    if (listUiElement) listUiElement.classList.remove('hidden'); // Show list
 
     if (!todoListJS) {
         initializeTodoListJS();
