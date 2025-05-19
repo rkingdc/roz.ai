@@ -12,7 +12,7 @@ from app import ai_services
 
 # Import db instance and models
 from app import db
-from .models import Chat, Message, File, Note, NoteHistory, default_utcnow # Import NoteHistory
+from .models import Chat, Message, File, Note, NoteHistory, TodoItem, default_utcnow # Import NoteHistory, TodoItem
 
 logger = logging.getLogger(__name__)
 
@@ -771,3 +771,155 @@ def search_files(search_term: str, limit: int = 10):
     except SQLAlchemyError as e:
         logger.error(f"Database error searching files for '{search_term}': {e}", exc_info=True)
         return []
+
+# --- TODO Item Functions ---
+
+def create_new_todo_item(name, details=None, category=None, priority="medium", status="pending", due_date=None):
+    """Creates a new todo item entry using the TodoItem model.
+    Expects due_date as a date object or None.
+    """
+    logger.info(f"Attempting to create new todo item with name: '{name}'")
+    new_todo = TodoItem(
+        name=name,
+        details=details,
+        category=category,
+        priority=priority,
+        status=status,
+        due_date=due_date  # Assumed to be a date object or None
+        # created_at and updated_at have defaults
+    )
+    try:
+        db.session.add(new_todo)
+        if _commit_session():
+            logger.info(f"Successfully created new todo item with ID: {new_todo.id}, Name: '{new_todo.name}'")
+            return {
+                'id': new_todo.id,
+                'name': new_todo.name,
+                'details': new_todo.details,
+                'category': new_todo.category,
+                'priority': new_todo.priority,
+                'status': new_todo.status,
+                'due_date': new_todo.due_date.isoformat() if new_todo.due_date else None,
+                'created_at': new_todo.created_at.isoformat(),
+                'updated_at': new_todo.updated_at.isoformat()
+            }
+        else:
+            return None  # Commit failed
+    except SQLAlchemyError as e:
+        logger.error(f"Database error creating new todo item: {e}", exc_info=True)
+        db.session.rollback()
+        return None
+
+def get_todo_item_from_db(todo_id):
+    """Retrieves details for a specific todo_id using the TodoItem model."""
+    try:
+        todo = db.session.get(TodoItem, todo_id)
+        if todo:
+            return {
+                'id': todo.id,
+                'name': todo.name,
+                'details': todo.details,
+                'category': todo.category,
+                'priority': todo.priority,
+                'status': todo.status,
+                'due_date': todo.due_date.isoformat() if todo.due_date else None,
+                'created_at': todo.created_at.isoformat(),
+                'updated_at': todo.updated_at.isoformat()
+            }
+        else:
+            return None
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting details for todo item {todo_id}: {e}", exc_info=True)
+        return None
+
+def get_all_todo_items_from_db(sort_by="due_date", sort_order="asc"):
+    """Retrieves a list of all todo items, ordered as specified."""
+    try:
+        query = TodoItem.query
+
+        sort_column_attr = getattr(TodoItem, sort_by, None)
+        if sort_column_attr is None: # Fallback to a default if sort_by is invalid
+            logger.warning(f"Invalid sort_by column '{sort_by}' for todos. Defaulting to 'due_date'.")
+            sort_column_attr = TodoItem.due_date
+        
+        if sort_order.lower() == "desc":
+            query = query.order_by(sort_column_attr.desc())
+        else:
+            query = query.order_by(sort_column_attr.asc())
+        
+        todos = query.all()
+        return [
+            {
+                'id': todo.id,
+                'name': todo.name,
+                'details': todo.details,
+                'category': todo.category,
+                'priority': todo.priority,
+                'status': todo.status,
+                'due_date': todo.due_date.isoformat() if todo.due_date else None,
+                'created_at': todo.created_at.isoformat(),
+                'updated_at': todo.updated_at.isoformat()
+            }
+            for todo in todos
+        ]
+    except SQLAlchemyError as e:
+        logger.error(f"Database error getting all todo items: {e}", exc_info=True)
+        return []
+
+def update_todo_item_in_db(todo_id, data_to_update):
+    """Updates a specific todo item. Expects values in data_to_update to be correctly typed
+    (e.g., due_date as a date object or None).
+    """
+    try:
+        todo = db.session.get(TodoItem, todo_id)
+        if not todo:
+            logger.warning(f"Todo item not found with ID: {todo_id} for update.")
+            return None # Indicate not found
+
+        for key, value in data_to_update.items():
+            if hasattr(todo, key):
+                setattr(todo, key, value) # Assumes value is already correct type
+            else:
+                logger.warning(f"Attempted to update non-existent attribute '{key}' on TodoItem {todo_id}.")
+        
+        # updated_at is handled by onupdate in the model
+        logger.info(f"Attempting to update todo item {todo_id}...")
+        if _commit_session():
+            logger.info(f"Successfully updated todo item {todo_id}")
+            return {
+                'id': todo.id,
+                'name': todo.name,
+                'details': todo.details,
+                'category': todo.category,
+                'priority': todo.priority,
+                'status': todo.status,
+                'due_date': todo.due_date.isoformat() if todo.due_date else None,
+                'created_at': todo.created_at.isoformat(),
+                'updated_at': todo.updated_at.isoformat()
+            }
+        else:
+            return None  # Commit failed
+    except SQLAlchemyError as e:
+        logger.error(f"Database error updating todo item {todo_id}: {e}", exc_info=True)
+        db.session.rollback()
+        return None
+
+def delete_todo_item_from_db(todo_id):
+    """Deletes a todo item using the TodoItem model."""
+    try:
+        todo = db.session.get(TodoItem, todo_id)
+        if not todo:
+            logger.warning(f"No todo item record found with ID: {todo_id} to delete.")
+            return False
+
+        logger.info(f"Attempting to delete todo item with ID: {todo_id}...")
+        db.session.delete(todo)
+        if _commit_session():
+            logger.info(f"Successfully deleted todo item with ID: {todo_id}")
+            return True
+        else:
+            return False  # Commit failed
+    except SQLAlchemyError as e:
+        logger.error(f"Database error deleting todo item {todo_id}: {e}", exc_info=True)
+        db.session.rollback()
+        return False
