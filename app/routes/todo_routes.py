@@ -8,8 +8,8 @@ bp = Blueprint('todo', __name__, url_prefix='/api/todos')
 
 VALID_TODO_FIELDS = ['name', 'details', 'category', 'priority', 'status', 'due_date']
 VALID_SORT_FIELDS = ['name', 'category', 'priority', 'status', 'due_date', 'created_at', 'updated_at']
-VALID_STATUS_VALUES = ['pending', 'in-progress', 'completed']
-VALID_PRIORITY_VALUES = ['low', 'medium', 'high']
+VALID_STATUS_VALUES = ['pending', 'in-progress', 'completed', 'not started', 'paused', 'blocked']
+VALID_PRIORITY_VALUES = ['low', 'medium', 'high', 'backlog']
 
 @bp.route('', methods=['POST'])
 def create_todo():
