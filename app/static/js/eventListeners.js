@@ -1303,7 +1303,14 @@ function subscribeStateChangeListeners() {
     state.subscribe('isLoadingTodos', ui.handleStateChange_isLoadingTodos);
     state.subscribe('todoStatusOptions', ui.handleStateChange_todoStatusOptions); // NEW
     state.subscribe('todoPriorityOptions', ui.handleStateChange_todoPriorityOptions); // NEW
-    state.subscribe('todoSortCriteria', ui.handleStateChange_todoSortCriteria); // NEW
+    // Wrap the listener for todoSortCriteria to defer access to ui.handleStateChange_todoSortCriteria
+    state.subscribe('todoSortCriteria', (data) => {
+        if (typeof ui.handleStateChange_todoSortCriteria === 'function') {
+            ui.handleStateChange_todoSortCriteria(data);
+        } else {
+            console.error("CRITICAL: ui.handleStateChange_todoSortCriteria is not available when 'todoSortCriteria' event fired! This may indicate a module loading or circular dependency issue.");
+        }
+    }); // NEW
     // ------------------------------
 
     elements.chatbox?.addEventListener('click', (event) => {

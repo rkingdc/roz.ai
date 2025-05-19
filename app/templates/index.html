@@ -316,8 +316,40 @@
                     </div>
                     <!-- The form is now in the modal. This area is for displaying the list of tasks. -->
                     <div class="flex-grow overflow-y-auto bg-[--rz-background-light] p-6 rounded-xl shadow-xl border border-[--rz-border-light]">
-                        <div id="todo-list-container" class="space-y-4">
-                            <p class="text-[--rz-text-muted] text-center py-4">Loading TODO items or add a new task to get started!</p>
+                        <!-- Sort Controls -->
+                        <div id="todo-sort-controls" class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-start gap-4 p-4 bg-[--rz-background-default] rounded-lg border border-[--rz-border-light] shadow">
+                            <span class="text-sm font-medium text-[--rz-text-secondary] flex-shrink-0">Sort by:</span>
+                            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                <div>
+                                    <label for="todo-sort-priority" class="sr-only">Priority</label>
+                                    <select id="todo-sort-priority" name="todo-sort-priority" class="input-field-sm todo-sort-select rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" data-sort-key="priority">
+                                        <option value="">Priority (Default)</option>
+                                        <option value="asc">Priority (Low to High)</option>
+                                        <option value="desc">Priority (High to Low)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="todo-sort-due-date" class="sr-only">Due Date</label>
+                                    <select id="todo-sort-due-date" name="todo-sort-due-date" class="input-field-sm todo-sort-select rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" data-sort-key="due_date">
+                                        <option value="">Due Date (Default)</option>
+                                        <option value="asc">Due Date (Oldest First)</option>
+                                        <option value="desc">Due Date (Newest First)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="todo-sort-category" class="sr-only">Category</label>
+                                    <select id="todo-sort-category" name="todo-sort-category" class="input-field-sm todo-sort-select rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50" data-sort-key="category">
+                                        <option value="">Category (Default)</option>
+                                        <option value="asc">Category (A-Z)</option>
+                                        <option value="desc">Category (Z-A)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- End Sort Controls -->
+                        <div id="todo-list-container"> <!-- List.js will manage items inside a .list child -->
+                            <div class="list space-y-4"></div> <!-- This div will hold the actual list items -->
+                            <p id="todo-list-placeholder" class="text-[--rz-text-muted] text-center py-4">Loading TODO items or add a new task to get started!</p>
                         </div>
                     </div>
                 </div>

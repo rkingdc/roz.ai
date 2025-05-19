@@ -2868,50 +2868,140 @@ export function renderTodoList() {
         console.error("TODO list container element not found.");
         return;
     }
-    elements.todoListContainer.innerHTML = ''; // Clear current list
+
+    const placeholder = document.getElementById('todo-list-placeholder');
+
+    if (state.isLoadingTodos) {
+        if (placeholder) placeholder.textContent = 'Loading TODO items...';
+        if (todoListJS) todoListJS.clear();
+        return;
+    }
 
     const todos = state.todoItems;
 
-    if (state.isLoadingTodos) {
-        elements.todoListContainer.innerHTML = '<p class="text-[--rz-text-muted] text-center py-4">Loading TODO items...</p>';
-        return;
-    }
-
     if (!todos || todos.length === 0) {
-        elements.todoListContainer.innerHTML = '<p class="text-[--rz-text-muted] text-center py-4">No TODO items yet. Add one above!</p>';
+        if (placeholder) placeholder.textContent = 'No TODO items yet. Add one above!';
+        if (todoListJS) todoListJS.clear();
         return;
     }
 
-    // Sort by status (pending, in-progress, completed), then by due date (nulls last, earlier dates first), then by priority (high, medium, low)
-    const priorityOrder = { high: 1, medium: 2, low: 3, default: 4 };
-    const statusOrder = { pending: 1, 'in-progress': 2, completed: 3, default: 4 };
+    if (placeholder) placeholder.textContent = ''; // Clear placeholder if there are items
 
-    const sortedTodos = [...todos].sort((a, b) => {
-        // Status: pending first, then in-progress, then completed
-        const statusA = statusOrder[a.status] || statusOrder.default;
-        const statusB = statusOrder[b.status] || statusOrder.default;
-        if (statusA !== statusB) {
-            return statusA - statusB;
+    if (!todoListJS) {
+        initializeTodoListJS();
+    }
+
+    if (!todoListJS) {
+        console.error("List.js instance for TODOs is not initialized.");
+        // Fallback to manual rendering if List.js fails (optional, or just error out)
+        elements.todoListContainer.querySelector('.list').innerHTML = '<p class="text-red-500">Error: TODO list UI component failed to load.</p>';
+        return;
+    }
+
+    todoListJS.clear(); // Clear existing items from List.js
+
+    const prioritySortValues = { low: 1, medium: 2, high: 3 }; // For 'asc' sort by priority
+
+    todos.forEach(todo => {
+        // Data for List.js item
+        const itemData = {
+            id: todo.id, // Keep id for data attributes
+            name: todo.name,
+            details: todo.details || '',
+            category: todo.category || '',
+            priorityDisplay: `P: ${todo.priority.charAt(0).toUpperCase() + todo.priority.slice(1)}`,
+            prioritySort: prioritySortValues[todo.priority.toLowerCase()] || 0,
+            statusDisplay: todo.status.charAt(0).toUpperCase() + todo.status.slice(1).replace('-', ' '),
+            statusSort: todo.status, // List.js will sort this alphabetically by default
+            dueDateDisplay: todo.due_date ? new Date(todo.due_date + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '',
+            dueDateSort: todo.due_date ? todo.due_date.replace(/-/g, '') : '99999999', // YYYYMMDD for sorting, future for nulls
+        };
+
+        // Add data to List.js. It will use the 'item' template defined in options.
+        const addedItems = todoListJS.add(itemData);
+        if (addedItems && addedItems.length > 0) {
+            const listItemElement = addedItems[0].elm; // Get the DOM element List.js created
+            listItemElement.dataset.todoId = todo.id; // Ensure the main ID is on the item
+
+            // Apply dynamic classes (like background color)
+            listItemElement.className = `todo-item p-5 mb-4 rounded-xl shadow-lg border flex flex-col md:flex-row md:items-start gap-4 transition-all duration-150 ease-in-out ${getTodoItemBgColor(todo.status, todo.due_date)}`;
+
+            // Attach event listeners for edit/delete buttons
+            const editButton = listItemElement.querySelector('.edit-btn');
+            if (editButton) {
+                editButton.addEventListener('click', () => {
+                    state.setCurrentTodoItem(todos.find(t => t.id === todo.id));
+                });
+            }
+            const deleteButton = listItemElement.querySelector('.delete-btn');
+            if (deleteButton) {
+                deleteButton.addEventListener('click', async () => {
+                    await api.deleteTodoItem(todo.id);
+                });
+            }
         }
-
-        // Due date: nulls last, earlier dates first
-        const dateA = a.due_date ? new Date(a.due_date + 'T00:00:00') : null; // Ensure local date parsing
-        const dateB = b.due_date ? new Date(b.due_date + 'T00:00:00') : null; // Ensure local date parsing
-
-        if (dateA && dateB) {
-            if (dateA.getTime() !== dateB.getTime()) return dateA - dateB;
-        } else if (dateA) {
-            return -1; // a has date, b does not, a comes first
-        } else if (dateB) {
-            return 1;  // b has date, a does not, b comes first
-        }
-        // Priority: high, medium, low
-        const priorityA = priorityOrder[a.priority] || priorityOrder.default;
-        const priorityB = priorityOrder[b.priority] || priorityOrder.default;
-        return priorityA - priorityB;
     });
 
+    // After adding all items, if a sort key is active, apply it.
+    // This ensures the list is sorted according to the current criteria after initial render or data update.
+    if (state.todoSortKey !== 'default' && todoListJS) {
+        todoListJS.sort(state.todoSortKey, { order: state.todoSortDirection });
+    } else if (todoListJS) {
+        // Apply default sort if no specific key is set (List.js doesn't have a multi-level default sort like JS .sort())
+        // For now, List.js will keep the order items were added, or its own default if any.
+        // To achieve the complex default sort, we'd need to pre-sort `todos` array before adding to List.js,
+        // or implement a custom sort function for List.js.
+        // For simplicity, we'll rely on List.js's single-key sort for now.
+        // The initial order will be as received from the backend or after the JS default sort if we re-add it before List.js.
+        // Let's re-add the default JS sort before giving data to List.js for the 'default' case.
+        const defaultPriorityOrder = { high: 1, medium: 2, low: 3, default: 4 };
+        const defaultStatusOrder = { pending: 1, 'in-progress': 2, completed: 3, default: 4 };
+        const preSortedTodos = [...state.todoItems].sort((a, b) => {
+            const statusA = defaultStatusOrder[a.status] || defaultStatusOrder.default;
+            const statusB = defaultStatusOrder[b.status] || defaultStatusOrder.default;
+            if (statusA !== statusB) return statusA - statusB;
+            const dateA = a.due_date ? new Date(a.due_date + 'T00:00:00') : null;
+            const dateB = b.due_date ? new Date(b.due_date + 'T00:00:00') : null;
+            if (dateA && dateB) {
+                if (dateA.getTime() !== dateB.getTime()) return dateA - dateB;
+            } else if (dateA) return -1;
+            else if (dateB) return 1;
+            const priorityA = defaultPriorityOrder[a.priority] || defaultPriorityOrder.default;
+            const priorityB = defaultPriorityOrder[b.priority] || defaultPriorityOrder.default;
+            return priorityA - priorityB;
+        });
+        
+        // Re-populate List.js with pre-sorted items for the default case
+        todoListJS.clear();
+        preSortedTodos.forEach(todo => {
+            const itemData = { /* ... as above ... */ 
+                id: todo.id, name: todo.name, details: todo.details || '', category: todo.category || '',
+                priorityDisplay: `P: ${todo.priority.charAt(0).toUpperCase() + todo.priority.slice(1)}`,
+                prioritySort: prioritySortValues[todo.priority.toLowerCase()] || 0,
+                statusDisplay: todo.status.charAt(0).toUpperCase() + todo.status.slice(1).replace('-', ' '),
+                statusSort: todo.status,
+                dueDateDisplay: todo.due_date ? new Date(todo.due_date + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '',
+                dueDateSort: todo.due_date ? todo.due_date.replace(/-/g, '') : '99999999',
+            };
+            const addedItems = todoListJS.add(itemData);
+            if (addedItems && addedItems.length > 0) {
+                const listItemElement = addedItems[0].elm;
+                listItemElement.dataset.todoId = todo.id;
+                listItemElement.className = `todo-item p-5 mb-4 rounded-xl shadow-lg border flex flex-col md:flex-row md:items-start gap-4 transition-all duration-150 ease-in-out ${getTodoItemBgColor(todo.status, todo.due_date)}`;
+                const editButton = listItemElement.querySelector('.edit-btn');
+                if (editButton) editButton.addEventListener('click', () => { state.setCurrentTodoItem(todos.find(t => t.id === todo.id)); });
+                const deleteButton = listItemElement.querySelector('.delete-btn');
+                if (deleteButton) deleteButton.addEventListener('click', async () => { await api.deleteTodoItem(todo.id); });
+            }
+        });
+    }
+}
 
+
+// Helper function to create a TODO item DOM element (will be used by List.js item template)
+// This function is now effectively replaced by the List.js item template.
+// The styling and button logic will be applied after List.js creates the item.
+/*
     sortedTodos.forEach(todo => {
         const itemEl = document.createElement('div');
         itemEl.className = `todo-item p-5 mb-4 rounded-xl shadow-lg border flex flex-col md:flex-row md:items-start gap-4 transition-all duration-150 ease-in-out ${getTodoItemBgColor(todo.status, todo.due_date)}`;
@@ -2991,9 +3081,70 @@ export function renderTodoList() {
         actionsEl.appendChild(deleteButton);
         itemEl.appendChild(actionsEl);
 
-        elements.todoListContainer.appendChild(itemEl);
-    });
+        // elements.todoListContainer.appendChild(itemEl); // List.js appends to its .list container
+    // }); // End of forEach for sortedTodos
+// } // End of renderTodoList
+
+// --- List.js instance and options ---
+let todoListJS = null;
+const todoListOptions = {
+    valueNames: [
+        'name', 'details', 'category', // Direct text content
+        { name: 'prioritySort', attr: 'data-priority-sortval' }, // Sort by this hidden value
+        'priorityDisplay', // Visible priority text
+        { name: 'dueDateSort', attr: 'data-duedate-sortval' },   // Sort by this hidden value
+        'dueDateDisplay',   // Visible due date text
+        'statusSort',       // Sort by status text
+        'statusDisplay'     // Visible status text
+    ],
+    // Define the HTML structure for each item List.js will create/manage
+    // List.js will populate elements with class names matching valueNames.
+    // We will add data attributes and buttons dynamically after List.js adds the item.
+    item: `
+        <li> <!-- List.js uses <li> by default if parent is <ul>, or <div> if parent is <div>. Let's use <li> and ensure .list is a <ul> or List.js will make divs. -->
+            <!-- The main todo-item class and dynamic background will be set after List.js creates the element -->
+            <div class="main-content">
+                <h4 class="name"></h4>
+                <p class="details" style="white-space: pre-wrap;"></p>
+                <p><span class="category-display category"></span></p> <!-- category-display for text, category for sort -->
+            </div>
+            <div class="info-block">
+                <span class="priority-display" data-priority-sortval></span>
+                <span class="status-display statusSort"></span> <!-- statusSort for sort -->
+                <p class="due-date-display" data-duedate-sortval></p>
+            </div>
+            <div class="actions">
+                <button class="btn btn-icon btn-sm text-[--rz-text-secondary] hover:text-[--rz-accent-default] p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 edit-btn" title="Edit TODO"><i class="fas fa-edit fa-fw"></i></button>
+                <button class="btn btn-icon btn-sm text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/50 delete-btn" title="Delete TODO"><i class="fas fa-trash-alt fa-fw"></i></button>
+            </div>
+        </li>
+    `
+};
+
+function initializeTodoListJS() {
+    if (elements.todoListContainer && !todoListJS) {
+        // Ensure the .list element exists for List.js
+        let listElement = elements.todoListContainer.querySelector('.list');
+        if (!listElement) {
+            console.error("'.list' element not found inside #todo-list-container for List.js initialization.");
+            return;
+        }
+        // If listElement is not a UL, List.js items will be DIVs.
+        // If we want LIs, ensure listElement is a UL. For now, assuming it's a div and List.js makes child divs.
+        // The item template uses <li>, so List.js will create <li>s if the list parent is a <ul>.
+        // If .list is a div, it will create divs based on the item template's outer tag.
+        // Let's ensure our item template starts with <li> and List.js will handle it.
+
+        try {
+            todoListJS = new List(elements.todoListContainer, todoListOptions);
+            console.log("List.js initialized for TODOs.");
+        } catch (e) {
+            console.error("Error initializing List.js for TODOs:", e);
+            todoListJS = null; // Ensure it's null if init fails
+        }
+    }
 }
+
 
 function getTodoItemBgColor(status, dueDateStr) {
     if (status === 'completed') {
