@@ -84,8 +84,20 @@ export const elements = {
 
 
     // Main Content Area Elements
-    chatSection: null,
-    notesSection: null,
+    // Main Tab Buttons (in header)
+    chatTabButton: null,
+    notesTabButton: null,
+    todoTabButton: null,
+    filesTabButton: null,
+    searchTabButton: null,
+
+    // Main Tab Content Sections
+    chatSection: null, // Will point to chat-tab-content
+    notesSection: null, // Will point to notes-tab-content
+    todoSection: null, // Will point to todo-tab-content (already declared below, but good to group mentally)
+    filesTabContent: null,
+    searchTabContent: null,
+
     notesTextarea: null,
     notesPreview: null,
     notesModeButtons: null,
@@ -233,10 +245,23 @@ export function populateElements() {
     elements.fileUploadSessionLabel = document.getElementById('file-upload-session-label');
     // elements.calendarToggleInputArea = elements.calendarToggle?.closest('label'); // This element doesn't exist in HTML, remove or fix
     elements.fileUploadSessionInput = document.getElementById('file-upload-session-input');
-    elements.chatNavButton = document.getElementById('chat-nav-btn');
-    elements.notesNavButton = document.getElementById('notes-nav-btn');
-    elements.chatSection = document.getElementById('chat-section');
-    elements.notesSection = document.getElementById('notes-section');
+    elements.chatNavButton = document.getElementById('chat-nav-btn'); // Sidebar nav
+    elements.notesNavButton = document.getElementById('notes-nav-btn'); // Sidebar nav
+
+    // Populate Main Navigation Tab Buttons (from header)
+    elements.chatTabButton = document.getElementById('chat-tab-button');
+    elements.notesTabButton = document.getElementById('notes-tab-button');
+    elements.todoTabButton = document.getElementById('todo-tab-button'); // Already being populated below, ensure consistency
+    elements.filesTabButton = document.getElementById('files-tab-button');
+    elements.searchTabButton = document.getElementById('search-tab-button');
+
+    // Populate Main Tab Content Sections
+    elements.chatSection = document.getElementById('chat-tab-content');
+    elements.notesSection = document.getElementById('notes-tab-content');
+    // elements.todoSection is populated below with todo-tab-content
+    elements.filesTabContent = document.getElementById('files-tab-content');
+    elements.searchTabContent = document.getElementById('search-tab-content');
+
     elements.notesTextarea = document.getElementById('notes-textarea');
     elements.notesPreview = document.getElementById('notes-preview');
     elements.chatSidebarContent = document.getElementById('chat-sidebar-content');
