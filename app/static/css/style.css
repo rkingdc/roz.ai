@@ -998,9 +998,6 @@
     opacity: 1 !important;
     visibility: visible !important;
     transform: scale(1) !important;
-    /* TEMPORARY DEBUGGING - MAKE IT VERY OBVIOUS */
-    background-color: rgba(255, 0, 0, 0.7) !important; /* Bright red background */
-    border: 5px solid lime !important; /* Bright green border */
 }
 
  .modal-content {
