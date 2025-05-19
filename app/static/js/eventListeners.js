@@ -1301,6 +1301,8 @@ function subscribeStateChangeListeners() {
     state.subscribe('todoItems', ui.handleStateChange_todoItems);
     state.subscribe('currentTodoItem', ui.handleStateChange_currentTodoItem);
     state.subscribe('isLoadingTodos', ui.handleStateChange_isLoadingTodos);
+    state.subscribe('todoStatusOptions', ui.handleStateChange_todoStatusOptions); // NEW
+    state.subscribe('todoPriorityOptions', ui.handleStateChange_todoPriorityOptions); // NEW
     // ------------------------------
 
     elements.chatbox?.addEventListener('click', (event) => {

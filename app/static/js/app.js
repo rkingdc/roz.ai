@@ -71,6 +71,8 @@ async function initializeApp() {
         // For 'files' and 'search' tabs, data is typically loaded on demand via user interaction within the tab,
         // so no specific initial data load might be needed here unless desired.
 
+        // --- Load TODO dropdown options ---
+        await api.loadTodoOptions(); // Fetch and set TODO status/priority options in state
 
         // --- Final Initial UI Render ---
         // After all initial data is loaded into state, trigger the full UI render for the active tab.

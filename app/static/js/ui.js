@@ -2750,6 +2750,41 @@ export function updateTodoDropdownStyles(selectElement) {
 // --- TODO List UI Functions ---
 
 /**
+ * Populates a select dropdown with options.
+ * @param {HTMLSelectElement} selectElement - The select DOM element.
+ * @param {string[]} options - An array of string values for the options.
+ * @param {string} [defaultValue] - The value to select by default.
+ */
+function populateTodoDropdownWithOptions(selectElement, options, defaultValue) {
+    if (!selectElement) return;
+    selectElement.innerHTML = ''; // Clear existing options
+
+    // Add a "Select..." or placeholder option if no default is provided or if it's a generic list
+    if (!defaultValue && selectElement.id === 'todo-category') { // Example for category
+        const placeholder = document.createElement('option');
+        placeholder.value = "";
+        placeholder.textContent = `Select ${selectElement.id.replace('todo-', '')}...`;
+        placeholder.disabled = true; // Make it non-selectable if it's just a placeholder
+        placeholder.selected = true; // Select it by default
+        selectElement.appendChild(placeholder);
+    }
+
+
+    options.forEach(optionValue => {
+        const option = document.createElement('option');
+        option.value = optionValue;
+        // Capitalize first letter for display, handle multi-word like "in progress"
+        option.textContent = optionValue.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        if (optionValue === defaultValue) {
+            option.selected = true;
+        }
+        selectElement.appendChild(option);
+    });
+    updateTodoDropdownStyles(selectElement); // Apply styling after populating
+}
+
+
+/**
  * Clears the TODO form fields and resets the hidden ID input.
  */
 export function resetTodoForm() {
@@ -2765,10 +2800,18 @@ export function resetTodoForm() {
     for (let i = 0; i < formElements.length; i++) {
         formElements[i].disabled = false;
     }
-    // Reset dropdown styles
-    if (elements.todoCategoryInput) updateTodoDropdownStyles(elements.todoCategoryInput);
-    if (elements.todoPriorityInput) updateTodoDropdownStyles(elements.todoPriorityInput);
-    if (elements.todoStatusInput) updateTodoDropdownStyles(elements.todoStatusInput);
+
+    // Populate dropdowns
+    populateTodoDropdownWithOptions(elements.todoStatusInput, state.todoStatusOptions, 'pending'); // Default to 'pending' or first option
+    populateTodoDropdownWithOptions(elements.todoPriorityInput, state.todoPriorityOptions, 'medium'); // Default to 'medium' or first option
+    // For category, assuming it might remain a text input or be populated differently.
+    // If category also becomes a select from backend, add:
+    // populateTodoDropdownWithOptions(elements.todoCategoryInput, state.todoCategoryOptions, '');
+
+    // Reset dropdown styles (already called by populateTodoDropdownWithOptions)
+    // if (elements.todoCategoryInput) updateTodoDropdownStyles(elements.todoCategoryInput);
+    // if (elements.todoPriorityInput) updateTodoDropdownStyles(elements.todoPriorityInput);
+    // if (elements.todoStatusInput) updateTodoDropdownStyles(elements.todoStatusInput);
 }
 
 /**
@@ -2801,10 +2844,19 @@ export function populateTodoForm(todoItem) {
         // Scrolling into view might not be necessary if modal centers form
     }, 50); // Small delay to ensure modal is visible before focus
 
-    // Apply styles to dropdowns after setting their values
-    if (elements.todoCategoryInput) updateTodoDropdownStyles(elements.todoCategoryInput);
-    if (elements.todoPriorityInput) updateTodoDropdownStyles(elements.todoPriorityInput);
-    if (elements.todoStatusInput) updateTodoDropdownStyles(elements.todoStatusInput);
+    // Populate dropdowns and set values
+    populateTodoDropdownWithOptions(elements.todoStatusInput, state.todoStatusOptions, todoItem.status);
+    populateTodoDropdownWithOptions(elements.todoPriorityInput, state.todoPriorityOptions, todoItem.priority);
+    // if (elements.todoCategoryInput && state.todoCategoryOptions) { // If category becomes dynamic
+    //     populateTodoDropdownWithOptions(elements.todoCategoryInput, state.todoCategoryOptions, todoItem.category || '');
+    // } else if (elements.todoCategoryInput) { // If category is still a text input
+    //     elements.todoCategoryInput.value = todoItem.category || '';
+    // }
+
+    // Apply styles to dropdowns (already called by populateTodoDropdownWithOptions)
+    // if (elements.todoCategoryInput) updateTodoDropdownStyles(elements.todoCategoryInput);
+    // if (elements.todoPriorityInput) updateTodoDropdownStyles(elements.todoPriorityInput);
+    // if (elements.todoStatusInput) updateTodoDropdownStyles(elements.todoStatusInput);
 }
 
 
@@ -3015,6 +3067,24 @@ export function handleStateChange_isLoadingTodos() {
         for (let i = 0; i < formElements.length; i++) {
             formElements[i].disabled = formShouldBeDisabled;
         }
+    }
+}
+
+export function handleStateChange_todoStatusOptions() {
+    // This might be called if options are dynamically updated later.
+    // For now, it ensures dropdowns are populated if state changes after initial load.
+    if (elements.todoForm && (state.currentTodoItem === null || elements.todoIdInput?.value === '')) { // Only re-populate for new task form
+        populateTodoDropdownWithOptions(elements.todoStatusInput, state.todoStatusOptions, 'pending');
+    } else if (elements.todoForm && state.currentTodoItem) { // For edit form, re-populate with current value
+        populateTodoDropdownWithOptions(elements.todoStatusInput, state.todoStatusOptions, state.currentTodoItem.status);
+    }
+}
+
+export function handleStateChange_todoPriorityOptions() {
+    if (elements.todoForm && (state.currentTodoItem === null || elements.todoIdInput?.value === '')) {
+        populateTodoDropdownWithOptions(elements.todoPriorityInput, state.todoPriorityOptions, 'medium');
+    } else if (elements.todoForm && state.currentTodoItem) {
+        populateTodoDropdownWithOptions(elements.todoPriorityInput, state.todoPriorityOptions, state.currentTodoItem.priority);
     }
 }
 

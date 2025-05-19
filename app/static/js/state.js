@@ -79,6 +79,8 @@ export let targetMessageIdToScroll = null; // Stores message_id to scroll to
 export let todoItems = []; // Array of {id, name, details, category, priority, status, due_date, created_at, updated_at}
 export let currentTodoItem = null; // The todo item currently being edited, or null
 export let isLoadingTodos = false;
+export let todoStatusOptions = []; // NEW: To store valid status options from backend
+export let todoPriorityOptions = []; // NEW: To store valid priority options from backend
 // -----------------------
 
 
@@ -173,6 +175,16 @@ export function setIsLoadingTodos(loading) {
         notify('isLoadingTodos', isLoadingTodos);
     }
 }
+
+export function setTodoStatusOptions(options) {
+    todoStatusOptions = Array.isArray(options) ? options : [];
+    notify('todoStatusOptions', todoStatusOptions);
+}
+
+export function setTodoPriorityOptions(options) {
+    todoPriorityOptions = Array.isArray(options) ? options : [];
+    notify('todoPriorityOptions', todoPriorityOptions);
+}
 // --- End TODO List Setters ---
 
 /**
@@ -260,6 +272,8 @@ export function notifyAll() {
     notify('todoItems', todoItems);
     notify('currentTodoItem', currentTodoItem);
     notify('isLoadingTodos', isLoadingTodos);
+    notify('todoStatusOptions', todoStatusOptions); // NEW
+    notify('todoPriorityOptions', todoPriorityOptions); // NEW
     // ----------------------------
 
     notificationsEnabled = wasEnabled; // Restore original notification state

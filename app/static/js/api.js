@@ -1496,6 +1496,32 @@ export async function deleteTodoItem(todoId) {
         setLoading(false);
     }
 }
+
+export async function loadTodoOptions() {
+    // No global loading indicator for this, as it's a background setup task.
+    // Individual error handling is sufficient.
+    try {
+        const response = await fetch('/api/todos/options');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: `HTTP error ${response.status}` }));
+            throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+        }
+        const options = await response.json();
+        if (options.status_values) {
+            state.setTodoStatusOptions(options.status_values);
+        }
+        if (options.priority_values) {
+            state.setTodoPriorityOptions(options.priority_values);
+        }
+        console.log("[API DEBUG] TODO options loaded:", options);
+    } catch (error) {
+        console.error('Error loading TODO options:', error);
+        showToast(`Error loading TODO options: ${error.message}`, { type: 'error' });
+        // Set to empty arrays so UI doesn't break, but logs error
+        state.setTodoStatusOptions([]);
+        state.setTodoPriorityOptions([]);
+    }
+}
 // --- End TODO API Functions ---
 
 /**
