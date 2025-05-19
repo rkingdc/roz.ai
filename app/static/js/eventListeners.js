@@ -1426,8 +1426,10 @@ if (elements.todoFormClearButton) {
 }
 
     // --- TODO Modal and New Task Button Listeners ---
+    console.log('[EVENT DEBUG] Setting up TODO Modal listeners. newTaskButton element:', elements.newTaskButton); // Log the element
     if (elements.newTaskButton) {
         elements.newTaskButton.addEventListener('click', () => {
+            console.log('[EVENT DEBUG] New Task button CLICKED. Attempting to show modal.'); // Log click event
             ui.resetTodoForm(); // This will now enable fields and set modal title
             ui.showModal(elements.todoModal);
             if (elements.todoNameInput) { // Focus the name input
