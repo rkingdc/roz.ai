@@ -3084,6 +3084,7 @@ export function renderTodoList() {
         // elements.todoListContainer.appendChild(itemEl); // List.js appends to its .list container
     // }); // End of forEach for sortedTodos
 // } // End of renderTodoList
+*/
 
 // --- List.js instance and options ---
 let todoListJS = null;
