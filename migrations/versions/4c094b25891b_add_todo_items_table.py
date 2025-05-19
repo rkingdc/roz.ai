@@ -92,67 +92,6 @@ def downgrade():
 
     # Removed incorrect create_table operations for FTS tables
     # op.create_table('message_fts_idx', # Removed
-    sa.Column('segid', sa.NullType(), nullable=False),
-    sa.Column('term', sa.NullType(), nullable=False),
-    sa.Column('pgno', sa.NullType(), nullable=True),
-    sa.PrimaryKeyConstraint('segid', 'term')
-    )
-    op.create_table('file_fts_data',
-    sa.Column('id', sa.INTEGER(), nullable=True),
-    sa.Column('block', sa.BLOB(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('file_fts_idx',
-    sa.Column('segid', sa.NullType(), nullable=False),
-    sa.Column('term', sa.NullType(), nullable=False),
-    sa.Column('pgno', sa.NullType(), nullable=True),
-    sa.PrimaryKeyConstraint('segid', 'term')
-    )
-    op.create_table('message_fts_data',
-    sa.Column('id', sa.INTEGER(), nullable=True),
-    sa.Column('block', sa.BLOB(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('message_fts_config',
-    sa.Column('k', sa.NullType(), nullable=False),
-    sa.Column('v', sa.NullType(), nullable=True),
-    sa.PrimaryKeyConstraint('k')
-    )
-    op.create_table('note_fts_docsize',
-    sa.Column('id', sa.INTEGER(), nullable=True),
-    sa.Column('sz', sa.BLOB(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('file_fts_config',
-    sa.Column('k', sa.NullType(), nullable=False),
-    sa.Column('v', sa.NullType(), nullable=True),
-    sa.PrimaryKeyConstraint('k')
-    )
-    op.create_table('note_fts_data',
-    sa.Column('id', sa.INTEGER(), nullable=True),
-    sa.Column('block', sa.BLOB(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('note_fts_config',
-    sa.Column('k', sa.NullType(), nullable=False),
-    sa.Column('v', sa.NullType(), nullable=True),
-    sa.PrimaryKeyConstraint('k')
-    )
-    op.create_table('file_fts_docsize',
-    sa.Column('id', sa.INTEGER(), nullable=True),
-    sa.Column('sz', sa.BLOB(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_table('note_fts_idx',
-    sa.Column('segid', sa.NullType(), nullable=False),
-    sa.Column('term', sa.NullType(), nullable=False),
-    sa.Column('pgno', sa.NullType(), nullable=True),
-    sa.PrimaryKeyConstraint('segid', 'term')
-    )
-    op.create_table('message_fts_docsize',
-    sa.Column('id', sa.INTEGER(), nullable=True),
-    sa.Column('sz', sa.BLOB(), nullable=True),
-    sa.PrimaryKeyConstraint('id')
-    )
+    # All the FTS related op.create_table calls and their sa.Column definitions are removed here.
     op.drop_table('todo_items')
     # ### end Alembic commands ###
