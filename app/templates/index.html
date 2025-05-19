@@ -161,9 +161,25 @@
         {# Removed border-bottom border-gray-300 #}
         <header class="bg-rz-header text-white p-4 flex justify-between items-center flex-wrap flex-shrink-0">
             <!-- Removed h1 "roz.ai" -->
-            <!-- Left Area (empty for now) -->
+            <!-- Left Area (Main Navigation Tabs) -->
             <div class="flex items-center">
-                <!-- Optional: Logo or Title here -->
+                <nav id="main-nav-tabs" class="flex space-x-1" aria-label="Tabs">
+                    <button id="chat-tab-button" class="px-4 py-2 text-sm font-medium text-white bg-[--rz-accent-default] rounded-md focus:outline-none" data-tab="chat">
+                        Chat
+                    </button>
+                    <button id="notes-tab-button" class="px-4 py-2 text-sm font-medium text-[--rz-text-tertiary] hover:text-[--rz-text-primary] focus:outline-none focus:ring-2 focus:ring-[--rz-accent-Muted] focus:ring-offset-2 focus:ring-offset-[--rz-background-dark] transition-colors duration-150 ease-in-out" data-tab="notes">
+                        Notes
+                    </button>
+                    <button id="todo-tab-button" class="px-4 py-2 text-sm font-medium text-[--rz-text-tertiary] hover:text-[--rz-text-primary] focus:outline-none focus:ring-2 focus:ring-[--rz-accent-Muted] focus:ring-offset-2 focus:ring-offset-[--rz-background-dark] transition-colors duration-150 ease-in-out" data-tab="todo">
+                        TODO
+                    </button>
+                    <button id="files-tab-button" class="px-4 py-2 text-sm font-medium text-[--rz-text-tertiary] hover:text-[--rz-text-primary] focus:outline-none focus:ring-2 focus:ring-[--rz-accent-Muted] focus:ring-offset-2 focus:ring-offset-[--rz-background-dark] transition-colors duration-150 ease-in-out" data-tab="files">
+                        Files
+                    </button>
+                    <button id="search-tab-button" class="px-4 py-2 text-sm font-medium text-[--rz-text-tertiary] hover:text-[--rz-text-primary] focus:outline-none focus:ring-2 focus:ring-[--rz-accent-Muted] focus:ring-offset-2 focus:ring-offset-[--rz-background-dark] transition-colors duration-150 ease-in-out" data-tab="search">
+                        Search
+                    </button>
+                </nav>
             </div>
 
             <!-- Center Area (Model Selector OR Notes Mode Elements) -->
@@ -225,115 +241,158 @@
         </header>
         <!-- End Header -->
 
+        <!-- Main Content Area Wrapper -->
+        <div class="flex-grow overflow-auto"> <!-- This div will handle scrolling for tab content -->
+            <!-- Chat Tab Content -->
+            <div id="chat-tab-content" class="tab-content h-full">
+                <!-- Original Chat Section Content Start -->
+                <div id="chat-section" class="flex flex-col flex-grow overflow-hidden">
+                     <div id="chat-area" class="flex flex-col flex-grow overflow-hidden p-4">
+                        <div id="chatbox" class="flex-grow overflow-y-auto mb-4 border border-gray-300 rounded-lg p-2 bg-white">
+                            <div class="system-msg p-4">Initializing chat...</div>
+                        </div>
+                    </div>
+                    <div id="input-area" class="flex flex-col gap-2 p-4 border-t border-gray-300 bg-gray-100 flex-shrink-0">
+                         <div id="selected-files-container" class="hidden"></div>
+                         <div class="flex items-center gap-2 mb-2">
+                             <label class="btn btn-secondary btn-sm p-1 flex-shrink-0" id="file-upload-session-label" for="file-upload-session-input" title="Attach file to message" style="height: 34px; width: 34px; line-height: normal;">
+                                 <i class="fas fa-paperclip"></i>
+                             </label>
+                             <div class="inline-flex items-center" role="group">
+                                 <button type="button" id="mic-button" class="btn btn-secondary p-0 relative flex items-center justify-center" title="Record Voice" style="height: 34px; width: 34px;">
+                                     <span class="mic-icon-wrapper"><i class="fas fa-microphone"></i></span>
+                                     <svg class="mic-progress-ring hidden" width="30" height="30" viewBox="0 0 30 30">
+                                         <circle class="progress-ring-track" cx="15" cy="15" r="13" fill="none" stroke-width="2"/>
+                                         <circle class="progress-ring-arc" cx="15" cy="15" r="13" fill="none" stroke-width="2.5"/>
+                                     </svg>
+                                 </button>
+                                 <button type="button" id="cleanup-transcript-btn" class="btn btn-secondary p-2 ml-1" title="Clean Up Transcript" disabled style="height: 34px; width: 34px;">
+                                     <i class="fas fa-wand-magic-sparkles"></i>
+                                 </button>
+                             </div>
+                             <div class="flex-grow"></div>
+                             <label class="toggle-switch text-xs mr-3" id="improve-prompt-toggle-label" title="Improve the user prompt before sending to the LLM">
+                                 <input type="checkbox" id="improve-prompt-toggle">
+                                 <span class="toggle-slider"></span>
+                                 Improve Prompt
+                             </label>
+                             <label class="toggle-switch text-xs mr-3" id="deep-research-toggle-label" title="Enable deep research mode (experimental)">
+                                 <input type="checkbox" id="deep-research-toggle">
+                                 <span class="toggle-slider"></span>
+                                 Deep Research
+                             </label>
+                             <label class="toggle-switch text-xs" id="web-search-toggle-label" title="Include web search results in the AI's context">
+                                 <input type="checkbox" id="web-search-toggle">
+                                 <span class="toggle-slider"></span>
+                                 Web Search
+                             </label>
+                         </div>
+                         <div id="input-controls" class="flex items-center gap-2">
+                           <div id="file-upload-session-container" class="hidden">
+                                <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf">
+                            </div>
+                            <div class="input-wrapper flex-grow relative">
+                                <textarea id="message-input" class="w-full p-2 rounded-lg focus:outline-none resize-none text-sm border border-gray-300" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
+                            </div>
+                            <div class="flex flex-col items-center flex-shrink-0">
+                                <button id="send-button" class="btn btn-primary flex-grow" style="height: 42px;">
+                                    <i class="fas fa-paper-plane"></i> Send
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                     <div id="status-bar" class="text-xs px-4 py-1 flex-shrink-0">Status: Idle</div>
+                </div>
+                <!-- Original Chat Section Content End -->
+            </div>
+            <!-- End Chat Tab Content -->
 
-        <!-- Chat Section -->
-        <div id="chat-section" class="flex flex-col flex-grow overflow-hidden">
-             <div id="chat-area" class="flex flex-col flex-grow overflow-hidden p-4">
-                <!-- Area to display the currently attached session file (MOVED BELOW) -->
-                <div id="chatbox" class="flex-grow overflow-y-auto mb-4 border border-gray-300 rounded-lg p-2 bg-white">
-                    <div class="system-msg p-4">Initializing chat...</div>
+            <!-- Notes Tab Content -->
+            <div id="notes-tab-content" class="tab-content hidden h-full">
+                <!-- Original Notes Section Content Start -->
+                <div id="notes-section" class="flex flex-col flex-grow p-4"> <!-- Removed hidden from inner div -->
+                    <textarea id="notes-textarea" class="note-mode-element flex-grow relative min-h-0 w-full h-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
+                    <div id="notes-preview" class="note-mode-element flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm overflow-y-auto prose dark:prose-invert max-w-none dark:bg-gray-800 dark:border-gray-600 dark:text-white hidden">
+                    </div>
+                </div>
+                <!-- Original Notes Section Content End -->
+            </div>
+            <!-- End Notes Tab Content -->
+
+            <!-- TODO Tab Content -->
+            <div id="todo-tab-content" class="tab-content hidden h-full p-6 bg-[--rz-background-default]">
+                <div class="flex flex-col h-full max-w-4xl mx-auto">
+                    <h2 class="text-3xl font-bold text-[--rz-text-primary] mb-8 text-center">My TODO List</h2>
+                    <form id="todo-form" class="mb-10 p-6 bg-[--rz-background-light] rounded-xl shadow-xl border border-[--rz-border-light]">
+                        <input type="hidden" id="todo-id">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="todo-name" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Task Name <span class="text-red-500">*</span></label>
+                                <input type="text" id="todo-name" name="name" required class="input-field" placeholder="e.g., Finish project report">
+                            </div>
+                            <div>
+                                <label for="todo-due-date" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Due Date</label>
+                                <input type="date" id="todo-due-date" name="due_date" class="input-field">
+                            </div>
+                        </div>
+                        <div class="mt-6">
+                            <label for="todo-details" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Details</label>
+                            <textarea id="todo-details" name="details" rows="3" class="input-field" placeholder="Add more details about the task..."></textarea>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                            <div>
+                                <label for="todo-category" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Category</label>
+                                <input type="text" id="todo-category" name="category" class="input-field" placeholder="e.g., Work, Personal">
+                            </div>
+                            <div>
+                                <label for="todo-priority" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Priority</label>
+                                <select id="todo-priority" name="priority" class="input-field">
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="todo-status" class="block text-sm font-semibold text-[--rz-text-secondary] mb-1">Status</label>
+                                <select id="todo-status" name="status" class="input-field">
+                                    <option value="pending" selected>Pending</option>
+                                    <option value="in-progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-8 flex items-center justify-end space-x-4">
+                            <button type="button" id="todo-form-clear-button" class="btn btn-outline">Clear Form</button>
+                            <button type="submit" id="todo-form-save-button" class="btn btn-primary">Save Task</button>
+                        </div>
+                    </form>
+                    <div class="flex-grow overflow-y-auto bg-[--rz-background-light] p-6 rounded-xl shadow-xl border border-[--rz-border-light]">
+                         <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-2xl font-semibold text-[--rz-text-primary]">Current Tasks</h3>
+                        </div>
+                        <div id="todo-list-container" class="space-y-4">
+                            <p class="text-[--rz-text-muted] text-center py-4">Loading TODO items or add a new task to get started!</p>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div id="input-area" class="flex flex-col gap-2 p-4 border-t border-gray-300 bg-gray-100 flex-shrink-0">
-                 <!-- Container for ALL attached files (session + plugin) -->
-                 <div id="selected-files-container" class="hidden"></div>
-                 <!-- NEW Top Controls Row -->
-                 <div class="flex items-center gap-2 mb-2">
-                     <!-- Attach Session File Button -->
-                     <label class="btn btn-secondary btn-sm p-1 flex-shrink-0" id="file-upload-session-label" for="file-upload-session-input" title="Attach file to message" style="height: 34px; width: 34px; line-height: normal;"> {# Adjusted style #}
-                         <i class="fas fa-paperclip"></i>
-                     </label>
-                     <!-- Mic/Cleanup Button Group -->
-                     <div class="inline-flex items-center" role="group">
-                         {# Chat Streaming Mic Button with SVG Progress Ring #}
-                         <button type="button" id="mic-button" class="btn btn-secondary p-0 relative flex items-center justify-center" title="Record Voice" style="height: 34px; width: 34px;">
-                             <span class="mic-icon-wrapper"><i class="fas fa-microphone"></i></span>
-                             <svg class="mic-progress-ring hidden" width="30" height="30" viewBox="0 0 30 30">
-                                 <circle class="progress-ring-track" cx="15" cy="15" r="13" fill="none" stroke-width="2"/>
-                                 <circle class="progress-ring-arc" cx="15" cy="15" r="13" fill="none" stroke-width="2.5"/>
-                             </svg>
-                         </button>
-                         <button type="button" id="cleanup-transcript-btn" class="btn btn-secondary p-2 ml-1" title="Clean Up Transcript" disabled style="height: 34px; width: 34px;">
-                             <i class="fas fa-wand-magic-sparkles"></i>
-                         </button>
-                     </div>
-                     <!-- Spacer to push Toggles to the right -->
-                     <div class="flex-grow"></div>
-                     <!-- Improve Prompt Toggle -->
-                     <label class="toggle-switch text-xs mr-3" id="improve-prompt-toggle-label" title="Improve the user prompt before sending to the LLM">
-                         <input type="checkbox" id="improve-prompt-toggle">
-                         <span class="toggle-slider"></span>
-                         Improve Prompt
-                     </label>
-                     <!-- Deep Research Toggle -->
-                     <label class="toggle-switch text-xs mr-3" id="deep-research-toggle-label" title="Enable deep research mode (experimental)">
-                         <input type="checkbox" id="deep-research-toggle">
-                         <span class="toggle-slider"></span>
-                         Deep Research
-                     </label>
-                     <!-- Web Search Toggle -->
-                     <label class="toggle-switch text-xs" id="web-search-toggle-label" title="Include web search results in the AI's context">
-                         <input type="checkbox" id="web-search-toggle">
-                         <span class="toggle-slider"></span>
-                         Web Search
-                     </label>
-                 </div>
-                 <!-- End NEW Top Controls Row -->
-                 <div id="input-controls" class="flex items-center gap-2">
-                    <!-- File upload trigger MOVED TO TOP ROW -->
-                   <div id="file-upload-session-container" class="hidden">
-                        <input type="file" id="file-upload-session-input" accept=".txt,.py,.js,.html,.css,.md,.json,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,image/*,audio/*,application/pdf">
-                        <!-- <div id="session-file-display"></div> --> <!-- This div is no longer used -->
-                    </div>
-                    <!-- Wrapper for textarea -->
-                    <div class="input-wrapper flex-grow relative">
-                        {# Removed rows="2" attribute #}
-                        <textarea id="message-input" class="w-full p-2 rounded-lg focus:outline-none resize-none text-sm border border-gray-300" placeholder="Type your message... (Shift+Enter for newline)"></textarea>
-                        <!-- Button Group MOVED TO TOP ROW -->
-                    </div>
-                    <div class="flex flex-col items-center flex-shrink-0"> <!-- Container for Send button - Removed self-end -->
-                        <!-- Web Search Toggle MOVED TO TOP ROW -->
-                        <!-- Send Button -->
-                        {# Mic button moved inside input-wrapper #}
-                        <button id="send-button" class="btn btn-primary flex-grow" style="height: 42px;">
-                            <i class="fas fa-paper-plane"></i> Send
-                        </button>
-                    </div>
-                </div>
+            <!-- End TODO Tab Content -->
+
+            <!-- Files Tab Content -->
+            <div id="files-tab-content" class="tab-content hidden h-full p-4">
+                 <h2 class="text-xl font-semibold text-[--rz-text-primary] mb-4">Files Management</h2>
+                 <p class="text-[--rz-text-secondary]">Files tab content will go here. (e.g., using a partial: {% raw %}{% include 'partials/_files_tab.html' %}{% endraw %})</p>
             </div>
-             <div id="status-bar" class="text-xs px-4 py-1 flex-shrink-0">Status: Idle</div>
-        </div>
-        <!-- End Chat Section -->
+            <!-- End Files Tab Content -->
 
-
-        <!-- Notes Section -->
-        <!-- Added flex-grow to make it fill available space. REMOVED overflow-hidden to let inner elements handle scroll -->
-        <div id="notes-section" class="flex flex-col flex-grow p-4 hidden">
-            <!-- Removed the inner flex container that created side-by-side layout -->
-            <!-- Removed labels for Markdown Input and Preview -->
-
-            <!-- Textarea for Markdown Input - REMOVED WRAPPER DIV -->
-            {# Added note-mode-element, flex-grow, relative, min-h-0 directly to textarea #}
-            <textarea id="notes-textarea" class="note-mode-element flex-grow relative min-h-0 w-full h-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none resize-none overflow-auto" placeholder="Start typing your markdown notes here..."></textarea>
-            <!-- Button Group MOVED to header -->
-            {# Preview Area remains unchanged structurally, but is now a direct sibling textarea #}
-
-            <!-- Preview Area -->
-            <!-- Added flex-grow and overflow-y-auto to make preview fill its container and scroll -->
-            <!-- Added note-mode-element class for JS toggling -->
-            <div id="notes-preview" class="note-mode-element flex-grow w-full p-3 border border-gray-300 rounded-md shadow-sm overflow-y-auto prose dark:prose-invert max-w-none dark:bg-gray-800 dark:border-gray-600 dark:text-white hidden">
-                <!-- Markdown will be rendered here -->
+            <!-- Search Tab Content -->
+            <div id="search-tab-content" class="tab-content hidden h-full p-4">
+                <h2 class="text-xl font-semibold text-[--rz-text-primary] mb-4">Global Search</h2>
+                <p class="text-[--rz-text-secondary]">Search tab content will go here. (e.g., using a partial: {% raw %}{% include 'partials/_search_tab.html' %}{% endraw %})</p>
             </div>
+            <!-- End Search Tab Content -->
 
-            <!-- Save Button - Moved to sidebar, but keeping this one for now if needed -->
-            <!-- <div class="mt-4 flex justify-end flex-shrink-0">
-                <button id="save-note-button" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-blue-700 dark:hover:bg-blue-800">
-                    Save Note
-                </button>
-            </div> -->
-        </div>
-        <!-- End Notes Section -->
-
+        </div> <!-- End Main Content Area Wrapper -->
     </main>
 
     <aside id="plugins-sidebar">
