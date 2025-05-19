@@ -1581,21 +1581,19 @@ export function renderChatInputArea() {
  */
 export function switchTab(tab) {
     const {
-        chatNavButton, notesNavButton, // Sidebar nav buttons
-        chatTabButton, notesTabButton, todoTabButton, filesTabButton, searchTabButton, // Main header nav buttons
-        chatSection, notesSection, todoSection, // Main content sections (todoSection was todoTabContent)
-        filesTabContent, searchTabContent, // Other main content sections
+        chatNavButton, notesNavButton, // Sidebar nav buttons (potentially legacy for direct activation)
+        chatTabButton, notesTabButton, todoTabButton, // Main sidebar tab buttons
+        chatSection, notesSection, todoSection, // Main content sections
+        filesTabContent, searchTabContent, // Other main content sections (still exist but not in main nav)
         chatSidebarContent, notesSidebarContent, modelSelectorContainer,
         notesModeElements, inputArea
     } = elements;
 
     // Check for essential elements for basic tab switching
-    // Note: chatNavButton and notesNavButton are the old sidebar buttons, not the main tabs.
-    // The main tab buttons are chatTabButton, notesTabButton, etc.
-    if (!elements.chatTabButton || !elements.notesTabButton || !elements.todoTabButton || !elements.filesTabButton || !elements.searchTabButton ||
+    if (!elements.chatTabButton || !elements.notesTabButton || !elements.todoTabButton ||
         !chatSection || !notesSection || !todoSection || !filesTabContent || !searchTabContent) {
         console.error("Missing essential elements for tab switching in main content or sidebar navigation.", {
-            chatTabButton: elements.chatTabButton, notesTabButton: elements.notesTabButton, todoTabButton: elements.todoTabButton, filesTabButton: elements.filesTabButton, searchTabButton: elements.searchTabButton,
+            chatTabButton: elements.chatTabButton, notesTabButton: elements.notesTabButton, todoTabButton: elements.todoTabButton,
             chatSection, notesSection, todoSection, filesTabContent, searchTabContent
         });
         return;
@@ -1605,9 +1603,10 @@ export function switchTab(tab) {
     const mainNavTabs = [
         { button: elements.chatTabButton, name: 'chat', content: elements.chatSection },
         { button: elements.notesTabButton, name: 'notes', content: elements.notesSection },
-        { button: elements.todoTabButton, name: 'todo', content: elements.todoSection },
-        { button: elements.filesTabButton, name: 'files', content: elements.filesTabContent },
-        { button: elements.searchTabButton, name: 'search', content: elements.searchTabContent }
+        { button: elements.todoTabButton, name: 'todo', content: elements.todoSection }
+        // Removed Files and Search from main navigation
+        // { button: elements.filesTabButton, name: 'files', content: elements.filesTabContent },
+        // { button: elements.searchTabButton, name: 'search', content: elements.searchTabContent }
     ];
 
     mainNavTabs.forEach(navTab => {

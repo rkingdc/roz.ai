@@ -967,8 +967,8 @@ export function setupEventListeners() {
     elements.chatTabButton?.addEventListener('click', () => handleTabSwitchClick('chat'));
     elements.notesTabButton?.addEventListener('click', () => handleTabSwitchClick('notes'));
     elements.todoTabButton?.addEventListener('click', () => handleTabSwitchClick('todo'));
-    elements.filesTabButton?.addEventListener('click', () => handleTabSwitchClick('files'));
-    elements.searchTabButton?.addEventListener('click', () => handleTabSwitchClick('search'));
+    // elements.filesTabButton?.addEventListener('click', () => handleTabSwitchClick('files')); // Removed
+    // elements.searchTabButton?.addEventListener('click', () => handleTabSwitchClick('search')); // Removed
 
 
     async function handleTabSwitchClick(tab) {

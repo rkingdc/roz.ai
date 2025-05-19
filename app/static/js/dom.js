@@ -88,8 +88,8 @@ export const elements = {
     chatTabButton: null,
     notesTabButton: null,
     todoTabButton: null,
-    filesTabButton: null,
-    searchTabButton: null,
+    // filesTabButton: null, // Removed
+    // searchTabButton: null, // Removed
 
     // Main Tab Content Sections
     chatSection: null, // Will point to chat-tab-content
@@ -266,9 +266,9 @@ export function populateElements() {
     // Populate Main Navigation Tab Buttons (from header)
     elements.chatTabButton = document.getElementById('chat-tab-button');
     elements.notesTabButton = document.getElementById('notes-tab-button');
-    elements.todoTabButton = document.getElementById('todo-tab-button'); // Already being populated below, ensure consistency
-    elements.filesTabButton = document.getElementById('files-tab-button');
-    elements.searchTabButton = document.getElementById('search-tab-button');
+    elements.todoTabButton = document.getElementById('todo-tab-button');
+    // elements.filesTabButton = document.getElementById('files-tab-button'); // Removed
+    // elements.searchTabButton = document.getElementById('search-tab-button'); // Removed
 
     // Populate Main Tab Content Sections
     elements.chatSection = document.getElementById('chat-tab-content');

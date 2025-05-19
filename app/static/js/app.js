@@ -101,7 +101,7 @@ function loadPersistedStates() {
 
     // Load initial tab
     const storedTab = localStorage.getItem(config.ACTIVE_TAB_KEY);
-    state.setCurrentTab((storedTab === 'chat' || storedTab === 'notes' || storedTab === 'todo' || storedTab === 'files' || storedTab === 'search') ? storedTab : 'chat');
+    state.setCurrentTab((storedTab === 'chat' || storedTab === 'notes' || storedTab === 'todo') ? storedTab : 'chat');
 
     // Load current IDs (will be used by loadInitialData)
     const persistedChatId = localStorage.getItem('currentChatId');
