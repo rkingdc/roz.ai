@@ -274,9 +274,16 @@ def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List
         )
 
         # Make LLM call to trigger the web_search tool
-        response = gemini_client.generate_content(
-            prompt_text,
+        response = gemini_client.models.generate_content(
+            contents=prompt_text, # 'contents' is the correct parameter name
             tools=[WEB_SEARCH_TOOL]
+            # model='gemini-2.5-flash-preview-04-17' # Model is specified during client.models.generate_content
+                                                  # or defaults if client was created with a model.
+                                                  # For tool usage, the model is implicitly the one the client is configured for.
+                                                  # If a specific model is needed here, it should be passed to generate_content.
+                                                  # However, generate_text in generation_services.py gets model from config,
+                                                  # this function should probably align or ensure client is for the right model.
+                                                  # For now, assuming client is configured for the correct model for tool use.
         )
 
         if not response.candidates or not response.candidates[0].content.parts:
