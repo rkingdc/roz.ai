@@ -254,10 +254,12 @@ Final JSON Output:
                 logger.info("Research step cancelled before LLM call.")
                 return ["[AI Info: Research step cancelled by user.]"]
 
+            max_tokens = current_app.config.get("DEFAULT_MAX_OUTPUT_TOKENS", 8192)
             generation_config = types.GenerateContentConfig(
                 tools=[WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL],
-                # Potentially increase max_output_tokens if the combined summaries are long
-                # temperature might be set lower for more factual summarization
+                max_output_tokens=max_tokens,
+                response_mime_type='text/plain', # Explicitly request text for the final output
+                # temperature might be set lower for more factual summarization, e.g., 0.5
             )
             
             if socketio and sid:
