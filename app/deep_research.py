@@ -214,35 +214,40 @@ def execute_research_step(
             logger.info(f"execute_research_step: Using model '{model_to_use}' for research step.")
 
             # Comprehensive prompt for the LLM to manage the research sub-tasks
-            # This prompt needs to be carefully engineered.
             prompt = f"""
-You are an AI research assistant executing a specific step of a larger research plan.
-Your goal is to gather relevant information for the following research step:
-"{step_description}"
+You are an AI research assistant. Your task is to execute a research step: "{step_description}"
+Follow these phases strictly:
 
-To do this, you must:
-1.  Formulate 2-3 targeted search queries based on the step description.
-2.  Execute these queries using the `web_search` tool. This tool will return a list of search results (title, link, snippet).
-3.  Review the search results. For each promising link that seems highly relevant and likely to contain detailed information, use the `scrape_url` tool to fetch its full content.
-    *   The `scrape_url` tool will return text content for HTML pages.
-    *   If `scrape_url` tool returns raw PDF data (which you cannot read directly), make a note of the PDF's title and link, and state that it is a PDF document. Do not attempt to include the raw PDF data in your output.
-    *   If scraping fails or a page has no useful content, note that and rely on the snippet if it's informative.
-4.  Synthesize the information you've gathered from the scraped content and relevant snippets.
-5.  For each distinct source of information you used (whether fully scraped or just a snippet), format it as a string with the following structure:
-    "Title: [Title of the source or page]\nLink: [URL of the source]\nSnippet: [Original snippet from web_search if available]\nContent: [Your summary of the scraped content, or the full text if concise and relevant, or a note like 'PDF document, content not directly viewable', or 'Scraping failed/No content extracted']\n---"
-6.  Return all these formatted source strings as a JSON list. Each string in the list represents one processed source.
+Phase 1: Plan Search Queries
+- Based on the step description, formulate 2-3 targeted search queries.
 
-Example of a single formatted source string in the output list:
+Phase 2: Execute Searches and Identify Promising URLs
+- Use the `web_search` tool for each query. This tool returns search result metadata (title, link, snippet).
+- Review the (title, link, snippet) for all search results.
+- Identify a list of promising URLs that seem most relevant for full content extraction.
+
+Phase 3: Scrape Content from Promising URLs
+- For each promising URL identified in Phase 2, use the `scrape_url` tool to fetch its full content.
+- If `scrape_url` tool returns HTML, use the extracted text.
+- If `scrape_url` tool returns raw PDF data, note that it's a PDF document (include its title and link) and that its content cannot be directly read by you in this step.
+- If scraping fails for a URL or a page has no useful content, note this.
+
+Phase 4: Compile and Format Final Output
+- After completing all searches and any necessary scraping (Phases 1-3):
+- Gather all the information you have collected.
+- For each original search result you considered (whether it was successfully scraped, was a PDF, failed to scrape, or was only a snippet):
+    - Create a formatted string with the following structure:
+      "Title: [Title of source]\nLink: [URL of source]\nSnippet: [Original snippet from web_search if available]\nContent: [Your summary of scraped HTML content / Full text if concise and relevant / 'PDF document, content not directly viewable.' / 'Scraping failed or no useful content extracted from this URL.' / 'Snippet information only, not scraped.']\n---"
+- Your *FINAL and ONLY* output for this entire multi-phase task must be a single JSON list containing all these formatted source strings.
+- Each string in the list represents one processed source.
+
+Example of a single formatted source string in the JSON list:
 "Title: Example Research Paper\nLink: https://example.com/paper.pdf\nSnippet: This paper discusses advanced research techniques...\nContent: PDF document, content not directly viewable.\n---"
 
-Another example:
-"Title: Blog Post on Topic X\nLink: https://example.com/blog/topic-x\nSnippet: An insightful blog post covering Topic X...\nContent: The blog post details several key aspects of Topic X. Firstly, it highlights A. Secondly, it discusses B. [More summarized content from scrape]...\n---"
+Do not output any intermediate results like lists of queries. Your sole output should be the final JSON list of formatted source strings after completing all phases.
+Begin execution.
 
-If a search result is not promising enough to scrape, but the snippet is useful, you can include it like:
-"Title: Less Relevant Page\nLink: https://example.com/less-relevant\nSnippet: This page touches upon a related concept...\nContent: Based on snippet: This page touches upon a related concept. [No scraping performed or scrape failed]\n---"
-
-Proceed with the research for the step description provided above. Ensure your final output is ONLY the JSON list of formatted source strings.
-JSON Output:
+Final JSON Output:
             """
 
             if is_cancelled_callback():
@@ -265,19 +270,31 @@ JSON Output:
             )
             
             # The SDK's automatic function calling handles the tool execution loop.
-            # The final response.text should contain the JSON list of formatted strings.
+            # The final response object should contain the model's concluding text.
 
-            if response.text:
-                logger.debug(f"LLM response for research step: {response.text[:500]}")
-                parsed_items = parse_llm_json_output(response.text, expected_keys=[]) # Expecting a list of strings
+            final_model_output_text = None
+            if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
+                # The model's final textual reply should ideally be the last part.
+                # Iterate through parts to find text, prioritizing the last one.
+                for part in reversed(response.candidates[0].content.parts):
+                    if part.text:
+                        final_model_output_text = part.text
+                        break
+                if not final_model_output_text and response.text: # Fallback to response.text if last part isn't text but response.text has something
+                    logger.info("Using response.text as fallback for final model output.")
+                    final_model_output_text = response.text # response.text concatenates all text parts
+
+            if final_model_output_text:
+                logger.debug(f"LLM final model output text for research step: {final_model_output_text[:500]}")
+                parsed_items = parse_llm_json_output(final_model_output_text, expected_keys=[]) # Expecting a list of strings
                 if isinstance(parsed_items, list) and all(isinstance(item, str) for item in parsed_items):
                     processed_research_items.extend(parsed_items)
                     logger.info(f"Successfully processed {len(parsed_items)} items for research step.")
                 else:
-                    logger.error(f"LLM response for research step was not a JSON list of strings: {response.text[:500]}")
-                    processed_research_items.append(f"[System Error: LLM did not return a valid list of research items for '{step_description}'. Raw response: {response.text[:200]}]")
+                    logger.error(f"LLM response for research step was not a JSON list of strings: {final_model_output_text[:500]}")
+                    processed_research_items.append(f"[System Error: LLM did not return a valid list of research items for '{step_description}'. Raw response: {final_model_output_text[:200]}]")
             else:
-                logger.warning(f"LLM returned no text for research step: {step_description}")
+                logger.warning(f"LLM returned no discernible final text for research step: {step_description}")
                 # Check for blocked prompt or other issues
                 if response.prompt_feedback and response.prompt_feedback.block_reason:
                     reason = response.prompt_feedback.block_reason
