@@ -6,6 +6,8 @@ from typing import List, Tuple, Any, Dict, Callable
 # Imports for Task 1 & 2 (Retries, Parallelization)
 import concurrent.futures
 import functools
+import os # For os.cpu_count() in Task 3
+import uuid # For Task 3 (Async PDF Transcription)
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import requests # For requests.exceptions
 from googleapiclient.errors import HttpError as GoogleHttpError # For Google API client errors
@@ -189,11 +191,15 @@ def execute_research_step(
     is_cancelled_callback: Callable[[], bool],
     socketio, # For emit_status
     sid,
-    app_context # Pass Flask app context for background thread safety
-) -> List[str]:
+    app_context, # Pass Flask app context for background thread safety
+    cpu_executor: concurrent.futures.ProcessPoolExecutor # For Task 3
+) -> Tuple[List[str], List[Dict]]: # Returns (llm_summary_strings, pdf_futures_info_list)
     """
     Executes a single research step using an LLM to orchestrate web searches and scraping.
-    Returns a list of strings, where each string is a formatted summary of a processed source.
+    Returns:
+        - A list of strings, where each string is a formatted summary of a processed source (may contain placeholders for PDFs).
+        - A list of dictionaries, each containing info about a submitted PDF transcription task 
+          (e.g., {'placeholder': str, 'future': Future, 'original_url': str, 'original_filename': str}).
     Must be called within an active Flask app context.
     """
     logger.info(f"Executing research step: {step_description[:100]}...")
@@ -267,8 +273,10 @@ Indicate you are ready for the final compilation step once all searches and scra
             conversation_history = [types.Content(parts=[types.Part.from_text(text=tool_usage_prompt)], role="user")]
             
             MAX_TOOL_TURNS = 15 
-            MAX_CONSECUTIVE_EMPTY_TOOL_CALL_TURNS = 2 # Prevent LLM getting stuck asking for no tools
+            MAX_CONSECUTIVE_EMPTY_TOOL_CALL_TURNS = 2
             consecutive_empty_tool_turns = 0
+            
+            submitted_pdf_futures_info = [] # For Task 3
 
             # Define retryable exceptions for network/API issues (used by retry-wrapped callables)
             RETRYABLE_EXCEPTIONS = (
@@ -402,19 +410,34 @@ Indicate you are ready for the final compilation step once all searches and scra
                                 if fc_name == "web_search":
                                     function_response_data_for_llm = {"results": tool_call_result_data}
                                 elif fc_name == "scrape_url":
-                                    # PDF transcription (Task 3) will make this async.
-                                    # For now, synchronous transcription within this worker thread.
                                     if tool_call_result_data['type'] == 'pdf' and isinstance(tool_call_result_data['content'], bytes):
+                                        pdf_bytes = tool_call_result_data['content']
                                         pdf_filename = tool_call_result_data.get('filename', 'scraped.pdf')
-                                        logger.info(f"Transcribing PDF: {pdf_filename} from parallel scrape_url tool call.")
+                                        original_url = tool_call_result_data.get('url', 'unknown_url')
+                                        placeholder_id = str(uuid.uuid4())
+                                        placeholder_string_for_llm = f"PDF_CONTENT_PENDING_ID_{placeholder_id}"
+                                        
+                                        logger.info(f"Submitting PDF for async transcription: {pdf_filename}, placeholder: {placeholder_string_for_llm}")
                                         if socketio and sid:
-                                            socketio.emit("status_update", {"message": f"Transcribing PDF: {pdf_filename[:25]}..."}, room=sid)
-                                        transcribed_text = transcribe_pdf_bytes(tool_call_result_data['content'], pdf_filename)
-                                        tool_call_result_data['content'] = transcribed_text 
-                                        tool_call_result_data['original_type'] = 'pdf' 
-                                        tool_call_result_data['type'] = 'text'
-                                    function_response_data_for_llm = {"scraped_data": tool_call_result_data}
-                                else: # Should not happen if validation above is correct
+                                            socketio.emit("status_update", {"message": f"PDF queued for transcription: {pdf_filename[:25]}..."}, room=sid)
+                                        
+                                        transcription_future = cpu_executor.submit(transcribe_pdf_bytes, pdf_bytes, pdf_filename)
+                                        submitted_pdf_futures_info.append({
+                                            'placeholder': placeholder_string_for_llm,
+                                            'future': transcription_future,
+                                            'original_url': original_url, # Store for context
+                                            'original_filename': pdf_filename
+                                        })
+                                        # Respond to LLM that transcription is pending
+                                        function_response_data_for_llm = {
+                                            "status": "pdf_transcription_submitted", 
+                                            "url": original_url, 
+                                            "filename": pdf_filename, 
+                                            "content_placeholder": placeholder_string_for_llm
+                                        }
+                                    else: # HTML or error from scrape
+                                        function_response_data_for_llm = {"scraped_data": tool_call_result_data}
+                                else: 
                                     function_response_data_for_llm = {"error": f"Unknown tool {fc_name} result processing."}
                                 
                             except RETRYABLE_EXCEPTIONS as retry_exc:
@@ -507,7 +530,7 @@ This JSON list should be the *only content* in your response. Do not include any
             logger.error(f"Error during execute_research_step for '{step_description}': {e}", exc_info=True)
             processed_research_items.append(f"[System Error: Exception during research step execution - {type(e).__name__}]")
 
-        return processed_research_items
+        return processed_research_items, submitted_pdf_futures_info
 
 
 # --- Research Plan Update ---
@@ -898,10 +921,24 @@ def perform_deep_research(
     # This is necessary because this function runs in a background thread started by SocketIO
     # and needs access to app.config, g, etc. for the AI/DB calls.
     app = current_app._get_current_object()
-    with app.app_context():
-        # --- Start Actual Research Process ---
+    
+    # Task 3: Initialize ProcessPoolExecutor for CPU-bound tasks (PDF transcription)
+    # Determine a reasonable number of workers, e.g., half of CPU cores or a fixed small number
+    # os.cpu_count() might be None, so provide a fallback.
+    num_cpu_workers = max(1, (os.cpu_count() or 4) // 2) 
+    logger.info(f"Initializing ProcessPoolExecutor with {num_cpu_workers} workers for PDF transcription.")
+    # cpu_executor should be managed within the app_context if it needs app context itself,
+    # or if transcribe_pdf_bytes needs it. Assuming transcribe_pdf_bytes is self-contained or gets context.
+    # For simplicity, let's create it here. It will be passed to execute_research_step.
+    
+    all_pending_pdf_details = [] # To store {'placeholder': str, 'future': Future, 'step_name': str, 'item_indices_in_step': List[int]}
+    PDF_TRANSCRIPTION_TIMEOUT = 120 # seconds
 
-        # --- Cancellation Check ---
+    with app.app_context(), concurrent.futures.ProcessPoolExecutor(max_workers=num_cpu_workers) as cpu_executor:
+        try:
+            # --- Start Actual Research Process ---
+
+            # --- Cancellation Check ---
         if is_cancelled_callback():
             return emit_cancellation_or_error("[AI Info: Deep research cancelled before starting.]", is_cancel=True)
 
@@ -940,16 +977,22 @@ def perform_deep_research(
         logger.info(f"--- Starting Research Step: {step_name} (SID: {sid}) ---")
         
         try:
-            research_items_for_step = execute_research_step(
+            llm_summary_strings, step_pdf_futures_info = execute_research_step(
                 step_description,
                 is_cancelled_callback,
                 socketio,
                 sid,
-                app.app_context() # Pass the app context
+                app.app_context(), # Pass the app context
+                cpu_executor # Pass the executor
             )
-            collected_research[step_name] = research_items_for_step
+            collected_research[step_name] = llm_summary_strings
+            if step_pdf_futures_info:
+                for pdf_info in step_pdf_futures_info:
+                    all_pending_pdf_details.append({**pdf_info, "step_name": step_name})
+                logger.info(f"Queued {len(step_pdf_futures_info)} PDFs for transcription from step '{step_name}'.")
+            
             logger.info(
-                f"--- Finished Research Step: {step_name} - Collected {len(research_items_for_step)} items ---"
+                f"--- Finished Research Step: {step_name} - Collected {len(llm_summary_strings)} initial items (PDFs pending) ---"
             )
 
         except Exception as e:
@@ -1072,6 +1115,73 @@ def perform_deep_research(
         )
         emit_status("No additional research needed.")
 
+    # Task 3: Process Pending PDF Transcriptions
+    if all_pending_pdf_details:
+        emit_status(f"Processing {len(all_pending_pdf_details)} pending PDF transcriptions...")
+        logger.info(f"Waiting for {len(all_pending_pdf_details)} PDF transcription tasks to complete...")
+        
+        for detail_idx, detail in enumerate(all_pending_pdf_details):
+            if is_cancelled_callback():
+                logger.info("PDF transcription processing cancelled.")
+                # Potentially mark remaining items as cancelled if needed, or just stop.
+                break 
+            
+            placeholder = detail['placeholder']
+            future = detail['future']
+            step_name_for_pdf = detail['step_name']
+            original_url = detail.get('original_url', 'N/A')
+            original_filename = detail.get('original_filename', 'N/A')
+
+            emit_status(f"Waiting for PDF transcription {detail_idx + 1}/{len(all_pending_pdf_details)}: {original_filename[:30]}...")
+            logger.info(f"Waiting for transcription: {placeholder} (URL: {original_url})")
+            
+            transcribed_text = f"[Error: PDF transcription result not processed for {placeholder}]" # Default
+            try:
+                # Wait for the transcription future to complete with a timeout
+                transcribed_text_result = future.result(timeout=PDF_TRANSCRIPTION_TIMEOUT)
+                if transcribed_text_result.startswith(("[Error", "[System Note")):
+                    logger.warning(f"Transcription for {placeholder} (URL: {original_url}) failed with note: {transcribed_text_result}")
+                    transcribed_text = f"[Transcription Error for {original_filename}: {transcribed_text_result}]"
+                else:
+                    transcribed_text = transcribed_text_result.strip()
+                    logger.info(f"Successfully transcribed {placeholder} (URL: {original_url}). Length: {len(transcribed_text)}")
+            except TimeoutError:
+                logger.error(f"PDF transcription timed out for {placeholder} (URL: {original_url}) after {PDF_TRANSCRIPTION_TIMEOUT}s.")
+                transcribed_text = f"[Error: PDF transcription timed out for {original_filename}]"
+            except Exception as e_trans:
+                logger.error(f"PDF transcription failed for {placeholder} (URL: {original_url}): {e_trans}", exc_info=True)
+                transcribed_text = f"[Error: PDF transcription failed for {original_filename} - {type(e_trans).__name__}]"
+
+            # Update the collected_research item containing the placeholder
+            if step_name_for_pdf in collected_research:
+                updated_items_for_step = []
+                found_placeholder = False
+                for item_string in collected_research[step_name_for_pdf]:
+                    if placeholder in item_string:
+                        # Replace the placeholder part. Assuming format "Content: PDF_CONTENT_PENDING_ID_xxx\n---"
+                        # This replacement needs to be robust.
+                        # A simple replace might be "Content: " + placeholder -> "Content: " + transcribed_text
+                        # Or more specifically: item_string.replace(placeholder, transcribed_text)
+                        # Let's assume the placeholder is unique enough.
+                        new_item_string = item_string.replace(placeholder, transcribed_text)
+                        if new_item_string == item_string: # If replace didn't happen (e.g. placeholder format mismatch)
+                            logger.warning(f"Placeholder '{placeholder}' not found as expected in research item for step '{step_name_for_pdf}'. Item: {item_string[:100]}")
+                            updated_items_for_step.append(item_string) # Keep original
+                        else:
+                            updated_items_for_step.append(new_item_string)
+                            found_placeholder = True
+                            logger.info(f"Updated item in step '{step_name_for_pdf}' with transcription for '{placeholder}'.")
+                    else:
+                        updated_items_for_step.append(item_string)
+                if not found_placeholder:
+                     logger.warning(f"Could not find placeholder '{placeholder}' in any research items for step '{step_name_for_pdf}'. Transcription for {original_url} might be lost.")
+                collected_research[step_name_for_pdf] = updated_items_for_step
+            else:
+                logger.warning(f"Step name '{step_name_for_pdf}' for PDF placeholder '{placeholder}' not found in collected_research.")
+        
+        emit_status("PDF transcription processing complete.")
+        logger.info("Finished processing all PDF transcription tasks.")
+
     # 5. Synthesize Report Sections based on the *updated* plan (Sequentially)
     logger.info(
         f"--- Synthesizing {len(updated_report_plan)} Report Sections Sequentially (SID: {sid}) ---"
@@ -1185,3 +1295,10 @@ def perform_deep_research(
                 f"Failed to save final deep research report to DB for chat {chat_id}: {db_err}",
                 exc_info=True,
             )
+        finally:
+            # This finally block is for the `with app.app_context():`
+            # The cpu_executor is managed by its own `with` statement if created inside the main try.
+            # If cpu_executor was created outside the try/finally of the main research process,
+            # it would need shutdown here.
+            # However, with the current structure, it's managed by its `with` block.
+            logger.info(f"Deep research process for SID {sid} concluded.")
