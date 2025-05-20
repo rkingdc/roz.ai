@@ -263,7 +263,7 @@ def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List
 
         if not response.candidates or not response.candidates[0].content.parts:
             logger.warning("LLM did not return parts for web_search tool call.")
-            return ["[System Note: LLM did not initiate web search tool.]", []
+            return ("[System Note: LLM did not initiate web search tool.]", [])
 
         part = response.candidates[0].content.parts[0]
         if not part.function_call or part.function_call.name != "web_search":
@@ -271,8 +271,8 @@ def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List
                 f"LLM did not call 'web_search' tool as expected. Called: {part.function_call.name if part.function_call else 'None'}"
             )
             if part.text:
-                 return [f"[System Note: LLM provided text instead of using web_search tool: {part.text}]", []]
-            return ["[System Note: LLM did not use the web_search tool correctly.]", []
+                 return ([f"[System Note: LLM provided text instead of using web_search tool: {part.text}]", []])
+            return ("[System Note: LLM did not use the web_search tool correctly.]", [])
 
         # Execute the function call
         fc = part.function_call
