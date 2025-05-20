@@ -1302,6 +1302,9 @@ def perform_deep_research(
                 f"Failed to save final deep research report to DB for chat {chat_id}: {db_err}",
                 exc_info=True,
             )
+        finally: # This finally corresponds to the try block starting after cpu_executor is created
+            logger.info(f"Deep research process for SID {sid} concluded within cpu_executor context.")
+    # cpu_executor is automatically shut down here by the 'with' statement.
         finally:
             # This finally block is for the `with app.app_context():`
             # The cpu_executor is managed by its own `with` statement if created inside the main try.
