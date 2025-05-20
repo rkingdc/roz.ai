@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from typing import List, Tuple, Any, Dict
+from typing import List, Tuple, Any, Dict, Callable # Import Callable
 
 # Removed ThreadPoolExecutor and as_completed imports
 from flask import current_app, g  # To access config and g for client caching
