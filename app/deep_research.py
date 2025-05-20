@@ -821,74 +821,30 @@ def perform_deep_research(
                 f"--- Starting Additional Research Step: {section_name} (SID: {sid}) ---"
             )
             logger.debug(f"Description: {section_description}")
-            processed_content_for_section = []
-            raw_dicts_for_section = []
             try:
-                # a. Determine Search Queries for the new section
-                search_queries: List[str] = determine_research_queries(
-                    section_description
+                research_items_for_new_section = execute_research_step(
+                    section_description,
+                    is_cancelled_callback,
+                    socketio,
+                    sid,
+                    app.app_context() # Pass the app context
                 )
-                if not search_queries:
-                    logger.warning(
-                        f"No search queries generated for new section: {section_name}"
-                    )
-                    # collected_research/raw_results already initialized, just continue
-                    continue
-
-                # b. Perform Web Search for each query to get metadata
-                current_section_raw_meta_results = []
-                for search_query_idx, search_query in enumerate(search_queries):
-                    # --- Cancellation Check (before each web search) ---
-                    if is_cancelled_callback():
-                        return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during additional research for '{section_name}' before web search for '{search_query}'.]", is_cancel=True)
-
-                    emit_status(f"Add. Search: {search_query[:30]}... (Query {search_query_idx+1}/{len(search_queries)})")
-                    _, raw_meta_dicts_for_query = web_search(search_query)
-
-                    if raw_meta_dicts_for_query:
-                        current_section_raw_meta_results.extend(raw_meta_dicts_for_query)
-                    else:
-                        logger.debug(f"No search results from web_search for query '{search_query}' in new section '{section_name}'")
-
-                # c. Scrape content for each unique link found
-                unique_links_to_scrape_meta_new_section = {item['link']: item for item in current_section_raw_meta_results if item.get('link')}.values()
-                
-                scraped_content_count_for_new_section = 0
-                for meta_item_idx, meta_item in enumerate(unique_links_to_scrape_meta_new_section):
-                    # --- Cancellation Check (before each scrape) ---
-                    if is_cancelled_callback():
-                        return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during additional research for '{section_name}' before scraping '{meta_item.get('link')}'.]", is_cancel=True)
-                    
-                    full_content_string = _scrape_and_process_url(
-                        meta_item,
-                        source_index=scraped_content_count_for_new_section, # Index for "Source N"
-                        is_cancelled_callback=is_cancelled_callback,
-                        socketio=socketio,
-                        sid=sid,
-                        app_context=app.app_context() # Pass the app context
-                    )
-                    if full_content_string:
-                        # Ensure collected_research[section_name] is a list
-                        if section_name not in collected_research or not isinstance(collected_research[section_name], list):
-                            collected_research[section_name] = []
-                        collected_research[section_name].append(full_content_string)
-                        scraped_content_count_for_new_section +=1
-                
-                # Store the unique metadata items for this new section as well
-                if section_name not in collected_raw_results or not isinstance(collected_raw_results[section_name], list):
-                    collected_raw_results[section_name] = []
-                collected_raw_results[section_name].extend(list(unique_links_to_scrape_meta_new_section))
-
+                # Ensure collected_research[section_name] is a list and extend it
+                if section_name not in collected_research or not isinstance(collected_research[section_name], list):
+                    collected_research[section_name] = []
+                collected_research[section_name].extend(research_items_for_new_section)
                 logger.info(
-                    f"--- Finished Additional Research Step: {section_name} - Collected {scraped_content_count_for_new_section} scraped/processed items from {len(unique_links_to_scrape_meta_new_section)} unique links ---"
+                    f"--- Finished Additional Research Step: {section_name} - Collected {len(research_items_for_new_section)} items ---"
                 )
-
             except Exception as e:
                 logger.error(
-                    f"Error during additional research step for section '{section_name}': {e}",
+                    f"Error executing research step '{section_name}' (SID: {sid}): {e}",
                     exc_info=True,
                 )
-                # Log error but continue if possible
+                # If execute_research_step itself fails catastrophically
+                if section_name not in collected_research or not isinstance(collected_research[section_name], list):
+                    collected_research[section_name] = [] # Initialize if not already
+                collected_research[section_name].append(f"[System Error: Unhandled exception during research for '{section_name}': {type(e).__name__}]")
 
         logger.info(
             f"--- Finished sequential execution of additional research for {len(new_sections_to_research)} section(s) (SID: {sid}) ---"
