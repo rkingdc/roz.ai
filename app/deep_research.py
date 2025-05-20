@@ -1189,59 +1189,97 @@ def perform_deep_research(
         emit_status("PDF transcription processing complete.")
         logger.info("Finished processing all PDF transcription tasks.")
 
-    # 5. Synthesize Report Sections based on the *updated* plan (Sequentially)
+    # 5. Synthesize Report Sections based on the *updated* plan (Task 4: Parallelize)
     logger.info(
-        f"--- Synthesizing {len(updated_report_plan)} Report Sections Sequentially (SID: {sid}) ---"
+        f"--- Synthesizing {len(updated_report_plan)} Report Sections in Parallel (SID: {sid}) ---"
     )
-    emit_status("Synthesizing report sections...")
-    report_sections_results: Dict[str, str] = {}  # Stores generated section text
-    report_references_results: Dict[str, List[str]] = (
-        {}
-    )  # Stores references used per section
+    emit_status("Synthesizing report sections in parallel...")
+    
+    # Use a ThreadPoolExecutor for I/O-bound LLM calls for synthesis
+    # Can reuse cpu_executor if it were a ThreadPoolExecutor and suitable, 
+    # but synthesis is I/O bound (network to LLM), so ThreadPool is fine.
+    # Let's create a new one for clarity or use the one from Task 2 if it was made class/module level.
+    # For now, creating a new one here.
+    # Max workers for synthesis - can be fewer than PDF processing if LLM API has rate limits.
+    num_synthesis_workers = min(len(updated_report_plan), 5) # e.g., up to 5 concurrent synthesis calls
+    
+    synthesis_futures_map = {} # To map futures back to section_name
+    # This will store tuples: (section_name, future) to preserve order if needed, or just futures.
+    # Let's store results in a dictionary keyed by section_name for easier assembly.
+    
+    temp_report_sections_results: Dict[str, str] = {}
+    temp_report_references_results: Dict[str, List[str]] = {}
 
-    # Execute synthesis sequentially
-    step_counter = 0
-    for section_name, section_description in updated_report_plan:
-        step_counter += 1
-        emit_status(
-            f"Synthesizing Section {step_counter}/{len(updated_report_plan)}: {section_name}..."
-        )
-        logger.info(f"--- Starting Section Synthesis: {section_name} (SID: {sid}) ---")
-        try:
-            # Prepare research items with "Source N:" prefix for synthesis
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_synthesis_workers) as synthesis_executor:
+        for i, (section_name, section_description) in enumerate(updated_report_plan):
+            if is_cancelled_callback():
+                logger.info("Synthesis cancelled before submitting all sections.")
+                # Mark remaining sections as not synthesized or handle as needed
+                for j in range(i, len(updated_report_plan)):
+                    sn, _ = updated_report_plan[j]
+                    temp_report_sections_results[sn] = f"## {sn}\n\n[Synthesis cancelled by user.]\n"
+                    temp_report_references_results[sn + "_references"] = []
+                break # Break from submitting new tasks
+
+            emit_status(
+                f"Submitting synthesis for Section {i+1}/{len(updated_report_plan)}: {section_name}..."
+            )
             items_for_synthesis = []
             if section_name in collected_research and collected_research[section_name]:
-                for i, item_content in enumerate(collected_research[section_name]):
-                    # Prepend "Source N:" to each research item string
-                    # The item_content itself should already contain Title, Link, Snippet, Content
-                    items_for_synthesis.append(f"Source {i+1}:\n{item_content}")
+                for item_idx, item_content in enumerate(collected_research[section_name]):
+                    items_for_synthesis.append(f"Source {item_idx+1}:\n{item_content}")
             else:
                 items_for_synthesis.append("[No research material found for this section.]")
-
-            report_section_text, section_refs = synthesize_research_into_report_section(
+            
+            future = synthesis_executor.submit(
+                synthesize_research_into_report_section,
                 section_name,
                 section_description,
-                items_for_synthesis, # Pass the prefixed items
+                items_for_synthesis,
             )
-            report_sections_results[section_name] = report_section_text
-            # Store references under the specific key format
-            report_references_results[section_name + "_references"] = section_refs
-            logger.info(
-                f"--- Finished Section Synthesis: {section_name} (Length: {len(report_section_text)}, Refs: {len(section_refs)}) ---"
-            )
-        except Exception as e:
-            logger.error(
-                f"Error during synthesis step for section '{section_name}': {e}",
-                exc_info=True,
-            )
-            error_msg = f"## {section_name}\n\n[System Error: Failed during synthesis for section '{section_name}': {type(e).__name__}]\n"
-            # Store error message as section text and empty refs
-            report_sections_results[section_name] = error_msg
-            report_references_results[section_name + "_references"] = []
-            # Optionally emit non-fatal warning
+            synthesis_futures_map[future] = section_name
+        
+        logger.info(f"Submitted {len(synthesis_futures_map)} sections for synthesis.")
+        emit_status(f"Waiting for {len(synthesis_futures_map)} sections to synthesize...")
+
+        for future in concurrent.futures.as_completed(synthesis_futures_map):
+            section_name_completed = synthesis_futures_map[future]
+            if is_cancelled_callback():
+                logger.info(f"Synthesis processing cancelled while waiting for section '{section_name_completed}'.")
+                # Mark this specific one as cancelled if it wasn't already processed
+                if section_name_completed not in temp_report_sections_results:
+                    temp_report_sections_results[section_name_completed] = f"## {section_name_completed}\n\n[Synthesis cancelled by user.]\n"
+                    temp_report_references_results[section_name_completed + "_references"] = []
+                continue # Don't process more futures if cancelled
+
+            try:
+                section_text, section_refs = future.result(timeout=300) # 5 min timeout per section synthesis
+                temp_report_sections_results[section_name_completed] = section_text
+                temp_report_references_results[section_name_completed + "_references"] = section_refs
+                logger.info(
+                    f"--- Finished Section Synthesis (parallel): {section_name_completed} (Length: {len(section_text)}, Refs: {len(section_refs)}) ---"
+                )
+            except TimeoutError:
+                logger.error(f"Synthesis for section '{section_name_completed}' timed out.")
+                error_msg = f"## {section_name_completed}\n\n[System Error: Synthesis timed out for this section.]\n"
+                temp_report_sections_results[section_name_completed] = error_msg
+                temp_report_references_results[section_name_completed + "_references"] = []
+            except Exception as e_synth:
+                logger.error(
+                    f"Error during parallel synthesis step for section '{section_name_completed}': {e_synth}",
+                    exc_info=True,
+                )
+                error_msg = f"## {section_name_completed}\n\n[System Error: Failed during synthesis for section '{section_name_completed}': {type(e_synth).__name__}]\n"
+                temp_report_sections_results[section_name_completed] = error_msg
+                temp_report_references_results[section_name_completed + "_references"] = []
+    
+    # Populate the main results dictionaries in the correct order
+    report_sections_results: Dict[str, str] = {name: temp_report_sections_results.get(name, f"## {name}\n\n[Error: Section not processed.]\n") for name, _ in updated_report_plan}
+    report_references_results: Dict[str, List[str]] = {name + "_references": temp_report_references_results.get(name + "_references", []) for name, _ in updated_report_plan}
+
 
     logger.info(
-        f"--- Finished Sequential Execution of Section Synthesis (SID: {sid}) ---"
+        f"--- Finished Parallel Execution of Section Synthesis (SID: {sid}) ---"
     )
     emit_status("Section synthesis complete. Assembling final report...")
 
