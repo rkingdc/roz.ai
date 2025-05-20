@@ -76,14 +76,18 @@ def parse_llm_json_output(llm_output: str, expected_keys: List[str]) -> Any:
                         f"Parsed JSON list items missing expected keys. Expected: {expected_keys}, Found in first item: {list(parsed_output[0].keys())}"
                     )
                     return None
-            else: # If it's a list but not of dicts, or empty, and no specific keys for list items
+            # If it's a list (e.g. list of strings, or empty list) and expected_keys is empty, it's valid.
+            # Or if it's a list of dicts but expected_keys was empty (meaning any list of dicts is fine).
+            else: 
                 logger.debug(
-                    "Parsed JSON is a list (not of dicts or empty), returning as is."
+                    "Parsed JSON is a list (e.g. of strings, or dicts with no specific key check, or empty), returning as is."
                 )
                 return parsed_output
-        elif isinstance(parsed_output, list) and not expected_keys: # List of strings, numbers etc.
+        # This case handles lists of non-dict items when expected_keys is empty, or any list if expected_keys is empty.
+        # It's largely covered by the above 'else' now, but kept for safety for other non-dict/non-list types.
+        elif isinstance(parsed_output, list) and not expected_keys: 
              return parsed_output
-        else:
+        else: # Handles non-dict, non-list types when expected_keys might be present (though less common)
             logger.debug(
                 "Parsed JSON is not a dict or list, or no expected keys specified."
             )
@@ -244,10 +248,12 @@ Phase 4: Compile and Format Final Output
 Example of a single formatted source string in the JSON list:
 "Title: Example Research Paper\nLink: https://example.com/paper.pdf\nSnippet: This paper discusses advanced research techniques...\nContent: PDF document, content not directly viewable.\n---"
 
-IMPORTANT: After all tool executions are complete and you have gathered all necessary information, your *FINAL and ONLY* output MUST be the JSON list of these formatted source strings. Do not output any other commentary, acknowledgments, or intermediate thoughts after the tool usage. The JSON list itself is your complete and final response.
-Begin execution.
+IMPORTANT INSTRUCTION FOR FINAL OUTPUT:
+After you have completed all necessary tool calls (web_search, scrape_url) and gathered all information for the research step, your *very last action* must be to output the *complete JSON list* of formatted source strings as a plain text response. This JSON list should be the *only content* in your final response part. Do not include any other text, commentary, or acknowledgments before or after the JSON list in your final output.
 
-Final JSON Output:
+Begin execution of all phases.
+
+Final JSON Output (ensure this is the only thing in your final text response):
             """
 
             if is_cancelled_callback():
