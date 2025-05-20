@@ -4,7 +4,8 @@ import re
 from typing import List, Tuple, Any, Dict
 
 # Removed ThreadPoolExecutor and as_completed imports
-from flask import current_app  # To access config for model names if needed
+from flask import current_app, g  # To access config and g for client caching
+import google.genai as genai # For genai.Client initialization
 
 # Assuming ai_services.py and web_search.py are in the same directory
 # or accessible via the Python path.
@@ -245,10 +246,27 @@ def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List
     processed_content_list = []
 
     try:
-        gemini_client = llm_factory.get_instance().client
-        if not gemini_client:
-            logger.error("LLM client not available for web_search.")
-            return ("[System Error: LLM client not configured]", [])
+        # --- Client Acquisition ---
+        api_key = current_app.config.get("API_KEY")
+        if not api_key:
+            logger.error("API_KEY is missing from current_app.config for web_search.")
+            return ("[System Error: AI Service API Key not configured]", [])
+
+        if "genai_client" not in g:
+            logger.info("web_search: Creating new genai.Client and caching in 'g'.")
+            try:
+                g.genai_client = genai.Client(api_key=api_key)
+            except Exception as e:
+                logger.error(f"web_search: Failed to initialize genai.Client: {e}", exc_info=True)
+                if "api key not valid" in str(e).lower():
+                    return ("[Error: Invalid Gemini API Key for web_search]", [])
+                return ("[Error: Failed to initialize AI client for web_search]", [])
+        
+        gemini_client = g.genai_client
+        if not gemini_client: # Should ideally not be reached if above logic is correct
+            logger.error("LLM client (g.genai_client) is unexpectedly None after init attempt in web_search.")
+            return ("[System Error: LLM client not available after init attempt]", [])
+        # --- End Client Acquisition ---
 
         prompt_text = (
             f"Please search the web for information on: '{search_query}'. "
