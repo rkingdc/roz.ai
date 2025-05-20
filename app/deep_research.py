@@ -13,8 +13,8 @@ from google.genai import types # For GenerateContentConfig
 # Use appropriate import style for your project structure (e.g., relative imports if part of a package)
 from .ai_services import (
     generate_text,
-    transcribe_pdf_bytes,
-    llm_factory,
+    # transcribe_pdf_bytes, # No longer used directly in this file after web_search refactor
+    # llm_factory, # No longer used in this file
 )  # Import the new function
 from app.plugins import web_search as web_search_plugin # For executing the web_search tool's function
 from .ai_services_lib.tool_definitions import WEB_SEARCH_TOOL # To enable tool use by the LLM
@@ -344,79 +344,20 @@ def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List
 
             title = result_item.get("title", "No Title")
             link = result_item.get("link", "No Link")
-            snippet = result_item.get(
-                "snippet", "No Snippet Available"
-            )  # Include snippet
-            fetch_result = result_item.get("fetch_result", {})
-            result_type = fetch_result.get("type", "error")
-            result_content = fetch_result.get(
-                "content"
-            )  # Can be text (html), bytes (pdf), or string (error)
-            fetched_filename = fetch_result.get("filename")  # For PDFs
+            snippet = result_item.get("snippet", "No Snippet Available")
 
-            # Add a header for each result for clarity in the combined text
-            # Include title, link, and snippet
-            header = f"\n--- Search Result {i+1}: {title} ---\nLink: {link}\nSnippet: {snippet}\n"
+            # Create a formatted string with the search result metadata.
+            # Actual content fetching is deferred to the WEB_SCRAPE_TOOL.
+            result_summary = (
+                f"Source {i+1}:\n"
+                f"Title: {title}\n"
+                f"Link: {link}\n"
+                f"Snippet: {snippet}\n---"
+            )
+            processed_content_list.append(result_summary)
+            logger.debug(f"Added search result summary for item {i+1}: {title}")
 
-            if (
-                result_type == "html"
-                and isinstance(result_content, str)
-                and result_content.strip()
-            ):
-                # Append header + HTML text content
-                processed_content_list.append(
-                    header + "Content:\n" + result_content.strip()
-                )
-                logger.debug(f"Added HTML content for result {i+1}")
-            elif result_type == "pdf" and isinstance(result_content, bytes):
-                pdf_bytes = result_content
-                pdf_filename = (
-                    fetched_filename if fetched_filename else f"search_result_{i+1}.pdf"
-                )
-                logger.info(f"Attempting to transcribe PDF: {pdf_filename}")
-                # Call the new transcription function from ai_services
-                transcription_result = transcribe_pdf_bytes(pdf_bytes, pdf_filename)
-
-                # Check if transcription was successful or returned an error string
-                if transcription_result.startswith(
-                    ("[Error", "[System Note", "[AI Error")
-                ):
-                    logger.warning(
-                        f"PDF transcription failed for {pdf_filename}: {transcription_result}"
-                    )
-                    # Append header + error/note about transcription failure
-                    processed_content_list.append(
-                        header
-                        + f"Content: [Transcription Failed for PDF '{pdf_filename}': {transcription_result}]\n---"
-                    )
-                else:
-                    logger.info(f"Successfully transcribed PDF: {pdf_filename}")
-                    # Append header + transcribed text
-                    processed_content_list.append(
-                        header
-                        + f"Content (Transcribed from PDF '{pdf_filename}'):\n{transcription_result.strip()}\n---"
-                    )
-
-            elif result_type == "error":
-                error_msg = (
-                    result_content
-                    if isinstance(result_content, str)
-                    else "Unknown error"
-                )
-                note = f"[Error fetching content for this source: {error_msg}]\n---"  # Added separator
-                processed_content_list.append(
-                    header + note
-                )  # Note already includes separator
-                logger.warning(f"Error fetching content for result {i+1}: {error_msg}")
-            else:
-                # Handle cases like empty content for HTML, or unexpected types/content
-                note = f"[Could not process content for this source (Type: {result_type}).]\n---"  # Added separator
-                processed_content_list.append(header + note)
-                logger.warning(
-                    f"Could not process content for result {i+1} (Type: {result_type}, Content type: {type(result_content)})."
-                )
-
-        # Return both the processed list of strings and the original list of dictionaries
+        # Return the list of summaries and the original list of dictionaries
         return processed_content_list, raw_results_dicts
 
     except Exception as e:
