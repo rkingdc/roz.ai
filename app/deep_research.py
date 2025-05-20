@@ -248,7 +248,7 @@ def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List
         gemini_client = llm_factory.get_instance().client
         if not gemini_client:
             logger.error("LLM client not available for web_search.")
-            return ["[System Error: LLM client not configured]", []
+            return ("[System Error: LLM client not configured]", [])
 
         prompt_text = (
             f"Please search the web for information on: '{search_query}'. "
