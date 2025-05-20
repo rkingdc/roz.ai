@@ -244,42 +244,115 @@ Indicate you are ready for the final compilation step once all searches and scra
                 logger.info("Research step cancelled before LLM tool usage call.")
                 return ["[AI Info: Research step cancelled by user.]"]
 
-            # Config for tool execution phase
+            # Config for tool execution phase - Manual Loop
+            # Note: max_output_tokens is not strictly necessary here as we expect tool calls or short text.
+            # response_mime_type is also not critical for this phase.
             tool_execution_config = types.GenerateContentConfig(
-                tools=[WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL]
-                # No max_output_tokens here, as the primary output is tool calls, not a long text response
+                tools=[WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL], 
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
             )
             
             if socketio and sid:
-                socketio.emit("status_update", {"message": f"Researching (Phase 1-3): {step_description[:30]}..."}, room=sid)
+                socketio.emit("status_update", {"message": f"Researching (Tool Phase): {step_description[:30]}..."}, room=sid)
 
-            # Step A: Tool Execution
-            # The conversation history will build up here through AFC
-            # We start a "chat" by sending the initial prompt.
-            # The `google-genai` SDK's `generate_content` with AFC will handle multiple turns if the model calls tools.
-            # The `response` object will contain the state after the model decides it's done with tool calls for this prompt.
-            
-            # Construct initial contents for the conversation
-            # The first message is the user's (our application's) request
+            # Step A: Manual Tool Execution Loop
             conversation_history = [types.Content(parts=[types.Part.from_text(text=tool_usage_prompt)], role="user")]
+            
+            MAX_TOOL_TURNS = 15 # Prevent infinite loops
+            for turn_count in range(MAX_TOOL_TURNS):
+                if is_cancelled_callback():
+                    logger.info("Research step cancelled during manual tool loop.")
+                    processed_research_items.append("[AI Info: Research step cancelled by user.]")
+                    return processed_research_items # Return immediately
 
-            tool_response = gemini_client.models.generate_content(
-                model=model_to_use,
-                contents=conversation_history, # Start with the initial prompt
-                config=tool_execution_config
-            )
+                logger.info(f"Manual tool loop turn {turn_count + 1}/{MAX_TOOL_TURNS} for step: {step_description[:30]}...")
+                
+                # Send current history to LLM
+                response_from_model_turn = gemini_client.models.generate_content(
+                    model=model_to_use,
+                    contents=conversation_history,
+                    config=tool_execution_config 
+                )
 
-            # Add the model's response (which includes tool calls and its own text parts) to history
-            if tool_response.candidates and tool_response.candidates[0].content:
-                conversation_history.append(tool_response.candidates[0].content)
-            else: # Should not happen if AFC is working, but as a safeguard
-                logger.error("No valid candidate content from tool execution phase.")
-                return ["[System Error: Tool execution phase did not yield valid response content.]"]
+                # Append model's response to history (could be text or function call)
+                if not response_from_model_turn.candidates or not response_from_model_turn.candidates[0].content:
+                    logger.error("No valid candidate/content in tool execution response.")
+                    processed_research_items.append("[System Error: LLM response missing content during tool phase.]")
+                    break # Exit loop, proceed to final JSON attempt with current history
+                
+                model_response_content = response_from_model_turn.candidates[0].content
+                conversation_history.append(model_response_content) # Add model's full response part to history
+
+                # Check for function calls in the latest model response part
+                function_call_to_execute = None
+                # The actual function call should be in the parts of the latest model_response_content
+                for part in model_response_content.parts:
+                    if part.function_call:
+                        function_call_to_execute = part.function_call
+                        break 
+                
+                if function_call_to_execute:
+                    fc_name = function_call_to_execute.name
+                    fc_args = dict(function_call_to_execute.args)
+                    logger.info(f"LLM requested tool: {fc_name} with args: {fc_args}")
+                    if socketio and sid:
+                        socketio.emit("status_update", {"message": f"Using tool: {fc_name} for {fc_args.get('query', fc_args.get('url', ''))[:20]}..."}, room=sid)
+
+                    function_response_data = None
+                    # tool_executed_successfully = False # Not strictly needed with current logic
+                    try:
+                        if fc_name == "web_search":
+                            query = fc_args.get("query", "")
+                            num_results = fc_args.get("num_results", 5) 
+                            search_results_list = web_search_plugin.perform_web_search(query=query, num_results=num_results)
+                            function_response_data = {"results": search_results_list}
+                            # tool_executed_successfully = True
+                        
+                        elif fc_name == "scrape_url":
+                            url_to_scrape = fc_args.get("url")
+                            if url_to_scrape:
+                                scraped_data = web_search_plugin.fetch_web_content(url=url_to_scrape)
+                                if scraped_data['type'] == 'pdf' and isinstance(scraped_data['content'], bytes):
+                                    pdf_filename = scraped_data.get('filename', 'scraped.pdf')
+                                    logger.info(f"Transcribing PDF: {pdf_filename} from scrape_url tool call.")
+                                    if socketio and sid:
+                                        socketio.emit("status_update", {"message": f"Transcribing PDF: {pdf_filename[:25]}..."}, room=sid)
+                                    transcribed_text = transcribe_pdf_bytes(scraped_data['content'], pdf_filename)
+                                    scraped_data['content'] = transcribed_text 
+                                    scraped_data['original_type'] = 'pdf' 
+                                    scraped_data['type'] = 'text' 
+                                function_response_data = {"scraped_data": scraped_data}
+                                # tool_executed_successfully = True
+                            else:
+                                function_response_data = {"error": "URL not provided for scrape_url"}
+                                logger.error("URL not provided for scrape_url tool call.")
+                        else:
+                            logger.warning(f"Unknown tool requested: {fc_name}")
+                            function_response_data = {"error": f"Unknown tool: {fc_name}"}
+                    except Exception as tool_exec_e:
+                        logger.error(f"Exception executing tool {fc_name}: {tool_exec_e}", exc_info=True)
+                        function_response_data = {"error": f"Exception during {fc_name} execution: {str(tool_exec_e)}"}
+
+                    # Create FunctionResponse part and add to history
+                    tool_response_part = types.Part.from_function_response(
+                        name=fc_name,
+                        response=function_response_data 
+                    )
+                    conversation_history.append(types.Content(parts=[tool_response_part], role="tool"))
+                    # Continue loop to let model process tool response
+                else:
+                    # No function call, model provided text. Assume it's done with tool phase.
+                    logger.info("LLM provided text response instead of tool call, exiting manual tool loop.")
+                    break # Exit loop
+            else: # Loop finished due to MAX_TOOL_TURNS
+                logger.warning(f"Exceeded MAX_TOOL_TURNS ({MAX_TOOL_TURNS}). Proceeding to final JSON generation.")
+                # No specific error message to add here, final JSON generation will proceed with current history
 
 
             if is_cancelled_callback():
-                logger.info("Research step cancelled after tool usage, before final JSON generation.")
-                return ["[AI Info: Research step cancelled by user.]"]
+                logger.info("Research step cancelled after manual tool loop, before final JSON generation.")
+                processed_research_items.append("[AI Info: Research step cancelled by user.]")
+                return processed_research_items
 
             # Step B: Final JSON Generation
             final_json_prompt_text = """
