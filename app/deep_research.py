@@ -1,7 +1,15 @@
 import json
 import logging
 import re
-from typing import List, Tuple, Any, Dict, Callable # Import Callable
+from typing import List, Tuple, Any, Dict, Callable
+
+# Imports for Task 1 & 2 (Retries, Parallelization)
+import concurrent.futures
+import functools
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import requests # For requests.exceptions
+from googleapiclient.errors import HttpError as GoogleHttpError # For Google API client errors
+
 
 # Removed ThreadPoolExecutor and as_completed imports
 from flask import current_app, g  # To access config and g for client caching
