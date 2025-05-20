@@ -244,7 +244,7 @@ Phase 4: Compile and Format Final Output
 Example of a single formatted source string in the JSON list:
 "Title: Example Research Paper\nLink: https://example.com/paper.pdf\nSnippet: This paper discusses advanced research techniques...\nContent: PDF document, content not directly viewable.\n---"
 
-Do not output any intermediate results like lists of queries. Your sole output should be the final JSON list of formatted source strings after completing all phases.
+IMPORTANT: After all tool executions are complete and you have gathered all necessary information, your *FINAL and ONLY* output MUST be the JSON list of these formatted source strings. Do not output any other commentary, acknowledgments, or intermediate thoughts after the tool usage. The JSON list itself is your complete and final response.
 Begin execution.
 
 Final JSON Output:
