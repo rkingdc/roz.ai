@@ -76,14 +76,16 @@ def parse_llm_json_output(llm_output: str, expected_keys: List[str]) -> Any:
                         f"Parsed JSON list items missing expected keys. Expected: {expected_keys}, Found in first item: {list(parsed_output[0].keys())}"
                     )
                     return None
-            else:
+            else: # If it's a list but not of dicts, or empty, and no specific keys for list items
                 logger.debug(
-                    "Parsed JSON is a list, but not a list of objects, or list is empty."
+                    "Parsed JSON is a list (not of dicts or empty), returning as is."
                 )
-                return parsed_output  # Return the list as is
+                return parsed_output
+        elif isinstance(parsed_output, list) and not expected_keys: # List of strings, numbers etc.
+             return parsed_output
         else:
             logger.debug(
-                "Parsed JSON is not a dict or list of dicts, or no expected keys specified."
+                "Parsed JSON is not a dict or list, or no expected keys specified."
             )
             return parsed_output  # Return the parsed output as is
 
@@ -169,311 +171,127 @@ def query_to_research_plan(query: str) -> List[Tuple[str, str]]:
         return []
 
 
-def determine_research_queries(
-    step_description: str, num_queries: int = 3
-) -> List[str]:
-    """
-    Takes a research step description and uses an LLM to generate relevant search queries.
-    Expects the LLM to return a JSON list of query strings.
-    """
-    logger.info(f"Generating search queries for step: '{step_description[:50]}...'")
-    prompt = f"""
-    Based on the research step description below, generate {num_queries} distinct and effective Google search queries to find relevant information.
-    Focus on keywords and specific phrases that would yield high-quality results.
-    Return the queries as a JSON list of strings.
-
-    Example Format:
-    ```json
-    [
-      "definition of [core concept]",
-      "history of [topic]",
-      "key figures in [field]"
-    ]
-    ```
-
-    Research Step Description: "{step_description}"
-
-    Search Queries (JSON):
-    """
-    try:
-        llm_response = generate_text(prompt)
-        if (
-            not llm_response
-            or llm_response.startswith("[Error")
-            or llm_response.startswith("[System Note")
-        ):
-            logger.error(f"LLM failed to generate search queries: {llm_response}")
-            return []
-
-        parsed_queries = parse_llm_json_output(
-            llm_response, expected_keys=[]
-        )  # No specific keys for outer list
-
-        if isinstance(parsed_queries, list) and all(
-            isinstance(q, str) for q in parsed_queries
-        ):
-            logger.info(f"Successfully generated {len(parsed_queries)} search queries.")
-            return parsed_queries
-        else:
-            logger.error(
-                f"LLM response for search queries was not in the expected format: {llm_response}"
-            )
-            # Fallback: Split by newline?
-            # queries = [q.strip() for q in llm_response.strip().split('\n') if q.strip()]
-            # if queries: return queries
-            return []
-
-    except Exception as e:
-        logger.error(f"Error in determine_research_queries: {e}", exc_info=True)
-        return []
-
-
-# --- Web Search Execution (Calls the plugin) ---
-
-
-def web_search(search_query: str, num_results: int = 10) -> Tuple[List[str], List[Dict]]:
-    """
-    Performs a web search using the LLM's tool-calling ability and processes the results.
-    Returns a tuple:
-    - A list of strings suitable for further processing (e.g., by an LLM),
-      including notes for non-text content like PDFs.
-    - A list of the raw result dictionaries from the underlying search tool function,
-      useful for generating the works cited section.
-    """
-    logger.info(
-        f"Performing web search via LLM for query: {search_query} (requesting {num_results} results)"
-    )
-    raw_results_dicts = []
-    processed_content_list = []
-
-    try:
-        # --- Client Acquisition ---
-        api_key = current_app.config.get("API_KEY")
-        if not api_key:
-            logger.error("API_KEY is missing from current_app.config for web_search.")
-            return ("[System Error: AI Service API Key not configured]", [])
-
-        if "genai_client" not in g:
-            logger.info("web_search: Creating new genai.Client and caching in 'g'.")
-            try:
-                g.genai_client = genai.Client(api_key=api_key)
-            except Exception as e:
-                logger.error(f"web_search: Failed to initialize genai.Client: {e}", exc_info=True)
-                if "api key not valid" in str(e).lower():
-                    return ("[Error: Invalid Gemini API Key for web_search]", [])
-                return ("[Error: Failed to initialize AI client for web_search]", [])
-        
-        gemini_client = g.genai_client
-        if not gemini_client: # Should ideally not be reached if above logic is correct
-            logger.error("LLM client (g.genai_client) is unexpectedly None after init attempt in web_search.")
-            return ("[System Error: LLM client not available after init attempt]", [])
-        # --- End Client Acquisition ---
-
-        prompt_text = (
-            f"Please search the web for information on: '{search_query}'. "
-            f"Provide up to {num_results} relevant results."
-        )
-
-        # Make LLM call to trigger the web_search tool
-        # Determine the model to use, similar to generate_text
-        raw_model_name = current_app.config.get("DEFAULT_MODEL", "gemini-2.5-flash-preview-04-17") # Fallback if not in config
-        model_to_use = (
-            f"models/{raw_model_name}"
-            if not raw_model_name.startswith("models/")
-            else raw_model_name
-        )
-        logger.info(f"web_search: Using model '{model_to_use}' for tool call.")
-
-        generation_config = types.GenerateContentConfig(
-            tools=[WEB_SEARCH_TOOL]
-            # Add other generation parameters here if needed, e.g., temperature, max_output_tokens
-        )
-        
-        response = gemini_client.models.generate_content(
-            model=model_to_use,
-            contents=prompt_text,
-            config=generation_config
-        )
-
-        if not response.candidates or not response.candidates[0].content.parts:
-            logger.warning("LLM did not return parts for web_search tool call.")
-            return ("[System Note: LLM did not initiate web search tool.]", [])
-
-        part = response.candidates[0].content.parts[0]
-        if not part.function_call or part.function_call.name != "web_search":
-            logger.warning(
-                f"LLM did not call 'web_search' tool as expected. Called: {part.function_call.name if part.function_call else 'None'}"
-            )
-            if part.text:
-                 return ([f"[System Note: LLM provided text instead of using web_search tool: {part.text}]", []])
-            return ("[System Note: LLM did not use the web_search tool correctly.]", [])
-
-        # Execute the function call
-        fc = part.function_call
-        tool_args = dict(fc.args)
-        
-        # Use query from tool call, fallback to original if not provided by LLM (though tool schema requires it)
-        query_for_tool = tool_args.get("query", search_query)
-        # Use num_results from tool call, fallback to function's parameter if not specified by LLM
-        num_results_for_tool = tool_args.get("num_results", num_results)
-
-
-        # Call the actual Python function associated with the "web_search" tool
-        # This function (app.plugins.web_search.perform_web_search) returns List[Dict]
-        # where each dict contains 'title', 'link', 'snippet', and 'fetch_result'.
-        actual_search_results = web_search_plugin.perform_web_search(
-            query=query_for_tool, num_results=num_results_for_tool
-        )
-        
-        raw_results_dicts.extend(actual_search_results)
-
-        if not raw_results_dicts:
-            logger.info("Web search tool returned no results.")
-            return [], []
-
-        for i, result_item in enumerate(raw_results_dicts):
-            # Ensure the item is a dictionary
-            if not isinstance(result_item, dict):
-                logger.warning(
-                    f"Unexpected item type in search results: {type(result_item)}. Skipping."
-                )
-                processed_content_list.append(
-                    f"[System Note: Skipped unexpected search result format for item {i+1}]"
-                )
-                continue
-
-            title = result_item.get("title", "No Title")
-            link = result_item.get("link", "No Link")
-            snippet = result_item.get("snippet", "No Snippet Available")
-
-            # Create a formatted string with the search result metadata.
-            # Actual content fetching is deferred to the WEB_SCRAPE_TOOL.
-            result_summary = (
-                f"Source {i+1}:\n"
-                f"Title: {title}\n"
-                f"Link: {link}\n"
-                f"Snippet: {snippet}\n---"
-            )
-            processed_content_list.append(result_summary)
-            logger.debug(f"Added search result summary for item {i+1}: {title}")
-
-        # Return the list of summaries and the original list of dictionaries
-        return processed_content_list, raw_results_dicts
-
-    except Exception as e:
-        logger.error(
-            f"An unexpected error occurred during web search (tool-based) in deep_research: {e}",
-            exc_info=True,
-        )
-        # Return a list containing a single error string and an empty dict list
-        return [
-            f"[System Error: An unexpected error occurred during web search: {type(e).__name__}]"
-        ], []
-
-
-# --- Helper for Scraping and Processing URL ---
-def _scrape_and_process_url(
-    search_result_meta: Dict, # Contains title, link, snippet
-    source_index: int, # For "Source N"
+# --- Unified Research Step Execution ---
+def execute_research_step(
+    step_description: str,
     is_cancelled_callback: Callable[[], bool],
     socketio, # For emit_status
     sid,
     app_context # Pass Flask app context for background thread safety
-) -> str:
+) -> List[str]:
     """
-    Uses WEB_SCRAPE_TOOL to fetch content from a URL, transcribes if PDF,
-    and returns a formatted string with all information.
+    Executes a single research step using an LLM to orchestrate web searches and scraping.
+    Returns a list of strings, where each string is a formatted summary of a processed source.
     Must be called within an active Flask app context.
     """
-    link_to_scrape = search_result_meta.get("link")
-    title = search_result_meta.get("title", "No Title")
-    original_snippet = search_result_meta.get("snippet", "No Snippet")
-    source_identifier = f"Source {source_index + 1}" # 0-indexed to 1-indexed
+    logger.info(f"Executing research step: {step_description[:100]}...")
+    processed_research_items = []
 
-    base_info = f"{source_identifier}: {title}\nLink: {link_to_scrape}\nSnippet: {original_snippet}\n"
-
-    if not link_to_scrape or link_to_scrape == "no link" or not link_to_scrape.startswith(('http://', 'https://')):
-        logger.warning(f"Skipping scrape for '{title}' due to missing or invalid link: {link_to_scrape}")
-        return base_info + "Content: [Could not scrape, link missing or invalid]\n---"
-
-    if is_cancelled_callback():
-        logger.info(f"Scraping cancelled by user for {link_to_scrape}")
-        return base_info + "Content: [Scraping cancelled by user]\n---"
-
-    if socketio and sid:
-        socketio.emit("status_update", {"message": f"Scraping: {title[:30]}..."}, room=sid)
-
-    # Ensure we are in app context for config and g
     with app_context:
         try:
+            # --- Client Acquisition (copied from old web_search, ensure it's robust) ---
+            api_key = current_app.config.get("API_KEY")
+            if not api_key:
+                logger.error("API_KEY is missing from current_app.config for execute_research_step.")
+                return ["[System Error: AI Service API Key not configured]"]
+
             if "genai_client" not in g:
-                logger.error("genai_client not in g for _scrape_and_process_url. Initializing.")
-                # Attempt to initialize client (basic version, assumes API_KEY is in config)
-                api_key = current_app.config.get("API_KEY")
-                if not api_key:
-                    return base_info + "Content: [Scraping Error: AI Service API Key not configured]\n---"
-                g.genai_client = genai.Client(api_key=api_key)
+                logger.info("execute_research_step: Creating new genai.Client and caching in 'g'.")
+                try:
+                    g.genai_client = genai.Client(api_key=api_key)
+                except Exception as e_client:
+                    logger.error(f"execute_research_step: Failed to initialize genai.Client: {e_client}", exc_info=True)
+                    return [f"[System Error: Failed to initialize AI client: {type(e_client).__name__}]"]
             
             gemini_client = g.genai_client
-            
+            if not gemini_client:
+                logger.error("LLM client (g.genai_client) is unexpectedly None in execute_research_step.")
+                return ["[System Error: LLM client not available after init attempt]"]
+            # --- End Client Acquisition ---
+
             raw_model_name = current_app.config.get("DEFAULT_MODEL", "gemini-2.5-flash-preview-04-17")
             model_to_use = f"models/{raw_model_name}" if not raw_model_name.startswith("models/") else raw_model_name
+            logger.info(f"execute_research_step: Using model '{model_to_use}' for research step.")
 
-            scrape_prompt_text = f"Please scrape the content from the following URL: {link_to_scrape}"
-            scrape_generation_config = types.GenerateContentConfig(tools=[WEB_SCRAPE_TOOL])
+            # Comprehensive prompt for the LLM to manage the research sub-tasks
+            # This prompt needs to be carefully engineered.
+            prompt = f"""
+You are an AI research assistant executing a specific step of a larger research plan.
+Your goal is to gather relevant information for the following research step:
+"{step_description}"
 
-            scrape_response = gemini_client.models.generate_content(
-                model=model_to_use,
-                contents=scrape_prompt_text,
-                config=scrape_generation_config
+To do this, you must:
+1.  Formulate 2-3 targeted search queries based on the step description.
+2.  Execute these queries using the `web_search` tool. This tool will return a list of search results (title, link, snippet).
+3.  Review the search results. For each promising link that seems highly relevant and likely to contain detailed information, use the `scrape_url` tool to fetch its full content.
+    *   The `scrape_url` tool will return text content for HTML pages.
+    *   If `scrape_url` tool returns raw PDF data (which you cannot read directly), make a note of the PDF's title and link, and state that it is a PDF document. Do not attempt to include the raw PDF data in your output.
+    *   If scraping fails or a page has no useful content, note that and rely on the snippet if it's informative.
+4.  Synthesize the information you've gathered from the scraped content and relevant snippets.
+5.  For each distinct source of information you used (whether fully scraped or just a snippet), format it as a string with the following structure:
+    "Title: [Title of the source or page]\nLink: [URL of the source]\nSnippet: [Original snippet from web_search if available]\nContent: [Your summary of the scraped content, or the full text if concise and relevant, or a note like 'PDF document, content not directly viewable', or 'Scraping failed/No content extracted']\n---"
+6.  Return all these formatted source strings as a JSON list. Each string in the list represents one processed source.
+
+Example of a single formatted source string in the output list:
+"Title: Example Research Paper\nLink: https://example.com/paper.pdf\nSnippet: This paper discusses advanced research techniques...\nContent: PDF document, content not directly viewable.\n---"
+
+Another example:
+"Title: Blog Post on Topic X\nLink: https://example.com/blog/topic-x\nSnippet: An insightful blog post covering Topic X...\nContent: The blog post details several key aspects of Topic X. Firstly, it highlights A. Secondly, it discusses B. [More summarized content from scrape]...\n---"
+
+If a search result is not promising enough to scrape, but the snippet is useful, you can include it like:
+"Title: Less Relevant Page\nLink: https://example.com/less-relevant\nSnippet: This page touches upon a related concept...\nContent: Based on snippet: This page touches upon a related concept. [No scraping performed or scrape failed]\n---"
+
+Proceed with the research for the step description provided above. Ensure your final output is ONLY the JSON list of formatted source strings.
+JSON Output:
+            """
+
+            if is_cancelled_callback():
+                logger.info("Research step cancelled before LLM call.")
+                return ["[AI Info: Research step cancelled by user.]"]
+
+            generation_config = types.GenerateContentConfig(
+                tools=[WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL],
+                # Potentially increase max_output_tokens if the combined summaries are long
+                # temperature might be set lower for more factual summarization
             )
-
-            if not scrape_response.candidates or not scrape_response.candidates[0].content.parts:
-                logger.warning(f"LLM did not return parts for WEB_SCRAPE_TOOL call for {link_to_scrape}.")
-                return base_info + "Content: [Scraping Error: LLM did not initiate scrape tool]\n---"
-
-            scrape_part = scrape_response.candidates[0].content.parts[0]
-            if not scrape_part.function_call or scrape_part.function_call.name != "scrape_url":
-                logger.warning(f"LLM did not call 'scrape_url' tool as expected for {link_to_scrape}. Called: {scrape_part.function_call.name if scrape_part.function_call else 'None'}")
-                return base_info + "Content: [Scraping Error: LLM did not use scrape tool correctly]\n---"
-
-            fc_scrape = scrape_part.function_call
-            tool_args_scrape = dict(fc_scrape.args)
-            url_from_tool = tool_args_scrape.get("url")
-
-            if not url_from_tool:
-                logger.error(f"LLM tool call for 'scrape_url' missing 'url' argument for {link_to_scrape}.")
-                return base_info + "Content: [Scraping Error: LLM tool call missing URL]\n---"
-
-            # Execute the actual scrape function (fetch_web_content from web_search_plugin)
-            scraped_data_dict = web_search_plugin.fetch_web_content(url=url_from_tool)
-
-            actual_content_str = ""
-            if scraped_data_dict['type'] == 'html':
-                actual_content_str = scraped_data_dict['content']
-                if not actual_content_str or not actual_content_str.strip():
-                    actual_content_str = "[No textual content extracted from HTML]"
-            elif scraped_data_dict['type'] == 'pdf':
-                pdf_bytes = scraped_data_dict['content']
-                pdf_filename = scraped_data_dict.get('filename', 'document.pdf')
-                if socketio and sid:
-                    socketio.emit("status_update", {"message": f"Transcribing PDF: {pdf_filename[:30]}..."}, room=sid)
-                # transcribe_pdf_bytes is imported from .ai_services
-                actual_content_str = transcribe_pdf_bytes(pdf_bytes, pdf_filename)
-                if actual_content_str.startswith(("[Error", "[System Note")):
-                    logger.warning(f"PDF transcription failed for {pdf_filename}: {actual_content_str}")
-            elif scraped_data_dict['type'] == 'error':
-                actual_content_str = f"[Scraping Error on URL {url_from_tool}: {scraped_data_dict['content']}]"
-                logger.warning(actual_content_str)
-            else:
-                actual_content_str = f"[Scraping Error: Unknown content type '{scraped_data_dict['type']}' from URL {url_from_tool}]"
-                logger.warning(actual_content_str)
             
-            return base_info + f"Content:\n{actual_content_str.strip()}\n---"
+            if socketio and sid:
+                socketio.emit("status_update", {"message": f"Researching: {step_description[:40]}..."}, room=sid)
 
-        except Exception as e_scrape:
-            logger.error(f"Error during scraping/processing of {link_to_scrape}: {e_scrape}", exc_info=True)
-            return base_info + f"Content: [Scraping/Processing Exception: {type(e_scrape).__name__}]\n---"
+            response = gemini_client.models.generate_content(
+                model=model_to_use,
+                contents=prompt,
+                config=generation_config
+            )
+            
+            # The SDK's automatic function calling handles the tool execution loop.
+            # The final response.text should contain the JSON list of formatted strings.
+
+            if response.text:
+                logger.debug(f"LLM response for research step: {response.text[:500]}")
+                parsed_items = parse_llm_json_output(response.text, expected_keys=[]) # Expecting a list of strings
+                if isinstance(parsed_items, list) and all(isinstance(item, str) for item in parsed_items):
+                    processed_research_items.extend(parsed_items)
+                    logger.info(f"Successfully processed {len(parsed_items)} items for research step.")
+                else:
+                    logger.error(f"LLM response for research step was not a JSON list of strings: {response.text[:500]}")
+                    processed_research_items.append(f"[System Error: LLM did not return a valid list of research items for '{step_description}'. Raw response: {response.text[:200]}]")
+            else:
+                logger.warning(f"LLM returned no text for research step: {step_description}")
+                # Check for blocked prompt or other issues
+                if response.prompt_feedback and response.prompt_feedback.block_reason:
+                    reason = response.prompt_feedback.block_reason
+                    msg = response.prompt_feedback.block_reason_message
+                    logger.error(f"Prompt blocked for research step. Reason: {reason}, Message: {msg}")
+                    processed_research_items.append(f"[System Error: Prompt blocked by API - {reason}. Please revise the query/step.]")
+                else:
+                    processed_research_items.append(f"[System Error: LLM returned no usable output for '{step_description}'.]")
+
+        except Exception as e:
+            logger.error(f"Error during execute_research_step for '{step_description}': {e}", exc_info=True)
+            processed_research_items.append(f"[System Error: Exception during research step execution - {type(e).__name__}]")
+
+        return processed_research_items
 
 
 # --- Research Plan Update ---
@@ -886,10 +704,7 @@ def perform_deep_research(
         # 2. Prepare for Research Execution
     collected_research: Dict[str, List[str]] = (
         {}
-    )  # Stores processed content strings per *initial* step name
-    collected_raw_results: Dict[str, List[Dict]] = (
-        {}
-    )  # Stores raw result dicts per *initial* step name
+    )  # Stores lists of formatted research item strings per step name
 
     # 3. Execute Initial Research Steps Sequentially
     logger.info(
@@ -907,63 +722,18 @@ def perform_deep_research(
             f"Research Step {step_counter}/{len(research_plan)}: {step_name}..."
         )
         logger.info(f"--- Starting Research Step: {step_name} (SID: {sid}) ---")
-        logger.debug(f"Description: {step_description}")
-        all_processed_content_for_step = []
-        all_raw_dicts_for_step = []
+        
         try:
-            # a. Determine Search Queries
-            search_queries: List[str] = determine_research_queries(step_description) # Needs app context, no cancellation check
-            if not search_queries:
-                logger.warning(f"No search queries generated for step: {step_name}")
-                collected_research[step_name] = []
-                collected_raw_results[step_name] = []
-                continue  # Move to the next step
-
-            # b. Perform Web Search for each query to get metadata
-            current_step_raw_meta_results = [] # Store metadata from all queries for this step
-            for search_query_idx, search_query in enumerate(search_queries):
-                # --- Cancellation Check (before each web search) ---
-                if is_cancelled_callback():
-                    return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during step '{step_name}' before web search for '{search_query}'.]", is_cancel=True)
-                
-                emit_status(f"Searching: {search_query[:40]}... (Query {search_query_idx+1}/{len(search_queries)})")
-                # web_search returns summaries (which we ignore here) and raw metadata dicts
-                _, raw_meta_dicts_for_query = web_search(search_query) 
-
-                if raw_meta_dicts_for_query:
-                    current_step_raw_meta_results.extend(raw_meta_dicts_for_query)
-                else:
-                    logger.debug(f"No search results from web_search for query '{search_query}' in step '{step_name}'")
-            
-            # c. Scrape content for each unique link found in the step's search results
-            # Use a set to avoid scraping the same link multiple times if returned by different queries
-            unique_links_to_scrape_meta = {item['link']: item for item in current_step_raw_meta_results if item.get('link')}.values()
-            
-            scraped_content_count_for_step = 0
-            for meta_item_idx, meta_item in enumerate(unique_links_to_scrape_meta):
-                 # --- Cancellation Check (before each scrape) ---
-                if is_cancelled_callback():
-                    return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during step '{step_name}' before scraping '{meta_item.get('link')}'.]", is_cancel=True)
-
-                # The source_index for _scrape_and_process_url should be relative to the items being processed for this step
-                full_content_string = _scrape_and_process_url(
-                    meta_item,
-                    source_index=scraped_content_count_for_step, # Index for "Source N"
-                    is_cancelled_callback=is_cancelled_callback,
-                    socketio=socketio,
-                    sid=sid,
-                    app_context=app.app_context() # Pass the app context
-                )
-                if full_content_string:
-                    all_processed_content_for_step.append(full_content_string)
-                    scraped_content_count_for_step +=1
-
-            collected_research[step_name] = all_processed_content_for_step
-            # collected_raw_results stores the initial search metadata (title, link, snippet)
-            # This can be useful for a "Works Cited" that lists initial hits, distinct from full scraped content.
-            collected_raw_results[step_name] = list(unique_links_to_scrape_meta) # Store the unique metadata items
+            research_items_for_step = execute_research_step(
+                step_description,
+                is_cancelled_callback,
+                socketio,
+                sid,
+                app.app_context() # Pass the app context
+            )
+            collected_research[step_name] = research_items_for_step
             logger.info(
-                f"--- Finished Research Step: {step_name} - Collected {len(all_processed_content_for_step)} scraped/processed items from {len(unique_links_to_scrape_meta)} unique links ---"
+                f"--- Finished Research Step: {step_name} - Collected {len(research_items_for_step)} items ---"
             )
 
         except Exception as e:
@@ -971,10 +741,8 @@ def perform_deep_research(
                 f"Error executing research step '{step_name}' (SID: {sid}): {e}",
                 exc_info=True,
             )
-            # Log error but continue to next step if possible
             error_msg = f"[System Error: Failed during research step '{step_name}': {type(e).__name__}]"
             collected_research[step_name] = [error_msg]
-            collected_raw_results[step_name] = [{"error": error_msg}]
 
     logger.info(
         f"--- Finished Sequential Execution of Initial Research Steps (SID: {sid}) ---"
@@ -987,9 +755,8 @@ def perform_deep_research(
 
     # Log collected research summary
     for step, items in collected_research.items():
-        raw_count = len(collected_raw_results.get(step, []))
         logger.debug(
-            f"Step '{step}': Collected {len(items)} processed items, {raw_count} raw items."
+            f"Step '{step}': Collected {len(items)} research items."
         )
 
     # 4. Generate Updated Report Plan (Outline) based on initial findings
@@ -1032,8 +799,7 @@ def perform_deep_research(
             # Initialize result lists immediately to avoid key errors later
             if section_name not in collected_research:
                 collected_research[section_name] = []
-            if section_name not in collected_raw_results:
-                collected_raw_results[section_name] = []
+            # collected_raw_results is removed
         else:
             logger.debug(
                 f"Section '{section_name}' was part of initial research, skipping additional search."
@@ -1153,11 +919,20 @@ def perform_deep_research(
         )
         logger.info(f"--- Starting Section Synthesis: {section_name} (SID: {sid}) ---")
         try:
-            # Call the synthesis function directly
+            # Prepare research items with "Source N:" prefix for synthesis
+            items_for_synthesis = []
+            if section_name in collected_research and collected_research[section_name]:
+                for i, item_content in enumerate(collected_research[section_name]):
+                    # Prepend "Source N:" to each research item string
+                    # The item_content itself should already contain Title, Link, Snippet, Content
+                    items_for_synthesis.append(f"Source {i+1}:\n{item_content}")
+            else:
+                items_for_synthesis.append("[No research material found for this section.]")
+
             report_section_text, section_refs = synthesize_research_into_report_section(
                 section_name,
                 section_description,
-                collected_research[section_name],
+                items_for_synthesis, # Pass the prefixed items
             )
             report_sections_results[section_name] = report_section_text
             # Store references under the specific key format
