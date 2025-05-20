@@ -6,6 +6,7 @@ from typing import List, Tuple, Any, Dict
 # Removed ThreadPoolExecutor and as_completed imports
 from flask import current_app, g  # To access config and g for client caching
 import google.genai as genai # For genai.Client initialization
+from google.genai import types # For GenerateContentConfig
 
 # Assuming ai_services.py and web_search.py are in the same directory
 # or accessible via the Python path.
@@ -274,16 +275,24 @@ def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List
         )
 
         # Make LLM call to trigger the web_search tool
-        response = gemini_client.models.generate_content(
-            contents=prompt_text, # 'contents' is the correct parameter name
+        # Determine the model to use, similar to generate_text
+        raw_model_name = current_app.config.get("DEFAULT_MODEL", "gemini-2.5-flash-preview-04-17") # Fallback if not in config
+        model_to_use = (
+            f"models/{raw_model_name}"
+            if not raw_model_name.startswith("models/")
+            else raw_model_name
+        )
+        logger.info(f"web_search: Using model '{model_to_use}' for tool call.")
+
+        generation_config = types.GenerateContentConfig(
             tools=[WEB_SEARCH_TOOL]
-            # model='gemini-2.5-flash-preview-04-17' # Model is specified during client.models.generate_content
-                                                  # or defaults if client was created with a model.
-                                                  # For tool usage, the model is implicitly the one the client is configured for.
-                                                  # If a specific model is needed here, it should be passed to generate_content.
-                                                  # However, generate_text in generation_services.py gets model from config,
-                                                  # this function should probably align or ensure client is for the right model.
-                                                  # For now, assuming client is configured for the correct model for tool use.
+            # Add other generation parameters here if needed, e.g., temperature, max_output_tokens
+        )
+        
+        response = gemini_client.models.generate_content(
+            model=model_to_use,
+            contents=prompt_text,
+            config=generation_config
         )
 
         if not response.candidates or not response.candidates[0].content.parts:
