@@ -261,7 +261,7 @@ Indicate you are ready for the final compilation step once all searches and scra
             
             # Construct initial contents for the conversation
             # The first message is the user's (our application's) request
-            conversation_history = [types.Content(parts=[types.Part.from_text(tool_usage_prompt)], role="user")]
+            conversation_history = [types.Content(parts=[types.Part.from_text(text=tool_usage_prompt)], role="user")]
 
             tool_response = gemini_client.models.generate_content(
                 model=model_to_use,
