@@ -14,10 +14,9 @@ from .ai_services import (
     transcribe_pdf_bytes,
     llm_factory,
 )  # Import the new function
-from .plugins.web_search import (
-    perform_web_search,
-    # fetch_web_content is now called internally by perform_web_search
-)  # For web searching and scraping
+from app.plugins import web_search as web_search_plugin # For executing the web_search tool's function
+from .ai_services_lib.tool_definitions import WEB_SEARCH_TOOL # To enable tool use by the LLM
+# perform_web_search is no longer directly imported
 
 
 # Configure logging
@@ -232,37 +231,74 @@ def determine_research_queries(
 
 def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List[Dict]]:
     """
-    Performs a web search using the plugin and processes the results.
+    Performs a web search using the LLM's tool-calling ability and processes the results.
     Returns a tuple:
     - A list of strings suitable for further processing (e.g., by an LLM),
       including notes for non-text content like PDFs.
-    - A list of the raw result dictionaries from perform_web_search,
+    - A list of the raw result dictionaries from the underlying search tool function,
       useful for generating the works cited section.
     """
     logger.info(
-        f"Performing web search for query: {search_query} (requesting {num_results} results)"
+        f"Performing web search via LLM for query: {search_query} (requesting {num_results} results)"
     )
     raw_results_dicts = []
     processed_content_list = []
 
     try:
-        # perform_web_search now returns List[Dict]
-        raw_results_dicts = perform_web_search(search_query, num_results)
+        gemini_client = llm_factory.get_instance().client
+        if not gemini_client:
+            logger.error("LLM client not available for web_search.")
+            return ["[System Error: LLM client not configured]", []
+
+        prompt_text = (
+            f"Please search the web for information on: '{search_query}'. "
+            f"Provide up to {num_results} relevant results."
+        )
+
+        # Make LLM call to trigger the web_search tool
+        response = gemini_client.generate_content(
+            prompt_text,
+            tools=[WEB_SEARCH_TOOL]
+        )
+
+        if not response.candidates or not response.candidates[0].content.parts:
+            logger.warning("LLM did not return parts for web_search tool call.")
+            return ["[System Note: LLM did not initiate web search tool.]", []
+
+        part = response.candidates[0].content.parts[0]
+        if not part.function_call or part.function_call.name != "web_search":
+            logger.warning(
+                f"LLM did not call 'web_search' tool as expected. Called: {part.function_call.name if part.function_call else 'None'}"
+            )
+            if part.text:
+                 return [f"[System Note: LLM provided text instead of using web_search tool: {part.text}]", []]
+            return ["[System Note: LLM did not use the web_search tool correctly.]", []
+
+        # Execute the function call
+        fc = part.function_call
+        tool_args = dict(fc.args)
+        
+        # Use query from tool call, fallback to original if not provided by LLM (though tool schema requires it)
+        query_for_tool = tool_args.get("query", search_query)
+        # Use num_results from tool call, fallback to function's parameter if not specified by LLM
+        num_results_for_tool = tool_args.get("num_results", num_results)
+
+
+        # Call the actual Python function associated with the "web_search" tool
+        # This function (app.plugins.web_search.perform_web_search) returns List[Dict]
+        # where each dict contains 'title', 'link', 'snippet', and 'fetch_result'.
+        actual_search_results = web_search_plugin.perform_web_search(
+            query=query_for_tool, num_results=num_results_for_tool
+        )
+        
+        raw_results_dicts.extend(actual_search_results)
 
         if not raw_results_dicts:
-            logger.info("Web search returned no results.")
-            # Check if it's the old system error string format (shouldn't happen with updated plugin, but defensive)
-            if (
-                len(raw_results_dicts) == 1
-                and isinstance(raw_results_dicts[0], str)
-                and raw_results_dicts[0].startswith("[System Error")
-            ):
-                # If it's the old error format, return it as the processed content and an empty dict list
-                return raw_results_dicts, []
-            return [], []  # Return empty lists if no results
+            logger.info("Web search tool returned no results.")
+            return [], []
 
         for i, result_item in enumerate(raw_results_dicts):
-            # Ensure the item is a dictionary as expected from the new perform_web_search
+            # Ensure the item is a dictionary
             if not isinstance(result_item, dict):
                 logger.warning(
                     f"Unexpected item type in search results: {type(result_item)}. Skipping."
@@ -351,7 +387,7 @@ def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List
 
     except Exception as e:
         logger.error(
-            f"An unexpected error occurred during web search in deep_research: {e}",
+            f"An unexpected error occurred during web search (tool-based) in deep_research: {e}",
             exc_info=True,
         )
         # Return a list containing a single error string and an empty dict list
