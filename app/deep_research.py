@@ -258,95 +258,175 @@ Indicate you are ready for the final compilation step once all searches and scra
             # Step A: Manual Tool Execution Loop
             conversation_history = [types.Content(parts=[types.Part.from_text(text=tool_usage_prompt)], role="user")]
             
-            MAX_TOOL_TURNS = 15 # Prevent infinite loops
+            MAX_TOOL_TURNS = 15 
+            MAX_CONSECUTIVE_EMPTY_TOOL_CALL_TURNS = 2 # Prevent LLM getting stuck asking for no tools
+            consecutive_empty_tool_turns = 0
+
+            # Define retryable exceptions for network/API issues (used by retry-wrapped callables)
+            RETRYABLE_EXCEPTIONS = (
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.RequestException, 
+                GoogleHttpError, 
+            )
+
+            # Retry-wrapped callables (defined once, used in the loop)
+            @retry(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential(multiplier=1, min=2, max=10),
+                retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
+                reraise=True
+            )
+            def call_web_search_with_retry(query_arg, num_results_arg):
+                logger.info(f"Attempting web_search for '{query_arg}' (retriable)")
+                return web_search_plugin.perform_web_search(query=query_arg, num_results=num_results_arg)
+
+            @retry(
+                stop=stop_after_attempt(3),
+                wait=wait_exponential(multiplier=1, min=2, max=10),
+                retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
+                reraise=True
+            )
+            def call_fetch_web_content_with_retry(url_arg):
+                logger.info(f"Attempting fetch_web_content for '{url_arg}' (retriable)")
+                return web_search_plugin.fetch_web_content(url=url_arg)
+
             for turn_count in range(MAX_TOOL_TURNS):
                 if is_cancelled_callback():
                     logger.info("Research step cancelled during manual tool loop.")
                     processed_research_items.append("[AI Info: Research step cancelled by user.]")
-                    return processed_research_items # Return immediately
+                    return processed_research_items
 
                 logger.info(f"Manual tool loop turn {turn_count + 1}/{MAX_TOOL_TURNS} for step: {step_description[:30]}...")
                 
-                # Send current history to LLM
                 response_from_model_turn = gemini_client.models.generate_content(
                     model=model_to_use,
                     contents=conversation_history,
                     config=tool_execution_config 
                 )
 
-                # Append model's response to history (could be text or function call)
                 if not response_from_model_turn.candidates or not response_from_model_turn.candidates[0].content:
-                    logger.error("No valid candidate/content in tool execution response.")
+                    logger.error("No valid candidate/content in LLM's turn response during tool phase.")
                     processed_research_items.append("[System Error: LLM response missing content during tool phase.]")
-                    break # Exit loop, proceed to final JSON attempt with current history
+                    break 
                 
                 model_response_content = response_from_model_turn.candidates[0].content
-                conversation_history.append(model_response_content) # Add model's full response part to history
+                conversation_history.append(model_response_content)
 
-                # Check for function calls in the latest model response part
-                function_call_to_execute = None
-                # The actual function call should be in the parts of the latest model_response_content
+                tasks_for_this_llm_response = []
                 for part in model_response_content.parts:
                     if part.function_call:
-                        function_call_to_execute = part.function_call
-                        break 
-                
-                if function_call_to_execute:
-                    fc_name = function_call_to_execute.name
-                    fc_args = dict(function_call_to_execute.args)
-                    logger.info(f"LLM requested tool: {fc_name} with args: {fc_args}")
-                    if socketio and sid:
-                        socketio.emit("status_update", {"message": f"Using tool: {fc_name} for {fc_args.get('query', fc_args.get('url', ''))[:20]}..."}, room=sid)
-
-                    function_response_data = None
-                    # tool_executed_successfully = False # Not strictly needed with current logic
-                    try:
+                        fc = part.function_call
+                        fc_name = fc.name
+                        fc_args = dict(fc.args)
+                        logger.info(f"LLM requested tool call: {fc_name} with args: {fc_args}")
+                        
+                        callable_task = None
                         if fc_name == "web_search":
                             query = fc_args.get("query", "")
-                            num_results = fc_args.get("num_results", 5) 
-                            search_results_list = web_search_plugin.perform_web_search(query=query, num_results=num_results)
-                            function_response_data = {"results": search_results_list}
-                            # tool_executed_successfully = True
-                        
+                            num_results = fc_args.get("num_results", 5)
+                            callable_task = functools.partial(call_web_search_with_retry, query_arg=query, num_results_arg=num_results)
                         elif fc_name == "scrape_url":
                             url_to_scrape = fc_args.get("url")
                             if url_to_scrape:
-                                scraped_data = web_search_plugin.fetch_web_content(url=url_to_scrape)
-                                if scraped_data['type'] == 'pdf' and isinstance(scraped_data['content'], bytes):
-                                    pdf_filename = scraped_data.get('filename', 'scraped.pdf')
-                                    logger.info(f"Transcribing PDF: {pdf_filename} from scrape_url tool call.")
-                                    if socketio and sid:
-                                        socketio.emit("status_update", {"message": f"Transcribing PDF: {pdf_filename[:25]}..."}, room=sid)
-                                    transcribed_text = transcribe_pdf_bytes(scraped_data['content'], pdf_filename)
-                                    scraped_data['content'] = transcribed_text 
-                                    scraped_data['original_type'] = 'pdf' 
-                                    scraped_data['type'] = 'text' 
-                                function_response_data = {"scraped_data": scraped_data}
-                                # tool_executed_successfully = True
+                                callable_task = functools.partial(call_fetch_web_content_with_retry, url_arg=url_to_scrape)
                             else:
-                                function_response_data = {"error": "URL not provided for scrape_url"}
-                                logger.error("URL not provided for scrape_url tool call.")
+                                logger.error(f"scrape_url call from LLM missing 'url' argument: {fc_args}")
+                                # Immediately prepare an error response for this specific bad call
+                                err_resp_part = types.Part.from_function_response(
+                                    name=fc_name, 
+                                    response={"error": {"type": "argument_error", "message": "URL not provided for scrape_url"}}
+                                )
+                                conversation_history.append(types.Content(parts=[err_resp_part], role="tool"))
+                                continue # to next part in model_response_content.parts
                         else:
-                            logger.warning(f"Unknown tool requested: {fc_name}")
-                            function_response_data = {"error": f"Unknown tool: {fc_name}"}
-                    except Exception as tool_exec_e:
-                        logger.error(f"Exception executing tool {fc_name}: {tool_exec_e}", exc_info=True)
-                        function_response_data = {"error": f"Exception during {fc_name} execution: {str(tool_exec_e)}"}
-
-                    # Create FunctionResponse part and add to history
-                    tool_response_part = types.Part.from_function_response(
-                        name=fc_name,
-                        response=function_response_data 
-                    )
-                    conversation_history.append(types.Content(parts=[tool_response_part], role="tool"))
-                    # Continue loop to let model process tool response
+                            logger.warning(f"LLM requested unknown tool: {fc_name}")
+                            err_resp_part = types.Part.from_function_response(
+                                name=fc_name, 
+                                response={"error": {"type": "unknown_tool", "message": f"Unknown tool: {fc_name}"}}
+                            )
+                            conversation_history.append(types.Content(parts=[err_resp_part], role="tool"))
+                            continue
+                        
+                        if callable_task:
+                            tasks_for_this_llm_response.append({'callable': callable_task, 'original_fc': fc})
+                
+                if not tasks_for_this_llm_response:
+                    # LLM did not request any tools in this turn, it might have provided text.
+                    logger.info("LLM provided text response or no tools in this turn, exiting manual tool loop.")
+                    consecutive_empty_tool_turns +=1
+                    if consecutive_empty_tool_turns >= MAX_CONSECUTIVE_EMPTY_TOOL_CALL_TURNS:
+                        logger.warning(f"LLM provided no tool calls for {MAX_CONSECUTIVE_EMPTY_TOOL_CALL_TURNS} consecutive turns. Breaking tool loop.")
+                        break
+                    # If it's just one turn of no tools, maybe it's thinking or summarizing before a final JSON.
+                    # The main loop break condition is if LLM outputs text (no function_call).
+                    # If there was any text part in model_response_content.parts, we assume it's done.
+                    has_text_part = any(part.text for part in model_response_content.parts if hasattr(part, 'text'))
+                    if has_text_part:
+                        break # Exit loop, proceed to final JSON generation
+                    else: # No text and no tools, this is an empty response from LLM.
+                        logger.warning("LLM returned no tools and no text. Continuing tool loop for now.")
+                        continue # Next turn of the tool loop
                 else:
-                    # No function call, model provided text. Assume it's done with tool phase.
-                    logger.info("LLM provided text response instead of tool call, exiting manual tool loop.")
-                    break # Exit loop
+                    consecutive_empty_tool_turns = 0 # Reset counter if tools were called
+                    
+                    function_response_parts_batch = []
+                    # Max workers for I/O bound tasks like web requests
+                    # TODO: Consider making this configurable or dynamic
+                    num_workers = min(len(tasks_for_this_llm_response), 10) 
+                    
+                    if socketio and sid:
+                        socketio.emit("status_update", {"message": f"Executing {len(tasks_for_this_llm_response)} tool(s) in parallel..."}, room=sid)
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+                        future_to_fc_info = {
+                            executor.submit(task_info['callable']): task_info['original_fc']
+                            for task_info in tasks_for_this_llm_response
+                        }
+
+                        for future in concurrent.futures.as_completed(future_to_fc_info):
+                            original_fc = future_to_fc_info[future]
+                            fc_name = original_fc.name
+                            function_response_data_for_llm = {}
+                            try:
+                                tool_call_result_data = future.result() # This is the direct return from the plugin function
+
+                                if fc_name == "web_search":
+                                    function_response_data_for_llm = {"results": tool_call_result_data}
+                                elif fc_name == "scrape_url":
+                                    # PDF transcription (Task 3) will make this async.
+                                    # For now, synchronous transcription within this worker thread.
+                                    if tool_call_result_data['type'] == 'pdf' and isinstance(tool_call_result_data['content'], bytes):
+                                        pdf_filename = tool_call_result_data.get('filename', 'scraped.pdf')
+                                        logger.info(f"Transcribing PDF: {pdf_filename} from parallel scrape_url tool call.")
+                                        if socketio and sid:
+                                            socketio.emit("status_update", {"message": f"Transcribing PDF: {pdf_filename[:25]}..."}, room=sid)
+                                        transcribed_text = transcribe_pdf_bytes(tool_call_result_data['content'], pdf_filename)
+                                        tool_call_result_data['content'] = transcribed_text 
+                                        tool_call_result_data['original_type'] = 'pdf' 
+                                        tool_call_result_data['type'] = 'text'
+                                    function_response_data_for_llm = {"scraped_data": tool_call_result_data}
+                                else: # Should not happen if validation above is correct
+                                    function_response_data_for_llm = {"error": f"Unknown tool {fc_name} result processing."}
+                                
+                            except RETRYABLE_EXCEPTIONS as retry_exc:
+                                error_msg = f"Tool call {fc_name} failed after multiple retries: {type(retry_exc).__name__} - {str(retry_exc)}"
+                                logger.error(error_msg, exc_info=False) # No need for full exc_info for retries
+                                function_response_data_for_llm = {"error": {"type": "tool_retry_failed", "message": error_msg}}
+                            except Exception as exc:
+                                error_msg = f"Exception executing tool {fc_name} in parallel: {type(exc).__name__} - {str(exc)}"
+                                logger.error(error_msg, exc_info=True)
+                                function_response_data_for_llm = {"error": {"type": "parallel_tool_execution_error", "message": error_msg}}
+                            
+                            function_response_parts_batch.append(
+                                types.Part.from_function_response(name=fc_name, response=function_response_data_for_llm)
+                            )
+                    
+                    if function_response_parts_batch:
+                        conversation_history.append(types.Content(parts=function_response_parts_batch, role="tool"))
+                    # Continue to the next turn of the tool loop
             else: # Loop finished due to MAX_TOOL_TURNS
                 logger.warning(f"Exceeded MAX_TOOL_TURNS ({MAX_TOOL_TURNS}). Proceeding to final JSON generation.")
-                # No specific error message to add here, final JSON generation will proceed with current history
 
 
             if is_cancelled_callback():
