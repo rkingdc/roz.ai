@@ -364,7 +364,7 @@ Your *FINAL and ONLY* output for this entire multi-phase task MUST be a single J
 This JSON list should be the *only content* in your response. Do not include any other text, commentary, or acknowledgments.
 """
             # Add this new instruction to the conversation history
-            conversation_history.append(types.Content(parts=[types.Part.from_text(final_json_prompt_text)], role="user"))
+            conversation_history.append(types.Content(parts=[types.Part.from_text(text=final_json_prompt_text)], role="user"))
 
             max_tokens_final = current_app.config.get("DEFAULT_MAX_OUTPUT_TOKENS", 8192)
             final_json_generation_config = types.GenerateContentConfig(
