@@ -231,7 +231,7 @@ def determine_research_queries(
 # --- Web Search Execution (Calls the plugin) ---
 
 
-def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List[Dict]]:
+def web_search(search_query: str, num_results: int = 10) -> Tuple[List[str], List[Dict]]:
     """
     Performs a web search using the LLM's tool-calling ability and processes the results.
     Returns a tuple:
