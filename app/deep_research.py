@@ -13,11 +13,11 @@ from google.genai import types # For GenerateContentConfig
 # Use appropriate import style for your project structure (e.g., relative imports if part of a package)
 from .ai_services import (
     generate_text,
-    # transcribe_pdf_bytes, # No longer used directly in this file after web_search refactor
+    transcribe_pdf_bytes, # Needed for processing scraped PDFs
     # llm_factory, # No longer used in this file
-)  # Import the new function
-from app.plugins import web_search as web_search_plugin # For executing the web_search tool's function
-from .ai_services_lib.tool_definitions import WEB_SEARCH_TOOL # To enable tool use by the LLM
+)
+from app.plugins import web_search as web_search_plugin # For perform_web_search AND fetch_web_content
+from .ai_services_lib.tool_definitions import WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL # Added WEB_SCRAPE_TOOL
 # perform_web_search is no longer directly imported
 
 
@@ -369,6 +369,111 @@ def web_search(search_query: str, num_results: int = 3) -> Tuple[List[str], List
         return [
             f"[System Error: An unexpected error occurred during web search: {type(e).__name__}]"
         ], []
+
+
+# --- Helper for Scraping and Processing URL ---
+def _scrape_and_process_url(
+    search_result_meta: Dict, # Contains title, link, snippet
+    source_index: int, # For "Source N"
+    is_cancelled_callback: Callable[[], bool],
+    socketio, # For emit_status
+    sid,
+    app_context # Pass Flask app context for background thread safety
+) -> str:
+    """
+    Uses WEB_SCRAPE_TOOL to fetch content from a URL, transcribes if PDF,
+    and returns a formatted string with all information.
+    Must be called within an active Flask app context.
+    """
+    link_to_scrape = search_result_meta.get("link")
+    title = search_result_meta.get("title", "No Title")
+    original_snippet = search_result_meta.get("snippet", "No Snippet")
+    source_identifier = f"Source {source_index + 1}" # 0-indexed to 1-indexed
+
+    base_info = f"{source_identifier}: {title}\nLink: {link_to_scrape}\nSnippet: {original_snippet}\n"
+
+    if not link_to_scrape or link_to_scrape == "no link" or not link_to_scrape.startswith(('http://', 'https://')):
+        logger.warning(f"Skipping scrape for '{title}' due to missing or invalid link: {link_to_scrape}")
+        return base_info + "Content: [Could not scrape, link missing or invalid]\n---"
+
+    if is_cancelled_callback():
+        logger.info(f"Scraping cancelled by user for {link_to_scrape}")
+        return base_info + "Content: [Scraping cancelled by user]\n---"
+
+    if socketio and sid:
+        socketio.emit("status_update", {"message": f"Scraping: {title[:30]}..."}, room=sid)
+
+    # Ensure we are in app context for config and g
+    with app_context:
+        try:
+            if "genai_client" not in g:
+                logger.error("genai_client not in g for _scrape_and_process_url. Initializing.")
+                # Attempt to initialize client (basic version, assumes API_KEY is in config)
+                api_key = current_app.config.get("API_KEY")
+                if not api_key:
+                    return base_info + "Content: [Scraping Error: AI Service API Key not configured]\n---"
+                g.genai_client = genai.Client(api_key=api_key)
+            
+            gemini_client = g.genai_client
+            
+            raw_model_name = current_app.config.get("DEFAULT_MODEL", "gemini-2.5-flash-preview-04-17")
+            model_to_use = f"models/{raw_model_name}" if not raw_model_name.startswith("models/") else raw_model_name
+
+            scrape_prompt_text = f"Please scrape the content from the following URL: {link_to_scrape}"
+            scrape_generation_config = types.GenerateContentConfig(tools=[WEB_SCRAPE_TOOL])
+
+            scrape_response = gemini_client.models.generate_content(
+                model=model_to_use,
+                contents=scrape_prompt_text,
+                config=scrape_generation_config
+            )
+
+            if not scrape_response.candidates or not scrape_response.candidates[0].content.parts:
+                logger.warning(f"LLM did not return parts for WEB_SCRAPE_TOOL call for {link_to_scrape}.")
+                return base_info + "Content: [Scraping Error: LLM did not initiate scrape tool]\n---"
+
+            scrape_part = scrape_response.candidates[0].content.parts[0]
+            if not scrape_part.function_call or scrape_part.function_call.name != "scrape_url":
+                logger.warning(f"LLM did not call 'scrape_url' tool as expected for {link_to_scrape}. Called: {scrape_part.function_call.name if scrape_part.function_call else 'None'}")
+                return base_info + "Content: [Scraping Error: LLM did not use scrape tool correctly]\n---"
+
+            fc_scrape = scrape_part.function_call
+            tool_args_scrape = dict(fc_scrape.args)
+            url_from_tool = tool_args_scrape.get("url")
+
+            if not url_from_tool:
+                logger.error(f"LLM tool call for 'scrape_url' missing 'url' argument for {link_to_scrape}.")
+                return base_info + "Content: [Scraping Error: LLM tool call missing URL]\n---"
+
+            # Execute the actual scrape function (fetch_web_content from web_search_plugin)
+            scraped_data_dict = web_search_plugin.fetch_web_content(url=url_from_tool)
+
+            actual_content_str = ""
+            if scraped_data_dict['type'] == 'html':
+                actual_content_str = scraped_data_dict['content']
+                if not actual_content_str or not actual_content_str.strip():
+                    actual_content_str = "[No textual content extracted from HTML]"
+            elif scraped_data_dict['type'] == 'pdf':
+                pdf_bytes = scraped_data_dict['content']
+                pdf_filename = scraped_data_dict.get('filename', 'document.pdf')
+                if socketio and sid:
+                    socketio.emit("status_update", {"message": f"Transcribing PDF: {pdf_filename[:30]}..."}, room=sid)
+                # transcribe_pdf_bytes is imported from .ai_services
+                actual_content_str = transcribe_pdf_bytes(pdf_bytes, pdf_filename)
+                if actual_content_str.startswith(("[Error", "[System Note")):
+                    logger.warning(f"PDF transcription failed for {pdf_filename}: {actual_content_str}")
+            elif scraped_data_dict['type'] == 'error':
+                actual_content_str = f"[Scraping Error on URL {url_from_tool}: {scraped_data_dict['content']}]"
+                logger.warning(actual_content_str)
+            else:
+                actual_content_str = f"[Scraping Error: Unknown content type '{scraped_data_dict['type']}' from URL {url_from_tool}]"
+                logger.warning(actual_content_str)
+            
+            return base_info + f"Content:\n{actual_content_str.strip()}\n---"
+
+        except Exception as e_scrape:
+            logger.error(f"Error during scraping/processing of {link_to_scrape}: {e_scrape}", exc_info=True)
+            return base_info + f"Content: [Scraping/Processing Exception: {type(e_scrape).__name__}]\n---"
 
 
 # --- Research Plan Update ---
@@ -814,28 +919,51 @@ def perform_deep_research(
                 collected_raw_results[step_name] = []
                 continue  # Move to the next step
 
-            # b. Perform Web Search & Scrape Results for each query
-            for search_query in search_queries:
-                # --- Cancellation Check (before each search) ---
+            # b. Perform Web Search for each query to get metadata
+            current_step_raw_meta_results = [] # Store metadata from all queries for this step
+            for search_query_idx, search_query in enumerate(search_queries):
+                # --- Cancellation Check (before each web search) ---
                 if is_cancelled_callback():
-                    return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during step '{step_name}' before searching '{search_query}'.]", is_cancel=True)
+                    return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during step '{step_name}' before web search for '{search_query}'.]", is_cancel=True)
+                
+                emit_status(f"Searching: {search_query[:40]}... (Query {search_query_idx+1}/{len(search_queries)})")
+                # web_search returns summaries (which we ignore here) and raw metadata dicts
+                _, raw_meta_dicts_for_query = web_search(search_query) 
 
-                # web_search also needs app context implicitly, no cancellation check inside
-                processed_content, raw_dicts = web_search(search_query)
-                if processed_content:
-                    all_processed_content_for_step.extend(processed_content)
-                if raw_dicts:
-                    all_raw_dicts_for_step.extend(raw_dicts)
+                if raw_meta_dicts_for_query:
+                    current_step_raw_meta_results.extend(raw_meta_dicts_for_query)
+                else:
+                    logger.debug(f"No search results from web_search for query '{search_query}' in step '{step_name}'")
+            
+            # c. Scrape content for each unique link found in the step's search results
+            # Use a set to avoid scraping the same link multiple times if returned by different queries
+            unique_links_to_scrape_meta = {item['link']: item for item in current_step_raw_meta_results if item.get('link')}.values()
+            
+            scraped_content_count_for_step = 0
+            for meta_item_idx, meta_item in enumerate(unique_links_to_scrape_meta):
+                 # --- Cancellation Check (before each scrape) ---
+                if is_cancelled_callback():
+                    return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during step '{step_name}' before scraping '{meta_item.get('link')}'.]", is_cancel=True)
 
-                if not processed_content and not raw_dicts:
-                    logger.debug(
-                        f"No results from web_search for query '{search_query}' in step '{step_name}'"
-                    )
+                # The source_index for _scrape_and_process_url should be relative to the items being processed for this step
+                full_content_string = _scrape_and_process_url(
+                    meta_item,
+                    source_index=scraped_content_count_for_step, # Index for "Source N"
+                    is_cancelled_callback=is_cancelled_callback,
+                    socketio=socketio,
+                    sid=sid,
+                    app_context=app.app_context() # Pass the app context
+                )
+                if full_content_string:
+                    all_processed_content_for_step.append(full_content_string)
+                    scraped_content_count_for_step +=1
 
             collected_research[step_name] = all_processed_content_for_step
-            collected_raw_results[step_name] = all_raw_dicts_for_step
+            # collected_raw_results stores the initial search metadata (title, link, snippet)
+            # This can be useful for a "Works Cited" that lists initial hits, distinct from full scraped content.
+            collected_raw_results[step_name] = list(unique_links_to_scrape_meta) # Store the unique metadata items
             logger.info(
-                f"--- Finished Research Step: {step_name} - Collected {len(all_processed_content_for_step)} processed items, {len(all_raw_dicts_for_step)} raw items ---"
+                f"--- Finished Research Step: {step_name} - Collected {len(all_processed_content_for_step)} scraped/processed items from {len(unique_links_to_scrape_meta)} unique links ---"
             )
 
         except Exception as e:
@@ -941,31 +1069,53 @@ def perform_deep_research(
                     # collected_research/raw_results already initialized, just continue
                     continue
 
-                # b. Perform Web Search & Scrape Results for each query
-                for search_query in search_queries:
-                    # --- Cancellation Check (before each search) ---
+                # b. Perform Web Search for each query to get metadata
+                current_section_raw_meta_results = []
+                for search_query_idx, search_query in enumerate(search_queries):
+                    # --- Cancellation Check (before each web search) ---
                     if is_cancelled_callback():
-                        return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during additional research for '{section_name}' before searching '{search_query}'.]", is_cancel=True)
+                        return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during additional research for '{section_name}' before web search for '{search_query}'.]", is_cancel=True)
 
-                    processed_content, raw_dicts = web_search(search_query)
-                    if processed_content:
-                        processed_content_for_section.extend(processed_content)
-                    if raw_dicts:
-                        raw_dicts_for_section.extend(raw_dicts)
+                    emit_status(f"Add. Search: {search_query[:30]}... (Query {search_query_idx+1}/{len(search_queries)})")
+                    _, raw_meta_dicts_for_query = web_search(search_query)
 
-                    if not processed_content and not raw_dicts:
-                        logger.debug(
-                            f"No results from web_search for query '{search_query}' in new section '{section_name}'"
-                        )
+                    if raw_meta_dicts_for_query:
+                        current_section_raw_meta_results.extend(raw_meta_dicts_for_query)
+                    else:
+                        logger.debug(f"No search results from web_search for query '{search_query}' in new section '{section_name}'")
 
-                    # Append results to the existing lists for this section
-                    collected_research[section_name].extend(
-                        processed_content_for_section
+                # c. Scrape content for each unique link found
+                unique_links_to_scrape_meta_new_section = {item['link']: item for item in current_section_raw_meta_results if item.get('link')}.values()
+                
+                scraped_content_count_for_new_section = 0
+                for meta_item_idx, meta_item in enumerate(unique_links_to_scrape_meta_new_section):
+                    # --- Cancellation Check (before each scrape) ---
+                    if is_cancelled_callback():
+                        return emit_cancellation_or_error(f"[AI Info: Deep research cancelled during additional research for '{section_name}' before scraping '{meta_item.get('link')}'.]", is_cancel=True)
+                    
+                    full_content_string = _scrape_and_process_url(
+                        meta_item,
+                        source_index=scraped_content_count_for_new_section, # Index for "Source N"
+                        is_cancelled_callback=is_cancelled_callback,
+                        socketio=socketio,
+                        sid=sid,
+                        app_context=app.app_context() # Pass the app context
                     )
-                    collected_raw_results[section_name].extend(raw_dicts_for_section)
-                    logger.info(
-                        f"--- Finished Additional Research Step: {section_name} - Collected {len(processed_content_for_section)} processed, {len(raw_dicts_for_section)} raw items ---"
-                    )
+                    if full_content_string:
+                        # Ensure collected_research[section_name] is a list
+                        if section_name not in collected_research or not isinstance(collected_research[section_name], list):
+                            collected_research[section_name] = []
+                        collected_research[section_name].append(full_content_string)
+                        scraped_content_count_for_new_section +=1
+                
+                # Store the unique metadata items for this new section as well
+                if section_name not in collected_raw_results or not isinstance(collected_raw_results[section_name], list):
+                    collected_raw_results[section_name] = []
+                collected_raw_results[section_name].extend(list(unique_links_to_scrape_meta_new_section))
+
+                logger.info(
+                    f"--- Finished Additional Research Step: {section_name} - Collected {scraped_content_count_for_new_section} scraped/processed items from {len(unique_links_to_scrape_meta_new_section)} unique links ---"
+                )
 
             except Exception as e:
                 logger.error(
