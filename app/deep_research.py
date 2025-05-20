@@ -982,8 +982,8 @@ def perform_deep_research(
                 is_cancelled_callback,
                 socketio,
                 sid,
-                app.app_context(), # Pass the app context
-                cpu_executor # Pass the executor
+                app.app_context(), 
+                cpu_executor 
             )
             collected_research[step_name] = llm_summary_strings
             if step_pdf_futures_info:
@@ -1082,12 +1082,12 @@ def perform_deep_research(
             logger.debug(f"Description: {section_description}")
             try:
                 llm_summary_strings, step_pdf_futures_info = execute_research_step(
-                    section_description, # Renamed from step_description for clarity in this loop
+                    section_description, 
                     is_cancelled_callback,
                     socketio,
                     sid,
-                    app.app_context(), # Pass the app context
-                    cpu_executor # Pass the executor
+                    app.app_context(), 
+                    cpu_executor 
                 )
                 # Ensure collected_research[section_name] is a list and extend it
                 if section_name not in collected_research or not isinstance(collected_research[section_name], list):
@@ -1302,13 +1302,10 @@ def perform_deep_research(
                 f"Failed to save final deep research report to DB for chat {chat_id}: {db_err}",
                 exc_info=True,
             )
-        finally: # This finally corresponds to the try block starting after cpu_executor is created
+        except Exception as main_exc: # Catch any exceptions from the main research process
+            logger.error(f"Unhandled exception in perform_deep_research for SID {sid}: {main_exc}", exc_info=True)
+            emit_cancellation_or_error(f"[System Error: An unexpected error occurred in the research process: {type(main_exc).__name__}]", is_cancel=False)
+        finally: 
             logger.info(f"Deep research process for SID {sid} concluded within cpu_executor context.")
-    # cpu_executor is automatically shut down here by the 'with' statement.
-        finally:
-            # This finally block is for the `with app.app_context():`
-            # The cpu_executor is managed by its own `with` statement if created inside the main try.
-            # If cpu_executor was created outside the try/finally of the main research process,
-            # it would need shutdown here.
-            # However, with the current structure, it's managed by its `with` block.
-            logger.info(f"Deep research process for SID {sid} concluded.")
+    # cpu_executor is automatically shut down here by the 'with' statement that created it.
+    logger.info(f"Deep research process for SID {sid} fully concluded (after cpu_executor shutdown).")
