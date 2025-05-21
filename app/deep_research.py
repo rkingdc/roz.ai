@@ -964,10 +964,10 @@ def perform_deep_research(
             )
             emit_status(f"Generated {len(research_plan)} initial research steps.")
 
-        # 2. Prepare for Research Execution
-    collected_research: Dict[str, List[str]] = (
-        {}
-    )  # Stores lists of formatted research item strings per step name
+            # 2. Prepare for Research Execution
+            collected_research: Dict[str, List[str]] = (
+                {}
+            )  # Stores lists of formatted research item strings per step name
 
     # 3. Execute Initial Research Steps Sequentially
     logger.info(
