@@ -969,18 +969,18 @@ def perform_deep_research(
                 {}
             )  # Stores lists of formatted research item strings per step name
 
-    # 3. Execute Initial Research Steps Sequentially
-    logger.info(
-        f"--- Executing {len(research_plan)} Initial Research Steps Sequentially (SID: {sid}) ---"
-    )
-    emit_status("Performing initial research...")
-    step_counter = 0
-    for step_name, step_description in research_plan:
-        # --- Cancellation Check (before each step) ---
-        if is_cancelled_callback():
-            return emit_cancellation_or_error(f"[AI Info: Deep research cancelled before step '{step_name}'.]", is_cancel=True)
+            # 3. Execute Initial Research Steps Sequentially
+            logger.info(
+                f"--- Executing {len(research_plan)} Initial Research Steps Sequentially (SID: {sid}) ---"
+            )
+            emit_status("Performing initial research...")
+            step_counter = 0
+            for step_name, step_description in research_plan:
+                # --- Cancellation Check (before each step) ---
+                if is_cancelled_callback():
+                    return emit_cancellation_or_error(f"[AI Info: Deep research cancelled before step '{step_name}'.]", is_cancel=True)
 
-        step_counter += 1
+                step_counter += 1
                 emit_status(
                     f"Research Step {step_counter}/{len(research_plan)}: {step_name}..."
                 )
