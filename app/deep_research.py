@@ -953,16 +953,16 @@ def perform_deep_research(
                 return emit_cancellation_or_error("[AI Info: Deep research cancelled before starting.]", is_cancel=True)
 
             emit_status("Generating initial research plan...")
-        # 1. Generate Initial Research Plan
-        research_plan: List[Tuple[str, str]] = query_to_research_plan(query) # Needs app context, but not cancellation check
-        if not research_plan:
-            return emit_cancellation_or_error(
-                "[Error: Could not generate initial research plan.]", is_cancel=False
+            # 1. Generate Initial Research Plan
+            research_plan: List[Tuple[str, str]] = query_to_research_plan(query) # Needs app context, but not cancellation check
+            if not research_plan:
+                return emit_cancellation_or_error(
+                    "[Error: Could not generate initial research plan.]", is_cancel=False
+                )
+            logger.info(
+                f"Initial Research Plan (SID: {sid}):\n{json.dumps(research_plan, indent=2)}"
             )
-        logger.info(
-            f"Initial Research Plan (SID: {sid}):\n{json.dumps(research_plan, indent=2)}"
-        )
-        emit_status(f"Generated {len(research_plan)} initial research steps.")
+            emit_status(f"Generated {len(research_plan)} initial research steps.")
 
         # 2. Prepare for Research Execution
     collected_research: Dict[str, List[str]] = (
