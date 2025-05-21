@@ -57,6 +57,16 @@ def parse_llm_json_output(llm_output: str, expected_keys: List[str]) -> Any:
     try:
         # Clean up common issues before parsing
         json_string = json_string.strip()
+
+        # Add Markdown Fence Stripping
+        if json_string.startswith("```json"):
+            json_string = json_string[len("```json"):].strip()
+        elif json_string.startswith("```"): # Handle generic code blocks if ```json is not present
+            json_string = json_string[len("```"):].strip()
+        
+        if json_string.endswith("```"):
+            json_string = json_string[:-len("```")].strip()
+            
         # Remove trailing commas in objects or arrays (basic attempt)
         json_string = re.sub(r",\s*([}\]])", r"\1", json_string)
 
@@ -104,7 +114,7 @@ def parse_llm_json_output(llm_output: str, expected_keys: List[str]) -> Any:
             return parsed_output  # Return the parsed output as is
 
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse JSON output: {e}")
+        logger.error(f"Failed to parse JSON output. Error: {e}. Raw input: {json_string}", exc_info=True)
         return None
     except Exception as e:
         logger.error(
