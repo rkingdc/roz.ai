@@ -949,10 +949,10 @@ def perform_deep_research(
             # --- Start Actual Research Process ---
 
             # --- Cancellation Check ---
-        if is_cancelled_callback():
-            return emit_cancellation_or_error("[AI Info: Deep research cancelled before starting.]", is_cancel=True)
+            if is_cancelled_callback():
+                return emit_cancellation_or_error("[AI Info: Deep research cancelled before starting.]", is_cancel=True)
 
-        emit_status("Generating initial research plan...")
+            emit_status("Generating initial research plan...")
         # 1. Generate Initial Research Plan
         research_plan: List[Tuple[str, str]] = query_to_research_plan(query) # Needs app context, but not cancellation check
         if not research_plan:
