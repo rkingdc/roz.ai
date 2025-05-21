@@ -981,375 +981,375 @@ def perform_deep_research(
             return emit_cancellation_or_error(f"[AI Info: Deep research cancelled before step '{step_name}'.]", is_cancel=True)
 
         step_counter += 1
-        emit_status(
-            f"Research Step {step_counter}/{len(research_plan)}: {step_name}..."
-        )
-        logger.info(f"--- Starting Research Step: {step_name} (SID: {sid}) ---")
-        
-        try:
-            llm_summary_strings, step_pdf_futures_info = execute_research_step(
-                step_description,
-                is_cancelled_callback,
-                socketio,
-                sid,
-                app.app_context(), 
-                cpu_executor 
-            )
-            collected_research[step_name] = llm_summary_strings
-            if step_pdf_futures_info:
-                for pdf_info in step_pdf_futures_info:
-                    all_pending_pdf_details.append({**pdf_info, "step_name": step_name})
-                logger.info(f"Queued {len(step_pdf_futures_info)} PDFs for transcription from step '{step_name}'.")
-            
-            logger.info(
-                f"--- Finished Research Step: {step_name} - Collected {len(llm_summary_strings)} initial items (PDFs pending) ---"
-            )
-
-        except Exception as e:
-            logger.error(
-                f"Error executing research step '{step_name}' (SID: {sid}): {e}",
-                exc_info=True,
-            )
-            error_msg = f"[System Error: Failed during research step '{step_name}': {type(e).__name__}]"
-            collected_research[step_name] = [error_msg]
-
-    logger.info(
-        f"--- Finished Sequential Execution of Initial Research Steps (SID: {sid}) ---"
-    )
-    emit_status("Initial research complete. Refining report plan...")
-
-    # --- Cancellation Check ---
-    if is_cancelled_callback():
-        return emit_cancellation_or_error("[AI Info: Deep research cancelled before refining plan.]", is_cancel=True)
-
-    # Log collected research summary
-    for step, items in collected_research.items():
-        logger.debug(
-            f"Step '{step}': Collected {len(items)} research items."
-        )
-
-    # 4. Generate Updated Report Plan (Outline) based on initial findings
-    # Note: query_and_research_to_updated_plan expects Dict[str, List[str]]
-    # where the list contains strings (snippets/content). Our collected_research matches this.
-    updated_report_plan: List[Tuple[str, str]] = query_and_research_to_updated_plan(
-        query, collected_research
-    )
-    if not updated_report_plan:
-        # Handle case where updated plan generation fails
-        logger.error(
-            f"Failed to generate updated report plan (SID: {sid}). Aborting synthesis."
-        )
-        # Combine collected research into a basic error report
-        error_report_body = "\n\n".join(
-            [
-                f"## {step}\n\n" + "\n".join(content)
-                for step, content in collected_research.items()
-            ]
-        )
-        error_msg = f"# Deep Research Error\n\nFailed to generate the report outline after initial research.\n\n## Collected Research Snippets:\n\n{error_report_body}"
-        return emit_cancellation_or_error(error_msg, is_cancel=False)
-
-    logger.info(
-        f"Updated Report Plan (SID: {sid}):\n{json.dumps(updated_report_plan, indent=2)}"
-    )
-    emit_status(f"Refined report plan with {len(updated_report_plan)} sections.")
-
-    # 4.5 Perform additional research for *new* sections identified in the updated plan (Sequentially).
-    logger.info(
-        f"--- Checking for and executing additional research based on updated plan (Sequentially) (SID: {sid}) ---"
-    )
-    original_step_names = {name for name, desc in research_plan}
-    new_sections_to_research = []
-
-    # Identify sections needing research
-    for section_name, section_description in updated_report_plan:
-        if section_name not in original_step_names:
-            new_sections_to_research.append((section_name, section_description))
-            # Initialize result lists immediately to avoid key errors later
-            if section_name not in collected_research:
-                collected_research[section_name] = []
-            # collected_raw_results is removed
-        else:
-            logger.debug(
-                f"Section '{section_name}' was part of initial research, skipping additional search."
-            )
-
-        # Execute research for new sections sequentially
-    if new_sections_to_research:
-        step_counter = 0
-        for section_name, section_description in new_sections_to_research:
-            # --- Cancellation Check (before each additional step) ---
-            if is_cancelled_callback():
-                return emit_cancellation_or_error(f"[AI Info: Deep research cancelled before additional research for '{section_name}'.]", is_cancel=True)
-
-            step_counter += 1
-            emit_status(
-                f"Additional Research {step_counter}/{len(new_sections_to_research)}: {section_name}..."
-            )
-            logger.info(
-                f"--- Starting Additional Research Step: {section_name} (SID: {sid}) ---"
-            )
-            logger.debug(f"Description: {section_description}")
-            try:
-                llm_summary_strings, step_pdf_futures_info = execute_research_step(
-                    section_description, 
-                    is_cancelled_callback,
-                    socketio,
-                    sid,
-                    app.app_context(), 
-                    cpu_executor 
+                emit_status(
+                    f"Research Step {step_counter}/{len(research_plan)}: {step_name}..."
                 )
-                # Ensure collected_research[section_name] is a list and extend it
-                if section_name not in collected_research or not isinstance(collected_research[section_name], list):
-                    collected_research[section_name] = []
-                collected_research[section_name].extend(llm_summary_strings)
+                logger.info(f"--- Starting Research Step: {step_name} (SID: {sid}) ---")
                 
-                if step_pdf_futures_info:
-                    for pdf_info in step_pdf_futures_info:
-                        all_pending_pdf_details.append({**pdf_info, "step_name": section_name})
-                    logger.info(f"Queued {len(step_pdf_futures_info)} PDFs for transcription from additional research step '{section_name}'.")
+                try:
+                    llm_summary_strings, step_pdf_futures_info = execute_research_step(
+                        step_description,
+                        is_cancelled_callback,
+                        socketio,
+                        sid,
+                        app.app_context(), 
+                        cpu_executor 
+                    )
+                    collected_research[step_name] = llm_summary_strings
+                    if step_pdf_futures_info:
+                        for pdf_info in step_pdf_futures_info:
+                            all_pending_pdf_details.append({**pdf_info, "step_name": step_name})
+                        logger.info(f"Queued {len(step_pdf_futures_info)} PDFs for transcription from step '{step_name}'.")
+                    
+                    logger.info(
+                        f"--- Finished Research Step: {step_name} - Collected {len(llm_summary_strings)} initial items (PDFs pending) ---"
+                    )
 
-                logger.info(
-                    f"--- Finished Additional Research Step: {section_name} - Collected {len(llm_summary_strings)} initial items (PDFs pending) ---"
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error executing research step '{section_name}' (SID: {sid}): {e}",
-                    exc_info=True,
-                )
-                # If execute_research_step itself fails catastrophically
-                if section_name not in collected_research or not isinstance(collected_research[section_name], list):
-                    collected_research[section_name] = [] # Initialize if not already
-                collected_research[section_name].append(f"[System Error: Unhandled exception during research for '{section_name}': {type(e).__name__}]")
+                except Exception as e:
+                    logger.error(
+                        f"Error executing research step '{step_name}' (SID: {sid}): {e}",
+                        exc_info=True,
+                    )
+                    error_msg = f"[System Error: Failed during research step '{step_name}': {type(e).__name__}]"
+                    collected_research[step_name] = [error_msg]
 
-        logger.info(
-            f"--- Finished sequential execution of additional research for {len(new_sections_to_research)} section(s) (SID: {sid}) ---"
-        )
-        emit_status("Additional research complete.")
-    else:
-        logger.info(
-            f"--- No new sections required additional research (SID: {sid}) ---"
-        )
-        emit_status("No additional research needed.")
-
-    # Task 3: Process Pending PDF Transcriptions
-    if all_pending_pdf_details:
-        emit_status(f"Processing {len(all_pending_pdf_details)} pending PDF transcriptions...")
-        logger.info(f"Waiting for {len(all_pending_pdf_details)} PDF transcription tasks to complete...")
-        
-        for detail_idx, detail in enumerate(all_pending_pdf_details):
-            if is_cancelled_callback():
-                logger.info("PDF transcription processing cancelled.")
-                # Potentially mark remaining items as cancelled if needed, or just stop.
-                break 
-            
-            placeholder = detail['placeholder']
-            future = detail['future']
-            step_name_for_pdf = detail['step_name']
-            original_url = detail.get('original_url', 'N/A')
-            original_filename = detail.get('original_filename', 'N/A')
-
-            emit_status(f"Waiting for PDF transcription {detail_idx + 1}/{len(all_pending_pdf_details)}: {original_filename[:30]}...")
-            logger.info(f"Waiting for transcription: {placeholder} (URL: {original_url})")
-            
-            transcribed_text = f"[Error: PDF transcription result not processed for {placeholder}]" # Default
-            try:
-                # Wait for the transcription future to complete with a timeout
-                transcribed_text_result = future.result(timeout=PDF_TRANSCRIPTION_TIMEOUT)
-                if transcribed_text_result.startswith(("[Error", "[System Note")):
-                    logger.warning(f"Transcription for {placeholder} (URL: {original_url}) failed with note: {transcribed_text_result}")
-                    transcribed_text = f"[Transcription Error for {original_filename}: {transcribed_text_result}]"
-                else:
-                    transcribed_text = transcribed_text_result.strip()
-                    logger.info(f"Successfully transcribed {placeholder} (URL: {original_url}). Length: {len(transcribed_text)}")
-            except TimeoutError:
-                logger.error(f"PDF transcription timed out for {placeholder} (URL: {original_url}) after {PDF_TRANSCRIPTION_TIMEOUT}s.")
-                transcribed_text = f"[Error: PDF transcription timed out for {original_filename}]"
-            except Exception as e_trans:
-                logger.error(f"PDF transcription failed for {placeholder} (URL: {original_url}): {e_trans}", exc_info=True)
-                transcribed_text = f"[Error: PDF transcription failed for {original_filename} - {type(e_trans).__name__}]"
-
-            # Update the collected_research item containing the placeholder
-            if step_name_for_pdf in collected_research:
-                updated_items_for_step = []
-                found_placeholder = False
-                for item_string in collected_research[step_name_for_pdf]:
-                    if placeholder in item_string:
-                        # Replace the placeholder part. Assuming format "Content: PDF_CONTENT_PENDING_ID_xxx\n---"
-                        # This replacement needs to be robust.
-                        # A simple replace might be "Content: " + placeholder -> "Content: " + transcribed_text
-                        # Or more specifically: item_string.replace(placeholder, transcribed_text)
-                        # Let's assume the placeholder is unique enough.
-                        new_item_string = item_string.replace(placeholder, transcribed_text)
-                        if new_item_string == item_string: # If replace didn't happen (e.g. placeholder format mismatch)
-                            logger.warning(f"Placeholder '{placeholder}' not found as expected in research item for step '{step_name_for_pdf}'. Item: {item_string[:100]}")
-                            updated_items_for_step.append(item_string) # Keep original
-                        else:
-                            updated_items_for_step.append(new_item_string)
-                            found_placeholder = True
-                            logger.info(f"Updated item in step '{step_name_for_pdf}' with transcription for '{placeholder}'.")
-                    else:
-                        updated_items_for_step.append(item_string)
-                if not found_placeholder:
-                     logger.warning(f"Could not find placeholder '{placeholder}' in any research items for step '{step_name_for_pdf}'. Transcription for {original_url} might be lost.")
-                collected_research[step_name_for_pdf] = updated_items_for_step
-            else:
-                logger.warning(f"Step name '{step_name_for_pdf}' for PDF placeholder '{placeholder}' not found in collected_research.")
-        
-        emit_status("PDF transcription processing complete.")
-        logger.info("Finished processing all PDF transcription tasks.")
-
-    # 5. Synthesize Report Sections based on the *updated* plan (Task 4: Parallelize)
-    logger.info(
-        f"--- Synthesizing {len(updated_report_plan)} Report Sections in Parallel (SID: {sid}) ---"
-    )
-    emit_status("Synthesizing report sections in parallel...")
-    
-    # Use a ThreadPoolExecutor for I/O-bound LLM calls for synthesis
-    # Can reuse cpu_executor if it were a ThreadPoolExecutor and suitable, 
-    # but synthesis is I/O bound (network to LLM), so ThreadPool is fine.
-    # Let's create a new one for clarity or use the one from Task 2 if it was made class/module level.
-    # For now, creating a new one here.
-    # Max workers for synthesis - can be fewer than PDF processing if LLM API has rate limits.
-    num_synthesis_workers = min(len(updated_report_plan), 5) # e.g., up to 5 concurrent synthesis calls
-    
-    synthesis_futures_map = {} # To map futures back to section_name
-    # This will store tuples: (section_name, future) to preserve order if needed, or just futures.
-    # Let's store results in a dictionary keyed by section_name for easier assembly.
-    
-    temp_report_sections_results: Dict[str, str] = {}
-    temp_report_references_results: Dict[str, List[str]] = {}
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_synthesis_workers) as synthesis_executor:
-        for i, (section_name, section_description) in enumerate(updated_report_plan):
-            if is_cancelled_callback():
-                logger.info("Synthesis cancelled before submitting all sections.")
-                # Mark remaining sections as not synthesized or handle as needed
-                for j in range(i, len(updated_report_plan)):
-                    sn, _ = updated_report_plan[j]
-                    temp_report_sections_results[sn] = f"## {sn}\n\n[Synthesis cancelled by user.]\n"
-                    temp_report_references_results[sn + "_references"] = []
-                break # Break from submitting new tasks
-
-            emit_status(
-                f"Submitting synthesis for Section {i+1}/{len(updated_report_plan)}: {section_name}..."
-            )
-            items_for_synthesis = []
-            if section_name in collected_research and collected_research[section_name]:
-                for item_idx, item_content in enumerate(collected_research[section_name]):
-                    items_for_synthesis.append(f"Source {item_idx+1}:\n{item_content}")
-            else:
-                items_for_synthesis.append("[No research material found for this section.]")
-            
-            future = synthesis_executor.submit(
-                synthesize_research_into_report_section,
-                section_name,
-                section_description,
-                items_for_synthesis,
-            )
-            synthesis_futures_map[future] = section_name
-        
-        logger.info(f"Submitted {len(synthesis_futures_map)} sections for synthesis.")
-        emit_status(f"Waiting for {len(synthesis_futures_map)} sections to synthesize...")
-
-        for future in concurrent.futures.as_completed(synthesis_futures_map):
-            section_name_completed = synthesis_futures_map[future]
-            if is_cancelled_callback():
-                logger.info(f"Synthesis processing cancelled while waiting for section '{section_name_completed}'.")
-                # Mark this specific one as cancelled if it wasn't already processed
-                if section_name_completed not in temp_report_sections_results:
-                    temp_report_sections_results[section_name_completed] = f"## {section_name_completed}\n\n[Synthesis cancelled by user.]\n"
-                    temp_report_references_results[section_name_completed + "_references"] = []
-                continue # Don't process more futures if cancelled
-
-            try:
-                section_text, section_refs = future.result(timeout=300) # 5 min timeout per section synthesis
-                temp_report_sections_results[section_name_completed] = section_text
-                temp_report_references_results[section_name_completed + "_references"] = section_refs
-                logger.info(
-                    f"--- Finished Section Synthesis (parallel): {section_name_completed} (Length: {len(section_text)}, Refs: {len(section_refs)}) ---"
-                )
-            except TimeoutError:
-                logger.error(f"Synthesis for section '{section_name_completed}' timed out.")
-                error_msg = f"## {section_name_completed}\n\n[System Error: Synthesis timed out for this section.]\n"
-                temp_report_sections_results[section_name_completed] = error_msg
-                temp_report_references_results[section_name_completed + "_references"] = []
-            except Exception as e_synth:
-                logger.error(
-                    f"Error during parallel synthesis step for section '{section_name_completed}': {e_synth}",
-                    exc_info=True,
-                )
-                error_msg = f"## {section_name_completed}\n\n[System Error: Failed during synthesis for section '{section_name_completed}': {type(e_synth).__name__}]\n"
-                temp_report_sections_results[section_name_completed] = error_msg
-                temp_report_references_results[section_name_completed + "_references"] = []
-    
-    # Populate the main results dictionaries in the correct order
-    report_sections_results: Dict[str, str] = {name: temp_report_sections_results.get(name, f"## {name}\n\n[Error: Section not processed.]\n") for name, _ in updated_report_plan}
-    report_references_results: Dict[str, List[str]] = {name + "_references": temp_report_references_results.get(name + "_references", []) for name, _ in updated_report_plan}
-
-
-    logger.info(
-        f"--- Finished Parallel Execution of Section Synthesis (SID: {sid}) ---"
-    )
-    emit_status("Section synthesis complete. Assembling final report...")
-
-    # --- Cancellation Check ---
-    if is_cancelled_callback():
-        return emit_cancellation_or_error("[AI Info: Deep research cancelled before final assembly.]", is_cancel=True)
-
-    # Ensure sections are assembled in the order defined by updated_report_plan
-    ordered_section_texts = [
-        report_sections_results.get(
-            name, f"## {name}\n\n[Error: Section not generated.]\n"
-        )
-        for name, desc in updated_report_plan
-    ]
-    full_report_body = "\n\n".join(ordered_section_texts)
-
-    # 6. Assemble Final Report Components
-    # full_report_body is now assembled above
-    executive_summary = create_exec_summary(full_report_body)
-    next_steps = create_next_steps(full_report_body)
-
-
-    # 7. Generate Final Report using LLM for formatting and citation linking
-    emit_status("Formatting final report...")
-    final_report_output = final_report(
-        executive_summary, full_report_body, next_steps, 
-    )
-
-    # Check if final formatting failed (returned fallback content)
-    if "[Error:" in final_report_output and "Failed to generate" in final_report_output:
-        logger.error(
-            f"Final report formatting failed for SID {sid}. Using concatenated content."
-        )
-        # Use the concatenated version as the final content
-        final_report_content = f"{executive_summary}\n\n---\n\n{full_report_body}\n\n---\n\n{next_steps}\n\n---".strip()
-        emit_status("Final formatting failed, using raw assembly.")
-    else:
-        final_report_content = (
-            final_report_output  # Store the successfully formatted report
-        )
-        emit_status("Final report formatting complete.")
-
-    # --- Emit Final Result ---
-    logger.info(f"--- Deep Research Complete for Query: '{query}' (SID: {sid}) ---")
-    socketio.emit("deep_research_result", {"report": final_report_content}, room=sid)
-
-    # --- Save Final Result to DB ---
-    if chat_id is not None:
-        try:
             logger.info(
-                f"Attempting to save final deep research report for chat {chat_id}."
+                f"--- Finished Sequential Execution of Initial Research Steps (SID: {sid}) ---"
             )
-            from . import database as db  # Local import
+            emit_status("Initial research complete. Refining report plan...")
 
-            db.add_message_to_db(chat_id, "assistant", final_report_content)
-        except Exception as db_err:
-            logger.error(
-                f"Failed to save final deep research report to DB for chat {chat_id}: {db_err}",
-                exc_info=True,
+            # --- Cancellation Check ---
+            if is_cancelled_callback():
+                return emit_cancellation_or_error("[AI Info: Deep research cancelled before refining plan.]", is_cancel=True)
+
+            # Log collected research summary
+            for step, items in collected_research.items():
+                logger.debug(
+                    f"Step '{step}': Collected {len(items)} research items."
+                )
+
+            # 4. Generate Updated Report Plan (Outline) based on initial findings
+            # Note: query_and_research_to_updated_plan expects Dict[str, List[str]]
+            # where the list contains strings (snippets/content). Our collected_research matches this.
+            updated_report_plan: List[Tuple[str, str]] = query_and_research_to_updated_plan(
+                query, collected_research
             )
+            if not updated_report_plan:
+                # Handle case where updated plan generation fails
+                logger.error(
+                    f"Failed to generate updated report plan (SID: {sid}). Aborting synthesis."
+                )
+                # Combine collected research into a basic error report
+                error_report_body = "\n\n".join(
+                    [
+                        f"## {step}\n\n" + "\n".join(content)
+                        for step, content in collected_research.items()
+                    ]
+                )
+                error_msg = f"# Deep Research Error\n\nFailed to generate the report outline after initial research.\n\n## Collected Research Snippets:\n\n{error_report_body}"
+                return emit_cancellation_or_error(error_msg, is_cancel=False)
+
+            logger.info(
+                f"Updated Report Plan (SID: {sid}):\n{json.dumps(updated_report_plan, indent=2)}"
+            )
+            emit_status(f"Refined report plan with {len(updated_report_plan)} sections.")
+
+            # 4.5 Perform additional research for *new* sections identified in the updated plan (Sequentially).
+            logger.info(
+                f"--- Checking for and executing additional research based on updated plan (Sequentially) (SID: {sid}) ---"
+            )
+            original_step_names = {name for name, desc in research_plan}
+            new_sections_to_research = []
+
+            # Identify sections needing research
+            for section_name, section_description in updated_report_plan:
+                if section_name not in original_step_names:
+                    new_sections_to_research.append((section_name, section_description))
+                    # Initialize result lists immediately to avoid key errors later
+                    if section_name not in collected_research:
+                        collected_research[section_name] = []
+                    # collected_raw_results is removed
+                else:
+                    logger.debug(
+                        f"Section '{section_name}' was part of initial research, skipping additional search."
+                    )
+
+            # Execute research for new sections sequentially
+            if new_sections_to_research:
+                step_counter = 0
+                for section_name, section_description in new_sections_to_research:
+                    # --- Cancellation Check (before each additional step) ---
+                    if is_cancelled_callback():
+                        return emit_cancellation_or_error(f"[AI Info: Deep research cancelled before additional research for '{section_name}'.]", is_cancel=True)
+
+                    step_counter += 1
+                    emit_status(
+                        f"Additional Research {step_counter}/{len(new_sections_to_research)}: {section_name}..."
+                    )
+                    logger.info(
+                        f"--- Starting Additional Research Step: {section_name} (SID: {sid}) ---"
+                    )
+                    logger.debug(f"Description: {section_description}")
+                    try:
+                        llm_summary_strings, step_pdf_futures_info = execute_research_step(
+                            section_description, 
+                            is_cancelled_callback,
+                            socketio,
+                            sid,
+                            app.app_context(), 
+                            cpu_executor 
+                        )
+                        # Ensure collected_research[section_name] is a list and extend it
+                        if section_name not in collected_research or not isinstance(collected_research[section_name], list):
+                            collected_research[section_name] = []
+                        collected_research[section_name].extend(llm_summary_strings)
+                        
+                        if step_pdf_futures_info:
+                            for pdf_info in step_pdf_futures_info:
+                                all_pending_pdf_details.append({**pdf_info, "step_name": section_name})
+                            logger.info(f"Queued {len(step_pdf_futures_info)} PDFs for transcription from additional research step '{section_name}'.")
+
+                        logger.info(
+                            f"--- Finished Additional Research Step: {section_name} - Collected {len(llm_summary_strings)} initial items (PDFs pending) ---"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Error executing research step '{section_name}' (SID: {sid}): {e}",
+                            exc_info=True,
+                        )
+                        # If execute_research_step itself fails catastrophically
+                        if section_name not in collected_research or not isinstance(collected_research[section_name], list):
+                            collected_research[section_name] = [] # Initialize if not already
+                        collected_research[section_name].append(f"[System Error: Unhandled exception during research for '{section_name}': {type(e).__name__}]")
+
+                logger.info(
+                    f"--- Finished sequential execution of additional research for {len(new_sections_to_research)} section(s) (SID: {sid}) ---"
+                )
+                emit_status("Additional research complete.")
+            else:
+                logger.info(
+                    f"--- No new sections required additional research (SID: {sid}) ---"
+                )
+                emit_status("No additional research needed.")
+
+            # Task 3: Process Pending PDF Transcriptions
+            if all_pending_pdf_details:
+                emit_status(f"Processing {len(all_pending_pdf_details)} pending PDF transcriptions...")
+                logger.info(f"Waiting for {len(all_pending_pdf_details)} PDF transcription tasks to complete...")
+                
+                for detail_idx, detail in enumerate(all_pending_pdf_details):
+                    if is_cancelled_callback():
+                        logger.info("PDF transcription processing cancelled.")
+                        # Potentially mark remaining items as cancelled if needed, or just stop.
+                        break 
+                    
+                    placeholder = detail['placeholder']
+                    future = detail['future']
+                    step_name_for_pdf = detail['step_name']
+                    original_url = detail.get('original_url', 'N/A')
+                    original_filename = detail.get('original_filename', 'N/A')
+
+                    emit_status(f"Waiting for PDF transcription {detail_idx + 1}/{len(all_pending_pdf_details)}: {original_filename[:30]}...")
+                    logger.info(f"Waiting for transcription: {placeholder} (URL: {original_url})")
+                    
+                    transcribed_text = f"[Error: PDF transcription result not processed for {placeholder}]" # Default
+                    try:
+                        # Wait for the transcription future to complete with a timeout
+                        transcribed_text_result = future.result(timeout=PDF_TRANSCRIPTION_TIMEOUT)
+                        if transcribed_text_result.startswith(("[Error", "[System Note")):
+                            logger.warning(f"Transcription for {placeholder} (URL: {original_url}) failed with note: {transcribed_text_result}")
+                            transcribed_text = f"[Transcription Error for {original_filename}: {transcribed_text_result}]"
+                        else:
+                            transcribed_text = transcribed_text_result.strip()
+                            logger.info(f"Successfully transcribed {placeholder} (URL: {original_url}). Length: {len(transcribed_text)}")
+                    except TimeoutError:
+                        logger.error(f"PDF transcription timed out for {placeholder} (URL: {original_url}) after {PDF_TRANSCRIPTION_TIMEOUT}s.")
+                        transcribed_text = f"[Error: PDF transcription timed out for {original_filename}]"
+                    except Exception as e_trans:
+                        logger.error(f"PDF transcription failed for {placeholder} (URL: {original_url}): {e_trans}", exc_info=True)
+                        transcribed_text = f"[Error: PDF transcription failed for {original_filename} - {type(e_trans).__name__}]"
+
+                    # Update the collected_research item containing the placeholder
+                    if step_name_for_pdf in collected_research:
+                        updated_items_for_step = []
+                        found_placeholder = False
+                        for item_string in collected_research[step_name_for_pdf]:
+                            if placeholder in item_string:
+                                # Replace the placeholder part. Assuming format "Content: PDF_CONTENT_PENDING_ID_xxx\n---"
+                                # This replacement needs to be robust.
+                                # A simple replace might be "Content: " + placeholder -> "Content: " + transcribed_text
+                                # Or more specifically: item_string.replace(placeholder, transcribed_text)
+                                # Let's assume the placeholder is unique enough.
+                                new_item_string = item_string.replace(placeholder, transcribed_text)
+                                if new_item_string == item_string: # If replace didn't happen (e.g. placeholder format mismatch)
+                                    logger.warning(f"Placeholder '{placeholder}' not found as expected in research item for step '{step_name_for_pdf}'. Item: {item_string[:100]}")
+                                    updated_items_for_step.append(item_string) # Keep original
+                                else:
+                                    updated_items_for_step.append(new_item_string)
+                                    found_placeholder = True
+                                    logger.info(f"Updated item in step '{step_name_for_pdf}' with transcription for '{placeholder}'.")
+                            else:
+                                updated_items_for_step.append(item_string)
+                        if not found_placeholder:
+                             logger.warning(f"Could not find placeholder '{placeholder}' in any research items for step '{step_name_for_pdf}'. Transcription for {original_url} might be lost.")
+                        collected_research[step_name_for_pdf] = updated_items_for_step
+                    else:
+                        logger.warning(f"Step name '{step_name_for_pdf}' for PDF placeholder '{placeholder}' not found in collected_research.")
+                
+                emit_status("PDF transcription processing complete.")
+                logger.info("Finished processing all PDF transcription tasks.")
+
+            # 5. Synthesize Report Sections based on the *updated* plan (Task 4: Parallelize)
+            logger.info(
+                f"--- Synthesizing {len(updated_report_plan)} Report Sections in Parallel (SID: {sid}) ---"
+            )
+            emit_status("Synthesizing report sections in parallel...")
+            
+            # Use a ThreadPoolExecutor for I/O-bound LLM calls for synthesis
+            # Can reuse cpu_executor if it were a ThreadPoolExecutor and suitable, 
+            # but synthesis is I/O bound (network to LLM), so ThreadPool is fine.
+            # Let's create a new one for clarity or use the one from Task 2 if it was made class/module level.
+            # For now, creating a new one here.
+            # Max workers for synthesis - can be fewer than PDF processing if LLM API has rate limits.
+            num_synthesis_workers = min(len(updated_report_plan), 5) # e.g., up to 5 concurrent synthesis calls
+            
+            synthesis_futures_map = {} # To map futures back to section_name
+            # This will store tuples: (section_name, future) to preserve order if needed, or just futures.
+            # Let's store results in a dictionary keyed by section_name for easier assembly.
+            
+            temp_report_sections_results: Dict[str, str] = {}
+            temp_report_references_results: Dict[str, List[str]] = {}
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_synthesis_workers) as synthesis_executor:
+                for i, (section_name, section_description) in enumerate(updated_report_plan):
+                    if is_cancelled_callback():
+                        logger.info("Synthesis cancelled before submitting all sections.")
+                        # Mark remaining sections as not synthesized or handle as needed
+                        for j in range(i, len(updated_report_plan)):
+                            sn, _ = updated_report_plan[j]
+                            temp_report_sections_results[sn] = f"## {sn}\n\n[Synthesis cancelled by user.]\n"
+                            temp_report_references_results[sn + "_references"] = []
+                        break # Break from submitting new tasks
+
+                    emit_status(
+                        f"Submitting synthesis for Section {i+1}/{len(updated_report_plan)}: {section_name}..."
+                    )
+                    items_for_synthesis = []
+                    if section_name in collected_research and collected_research[section_name]:
+                        for item_idx, item_content in enumerate(collected_research[section_name]):
+                            items_for_synthesis.append(f"Source {item_idx+1}:\n{item_content}")
+                    else:
+                        items_for_synthesis.append("[No research material found for this section.]")
+                    
+                    future = synthesis_executor.submit(
+                        synthesize_research_into_report_section,
+                        section_name,
+                        section_description,
+                        items_for_synthesis,
+                    )
+                    synthesis_futures_map[future] = section_name
+                
+                logger.info(f"Submitted {len(synthesis_futures_map)} sections for synthesis.")
+                emit_status(f"Waiting for {len(synthesis_futures_map)} sections to synthesize...")
+
+                for future in concurrent.futures.as_completed(synthesis_futures_map):
+                    section_name_completed = synthesis_futures_map[future]
+                    if is_cancelled_callback():
+                        logger.info(f"Synthesis processing cancelled while waiting for section '{section_name_completed}'.")
+                        # Mark this specific one as cancelled if it wasn't already processed
+                        if section_name_completed not in temp_report_sections_results:
+                            temp_report_sections_results[section_name_completed] = f"## {section_name_completed}\n\n[Synthesis cancelled by user.]\n"
+                            temp_report_references_results[section_name_completed + "_references"] = []
+                        continue # Don't process more futures if cancelled
+
+                    try:
+                        section_text, section_refs = future.result(timeout=300) # 5 min timeout per section synthesis
+                        temp_report_sections_results[section_name_completed] = section_text
+                        temp_report_references_results[section_name_completed + "_references"] = section_refs
+                        logger.info(
+                            f"--- Finished Section Synthesis (parallel): {section_name_completed} (Length: {len(section_text)}, Refs: {len(section_refs)}) ---"
+                        )
+                    except TimeoutError:
+                        logger.error(f"Synthesis for section '{section_name_completed}' timed out.")
+                        error_msg = f"## {section_name_completed}\n\n[System Error: Synthesis timed out for this section.]\n"
+                        temp_report_sections_results[section_name_completed] = error_msg
+                        temp_report_references_results[section_name_completed + "_references"] = []
+                    except Exception as e_synth:
+                        logger.error(
+                            f"Error during parallel synthesis step for section '{section_name_completed}': {e_synth}",
+                            exc_info=True,
+                        )
+                        error_msg = f"## {section_name_completed}\n\n[System Error: Failed during synthesis for section '{section_name_completed}': {type(e_synth).__name__}]\n"
+                        temp_report_sections_results[section_name_completed] = error_msg
+                        temp_report_references_results[section_name_completed + "_references"] = []
+            
+            # Populate the main results dictionaries in the correct order
+            report_sections_results: Dict[str, str] = {name: temp_report_sections_results.get(name, f"## {name}\n\n[Error: Section not processed.]\n") for name, _ in updated_report_plan}
+            report_references_results: Dict[str, List[str]] = {name + "_references": temp_report_references_results.get(name + "_references", []) for name, _ in updated_report_plan}
+
+
+            logger.info(
+                f"--- Finished Parallel Execution of Section Synthesis (SID: {sid}) ---"
+            )
+            emit_status("Section synthesis complete. Assembling final report...")
+
+            # --- Cancellation Check ---
+            if is_cancelled_callback():
+                return emit_cancellation_or_error("[AI Info: Deep research cancelled before final assembly.]", is_cancel=True)
+
+            # Ensure sections are assembled in the order defined by updated_report_plan
+            ordered_section_texts = [
+                report_sections_results.get(
+                    name, f"## {name}\n\n[Error: Section not generated.]\n"
+                )
+                for name, desc in updated_report_plan
+            ]
+            full_report_body = "\n\n".join(ordered_section_texts)
+
+            # 6. Assemble Final Report Components
+            # full_report_body is now assembled above
+            executive_summary = create_exec_summary(full_report_body)
+            next_steps = create_next_steps(full_report_body)
+
+
+            # 7. Generate Final Report using LLM for formatting and citation linking
+            emit_status("Formatting final report...")
+            final_report_output = final_report(
+                executive_summary, full_report_body, next_steps, 
+            )
+
+            # Check if final formatting failed (returned fallback content)
+            if "[Error:" in final_report_output and "Failed to generate" in final_report_output:
+                logger.error(
+                    f"Final report formatting failed for SID {sid}. Using concatenated content."
+                )
+                # Use the concatenated version as the final content
+                final_report_content = f"{executive_summary}\n\n---\n\n{full_report_body}\n\n---\n\n{next_steps}\n\n---".strip()
+                emit_status("Final formatting failed, using raw assembly.")
+            else:
+                final_report_content = (
+                    final_report_output  # Store the successfully formatted report
+                )
+                emit_status("Final report formatting complete.")
+
+            # --- Emit Final Result ---
+            logger.info(f"--- Deep Research Complete for Query: '{query}' (SID: {sid}) ---")
+            socketio.emit("deep_research_result", {"report": final_report_content}, room=sid)
+
+            # --- Save Final Result to DB ---
+            if chat_id is not None:
+                try:
+                    logger.info(
+                        f"Attempting to save final deep research report for chat {chat_id}."
+                    )
+                    from . import database as db  # Local import
+
+                    db.add_message_to_db(chat_id, "assistant", final_report_content)
+                except Exception as db_err:
+                    logger.error(
+                        f"Failed to save final deep research report to DB for chat {chat_id}: {db_err}",
+                        exc_info=True,
+                    )
         except Exception as main_exc: # Catch any exceptions from the main research process
             logger.error(f"Unhandled exception in perform_deep_research for SID {sid}: {main_exc}", exc_info=True)
             emit_cancellation_or_error(f"[System Error: An unexpected error occurred in the research process: {type(main_exc).__name__}]", is_cancel=False)
