@@ -553,8 +553,8 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
                             
                                 if result.get("status") == "error":
                                     tool_error = f"[Browser Task Error: {result.get('message', 'Unknown error')}]"
-                            else:
-                                tool_response_data = {"summary": result.get("outcome", "Task completed.")}
+                                else:
+                                    tool_response_data = {"summary": result.get("outcome", "Task completed.")}
                         except Exception as e:
                             logger.error(
                                 f"Error executing 'perform_browser_task' (stream): {e}",
