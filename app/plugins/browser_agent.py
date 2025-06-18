@@ -21,8 +21,8 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
         # Configure browser session for Firefox
         browser_profile = BrowserProfile(
             browser="firefox", # Explicitly set firefox
-            playwright_browser_type="firefox", # Try to force firefox via playwright_browser_type
-            user_data_dir=None # Use a temporary profile to avoid conflicts and ensure clean state
+            user_data_dir=None, # Use a temporary profile to avoid conflicts and ensure clean state
+            playwright_launch_options={"headless": False} # Make browser visible
         )
         browser_session = BrowserSession(browser_profile=browser_profile)
 
