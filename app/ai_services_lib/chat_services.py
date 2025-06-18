@@ -27,6 +27,7 @@ from werkzeug.utils import secure_filename
 
 from .. import database
 from ..plugins.web_search import perform_web_search, fetch_web_content
+from ..plugins.browser_agent import run_browser_task # Added import
 from .summary_services import get_or_generate_summary
 from .tool_definitions import WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL, BROWSER_USE_TOOL
 from .transcription_services import transcribe_pdf_bytes
@@ -535,10 +536,8 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
                                 },
                                 room=sid,
                             )
-                            # TODO: Implement the actual browser task execution in a new plugin file
-                            # For now, simulate a successful execution.
-                            # result = app.plugins.browser_agent.run_browser_task(task_instruction)
-                            result = {"status": "success", "outcome": f"Simulated completion of: {task_instruction}"}
+                            # Call the actual browser task execution function
+                            result = run_browser_task(task_instruction)
                             
                             if result.get("status") == "error":
                                 tool_error = f"[Browser Task Error: {result.get('message', 'Unknown error')}]"
