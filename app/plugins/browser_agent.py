@@ -21,8 +21,7 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
         # Configure browser session for Firefox
         browser_profile = BrowserProfile(
             browser="firefox", # Explicitly set firefox
-            # user_data_dir can be set if persistent profiles are needed, e.g.,
-            # user_data_dir='~/.config/browseruse/profiles/firefox_assistant' 
+            user_data_dir=None # Use a temporary profile to avoid conflicts and ensure clean state
         )
         browser_session = BrowserSession(browser_profile=browser_profile)
 
