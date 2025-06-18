@@ -3,6 +3,7 @@ import logging
 import os
 
 from browser_use import Agent
+from browser_use.browser import BrowserProfile, BrowserSession # Added imports
 # from langchain_openai import ChatOpenAI  # browser-use examples use this LLM
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import SecretStr
@@ -17,11 +18,18 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
     """
     try:
         # The user should have run `playwright install firefox --with-deps`
-        # The browser_config parameter explicitly tells browser-use to use Firefox.
+        # Configure browser session for Firefox
+        browser_profile = BrowserProfile(
+            browser="firefox", # Explicitly set firefox
+            # user_data_dir can be set if persistent profiles are needed, e.g.,
+            # user_data_dir='~/.config/browseruse/profiles/firefox_assistant' 
+        )
+        browser_session = BrowserSession(browser_profile=browser_profile)
+
         agent = Agent(
             task=task_instruction,
             llm=llm,
-            browser_config={"type": "firefox"} 
+            browser_session=browser_session # Use browser_session instead of browser_config
         )
         logger.info(f"Running browser-use agent with Firefox for task: \"{task_instruction}\"")
         await agent.run()
