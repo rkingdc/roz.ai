@@ -20,35 +20,15 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
     Ensures Playwright is set up for Firefox.
     """
     try:
-        # The user should have run `playwright install firefox --with-deps`
-        # Configure browser session for Firefox
-        # User may need to change this path if Firefox is installed elsewhere
-        firefox_executable_path = "/usr/bin/firefox" 
-        if not os.path.exists(firefox_executable_path):
-            # Fallback for snap installs or other common locations - user should verify
-            alt_paths = ["/snap/bin/firefox", "/opt/firefox/firefox"]
-            for path in alt_paths:
-                if os.path.exists(path):
-                    firefox_executable_path = path
-                    break
-            else: # If no path found, log a warning but proceed (Playwright might find it)
-                logger.warning(
-                    f"Firefox executable not found at typical paths including {firefox_executable_path}. "
-                    "Playwright will attempt to find it. Ensure Firefox is installed and in PATH."
-                )
-                # Set to None if not found, Playwright will use its default search for 'firefox'
-                firefox_executable_path = None
-
-
+        # The user should have run `playwright install chromium --with-deps`
+        # Configure browser session for Chromium
         browser_profile = BrowserProfile(
-            browser="firefox",  # Explicitly set firefox
-            executable_path=firefox_executable_path, # Point to specific Firefox executable
-            headless=False, # Make browser visible (set directly in profile)
-            user_data_dir=None,  # Use a temporary profile to avoid conflicts and ensure clean state
+            browser="chromium",  # Explicitly set chromium
+            executable_path=None, # Let Playwright find the default Chromium
+            headless=False, # Make browser visible
+            user_data_dir=None,  # Use a temporary profile
             playwright_launch_options={
-                # headless is set in BrowserProfile directly.
-                # No specific args needed for Firefox at this moment,
-                # removing --no-sandbox as it's Chromium-specific.
+                "args": ["--no-sandbox"] # Often needed for Chromium on Linux
             },
         )
         browser_session = BrowserSession(browser_profile=browser_profile)
@@ -60,7 +40,7 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
             enable_memory=False,
         )
         logger.info(
-            f'Running browser-use agent with Firefox for task: "{task_instruction}"'
+            f'Running browser-use agent with Chromium for task: "{task_instruction}"'
         )
         await agent.run()
 
