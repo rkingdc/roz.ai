@@ -3,13 +3,16 @@ import logging
 import os
 
 from browser_use import Agent
-from browser_use.browser import BrowserProfile, BrowserSession # Added imports
+from browser_use.browser import BrowserProfile, BrowserSession  # Added imports
+
 # from langchain_openai import ChatOpenAI  # browser-use examples use this LLM
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import SecretStr
+
 # from dotenv import load_dotenv # No longer loading .env directly here
 
 logger = logging.getLogger(__name__)
+
 
 async def _run_agent_async(task_instruction: str, llm) -> dict:
     """
@@ -20,25 +23,29 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
         # The user should have run `playwright install firefox --with-deps`
         # Configure browser session for Firefox
         browser_profile = BrowserProfile(
-            browser="firefox", # Explicitly set firefox
-            playwright_browser_type="firefox", # Also set playwright_browser_type
-            user_data_dir=None, # Use a temporary profile to avoid conflicts and ensure clean state
+            browser="firefox",  # Explicitly set firefox
+            playwright_browser_type="firefox",  # Also set playwright_browser_type
+            user_data_dir=None,  # Use a temporary profile to avoid conflicts and ensure clean state
             playwright_launch_options={
-                "headless": False, # Make browser visible
-                "args": ["--no-sandbox"] # Add no-sandbox argument for Chromium if it's launched
-            }
+                "headless": False,  # Make browser visible
+                "args": [
+                    "--no-sandbox"
+                ],  # Add no-sandbox argument for Chromium if it's launched
+            },
         )
         browser_session = BrowserSession(browser_profile=browser_profile)
 
         agent = Agent(
             task=task_instruction,
             llm=llm,
-            browser_session=browser_session, # Use browser_session instead of browser_config
-            enable_memory=False # Disable memory to suppress warning
+            browser_session=browser_session,  # Use browser_session instead of browser_config
+            enable_memory=False,
         )
-        logger.info(f"Running browser-use agent with Firefox for task: \"{task_instruction}\"")
+        logger.info(
+            f'Running browser-use agent with Firefox for task: "{task_instruction}"'
+        )
         await agent.run()
-        
+
         # For browser-use 0.2.7, the agent.run() method completes the task.
         # The 'messages' attribute might not exist or be populated in the way expected.
         # We'll assume success if no exception is raised by agent.run().
@@ -50,10 +57,16 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
     except Exception as e:
         logger.error(f"Error during browser-use agent execution: {e}", exc_info=True)
         # Check if the exception itself has a 'message' attribute, common in some error objects
-        error_message = getattr(e, 'message', str(e))
-        return {"status": "error", "message": f"Agent execution failed: {error_message}"}
+        error_message = getattr(e, "message", str(e))
+        return {
+            "status": "error",
+            "message": f"Agent execution failed: {error_message}",
+        }
 
-def run_browser_task(task_instruction: str, google_api_key: str, model_name: str) -> dict:
+
+def run_browser_task(
+    task_instruction: str, google_api_key: str, model_name: str
+) -> dict:
     """
     Performs a browser-based task using the browser-use agent with Playwright and Firefox.
 
@@ -67,21 +80,37 @@ def run_browser_task(task_instruction: str, google_api_key: str, model_name: str
         e.g., {"status": "success", "outcome": "Task completed successfully."}
               {"status": "error", "message": "Error details."}
     """
-    logger.info(f"Received browser task: \"{task_instruction}\" with model \"{model_name}\"")
+    logger.info(
+        f'Received browser task: "{task_instruction}" with model "{model_name}"'
+    )
 
     if not google_api_key:
         logger.error("Google API key not provided to run_browser_task.")
-        return {"status": "error", "message": "Google API Key not configured for browser agent."}
+        return {
+            "status": "error",
+            "message": "Google API Key not configured for browser agent.",
+        }
     if not model_name:
         logger.error("Model name not provided to run_browser_task.")
-        return {"status": "error", "message": "Model name not configured for browser agent."}
+        return {
+            "status": "error",
+            "message": "Model name not configured for browser agent.",
+        }
 
     # Initialize the LLM for the browser-use agent.
     try:
-        llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=SecretStr(google_api_key), temperature=0)
+        llm = ChatGoogleGenerativeAI(
+            model=model_name, google_api_key=SecretStr(google_api_key), temperature=0
+        )
     except Exception as e:
-        logger.error(f"Failed to initialize ChatGoogleGenerativeAI with model {model_name}: {e}", exc_info=True)
-        return {"status": "error", "message": f"Failed to initialize LLM for agent: {str(e)}"}
+        logger.error(
+            f"Failed to initialize ChatGoogleGenerativeAI with model {model_name}: {e}",
+            exc_info=True,
+        )
+        return {
+            "status": "error",
+            "message": f"Failed to initialize LLM for agent: {str(e)}",
+        }
 
     try:
         # Run the asynchronous agent function.
@@ -95,4 +124,7 @@ def run_browser_task(task_instruction: str, google_api_key: str, model_name: str
         return {"status": "error", "message": f"Asyncio runtime error: {str(e)}"}
     except Exception as e:
         logger.error(f"Unexpected error running browser task: {e}", exc_info=True)
-        return {"status": "error", "message": f"Unexpected error in browser task execution: {str(e)}"}
+        return {
+            "status": "error",
+            "message": f"Unexpected error in browser task execution: {str(e)}",
+        }
