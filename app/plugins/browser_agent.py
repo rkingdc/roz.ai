@@ -22,7 +22,10 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
         browser_profile = BrowserProfile(
             browser="firefox", # Explicitly set firefox
             user_data_dir=None, # Use a temporary profile to avoid conflicts and ensure clean state
-            playwright_launch_options={"headless": False} # Make browser visible
+            playwright_launch_options={
+                "headless": False, # Make browser visible
+                "args": ["--no-sandbox"] # Add no-sandbox argument for Chromium if it's launched
+            }
         )
         browser_session = BrowserSession(browser_profile=browser_profile)
 
