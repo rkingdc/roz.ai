@@ -3,7 +3,9 @@ import logging
 import os
 
 from browser_use import Agent
-from langchain_openai import ChatOpenAI  # browser-use examples use this LLM
+# from langchain_openai import ChatOpenAI  # browser-use examples use this LLM
+from langchain_google_genai import ChatGoogleGenerativeAI
+from pydantic import SecretStr
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
@@ -60,22 +62,20 @@ def run_browser_task(task_instruction: str) -> dict:
     logger.info(f"Received browser task: \"{task_instruction}\"")
 
     # Load environment variables from .env file for API keys.
-    # Ensure OPENAI_API_KEY is set for ChatOpenAI.
+    # Ensure GOOGLE_API_KEY is set for ChatGoogleGenerativeAI.
     load_dotenv()
     
-    openai_api_key = os.getenv("OPENAI_API_KEY")
-    if not openai_api_key:
-        logger.error("OPENAI_API_KEY not found in environment variables. This is required for the browser-use agent's LLM.")
-        return {"status": "error", "message": "OPENAI_API_KEY not configured."}
+    google_api_key = os.getenv("GOOGLE_API_KEY")
+    if not google_api_key:
+        logger.error("GOOGLE_API_KEY not found in environment variables. This is required for the browser-use agent's LLM.")
+        return {"status": "error", "message": "GOOGLE_API_KEY not configured."}
 
     # Initialize the LLM for the browser-use agent.
-    # browser-use examples use ChatOpenAI.
-    # If you have a Langchain wrapper for Gemini, you could adapt this.
     try:
-        # Using gpt-4o as an example, can be changed.
-        llm = ChatOpenAI(model="gpt-4o", openai_api_key=openai_api_key, temperature=0) 
+        # Using a generally available Gemini model.
+        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", google_api_key=SecretStr(google_api_key), temperature=0)
     except Exception as e:
-        logger.error(f"Failed to initialize ChatOpenAI: {e}", exc_info=True)
+        logger.error(f"Failed to initialize ChatGoogleGenerativeAI: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to initialize LLM for agent: {str(e)}"}
 
     try:
