@@ -45,6 +45,7 @@ def generate_chat_response(
     session_files=None,
     calendar_context=None,
     web_search_enabled=False,
+    browser_automation_enabled=False, # New parameter
     streaming_enabled=False,
     socketio=None,
     sid=None,
@@ -194,6 +195,7 @@ def generate_chat_response(
         sid=sid,
         is_cancelled_callback=is_cancelled_callback,
         web_search_enabled=web_search_enabled,
+        browser_automation_enabled=browser_automation_enabled, # Pass new parameter
     )
 
 
@@ -208,11 +210,12 @@ def _generate_chat_response_stream(
     socketio,
     sid,
     is_cancelled_callback: Callable[[], bool],
-    web_search_enabled: bool,  # New parameter
+    web_search_enabled: bool,
+    browser_automation_enabled: bool, # New parameter
 ):
     """Internal helper that generates and emits chat response chunks via SocketIO. Checks for cancellation. Handles tool calls with streaming."""
     logger.info(
-        f"_generate_chat_response_stream called for chat {chat_id} (SID: {sid}), WebSearch: {web_search_enabled}"
+        f"_generate_chat_response_stream called for chat {chat_id} (SID: {sid}), WebSearch: {web_search_enabled}, BrowserAutomation: {browser_automation_enabled}"
     )
     full_reply_content = ""  # Accumulate full reply for saving
     emitted_error_or_cancel_final_signal = False  # Tracks if a final error/cancel signal was sent, to prevent duplicate stream_end
@@ -286,9 +289,14 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
             logger.info(
                 f"Calling model.generate_content_stream (Iteration {iteration}) for chat {chat_id}."
             )
-            tools_to_provide = None
-            if web_search_enabled: # Assuming browser_use is also enabled when web_search is
-                tools_to_provide = [WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL, BROWSER_USE_TOOL]
+            tools_to_provide = [] # Initialize as an empty list
+            if web_search_enabled:
+                tools_to_provide.extend([WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL])
+            if browser_automation_enabled:
+                tools_to_provide.append(BROWSER_USE_TOOL)
+            
+            if not tools_to_provide: # If list is still empty after checks
+                tools_to_provide = None
 
             # GenerateContentConfig is needed for system_instruction and tools with streaming
             gen_config = GenerateContentConfig(
