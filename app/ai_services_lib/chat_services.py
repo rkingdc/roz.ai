@@ -28,7 +28,7 @@ from werkzeug.utils import secure_filename
 from .. import database
 from ..plugins.web_search import perform_web_search, fetch_web_content
 from .summary_services import get_or_generate_summary
-from .tool_definitions import WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL
+from .tool_definitions import WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL, BROWSER_USE_TOOL
 from .transcription_services import transcribe_pdf_bytes
 
 logger = logging.getLogger(__name__)
@@ -285,9 +285,9 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
             logger.info(
                 f"Calling model.generate_content_stream (Iteration {iteration}) for chat {chat_id}."
             )
-            tools_to_provide = (
-                [WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL] if web_search_enabled else None
-            )
+            tools_to_provide = None
+            if web_search_enabled: # Assuming browser_use is also enabled when web_search is
+                tools_to_provide = [WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL, BROWSER_USE_TOOL]
 
             # GenerateContentConfig is needed for system_instruction and tools with streaming
             gen_config = GenerateContentConfig(
@@ -524,6 +524,33 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
                             )
                             tool_error = (
                                 f"[Tool Error: scrape_url failed - {type(e).__name__}]"
+                            )
+                    elif function_name == "perform_browser_task":
+                        try:
+                            task_instruction = function_args["task_instruction"]
+                            socketio.emit(
+                                "status_update",
+                                {
+                                    "message": f"Starting browser task: {task_instruction[:50]}..."
+                                },
+                                room=sid,
+                            )
+                            # TODO: Implement the actual browser task execution in a new plugin file
+                            # For now, simulate a successful execution.
+                            # result = app.plugins.browser_agent.run_browser_task(task_instruction)
+                            result = {"status": "success", "outcome": f"Simulated completion of: {task_instruction}"}
+                            
+                            if result.get("status") == "error":
+                                tool_error = f"[Browser Task Error: {result.get('message', 'Unknown error')}]"
+                            else:
+                                tool_response_data = {"summary": result.get("outcome", "Task completed.")}
+                        except Exception as e:
+                            logger.error(
+                                f"Error executing 'perform_browser_task' (stream): {e}",
+                                exc_info=True,
+                            )
+                            tool_error = (
+                                f"[Tool Error: perform_browser_task failed - {type(e).__name__}]"
                             )
                     else:
                         tool_error = f"[System Error: Unknown tool '{function_name}']"
