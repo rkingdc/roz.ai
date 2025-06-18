@@ -46,10 +46,9 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
             headless=False, # Make browser visible (set directly in profile)
             user_data_dir=None,  # Use a temporary profile to avoid conflicts and ensure clean state
             playwright_launch_options={
-                # headless is set in BrowserProfile directly, but args can remain for fallback
-                "args": [
-                    "--no-sandbox"
-                ],  # Add no-sandbox argument for Chromium if it's launched
+                # headless is set in BrowserProfile directly.
+                # No specific args needed for Firefox at this moment,
+                # removing --no-sandbox as it's Chromium-specific.
             },
         )
         browser_session = BrowserSession(browser_profile=browser_profile)
