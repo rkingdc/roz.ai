@@ -27,8 +27,9 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
             executable_path=None, # Let Playwright find the default Chromium
             headless=False, # Make browser visible
             user_data_dir=None,  # Use a temporary profile
+            chromium_sandbox=False, # Explicitly disable sandbox via browser-use parameter
             playwright_launch_options={
-                "args": ["--no-sandbox"] # Often needed for Chromium on Linux
+                "args": ["--no-sandbox"] # Keep for Playwright, just in case
             },
         )
         browser_session = BrowserSession(browser_profile=browser_profile)
