@@ -9,8 +9,10 @@ click==8.1.8
 Flask==3.1.0
 Flask-Migrate>=3.1.0 # Specify version
 Flask-SQLAlchemy>=3.0.0 # Specify version
-google-ai-generativelanguage==0.6.15
-google-api-core==2.24.2
+browser-use==0.2.7 # Added browser-use
+langchain-google-genai==2.1.5 # Added for browser-use with Gemini
+google-ai-generativelanguage>=0.6.18,<0.7.0 # Updated for langchain-google-genai
+google-api-core>=2.25.0 # Updated for browser-use
 google-api-python-client==2.167.0
 google-auth==2.39.0
 google-auth-httplib2==0.2.0
@@ -31,8 +33,8 @@ proto-plus==1.26.1
 protobuf==5.29.4
 pyasn1==0.6.1
 pyasn1_modules==0.4.2
-pydantic==2.11.3
-pydantic_core==2.33.1
+pydantic>=2.11.5 # Updated for browser-use
+# pydantic_core==2.33.1 # Removed, let pydantic handle its core version
 pyparsing==3.2.3
 pytest  # Added for unit testing
 python-dotenv==1.1.0
