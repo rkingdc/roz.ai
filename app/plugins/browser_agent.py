@@ -43,15 +43,30 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
         logger.info(
             f'Running browser-use agent with Chromium for task: "{task_instruction}"'
         )
-        await agent.run()
+        history = await agent.run() # Capture the history object
 
-        # For browser-use 0.2.7, the agent.run() method completes the task.
-        # The 'messages' attribute might not exist or be populated in the way expected.
-        # We'll assume success if no exception is raised by agent.run().
-        # A more sophisticated outcome might require inspecting browser_session state or agent's internal state
-        # if the library provides access to it after run() completes.
-        outcome = f"Browser task '{task_instruction}' completed."
-        logger.info(f"Browser-use agent finished. Task: {task_instruction}")
+        outcome = None
+        if history:
+            final_result_data = history.final_result()
+            if final_result_data:
+                # final_result_data could be a string (often JSON) or a dict
+                outcome = final_result_data
+                logger.info(f"Browser-use agent finished. Final result: {outcome}")
+            else:
+                # Check for model thoughts or actions if final_result is empty
+                # This part can be expanded based on how browser-use 0.2.7 structures history
+                model_actions = history.model_actions()
+                if model_actions: # Get the last action/thought
+                    last_action = model_actions[-1] if isinstance(model_actions, list) and model_actions else model_actions
+                    outcome = f"Browser task completed. Last agent action/thought: {str(last_action)[:500]}" # Truncate if too long
+                    logger.info(f"Browser-use agent finished. No specific final_result. Last action: {outcome}")
+                else:
+                    outcome = f"Browser task '{task_instruction}' completed, but no specific result was extracted from the agent's history."
+                    logger.info(outcome)
+        else:
+            outcome = f"Browser task '{task_instruction}' completed, but the agent did not return a history object."
+            logger.warning(outcome)
+            
         return {"status": "success", "outcome": outcome}
     except Exception as e:
         logger.error(f"Error during browser-use agent execution: {e}", exc_info=True)
