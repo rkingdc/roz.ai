@@ -195,6 +195,7 @@ def _process_chat_message_async(app, sid, data, message_attachments_metadata): #
     session_files = data.get("session_files", []) # New files with content
     calendar_context = data.get("calendar_context")
     enable_web_search = data.get("enable_web_search", False)
+    enable_browser_automation = data.get("enable_browser_automation", False) # Extract new flag
     enable_streaming = data.get("enable_streaming", False)
     mode = data.get("mode", "chat")
 
@@ -256,6 +257,7 @@ def _process_chat_message_async(app, sid, data, message_attachments_metadata): #
                     session_files=session_files, # Pass raw session data
                     calendar_context=calendar_context,
                     web_search_enabled=enable_web_search,
+                    browser_automation_enabled=enable_browser_automation, # Pass new flag
                     streaming_enabled=enable_streaming,
                     socketio=socketio,
                     sid=sid,
