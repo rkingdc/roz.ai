@@ -48,4 +48,29 @@ WEB_SCRAPE_TOOL = Tool(
         )
     ]
 )
+
+# Browser Use Tool (with Playwright for Firefox)
+BROWSER_USE_TOOL = Tool(
+    function_declarations=[
+        FunctionDeclaration(
+            name="perform_browser_task",
+            description=(
+                "Uses a browser automation agent (Playwright with Firefox) to perform a given task. "
+                "This is suitable for complex web interactions, such as navigating multiple pages, "
+                "filling forms, clicking buttons, and extracting information based on a high-level goal. "
+                "The agent will attempt to complete the task autonomously."
+            ),
+            parameters=Schema(
+                type=Type.OBJECT,
+                properties={
+                    "task_instruction": Schema(
+                        type=Type.STRING,
+                        description="A clear and detailed natural language instruction describing the task to be performed in the browser."
+                    )
+                },
+                required=["task_instruction"],
+            ),
+        )
+    ]
+)
 # --- End Tool Definitions ---
