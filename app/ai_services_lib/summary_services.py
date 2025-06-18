@@ -386,13 +386,23 @@ def generate_note_diff_summary(previous_content_str: str, current_content_str: s
             logger.error("API_KEY is missing from current_app.config for note diff.")
             return "[Error: AI Service API Key not configured]"
 
-        # Client setup (can be simplified if no actual API call is made by placeholder)
-        # if "genai_client" not in g:
-        #     g.genai_client = genai.Client(api_key=api_key)
-        # client = g.genai_client
-        # logger.info("Successfully obtained genai.Client for note diff summary (placeholder).")
+        # Client setup
+        if "genai_client" not in g:
+            logger.info("Creating new genai.Client for note diff and caching in 'g'.")
+            g.genai_client = genai.Client(api_key=api_key)
+        else:
+            logger.debug("Using cached genai.Client from 'g' for note diff.")
+        client = g.genai_client
+        logger.info("Successfully obtained genai.Client for note diff summary.")
 
-    except Exception as e:
+    except (GoogleAPIError, ClientError, ValueError, Exception) as e:
+        logger.error(
+            f"Failed to initialize/get genai.Client for note diff summary: {e}", exc_info=True
+        )
+        if "api key not valid" in str(e).lower():
+            return "[Error: Invalid Gemini API Key for note diff]"
+        return "[Error: Failed to initialize AI client for note diff]"
+    except Exception as e: # Catch any other unexpected errors during readiness
         logger.error(
             f"generate_note_diff_summary: Unexpected error during readiness check: {type(e).__name__} - {e}",
             exc_info=True,
@@ -400,23 +410,106 @@ def generate_note_diff_summary(previous_content_str: str, current_content_str: s
         return f"[CRITICAL Unexpected Error during AI Service readiness check: {type(e).__name__}]"
     # --- End AI Readiness Check ---
 
-    # Placeholder logic:
     if previous_content_str == current_content_str:
         logger.info("Note content unchanged, returning '[No changes detected in content]'")
         return "[No changes detected in content]"
     elif not previous_content_str and current_content_str:
-        logger.info("Content added, returning '[Content added]'")
-        return "[Content added]"
+        # Content was added to an empty note.
+        # A full summary might be too verbose, a simpler message is often better.
+        # Or, summarize the new content if desired. For now, keeping it simple.
+        # To summarize new content:
+        # prompt = f"This is a new note. Summarize its content:\n\n{current_content_str}"
+        # model_name = current_app.config.get('DEFAULT_MODEL', 'gemini-1.5-flash')
+        # ... call client.models.generate_content ...
+        logger.info("Content added to empty note, returning '[Content added]'")
+        return "[Content added]" # Or an AI summary of the new content
     elif previous_content_str and not current_content_str:
-        logger.info("Content removed, returning '[Content removed]'")
+        logger.info("All content removed, returning '[Content removed]'")
         return "[Content removed]"
-    else:
-        # This is where a real AI call would summarize the diff.
-        # For now, a generic "modified" message.
-        # prompt = f"Summarize the changes from this old text:\n{previous_content_str}\n\nTo this new text:\n{current_content_str}"
-        # response = client.models.generate_content(model="<your-chosen-model>", contents=[prompt])
-        # summary = response.text
-        logger.info("Content modified, returning placeholder '[Content modified (AI summary pending)]'")
-        return "[Content modified (AI summary pending)]"
+
+    # Determine model for diff summary
+    # You might want a specific model or a different config option for this.
+    # Using DEFAULT_MODEL as a fallback.
+    raw_model_name = current_app.config.get('NOTE_DIFF_MODEL', current_app.config.get('DEFAULT_MODEL', 'gemini-1.5-flash'))
+    model_name = f"models/{raw_model_name}" if not raw_model_name.startswith("models/") else raw_model_name
+
+    prompt = (
+        "You are an expert at identifying and summarizing changes between two versions of text. "
+        "Please provide a concise summary of the key differences between the 'Old Content' and 'New Content' below. "
+        "Focus on what was added, removed, or significantly changed. Do not state the obvious (e.g. 'the content was modified')."
+        "If the changes are minor (e.g., typo fixes, small rephrasing), just state 'Minor textual edits.'\n\n"
+        f"--- Old Content ---\n{previous_content_str}\n\n"
+        f"--- New Content ---\n{current_content_str}\n\n"
+        "--- Summary of Changes ---"
+    )
+
+    try:
+        logger.info(f"Generating note diff summary using model '{model_name}'.")
+        response = client.models.generate_content(
+            model=model_name,
+            contents=[prompt] # Content is a list of Parts, simple string is auto-converted
+        )
+
+        # Process response (similar to generate_summary)
+        if response.prompt_feedback and response.prompt_feedback.block_reason:
+            reason = response.prompt_feedback.block_reason.name
+            logger.warning(
+                f"Note diff summary generation blocked by safety settings. Reason: {reason}"
+            )
+            return f"[Error: Diff summary blocked by safety settings (Reason: {reason})]"
+
+        if (
+            response.candidates
+            and hasattr(response.candidates[0], "content")
+            and hasattr(response.candidates[0].content, "parts")
+            and response.candidates[0].content.parts
+        ):
+            summary = "".join(
+                part.text
+                for part in response.candidates[0].content.parts
+                if hasattr(part, "text")
+            )
+            if summary.strip():
+                logger.info("Note diff summary generated successfully.")
+                return summary
+            else:
+                logger.warning("Note diff summary generation resulted in empty text.")
+                return "[System Note: AI generated an empty diff summary.]"
+        else:
+            finish_reason = "UNKNOWN"
+            if response.candidates and hasattr(response.candidates[0], "finish_reason"):
+                finish_reason = response.candidates[0].finish_reason.name
+            logger.warning(
+                f"Note diff summary generation did not produce usable content. Finish Reason: {finish_reason}. Response: {response!r}"
+            )
+            return f"[Error: AI did not generate diff summary (Finish Reason: {finish_reason})]"
+
+    except InvalidArgument as e:
+        logger.error(
+            f"InvalidArgument error during note diff summary: {e}.",
+            exc_info=True,
+        )
+        return f"[Error generating diff summary: Invalid argument ({type(e).__name__}).]"
+    except DeadlineExceeded:
+        logger.error("Note diff summary generation timed out.")
+        return "[Error: Diff summary generation timed out.]"
+    except NotFound as e:
+        logger.error(f"Model '{model_name}' not found for note diff: {e}")
+        return f"[Error: AI Model '{raw_model_name}' for diff not found.]"
+    except GoogleAPIError as e:
+        logger.error(f"Google API error during note diff summary: {e}")
+        err_str = str(e).lower()
+        if "api key not valid" in err_str:
+            return "[Error: Invalid Gemini API Key for note diff]"
+        if "resource has been exhausted" in err_str or "429" in str(e):
+            logger.warning("Quota/Rate limit hit during note diff summary.")
+            return "[Error: API quota/rate limit exceeded for diff. Please try again later.]"
+        return f"[Error generating diff summary via API: {type(e).__name__}]"
+    except Exception as e:
+        logger.error(
+            f"Unexpected error during note diff summary generation: {e}",
+            exc_info=True,
+        )
+        return f"[Error generating diff summary: An unexpected error occurred ({type(e).__name__}).]"
 
 
