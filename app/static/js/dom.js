@@ -19,6 +19,8 @@ export const elements = {
     improvePromptToggleLabel: null, // Added improve prompt toggle label reference
     deepResearchToggle: null, // Added deep research toggle reference
     deepResearchToggleLabel: null, // Added deep research toggle label reference
+    browserAutomationToggle: null, // New toggle for browser automation
+    browserAutomationToggleLabel: null, // New toggle label for browser automation
     calendarToggle: null,
     // calendarToggleInputArea: null, // This element doesn't exist in HTML, remove or fix
     fileUploadSessionLabel: null,
@@ -243,6 +245,8 @@ export function populateElements() {
     elements.improvePromptToggleLabel = document.getElementById('improve-prompt-toggle-label'); // Added improve prompt toggle label
     elements.deepResearchToggle = document.getElementById('deep-research-toggle'); // Added deep research toggle
     elements.deepResearchToggleLabel = document.getElementById('deep-research-toggle-label'); // Added deep research toggle label
+    elements.browserAutomationToggle = document.getElementById('browser-automation-toggle'); // Populate new toggle
+    elements.browserAutomationToggleLabel = document.getElementById('browser-automation-toggle-label'); // Populate new toggle label
     elements.urlModal = document.getElementById('url-modal');
     elements.closeUrlModal = document.getElementById('close-url-modal'); // Corrected ID
     elements.urlInput = document.getElementById('url-input');
