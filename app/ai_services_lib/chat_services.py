@@ -265,6 +265,18 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
                 "--- End Web Tool Instructions ---",
             ]
         )
+    if browser_automation_enabled:
+        system_prompt_parts.extend(
+            [
+                "\n--- Browser Automation Tool Instructions ---",
+                "You also have a 'perform_browser_task' tool. This tool can control a web browser (Firefox) to perform complex tasks like navigating websites, "
+                "filling out forms, clicking buttons, and extracting information based on a high-level instruction. "
+                "Use this tool for tasks that require direct interaction with web pages beyond simple content scraping, such as logging into a site (if credentials are provided or can be asked for), "
+                "completing a multi-step process on a website, or when a site is heavily JavaScript-driven and 'scrape_url' is insufficient. "
+                "Provide a clear, natural language instruction for the task to be performed in the browser.",
+                "--- End Browser Automation Tool Instructions ---",
+            ]
+        )
     final_system_prompt = "\n\n".join(
         system_prompt_parts
     )  # Reconstruct the full system prompt from non-streaming version here.
