@@ -6,7 +6,7 @@ from browser_use import Agent
 # from langchain_openai import ChatOpenAI  # browser-use examples use this LLM
 from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import SecretStr
-from dotenv import load_dotenv
+# from dotenv import load_dotenv # No longer loading .env directly here
 
 logger = logging.getLogger(__name__)
 
@@ -47,35 +47,34 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
         logger.error(f"Error during browser-use agent execution: {e}", exc_info=True)
         return {"status": "error", "message": f"Agent execution failed: {str(e)}"}
 
-def run_browser_task(task_instruction: str) -> dict:
+def run_browser_task(task_instruction: str, google_api_key: str, model_name: str) -> dict:
     """
     Performs a browser-based task using the browser-use agent with Playwright and Firefox.
 
     Args:
         task_instruction: The natural language instruction for the task.
+        google_api_key: The Google API key to use for the LLM.
+        model_name: The Gemini model name to use for the LLM.
 
     Returns:
         A dictionary with the status and outcome of the task.
         e.g., {"status": "success", "outcome": "Task completed successfully."}
               {"status": "error", "message": "Error details."}
     """
-    logger.info(f"Received browser task: \"{task_instruction}\"")
+    logger.info(f"Received browser task: \"{task_instruction}\" with model \"{model_name}\"")
 
-    # Load environment variables from .env file for API keys.
-    # Ensure GOOGLE_API_KEY is set for ChatGoogleGenerativeAI.
-    load_dotenv()
-    
-    google_api_key = os.getenv("GOOGLE_API_KEY")
     if not google_api_key:
-        logger.error("GOOGLE_API_KEY not found in environment variables. This is required for the browser-use agent's LLM.")
-        return {"status": "error", "message": "GOOGLE_API_KEY not configured."}
+        logger.error("Google API key not provided to run_browser_task.")
+        return {"status": "error", "message": "Google API Key not configured for browser agent."}
+    if not model_name:
+        logger.error("Model name not provided to run_browser_task.")
+        return {"status": "error", "message": "Model name not configured for browser agent."}
 
     # Initialize the LLM for the browser-use agent.
     try:
-        # Using a generally available Gemini model.
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", google_api_key=SecretStr(google_api_key), temperature=0)
+        llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=SecretStr(google_api_key), temperature=0)
     except Exception as e:
-        logger.error(f"Failed to initialize ChatGoogleGenerativeAI: {e}", exc_info=True)
+        logger.error(f"Failed to initialize ChatGoogleGenerativeAI with model {model_name}: {e}", exc_info=True)
         return {"status": "error", "message": f"Failed to initialize LLM for agent: {str(e)}"}
 
     try:

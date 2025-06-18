@@ -536,11 +536,23 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
                                 },
                                 room=sid,
                             )
-                            # Call the actual browser task execution function
-                            result = run_browser_task(task_instruction)
+                            # Fetch config for browser agent
+                            agent_google_api_key = current_app.config.get("GOOGLE_API_KEY")
+                            agent_model_name = current_app.config.get("DEFAULT_MODEL") # Using default model for agent
+
+                            if not agent_google_api_key or not agent_model_name:
+                                logger.error("Missing GOOGLE_API_KEY or DEFAULT_MODEL in app config for browser agent.")
+                                tool_error = "[System Error: Browser agent LLM not configured.]"
+                            else:
+                                # Call the actual browser task execution function
+                                result = run_browser_task(
+                                    task_instruction=task_instruction,
+                                    google_api_key=agent_google_api_key,
+                                    model_name=agent_model_name
+                                )
                             
-                            if result.get("status") == "error":
-                                tool_error = f"[Browser Task Error: {result.get('message', 'Unknown error')}]"
+                                if result.get("status") == "error":
+                                    tool_error = f"[Browser Task Error: {result.get('message', 'Unknown error')}]"
                             else:
                                 tool_response_data = {"summary": result.get("outcome", "Task completed.")}
                         except Exception as e:
