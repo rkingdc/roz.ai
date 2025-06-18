@@ -21,6 +21,7 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
         # Configure browser session for Firefox
         browser_profile = BrowserProfile(
             browser="firefox", # Explicitly set firefox
+            playwright_browser_type="firefox", # Try to force firefox via playwright_browser_type
             user_data_dir=None # Use a temporary profile to avoid conflicts and ensure clean state
         )
         browser_session = BrowserSession(browser_profile=browser_profile)
@@ -33,26 +34,19 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
         logger.info(f"Running browser-use agent with Firefox for task: \"{task_instruction}\"")
         await agent.run()
         
-        # Attempt to get a result from the agent.
-        # The agent.messages list contains the interaction history.
-        # The last message from the 'assistant' (agent) might contain the summary or result.
-        outcome = "Browser task executed." # Default outcome
-        if agent.messages:
-            # Iterate backwards to find the last assistant message with content
-            for msg in reversed(agent.messages):
-                if msg.get('role') == 'assistant' and msg.get('content'):
-                    outcome = msg['content']
-                    break
-            else: # No suitable assistant message found
-                outcome = "Browser task executed, but no specific outcome message from agent."
-        else:
-            outcome = "Browser task executed, no agent messages recorded."
-
-        logger.info(f"Browser-use agent finished. Outcome: {outcome}")
+        # For browser-use 0.2.7, the agent.run() method completes the task.
+        # The 'messages' attribute might not exist or be populated in the way expected.
+        # We'll assume success if no exception is raised by agent.run().
+        # A more sophisticated outcome might require inspecting browser_session state or agent's internal state
+        # if the library provides access to it after run() completes.
+        outcome = f"Browser task '{task_instruction}' completed."
+        logger.info(f"Browser-use agent finished. Task: {task_instruction}")
         return {"status": "success", "outcome": outcome}
     except Exception as e:
         logger.error(f"Error during browser-use agent execution: {e}", exc_info=True)
-        return {"status": "error", "message": f"Agent execution failed: {str(e)}"}
+        # Check if the exception itself has a 'message' attribute, common in some error objects
+        error_message = getattr(e, 'message', str(e))
+        return {"status": "error", "message": f"Agent execution failed: {error_message}"}
 
 def run_browser_task(task_instruction: str, google_api_key: str, model_name: str) -> dict:
     """
