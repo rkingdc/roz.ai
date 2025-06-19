@@ -273,7 +273,8 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
                 "filling out forms, clicking buttons, and extracting information based on a high-level instruction. "
                 "Use this tool for tasks that require direct interaction with web pages beyond simple content scraping, such as logging into a site (if credentials are provided or can be asked for), "
                 "completing a multi-step process on a website, or when a site is heavily JavaScript-driven and 'scrape_url' is insufficient. "
-                "Provide a clear, natural language instruction for the task to be performed in the browser.",
+                "Provide a clear, natural language instruction for the task to be performed in the browser."
+                " If a direct action (e.g., downloading a file) fails or is not supported by the tool, try to achieve the user's underlying goal in an alternative way (e.g., by providing a direct URL to the content, or extracting the relevant information as text).",
                 "--- End Browser Automation Tool Instructions ---",
             ]
         )
