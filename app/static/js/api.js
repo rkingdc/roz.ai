@@ -876,7 +876,6 @@ export function sendMessage() {
     const stagedSessionFile = state.sessionFile;     // File from paperclip
     const calendarContextToSend = (state.isCalendarContextActive && state.calendarContext) ? state.calendarContext : null;
     const webSearchEnabledToSend = state.isWebSearchEnabled;
-    const browserAutomationEnabledToSend = state.isBrowserAutomationEnabled; // Ensure this is being read from state
     const deepResearchEnabled = state.isDeepResearchEnabled;
     const mode = deepResearchEnabled ? 'deep_research' : 'chat';
 
@@ -952,7 +951,6 @@ export function sendMessage() {
         message_attachments_metadata: attachmentsForHistory, // Send pre-formatted metadata for DB
         calendar_context: calendarContextToSend,
         enable_web_search: webSearchEnabledToSend,
-        enable_browser_automation: browserAutomationEnabledToSend, // Ensure this is in the payload
         mode: mode,
         enable_streaming: (mode === 'chat'),
         improve_prompt: state.isImprovePromptEnabled,
