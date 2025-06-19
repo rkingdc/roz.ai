@@ -195,6 +195,7 @@ def _process_chat_message_async(app, sid, data, message_attachments_metadata): #
     session_files = data.get("session_files", []) # New files with content
     calendar_context = data.get("calendar_context")
     enable_web_search = data.get("enable_web_search", False)
+    # enable_browser_automation is no longer sent from client / used here
     enable_streaming = data.get("enable_streaming", False)
     mode = data.get("mode", "chat")
 
