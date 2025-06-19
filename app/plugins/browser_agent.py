@@ -28,10 +28,17 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
             headless=False, # Make browser visible
             user_data_dir=None,  # Use a temporary profile
             chromium_sandbox=False, # Explicitly disable sandbox via browser-use parameter
+            downloads_path=os.path.join(os.getcwd(), "instance", "browser_downloads"), # Define downloads path
             playwright_launch_options={
                 "args": ["--no-sandbox"] # Keep for Playwright, just in case
             },
         )
+        # Ensure the downloads directory exists
+        downloads_dir = browser_profile.downloads_path
+        if downloads_dir and not os.path.exists(downloads_dir):
+            os.makedirs(downloads_dir)
+            logger.info(f"Created downloads directory: {downloads_dir}")
+
         browser_session = BrowserSession(browser_profile=browser_profile)
 
         agent = Agent(
