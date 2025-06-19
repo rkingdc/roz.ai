@@ -265,7 +265,7 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
                 "--- End Web Tool Instructions ---",
             ]
         )
-    if browser_automation_enabled:
+    if True:
         system_prompt_parts.extend(
             [
                 "\n--- Browser Automation Tool Instructions ---",
@@ -304,7 +304,7 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
             tools_to_provide = [] # Initialize as an empty list
             if web_search_enabled:
                 tools_to_provide.extend([WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL])
-            if browser_automation_enabled:
+            if True:
                 tools_to_provide.append(BROWSER_USE_TOOL)
             
             if not tools_to_provide: # If list is still empty after checks
@@ -558,7 +558,7 @@ Your goal is to make the response clear, well-organized, and easy to read, lever
                             )
                             # Fetch config for browser agent
                             agent_google_api_key = current_app.config.get("GOOGLE_API_KEY")
-                            agent_model_name = current_app.config.get("DEFAULT_MODEL") # Using default model for agent
+                            agent_model_name = current_app.config.get("BROWSER_USE_MODEL") # Using default model for agent
 
                             if not agent_google_api_key or not agent_model_name:
                                 logger.error("Missing GOOGLE_API_KEY or DEFAULT_MODEL in app config for browser agent.")
