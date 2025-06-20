@@ -34,6 +34,8 @@ export const markedRenderer = new marked.Renderer();
 const originalCodeRenderer = markedRenderer.code.bind(markedRenderer);
 
 markedRenderer.code = function(code, language, isEscaped) {
+    console.log('[DEBUG Marked Renderer] code() called. Language param:', language, '(type:', typeof language, '), Code (start):', String(code).substring(0, 70), 'IsEscaped:', isEscaped);
+
     // Extract the actual code text, handling potential object input from marked
     let codeString = '';
     if (typeof code === 'object' && code !== null && typeof code.text === 'string') {
@@ -45,6 +47,7 @@ markedRenderer.code = function(code, language, isEscaped) {
     // The 'language' parameter from marked.js indicates the fenced language.
     // Ensure it's a string and clean it up.
     const lang = (typeof language === 'string' ? language : '').toLowerCase().trim();
+    console.log('[DEBUG Marked Renderer] Derived lang:', lang);
 
     // Check for Draw.io XML signature using the extracted string
     // Also check if the language is explicitly 'xml' or 'drawio' for Drawio diagrams
@@ -67,6 +70,7 @@ markedRenderer.code = function(code, language, isEscaped) {
         // For other languages, including Mermaid, use a standard <pre><code> structure
         // and ensure the language class is applied to the <code> element.
         const className = lang ? `language-${escapeHtml(lang)}` : '';
+        console.log('[DEBUG Marked Renderer] Derived className for code block:', className);
         const escapedCode = escapeHtml(codeString);
         // Note: Marked.js usually handles escaping if isEscaped is false.
         // Here, we are manually escaping for safety.
