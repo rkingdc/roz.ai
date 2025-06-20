@@ -2,8 +2,10 @@ import asyncio
 import logging
 import os
 
-from browser_use import Agent
-from browser_use.browser import BrowserProfile, BrowserSession  # Added imports
+from typing import Optional, List, Dict, Any, Union # For Pydantic model
+from pydantic import BaseModel # For Pydantic model
+from browser_use import Agent, Controller # Import Controller
+from browser_use.browser import BrowserProfile, BrowserSession
 
 # from langchain_openai import ChatOpenAI  # browser-use examples use this LLM
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -12,6 +14,14 @@ from pydantic import SecretStr
 # from dotenv import load_dotenv # No longer loading .env directly here
 
 logger = logging.getLogger(__name__)
+
+# Define a Pydantic model for structured output from the browser agent
+class BrowserTaskOutput(BaseModel):
+    status_message: str  # e.g., "Task completed successfully." or "Task partially completed."
+    summary_of_actions: str # Brief summary of what the agent did.
+    extracted_information: Optional[Union[Dict[str, Any], str]] = None # Specific data points extracted.
+    key_urls: Optional[List[str]] = None # Relevant URLs encountered or used.
+    errors_encountered: Optional[List[str]] = None # Any errors or issues the agent faced.
 
 
 async def _run_agent_async(task_instruction: str, llm) -> dict:
@@ -41,10 +51,14 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
 
         browser_session = BrowserSession(browser_profile=browser_profile)
 
+        # Instantiate a Controller with the output model
+        controller = Controller(output_model=BrowserTaskOutput)
+
         agent = Agent(
             task=task_instruction,
             llm=llm,
-            browser_session=browser_session,  # Use browser_session instead of browser_config
+            browser_session=browser_session,
+            controller=controller, # Pass the controller to the agent
             enable_memory=False,
         )
         logger.info(
@@ -54,27 +68,36 @@ async def _run_agent_async(task_instruction: str, llm) -> dict:
 
         outcome = None
         if history:
-            final_result_data = history.final_result()
-            if final_result_data:
-                # final_result_data could be a string (often JSON) or a dict
-                outcome = final_result_data
-                logger.info(f"Browser-use agent finished. Final result: {outcome}")
+            final_result_json_str = history.final_result()
+            if final_result_json_str and isinstance(final_result_json_str, str):
+                try:
+                    # Attempt to parse the final_result using the Pydantic model
+                    parsed_output = BrowserTaskOutput.model_validate_json(final_result_json_str)
+                    outcome = parsed_output.model_dump() # Convert Pydantic model to dict
+                    logger.info(f"Browser-use agent finished. Parsed structured result: {outcome}")
+                except Exception as pydantic_error: # Catch Pydantic validation or JSON parsing errors
+                    logger.warning(f"Failed to parse final_result as BrowserTaskOutput: {pydantic_error}. Falling back to raw string.")
+                    outcome = {"status_message": "Task completed, but output parsing failed.", "summary_of_actions": "Agent executed the task.", "raw_output": final_result_json_str}
+            elif final_result_json_str: # If it's not a string but some other data (e.g. already a dict)
+                 outcome = {"status_message": "Task completed.", "summary_of_actions": "Agent executed the task.", "raw_output": final_result_json_str}
+                 logger.info(f"Browser-use agent finished. Final result (non-string): {outcome}")
             else:
-                # Check for model thoughts or actions if final_result is empty
-                # This part can be expanded based on how browser-use 0.2.7 structures history
+                # Fallback if final_result is empty
                 model_actions = history.model_actions()
-                if model_actions: # Get the last action/thought
-                    last_action = model_actions[-1] if isinstance(model_actions, list) and model_actions else model_actions
-                    outcome = f"Browser task completed. Last agent action/thought: {str(last_action)[:500]}" # Truncate if too long
-                    logger.info(f"Browser-use agent finished. No specific final_result. Last action: {outcome}")
-                else:
-                    outcome = f"Browser task '{task_instruction}' completed, but no specific result was extracted from the agent's history."
-                    logger.info(outcome)
+                last_action_summary = str(model_actions[-1])[:500] if model_actions and isinstance(model_actions, list) else "No specific actions recorded."
+                outcome = {
+                    "status_message": "Task completed, but no specific structured result was provided by the agent.",
+                    "summary_of_actions": f"Last agent action/thought: {last_action_summary}"
+                }
+                logger.info(f"Browser-use agent finished. No specific final_result. Fallback outcome: {outcome}")
         else:
-            outcome = f"Browser task '{task_instruction}' completed, but the agent did not return a history object."
-            logger.warning(outcome)
+            outcome = {
+                "status_message": "Task completed, but the agent did not return a history object.",
+                "summary_of_actions": "Agent execution did not yield a history object."
+            }
+            logger.warning(str(outcome))
             
-        return {"status": "success", "outcome": outcome}
+        return {"status": "success", "outcome": outcome} # outcome is now a dict
     except Exception as e:
         logger.error(f"Error during browser-use agent execution: {e}", exc_info=True)
         # Check if the exception itself has a 'message' attribute, common in some error objects
