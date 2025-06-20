@@ -306,7 +306,6 @@ You are operating within an AI assistant tool that provides several features to 
                 "--- End Web Tool Instructions ---",
             ]
         )
-    if True:
         system_prompt_parts.extend(
             [
                 "\n--- Browser Automation Tool Instructions ---",
@@ -346,7 +345,6 @@ You are operating within an AI assistant tool that provides several features to 
             tools_to_provide = [] # Initialize as an empty list
             if web_search_enabled:
                 tools_to_provide.extend([WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL])
-            if True:
                 tools_to_provide.append(BROWSER_USE_TOOL)
             
             if not tools_to_provide: # If list is still empty after checks
