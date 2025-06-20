@@ -23,20 +23,40 @@ let _currentNoteH1Sections = [];
 
 import * as api from './api.js'; // Import API functions
 
-// Initialize Mermaid (will use the global mermaid object once loaded via script tag)
-// Ensure this initialization happens after the mermaid script is loaded.
-// Since app.js is deferred, and mermaid script will be before it, this should be fine.
-window.mermaid.initialize({
-    startOnLoad: false, // We will call mermaid.run() manually
-    securityLevel: 'loose', // Consider the security implications for your use case
-    theme: 'default', // Available themes: default, dark, forest, neutral
-    // Example for more specific theme variables:
-    // themeVariables: {
-    //   primaryColor: '#f0f0f0',
-    //   mainBkg: '#333',
-    //   textColor: '#f0f0f0',
-    // }
-});
+let isMermaidInitialized = false;
+
+export function ensureMermaidInitialized() { // Export this function
+    if (isMermaidInitialized) {
+        // console.log("[DEBUG] Mermaid already initialized.");
+        return true; // Already successfully initialized
+    }
+
+    if (window.mermaid && typeof window.mermaid.initialize === 'function') {
+        try {
+            console.log("[DEBUG] Attempting Mermaid initialization...");
+            window.mermaid.initialize({
+                startOnLoad: false,
+                securityLevel: 'loose',
+                theme: 'default',
+            });
+            isMermaidInitialized = true;
+            console.log("[DEBUG] Mermaid initialized successfully.");
+            return true;
+        } catch (e) {
+            console.error("[ERROR] Mermaid initialization failed:", e);
+            isMermaidInitialized = false; // Explicitly set to false on error
+            return false;
+        }
+    } else {
+        if (!window.mermaid) {
+            console.warn("[WARN] Mermaid library (window.mermaid) not found during initialization attempt.");
+        } else if (typeof window.mermaid.initialize !== 'function') {
+            console.warn("[WARN] window.mermaid.initialize is not a function during initialization attempt.");
+        }
+        isMermaidInitialized = false; // Ensure it's false if library or method is missing
+        return false;
+    }
+}
 
 /**
  * Waits for GraphViewer to be available and then processes diagrams.
@@ -615,14 +635,20 @@ function addMessageToDom(messageObject) {
                      waitForGraphViewerAndProcess();
                  }
                  // Mermaid
-                 const mermaidNodes = messageContentDiv.querySelectorAll('.mermaid');
-                 if (mermaidNodes.length > 0) {
-                     try {
-                         console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in message.`);
-                         window.mermaid.run({ nodes: mermaidNodes });
-                     } catch (e) {
-                         console.error("Error in window.mermaid.run() for message:", e);
+                 if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
+                     const mermaidNodes = messageContentDiv.querySelectorAll('.mermaid');
+                     if (mermaidNodes.length > 0) {
+                         try {
+                             console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in message.`);
+                             window.mermaid.run({ nodes: mermaidNodes });
+                         } catch (e) {
+                             console.error("Error in window.mermaid.run() for message:", e);
+                         }
                      }
+                 } else if (!isMermaidInitialized) {
+                    console.warn("[WARN] Mermaid not initialized prior to render in addMessageToDom. Diagrams will not render.");
+                 } else if (!(window.mermaid && typeof window.mermaid.run === 'function')) {
+                    console.error("[ERROR] Mermaid library or mermaid.run not available at render time in addMessageToDom.");
                  }
              }, 50); // Small delay to ensure DOM is ready
          } else {
@@ -1875,14 +1901,20 @@ export function updateNotesPreview() {
                         waitForGraphViewerAndProcess();
                     }
                     // Mermaid
-                    const mermaidNodes = notesPreview.querySelectorAll('.mermaid');
-                    if (mermaidNodes.length > 0) {
-                        try {
-                            console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in notesPreview.`);
-                            window.mermaid.run({ nodes: mermaidNodes });
-                        } catch (e) {
-                            console.error("Error in window.mermaid.run() for notesPreview:", e);
+                    if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
+                        const mermaidNodes = notesPreview.querySelectorAll('.mermaid');
+                        if (mermaidNodes.length > 0) {
+                            try {
+                                console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in notesPreview.`);
+                                window.mermaid.run({ nodes: mermaidNodes });
+                            } catch (e) {
+                                console.error("Error in window.mermaid.run() for notesPreview:", e);
+                            }
                         }
+                    } else if (!isMermaidInitialized) {
+                        console.warn("[WARN] Mermaid not initialized prior to render in updateNotesPreview. Diagrams will not render.");
+                    } else if (!(window.mermaid && typeof window.mermaid.run === 'function')) {
+                        console.error("[ERROR] Mermaid library or mermaid.run not available at render time in updateNotesPreview.");
                     }
                 }, 50);
 
@@ -1928,14 +1960,20 @@ function _renderActiveH1SectionUI() {
                 waitForGraphViewerAndProcess();
             }
             // Mermaid
-            const mermaidNodes = contentContainer.querySelectorAll('.mermaid');
-            if (mermaidNodes.length > 0) {
-                try {
-                    console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in H1 section.`);
-                    window.mermaid.run({ nodes: mermaidNodes });
-                } catch (e) {
-                    console.error("Error in window.mermaid.run() for H1 section:", e);
+            if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
+                const mermaidNodes = contentContainer.querySelectorAll('.mermaid');
+                if (mermaidNodes.length > 0) {
+                    try {
+                        console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in H1 section.`);
+                        window.mermaid.run({ nodes: mermaidNodes });
+                    } catch (e) {
+                        console.error("Error in window.mermaid.run() for H1 section:", e);
+                    }
                 }
+            } else if (!isMermaidInitialized) {
+                console.warn("[WARN] Mermaid not initialized prior to render in _renderActiveH1SectionUI. Diagrams will not render.");
+            } else if (!(window.mermaid && typeof window.mermaid.run === 'function')) {
+                console.error("[ERROR] Mermaid library or mermaid.run not available at render time in _renderActiveH1SectionUI.");
             }
         }, 50);
 
@@ -2165,14 +2203,20 @@ function renderFileContentModal() {
                         waitForGraphViewerAndProcess();
                     }
                     // Mermaid
-                    const mermaidNodes = fileContentModalContent.querySelectorAll('.mermaid');
-                    if (mermaidNodes.length > 0) {
-                        try {
-                            console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in file modal.`);
-                            window.mermaid.run({ nodes: mermaidNodes }); // Use window.mermaid
-                        } catch (e) {
-                            console.error("Error in window.mermaid.run() for file modal:", e);
+                    if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
+                        const mermaidNodes = fileContentModalContent.querySelectorAll('.mermaid');
+                        if (mermaidNodes.length > 0) {
+                            try {
+                                console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in file modal.`);
+                                window.mermaid.run({ nodes: mermaidNodes });
+                            } catch (e) {
+                                console.error("Error in window.mermaid.run() for file modal:", e);
+                            }
                         }
+                    } else if (!isMermaidInitialized) {
+                        console.warn("[WARN] Mermaid not initialized prior to render in renderFileContentModal. Diagrams will not render.");
+                    } else if (!(window.mermaid && typeof window.mermaid.run === 'function')) {
+                        console.error("[ERROR] Mermaid library or mermaid.run not available at render time in renderFileContentModal.");
                     }
                 }, 50); // Small delay to ensure DOM is ready
             } else { // marked is undefined, fallback for Markdown
