@@ -38,15 +38,27 @@ markedRenderer.code = function(code, language, isEscaped) {
 
     // Extract the actual code text, handling potential object input from marked
     let codeString = '';
-    if (typeof code === 'object' && code !== null && typeof code.text === 'string') {
-        codeString = code.text; // Use the text property if available
+    let detectedLang = language; // Prioritize the language parameter
+
+    if (typeof code === 'object' && code !== null) {
+        if (typeof code.text === 'string') {
+            codeString = code.text;
+        } else {
+            codeString = String(code); // Fallback if code.text is not a string
+        }
+        // If language parameter is undefined, check if the code object has a lang property
+        if (detectedLang === undefined && typeof code.lang === 'string') {
+            console.log('[DEBUG Marked Renderer] Language param was undefined, using code.lang:', code.lang);
+            detectedLang = code.lang;
+        }
     } else {
-        codeString = String(code); // Fallback to string conversion
+        codeString = String(code); // Fallback to string conversion if code is not an object
     }
+
 
     // The 'language' parameter from marked.js indicates the fenced language.
     // Ensure it's a string and clean it up.
-    const lang = (typeof language === 'string' ? language : '').toLowerCase().trim();
+    const lang = (typeof detectedLang === 'string' ? detectedLang : '').toLowerCase().trim();
     console.log('[DEBUG Marked Renderer] Derived lang:', lang);
 
     // Check for Draw.io XML signature using the extracted string
