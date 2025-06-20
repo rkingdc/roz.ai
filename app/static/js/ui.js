@@ -22,10 +22,11 @@ import { markedRenderer } from './config.js'; // Import the custom renderer from
 let _currentNoteH1Sections = [];
 
 import * as api from './api.js'; // Import API functions
-import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.js';
 
-// Initialize Mermaid
-mermaid.initialize({
+// Initialize Mermaid (will use the global mermaid object once loaded via script tag)
+// Ensure this initialization happens after the mermaid script is loaded.
+// Since app.js is deferred, and mermaid script will be before it, this should be fine.
+window.mermaid.initialize({
     startOnLoad: false, // We will call mermaid.run() manually
     securityLevel: 'loose', // Consider the security implications for your use case
     theme: 'default', // Available themes: default, dark, forest, neutral
@@ -618,9 +619,9 @@ function addMessageToDom(messageObject) {
                  if (mermaidNodes.length > 0) {
                      try {
                          console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in message.`);
-                         mermaid.run({ nodes: mermaidNodes });
+                         window.mermaid.run({ nodes: mermaidNodes });
                      } catch (e) {
-                         console.error("Error in mermaid.run() for message:", e);
+                         console.error("Error in window.mermaid.run() for message:", e);
                      }
                  }
              }, 50); // Small delay to ensure DOM is ready
@@ -1878,9 +1879,9 @@ export function updateNotesPreview() {
                     if (mermaidNodes.length > 0) {
                         try {
                             console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in notesPreview.`);
-                            mermaid.run({ nodes: mermaidNodes });
-                        } catch (e) {
-                            console.error("Error in mermaid.run() for notesPreview:", e);
+                            window.mermaid.run({ nodes: mermaidNodes });
+                        } catch (e)
+                            console.error("Error in window.mermaid.run() for notesPreview:", e);
                         }
                     }
                 }, 50);
@@ -1931,9 +1932,9 @@ function _renderActiveH1SectionUI() {
             if (mermaidNodes.length > 0) {
                 try {
                     console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in H1 section.`);
-                    mermaid.run({ nodes: mermaidNodes });
+                    window.mermaid.run({ nodes: mermaidNodes });
                 } catch (e) {
-                    console.error("Error in mermaid.run() for H1 section:", e);
+                    console.error("Error in window.mermaid.run() for H1 section:", e);
                 }
             }
         }, 50);
