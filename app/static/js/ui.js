@@ -641,17 +641,7 @@ function addMessageToDom(messageObject) {
                  if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
                      const mermaidNodes = messageContentDiv.querySelectorAll('.mermaid');
                      console.log(`[DEBUG Mermaid Render - Message] Found ${mermaidNodes.length} '.mermaid' divs to process.`);
-                     if (mermaidNodes.length > 0) {
-                        mermaidNodes.forEach((node, index) => {
-                            console.log(`[DEBUG Mermaid Render - Message] Node ${index} (${node.className}) textContent: "${node.textContent.substring(0,150)}..."`);
-                        });
-                         try {
-                             console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in message.`);
-                             window.mermaid.run({ nodes: mermaidNodes });
-                         } catch (e) {
-                             console.error("Error in window.mermaid.run() for message:", e);
-                         }
-                     }
+                     mermaidNodes.forEach(node => renderSingleMermaidNode(node, "Message"));
                  } else if (!isMermaidInitialized) {
                     console.warn("[WARN] Mermaid not initialized prior to render in addMessageToDom. Diagrams will not render.");
                  } else if (!(window.mermaid && typeof window.mermaid.run === 'function')) {
@@ -1911,17 +1901,7 @@ export function updateNotesPreview() {
                     if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
                         const mermaidNodes = notesPreview.querySelectorAll('.mermaid');
                         console.log(`[DEBUG Mermaid Render - NotesPreview] Found ${mermaidNodes.length} '.mermaid' divs to process.`);
-                        if (mermaidNodes.length > 0) {
-                            mermaidNodes.forEach((node, index) => {
-                                console.log(`[DEBUG Mermaid Render - NotesPreview] Node ${index} (${node.className}) textContent: "${node.textContent.substring(0,150)}..."`);
-                            });
-                            try {
-                                console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in notesPreview.`);
-                                window.mermaid.run({ nodes: mermaidNodes });
-                            } catch (e) {
-                                console.error("Error in window.mermaid.run() for notesPreview:", e);
-                            }
-                        }
+                        mermaidNodes.forEach(node => renderSingleMermaidNode(node, "NotesPreview"));
                     } else if (!isMermaidInitialized) {
                         console.warn("[WARN] Mermaid not initialized prior to render in updateNotesPreview. Diagrams will not render.");
                     } else if (!(window.mermaid && typeof window.mermaid.run === 'function')) {
@@ -1974,17 +1954,7 @@ function _renderActiveH1SectionUI() {
             if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
                 const mermaidNodes = contentContainer.querySelectorAll('.mermaid');
                 console.log(`[DEBUG Mermaid Render - H1Section] Found ${mermaidNodes.length} '.mermaid' divs to process.`);
-                if (mermaidNodes.length > 0) {
-                    mermaidNodes.forEach((node, index) => {
-                        console.log(`[DEBUG Mermaid Render - H1Section] Node ${index} (${node.className}) textContent: "${node.textContent.substring(0,150)}..."`);
-                    });
-                    try {
-                        console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in H1 section.`);
-                        window.mermaid.run({ nodes: mermaidNodes });
-                    } catch (e) {
-                        console.error("Error in window.mermaid.run() for H1 section:", e);
-                    }
-                }
+                mermaidNodes.forEach(node => renderSingleMermaidNode(node, "H1Section"));
             } else if (!isMermaidInitialized) {
                 console.warn("[WARN] Mermaid not initialized prior to render in _renderActiveH1SectionUI. Diagrams will not render.");
             } else if (!(window.mermaid && typeof window.mermaid.run === 'function')) {
@@ -2221,17 +2191,7 @@ function renderFileContentModal() {
                     if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
                         const mermaidNodes = fileContentModalContent.querySelectorAll('.mermaid');
                         console.log(`[DEBUG Mermaid Render - FileModal] Found ${mermaidNodes.length} '.mermaid' divs to process.`);
-                        if (mermaidNodes.length > 0) {
-                            mermaidNodes.forEach((node, index) => {
-                                console.log(`[DEBUG Mermaid Render - FileModal] Node ${index} (${node.className}) textContent: "${node.textContent.substring(0,150)}..."`);
-                            });
-                            try {
-                                console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in file modal.`);
-                                window.mermaid.run({ nodes: mermaidNodes });
-                            } catch (e) {
-                                console.error("Error in window.mermaid.run() for file modal:", e);
-                            }
-                        }
+                        mermaidNodes.forEach(node => renderSingleMermaidNode(node, "FileModal"));
                     } else if (!isMermaidInitialized) {
                         console.warn("[WARN] Mermaid not initialized prior to render in renderFileContentModal. Diagrams will not render.");
                     } else if (!(window.mermaid && typeof window.mermaid.run === 'function')) {
@@ -2278,6 +2238,47 @@ function renderFileContentModal() {
     }
     // --------------------------------------
     console.log(`[DEBUG] renderFileContentModal: Final modal content HTML (first 200 chars): "${fileContentModalContent.innerHTML.substring(0,200)}"`);
+}
+
+/**
+ * Renders a single Mermaid node and handles potential parsing errors.
+ * @param {HTMLElement} node - The div.mermaid element.
+ * @param {string} contextLabel - A label for logging (e.g., "Message", "NotesPreview").
+ */
+function renderSingleMermaidNode(node, contextLabel) {
+    if (!isMermaidInitialized || !window.mermaid || typeof window.mermaid.run !== 'function') {
+        console.warn(`[WARN Mermaid Render - ${contextLabel}] Mermaid not initialized or run function not available.`);
+        node.innerHTML = `<p class="text-red-500 font-semibold">Mermaid library not ready.</p><pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapeHtml(node.textContent || '')}</code></pre>`;
+        return;
+    }
+    const originalMermaidScript = node.textContent || ''; // Save original script
+    try {
+        console.log(`[DEBUG Mermaid Render - ${contextLabel}] Processing node. Content (start): "${originalMermaidScript.substring(0, 150)}..."`);
+        // Mermaid.js modifies the node in-place, replacing its textContent with SVG.
+        // No need to clear node.innerHTML if textContent is what we set.
+        window.mermaid.run({ nodes: [node] });
+        console.log(`[DEBUG Mermaid Render - ${contextLabel}] Successfully called mermaid.run() for node.`);
+    } catch (e) {
+        console.error(`[ERROR Mermaid Render - ${contextLabel}] Error in window.mermaid.run():`, e);
+        // Check if the error object has the expected structure for parse errors
+        const errorMessage = (e && typeof e.message === 'string') ? e.message : "Unknown error during rendering.";
+        
+        if (errorMessage.toLowerCase().includes("parse error")) {
+            node.innerHTML = `
+                <p class="text-red-500 font-semibold">Mermaid Diagram Syntax Error:</p>
+                <p class="text-red-400 text-xs mb-1">${escapeHtml(errorMessage)}</p>
+                <p class="text-xs mb-1">The following Mermaid code could not be rendered:</p>
+                <pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapeHtml(originalMermaidScript)}</code></pre>
+            `;
+        } else {
+            // Generic error display
+            node.innerHTML = `
+                <p class="text-red-500 font-semibold">Error Rendering Mermaid Diagram:</p>
+                <p class="text-red-400 text-xs mb-1">${escapeHtml(errorMessage)}</p>
+                <pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapeHtml(originalMermaidScript)}</code></pre>
+            `;
+        }
+    }
 }
 
 
