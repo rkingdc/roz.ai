@@ -295,27 +295,18 @@ You are operating within an AI assistant tool that provides several features to 
     if web_search_enabled:
         system_prompt_parts.extend(
             [
-                "\n--- Web Tool Instructions ---",
-                "You have access to tools for web searching ('web_search') and scraping specific URLs ('scrape_url').",
-                "IMPORTANT: When you use information obtained from 'web_search' or 'scrape_url', you MUST cite your sources.",
-                "Review the search results or scraped content carefully. Only cite the specific URLs (from the 'link' field in search results or the original URL for scraped content) that directly contributed to your answer.",
-                "If the snippets from 'web_search' are ambiguous or insufficient to fully answer the query, use the 'scrape_url' tool on the most promising URLs from the search results to get more detailed content before formulating your response.",
-                "Do not cite all search results if only some were used.",
-                "Present citations clearly, for example, by listing them at the end of your response or embedding them as inline Markdown links (e.g., [source](URL)).",
-                # ... (detailed tool instructions as in non-streaming version)
-                "--- End Web Tool Instructions ---",
-            ]
-        )
-        system_prompt_parts.extend(
-            [
-                "\n--- Browser Automation Tool Instructions ---",
-                "You also have a 'perform_browser_task' tool. This tool can control a web browser (Firefox) to perform complex tasks like navigating websites, "
-                "filling out forms, clicking buttons, and extracting information based on a high-level instruction. "
-                "Use this tool for tasks that require direct interaction with web pages beyond simple content scraping, such as logging into a site (if credentials are provided or can be asked for), "
-                "completing a multi-step process on a website, or when a site is heavily JavaScript-driven and 'scrape_url' is insufficient. "
-                "Provide a clear, natural language instruction for the task to be performed in the browser."
-                " If you encounter difficulties or limitations with a specific action, focus on understanding the user's overall goal and attempt to achieve it through alternative interactions or by providing the most relevant information you can gather.",
-                "--- End Browser Automation Tool Instructions ---",
+                "\n--- Web Interaction Tool Instructions ---",
+                "You have access to several tools for interacting with the web. Please use them strategically:",
+                "1. 'web_search': Use this first to find relevant web pages for a query. Review the search results carefully.",
+                "2. 'scrape_url': After using 'web_search', if a specific URL seems promising and you need its textual content (including PDFs, which will be transcribed), use this tool. It's good for extracting information from static pages or articles.",
+                "IMPORTANT: When you use information obtained from 'web_search' or 'scrape_url', you MUST cite your sources. Only cite the specific URLs that directly contributed to your answer. Present citations clearly (e.g., list at the end or inline Markdown links: [source](URL)).",
+                
+                "3. 'perform_browser_task': This tool controls a web browser (Chromium) for complex, interactive tasks. Use this tool ONLY IF:",
+                "    a. 'web_search' and 'scrape_url' are insufficient (e.g., the site requires login, form submissions, complex navigation, or is heavily JavaScript-driven and 'scrape_url' fails to get the needed dynamic content).",
+                "    b. The task explicitly requires direct browser interaction (e.g., 'add this to my cart', 'download this file by clicking the button').",
+                "Before using 'perform_browser_task', consider if 'web_search' and 'scrape_url' can first help you identify specific URLs or information that would make your browser task instruction more precise and efficient.",
+                "For 'perform_browser_task', provide a clear, natural language instruction. If you encounter difficulties or limitations with a specific action, focus on understanding the user's overall goal and attempt to achieve it through alternative interactions or by providing the most relevant information you can gather using any of the available web tools.",
+                "--- End Web Interaction Tool Instructions ---",
             ]
         )
     final_system_prompt = "\n\n".join(
