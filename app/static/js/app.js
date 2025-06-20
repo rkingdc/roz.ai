@@ -4,7 +4,7 @@
 
 import { elements, populateElements } from './dom.js';
 import * as state from './state.js';
-import * as ui from './ui.js';
+import * as ui from './ui.js'; // Import the whole ui module
 import * as api from './api.js'; // Import the whole api module
 import * as config from './config.js'; // Import config
 import { setupEventListeners } from './eventListeners.js';
@@ -79,6 +79,9 @@ async function initializeApp() {
         // This will render the UI based on the state populated by loadPersistedStates and initial data loads.
         // We notify all state changes that happened while notifications were disabled.
         state.notifyAll(); // Trigger UI updates for all state that changed during loading
+
+        // Attempt to initialize Mermaid after other setups
+        ui.ensureMermaidInitialized();
 
         // Final status is set by the last API call or loadInitialData
         // ui.updateStatus("Idle"); // Removed direct call
