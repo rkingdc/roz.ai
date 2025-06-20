@@ -22,6 +22,20 @@ import { markedRenderer } from './config.js'; // Import the custom renderer from
 let _currentNoteH1Sections = [];
 
 import * as api from './api.js'; // Import API functions
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.js';
+
+// Initialize Mermaid
+mermaid.initialize({
+    startOnLoad: false, // We will call mermaid.run() manually
+    securityLevel: 'loose', // Consider the security implications for your use case
+    theme: 'default', // Available themes: default, dark, forest, neutral
+    // Example for more specific theme variables:
+    // themeVariables: {
+    //   primaryColor: '#f0f0f0',
+    //   mainBkg: '#333',
+    //   textColor: '#f0f0f0',
+    // }
+});
 
 /**
  * Waits for GraphViewer to be available and then processes diagrams.
@@ -122,6 +136,61 @@ function makeHeadingsCollapsible(htmlString) {
     });
 
     return resultFragment;
+}
+
+/**
+ * Processes raw HTML string to handle Drawio and Mermaid diagrams,
+ * and make headings collapsible.
+ * @param {string} rawHtmlInput - The raw HTML string from marked.js.
+ * @returns {DocumentFragment} - A DOM fragment with processed content.
+ */
+function processHtmlContentWithDiagrams(rawHtmlInput) {
+    const tempContainer = document.createElement('div');
+    tempContainer.innerHTML = rawHtmlInput;
+
+    // Drawio processing
+    const drawioReplacements = [];
+    const drawioCodeBlocks = tempContainer.querySelectorAll('pre > code.language-xml, pre > code.language-drawio');
+    drawioCodeBlocks.forEach((codeBlock) => {
+        const parentPre = codeBlock.parentElement;
+        const xmlContent = codeBlock.textContent || '';
+        if (xmlContent.includes('<mxfile') && xmlContent.includes('</mxfile>')) {
+            const graphDiv = document.createElement('div');
+            graphDiv.className = 'mxgraph'; // Class for GraphViewer
+            graphDiv.setAttribute('style', 'max-width: 100%; border: 1px solid transparent;');
+            graphDiv.setAttribute('data-mxgraph', JSON.stringify({
+                highlight: '#0000ff', nav: true, resize: true, toolbar: 'zoom layers lightbox', xml: xmlContent
+            }));
+            drawioReplacements.push({ oldNode: parentPre, newNode: graphDiv });
+        }
+    });
+    drawioReplacements.forEach(rep => {
+        if (rep.oldNode && rep.oldNode.parentNode) {
+            rep.oldNode.parentNode.replaceChild(rep.newNode, rep.oldNode);
+        }
+    });
+
+    // Mermaid processing
+    const mermaidReplacements = [];
+    const mermaidCodeBlocks = tempContainer.querySelectorAll('pre > code.language-mermaid');
+    mermaidCodeBlocks.forEach((codeBlock) => {
+        const parentPre = codeBlock.parentElement;
+        const mermaidScript = codeBlock.textContent || '';
+        if (mermaidScript.trim()) {
+            const mermaidDiv = document.createElement('div');
+            mermaidDiv.className = 'mermaid'; // Class for Mermaid.js
+            mermaidDiv.textContent = mermaidScript; // Mermaid script goes here as text content
+            mermaidReplacements.push({ oldNode: parentPre, newNode: mermaidDiv });
+        }
+    });
+    mermaidReplacements.forEach(rep => {
+        if (rep.oldNode && rep.oldNode.parentNode) {
+            rep.oldNode.parentNode.replaceChild(rep.newNode, rep.oldNode);
+        }
+    });
+
+    const processedHtml = tempContainer.innerHTML;
+    return makeHeadingsCollapsible(processedHtml); // Returns a DocumentFragment
 }
 
 
@@ -530,38 +599,31 @@ function addMessageToDom(messageObject) {
     } else {
          const messageContentDiv = document.createElement('div'); // Create a div for main content
          if (typeof marked !== 'undefined') {
-             let rawHtml = marked.parse(content || '', { renderer: markedRenderer, ...config.markedOptions }); // Ensure content is not null
-             const tempContainer = document.createElement('div');
-             tempContainer.innerHTML = rawHtml;
-             const codeBlocks = tempContainer.querySelectorAll('pre > code.language-xml, pre > code.language-drawio');
-             const replacements = [];
-             codeBlocks.forEach((codeBlock) => {
-                 const parentPre = codeBlock.parentElement;
-                 const xmlContent = codeBlock.textContent || '';
-                 if (xmlContent.includes('<mxfile') && xmlContent.includes('</mxfile>')) {
-                     const graphDiv = document.createElement('div');
-                     graphDiv.className = 'mxgraph';
-                     graphDiv.setAttribute('style', 'max-width: 100%; border: 1px solid transparent;');
-                     graphDiv.setAttribute('data-mxgraph', JSON.stringify({
-                         highlight: '#0000ff', nav: true, resize: true, toolbar: 'zoom layers lightbox', xml: xmlContent
-                     }));
-                     replacements.push({ oldNode: parentPre, newNode: graphDiv });
-                 }
-             });
-             replacements.forEach(rep => {
-                 if (rep.oldNode && rep.oldNode.parentNode) {
-                     rep.oldNode.parentNode.replaceChild(rep.newNode, rep.oldNode);
-                 }
-             });
-             rawHtml = tempContainer.innerHTML;
-             const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
-             messageContentDiv.appendChild(collapsibleFragment);
+             const rawHtml = marked.parse(content || '', { renderer: markedRenderer, ...config.markedOptions }); // Ensure content is not null
+             const processedFragment = processHtmlContentWithDiagrams(rawHtml);
+             messageContentDiv.appendChild(processedFragment);
 
              // Initialize List.js for any tables within the message content
              const messageIdForTable = messageObject.id || `msg-${Date.now()}`;
              initializeListJsForTables(messageContentDiv, `chat-${messageIdForTable}`);
 
-             setTimeout(() => { waitForGraphViewerAndProcess(); }, 50);
+             // After appending, render diagrams
+             setTimeout(() => {
+                 // Drawio
+                 if (messageContentDiv.querySelector('.mxgraph')) {
+                     waitForGraphViewerAndProcess();
+                 }
+                 // Mermaid
+                 const mermaidNodes = messageContentDiv.querySelectorAll('.mermaid');
+                 if (mermaidNodes.length > 0) {
+                     try {
+                         console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in message.`);
+                         mermaid.run({ nodes: mermaidNodes });
+                     } catch (e) {
+                         console.error("Error in mermaid.run() for message:", e);
+                     }
+                 }
+             }, 50); // Small delay to ensure DOM is ready
          } else {
              messageContentDiv.textContent = content || ''; // Fallback, ensure content is not null
          }
@@ -1797,19 +1859,32 @@ export function updateNotesPreview() {
             // This is for when there are no H1 tabs, content directly in notesPreview
             if (typeof marked !== 'undefined') {
                 const rawHtml = marked.parse(state.noteContent || '', { renderer: markedRenderer, ...config.markedOptions });
-                // notesPreview.innerHTML = rawHtml; // Original line
-                const tempDiv = document.createElement('div'); // Use a temporary div for processing
-                tempDiv.innerHTML = rawHtml;
-                // Assuming makeHeadingsCollapsible should also run here if headings are present without H1 tabs
-                const processedFragment = makeHeadingsCollapsible(tempDiv.innerHTML);
+                const processedFragment = processHtmlContentWithDiagrams(rawHtml);
                 notesPreview.appendChild(processedFragment);
 
                 notesPreview.classList.add('prose', 'prose-sm', 'max-w-none');
 
                 // Call the helper function for tables in notesPreview
                 initializeListJsForTables(notesPreview, `note-${state.currentNoteId || 'current'}`);
+                
+                // After appending, render diagrams
+                setTimeout(() => {
+                    // Drawio
+                    if (notesPreview.querySelector('.mxgraph')) {
+                        waitForGraphViewerAndProcess();
+                    }
+                    // Mermaid
+                    const mermaidNodes = notesPreview.querySelectorAll('.mermaid');
+                    if (mermaidNodes.length > 0) {
+                        try {
+                            console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in notesPreview.`);
+                            mermaid.run({ nodes: mermaidNodes });
+                        } catch (e) {
+                            console.error("Error in mermaid.run() for notesPreview:", e);
+                        }
+                    }
+                }, 50);
 
-                waitForGraphViewerAndProcess();
                 generateAndRenderToc(state.noteContent || '');
             } else {
                 notesPreview.textContent = state.noteContent || '';
@@ -1838,14 +1913,31 @@ function _renderActiveH1SectionUI() {
 
     if (typeof marked !== 'undefined') {
         const rawHtml = marked.parse(section.rawMarkdownContent || '', { renderer: markedRenderer, ...config.markedOptions });
-        const collapsibleFragment = makeHeadingsCollapsible(rawHtml);
-        contentContainer.appendChild(collapsibleFragment);
+        const processedFragment = processHtmlContentWithDiagrams(rawHtml);
+        contentContainer.appendChild(processedFragment);
 
         // Initialize List.js for tables within the active H1 section's content
         const activeIndex = state.currentNoteActiveH1SectionIndex; // Get current index for unique ID
         initializeListJsForTables(contentContainer, `note-${state.currentNoteId || 'current'}-h1section-${activeIndex}`);
 
-        waitForGraphViewerAndProcess();
+        // After appending, render diagrams
+        setTimeout(() => {
+            // Drawio
+            if (contentContainer.querySelector('.mxgraph')) {
+                waitForGraphViewerAndProcess();
+            }
+            // Mermaid
+            const mermaidNodes = contentContainer.querySelectorAll('.mermaid');
+            if (mermaidNodes.length > 0) {
+                try {
+                    console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in H1 section.`);
+                    mermaid.run({ nodes: mermaidNodes });
+                } catch (e) {
+                    console.error("Error in mermaid.run() for H1 section:", e);
+                }
+            }
+        }, 50);
+
         generateAndRenderToc(section.rawMarkdownContent || '');
     } else {
         contentContainer.textContent = section.rawMarkdownContent || '';
