@@ -2146,12 +2146,49 @@ function renderFileContentModal() {
         embed.className = 'w-full h-[75vh]';
         fileContentModalContent.appendChild(embed);
     } else if (isTextDisplayable) {
-        console.log('[DEBUG] renderFileContentModal: Rendering as preformatted text.');
-        const pre = document.createElement('pre');
-        pre.className = 'whitespace-pre-wrap break-all p-2 bg-gray-100 dark:bg-gray-700 dark:text-gray-200 rounded text-sm overflow-auto max-h-[75vh]';
-        pre.textContent = contentForTextDisplay;
-        fileContentModalContent.appendChild(pre);
-    } else {
+        // Check if it's Markdown and process it
+        if (mimetype === 'text/markdown' || (filename && filename.toLowerCase().endsWith('.md'))) {
+            console.log('[DEBUG] renderFileContentModal: Rendering as Markdown.');
+            if (typeof marked !== 'undefined') {
+                const rawHtml = marked.parse(contentForTextDisplay, { renderer: markedRenderer, ...config.markedOptions });
+                const processedFragment = processHtmlContentWithDiagrams(rawHtml); // Use the helper
+                // fileContentModalContent is already cleared before this if/else chain.
+                fileContentModalContent.appendChild(processedFragment);
+
+                // Initialize List.js for tables within the modal content
+                initializeListJsForTables(fileContentModalContent, `file-modal-${state.currentViewingFileId || 'current'}`);
+
+                // After appending, render diagrams
+                setTimeout(() => {
+                    // Drawio
+                    if (fileContentModalContent.querySelector('.mxgraph')) {
+                        waitForGraphViewerAndProcess();
+                    }
+                    // Mermaid
+                    const mermaidNodes = fileContentModalContent.querySelectorAll('.mermaid');
+                    if (mermaidNodes.length > 0) {
+                        try {
+                            console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in file modal.`);
+                            window.mermaid.run({ nodes: mermaidNodes }); // Use window.mermaid
+                        } catch (e) {
+                            console.error("Error in window.mermaid.run() for file modal:", e);
+                        }
+                    }
+                }, 50); // Small delay to ensure DOM is ready
+            } else { // marked is undefined, fallback for Markdown
+                const pre = document.createElement('pre');
+                pre.className = 'whitespace-pre-wrap break-all p-2 bg-gray-100 dark:bg-gray-700 dark:text-gray-200 rounded text-sm overflow-auto max-h-[75vh]';
+                pre.textContent = contentForTextDisplay;
+                fileContentModalContent.appendChild(pre);
+            }
+        } else { // If isTextDisplayable but NOT markdown
+            console.log('[DEBUG] renderFileContentModal: Rendering as preformatted text (non-Markdown).');
+            const pre = document.createElement('pre');
+            pre.className = 'whitespace-pre-wrap break-all p-2 bg-gray-100 dark:bg-gray-700 dark:text-gray-200 rounded text-sm overflow-auto max-h-[75vh]';
+            pre.textContent = contentForTextDisplay;
+            fileContentModalContent.appendChild(pre);
+        }
+    } else { // Not image, not PDF, not textDisplayable
         console.log('[DEBUG] renderFileContentModal: Rendering "Preview not available" fallback.');
         const p = document.createElement('p');
         p.className = 'text-gray-600 dark:text-gray-400';
