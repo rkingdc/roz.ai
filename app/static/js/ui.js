@@ -194,13 +194,16 @@ function processHtmlContentWithDiagrams(rawHtmlInput) {
     // Mermaid processing
     const mermaidReplacements = [];
     const mermaidCodeBlocks = tempContainer.querySelectorAll('pre > code.language-mermaid');
-    mermaidCodeBlocks.forEach((codeBlock) => {
+    console.log(`[DEBUG Mermaid Process] Found ${mermaidCodeBlocks.length} 'pre > code.language-mermaid' blocks.`);
+    mermaidCodeBlocks.forEach((codeBlock, idx) => {
         const parentPre = codeBlock.parentElement;
         const mermaidScript = codeBlock.textContent || '';
+        console.log(`[DEBUG Mermaid Process] Block ${idx} script: "${mermaidScript.substring(0, 150)}..."`);
         if (mermaidScript.trim()) {
             const mermaidDiv = document.createElement('div');
             mermaidDiv.className = 'mermaid'; // Class for Mermaid.js
             mermaidDiv.textContent = mermaidScript; // Mermaid script goes here as text content
+            console.log(`[DEBUG Mermaid Process] Block ${idx} created div.mermaid with textContent: "${mermaidDiv.textContent.substring(0, 150)}..."`);
             mermaidReplacements.push({ oldNode: parentPre, newNode: mermaidDiv });
         }
     });
@@ -637,7 +640,11 @@ function addMessageToDom(messageObject) {
                  // Mermaid
                  if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
                      const mermaidNodes = messageContentDiv.querySelectorAll('.mermaid');
+                     console.log(`[DEBUG Mermaid Render - Message] Found ${mermaidNodes.length} '.mermaid' divs to process.`);
                      if (mermaidNodes.length > 0) {
+                        mermaidNodes.forEach((node, index) => {
+                            console.log(`[DEBUG Mermaid Render - Message] Node ${index} (${node.className}) textContent: "${node.textContent.substring(0,150)}..."`);
+                        });
                          try {
                              console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in message.`);
                              window.mermaid.run({ nodes: mermaidNodes });
@@ -1903,7 +1910,11 @@ export function updateNotesPreview() {
                     // Mermaid
                     if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
                         const mermaidNodes = notesPreview.querySelectorAll('.mermaid');
+                        console.log(`[DEBUG Mermaid Render - NotesPreview] Found ${mermaidNodes.length} '.mermaid' divs to process.`);
                         if (mermaidNodes.length > 0) {
+                            mermaidNodes.forEach((node, index) => {
+                                console.log(`[DEBUG Mermaid Render - NotesPreview] Node ${index} (${node.className}) textContent: "${node.textContent.substring(0,150)}..."`);
+                            });
                             try {
                                 console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in notesPreview.`);
                                 window.mermaid.run({ nodes: mermaidNodes });
@@ -1962,7 +1973,11 @@ function _renderActiveH1SectionUI() {
             // Mermaid
             if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
                 const mermaidNodes = contentContainer.querySelectorAll('.mermaid');
+                console.log(`[DEBUG Mermaid Render - H1Section] Found ${mermaidNodes.length} '.mermaid' divs to process.`);
                 if (mermaidNodes.length > 0) {
+                    mermaidNodes.forEach((node, index) => {
+                        console.log(`[DEBUG Mermaid Render - H1Section] Node ${index} (${node.className}) textContent: "${node.textContent.substring(0,150)}..."`);
+                    });
                     try {
                         console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in H1 section.`);
                         window.mermaid.run({ nodes: mermaidNodes });
@@ -2205,7 +2220,11 @@ function renderFileContentModal() {
                     // Mermaid
                     if (isMermaidInitialized && window.mermaid && typeof window.mermaid.run === 'function') {
                         const mermaidNodes = fileContentModalContent.querySelectorAll('.mermaid');
+                        console.log(`[DEBUG Mermaid Render - FileModal] Found ${mermaidNodes.length} '.mermaid' divs to process.`);
                         if (mermaidNodes.length > 0) {
+                            mermaidNodes.forEach((node, index) => {
+                                console.log(`[DEBUG Mermaid Render - FileModal] Node ${index} (${node.className}) textContent: "${node.textContent.substring(0,150)}..."`);
+                            });
                             try {
                                 console.log(`[DEBUG] Calling window.mermaid.run() for ${mermaidNodes.length} nodes in file modal.`);
                                 window.mermaid.run({ nodes: mermaidNodes });
