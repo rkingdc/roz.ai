@@ -1880,7 +1880,7 @@ export function updateNotesPreview() {
                         try {
                             console.log(`[DEBUG] Calling mermaid.run() for ${mermaidNodes.length} nodes in notesPreview.`);
                             window.mermaid.run({ nodes: mermaidNodes });
-                        } catch (e)
+                        } catch (e) {
                             console.error("Error in window.mermaid.run() for notesPreview:", e);
                         }
                     }
