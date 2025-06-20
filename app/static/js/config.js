@@ -42,16 +42,19 @@ markedRenderer.code = function(code, language, isEscaped) {
         codeString = String(code); // Fallback to string conversion
     }
 
-    // Check for Draw.io XML signature using the extracted string
-    const isDrawioXml = /<(diagram|mxGraphModel)(\s|>)/.test(codeString);
+    // The 'language' parameter from marked.js indicates the fenced language.
+    // Ensure it's a string and clean it up.
+    const lang = (typeof language === 'string' ? language : '').toLowerCase().trim();
 
-    if (isDrawioXml) {
+    // Check for Draw.io XML signature using the extracted string
+    // Also check if the language is explicitly 'xml' or 'drawio' for Drawio diagrams
+    const isDrawioXmlSignature = /<(diagram|mxGraphModel)(\s|>)/.test(codeString);
+    const isDrawioLanguage = lang === 'xml' || lang === 'drawio';
+
+    if (isDrawioXmlSignature || (isDrawioLanguage && codeString.includes('<mxfile'))) {
         // Prepare data for GraphViewer.processElements()
-        // Create a JSON object containing the raw XML string.
         const graphData = { xml: codeString };
-        // Stringify the JSON object.
         const jsonGraphData = JSON.stringify(graphData);
-        // Escape the resulting JSON string to make it safe for the HTML attribute.
         const escapedJsonData = escapeHtml(jsonGraphData);
 
         // Return the specific div structure with the escaped JSON string in data-mxgraph
@@ -61,9 +64,15 @@ markedRenderer.code = function(code, language, isEscaped) {
                      <p class="text-center text-gray-500 p-4">Processing diagram...</p>
                 </div>`;
     } else {
-        // Fallback for non-Draw.io code blocks: Use the extracted codeString.
-        const escapedCode = escapeHtml(codeString); // Escape the extracted string
-        return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code>${escapedCode}\n</code></pre>`;
+        // For other languages, including Mermaid, use a standard <pre><code> structure
+        // and ensure the language class is applied to the <code> element.
+        const className = lang ? `language-${escapeHtml(lang)}` : '';
+        const escapedCode = escapeHtml(codeString);
+        // Note: Marked.js usually handles escaping if isEscaped is false.
+        // Here, we are manually escaping for safety.
+        // The default renderer might do more sophisticated highlighting if we called it.
+        // For simplicity and direct control for Mermaid, we construct it directly.
+        return `<pre class="bg-gray-800 text-white p-2 rounded mt-1 overflow-x-auto text-sm font-mono"><code class="${className}">${escapedCode}\n</code></pre>`;
     }
 };
 
