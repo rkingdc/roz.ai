@@ -215,7 +215,7 @@ def get_chat_history_from_db(chat_id, limit=100):
 # Added optional commit parameter
 def save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=True):
     """Saves file metadata and content blob using the File model."""
-    logger.debug(f"save_file_record_to_db called for '{filename}' with commit={commit}.")
+    logger.info(f"save_file_record_to_db called for '{filename}' with commit={commit}.")
     new_file = File(
         filename=filename,
         content=content_blob,
@@ -225,7 +225,7 @@ def save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=Tr
     )
     try:
         db.session.add(new_file)
-        logger.debug(f"Added file record for '{filename}' to session.")
+        logger.info(f"Added file record for '{filename}' to session.")
         if commit:
             logger.info(f"Attempting to commit file record for '{filename}'...")
             if _commit_session():
@@ -236,7 +236,7 @@ def save_file_record_to_db(filename, content_blob, mimetype, filesize, commit=Tr
                 return None # Commit failed
         else:
             # Return the object itself so the caller can collect it
-            logger.debug(f"File record for '{filename}' added to session, commit deferred. Returning object.")
+            logger.info(f"File record for '{filename}' added to session, commit deferred. Returning object.")
             return new_file # Return the SQLAlchemy object
     except SQLAlchemyError as e:
         logger.error(f"Database error adding file record/BLOB for '{filename}' to session: {e}", exc_info=True)
@@ -618,7 +618,7 @@ def get_note_history_from_db(note_id, limit=None):
 def search_messages(search_term: str, limit: int = 10):
     """Searches messages using FTS5 and returns Message objects as dictionaries."""
     if not search_term:
-        logger.debug("Search term is empty for messages, returning empty list.")
+        logger.info("Search term is empty for messages, returning empty list.")
         return []
     try:
         # FTS5 query to get matching rowids (Message IDs) and snippets
@@ -638,7 +638,7 @@ def search_messages(search_term: str, limit: int = 10):
         message_ids = [res['id'] for res in ranked_results]
 
         if not message_ids:
-            logger.debug(f"No messages found for search term: '{search_term}'")
+            logger.info(f"No messages found for search term: '{search_term}'")
             return []
 
         # Fetch Message objects based on the IDs, and eagerly load their related Chat objects
@@ -684,7 +684,7 @@ def search_messages(search_term: str, limit: int = 10):
 def search_notes(search_term: str, limit: int = 10):
     """Searches notes using FTS5 and returns Note objects as dictionaries."""
     if not search_term:
-        logger.debug("Search term is empty for notes, returning empty list.")
+        logger.info("Search term is empty for notes, returning empty list.")
         return []
     try:
         # Column 0 in note_fts is 'content'
@@ -701,7 +701,7 @@ def search_notes(search_term: str, limit: int = 10):
         note_ids = [res['id'] for res in ranked_results]
 
         if not note_ids:
-            logger.debug(f"No notes found for search term: '{search_term}'")
+            logger.info(f"No notes found for search term: '{search_term}'")
             return []
 
         notes = db.session.query(Note).filter(Note.id.in_(note_ids)).all()
@@ -728,7 +728,7 @@ def search_notes(search_term: str, limit: int = 10):
 def search_files(search_term: str, limit: int = 10):
     """Searches file summaries using FTS5 and returns File objects as dictionaries."""
     if not search_term:
-        logger.debug("Search term is empty for files, returning empty list.")
+        logger.info("Search term is empty for files, returning empty list.")
         return []
     try:
         # Column 0 in file_fts is 'summary'
@@ -745,7 +745,7 @@ def search_files(search_term: str, limit: int = 10):
         file_ids = [res['id'] for res in ranked_results]
 
         if not file_ids:
-            logger.debug(f"No files found for search term: '{search_term}'")
+            logger.info(f"No files found for search term: '{search_term}'")
             return []
 
         files = db.session.query(File).filter(File.id.in_(file_ids)).all()
@@ -788,10 +788,10 @@ def create_new_todo_item(name, details=None, category=None, priority="medium", s
         due_date=due_date  # Assumed to be a date object or None
         # created_at and updated_at have defaults
     )
-    logger.debug(f"TodoItem object created: ID (before commit)={new_todo.id}, Name='{new_todo.name}'")
+    logger.info(f"TodoItem object created: ID (before commit)={new_todo.id}, Name='{new_todo.name}'")
     try:
         db.session.add(new_todo)
-        logger.debug(f"TodoItem ID {new_todo.id} added to session.")
+        logger.info(f"TodoItem ID {new_todo.id} added to session.")
         if _commit_session():
             logger.info(f"Successfully created and committed new todo item with ID: {new_todo.id}, Name: '{new_todo.name}'")
             return {

@@ -21,11 +21,13 @@ def get_todo_options():
 
 @bp.route('', methods=['POST'])
 def create_todo():
+
     data = request.get_json()
     if not data or not data.get('name'):
         logger.warning("Create TODO failed: Missing required field 'name'.")
         return jsonify({'error': "Missing required field: name"}), 400
 
+    
     name = data.get('name')
     details = data.get('details')
     category = data.get('category')

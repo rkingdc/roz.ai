@@ -5,7 +5,6 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from sqlalchemy import MetaData
-import google.generativeai as genai
 from flask_socketio import SocketIO # Import SocketIO
 
 # Configure logging FIRST, at the application entry point
