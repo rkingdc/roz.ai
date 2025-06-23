@@ -298,7 +298,7 @@ def test_generate_history_item_summary_content_change_on_demand(client, db, mock
     hist_v2_obj.note_diff = None 
     flask_db.session.commit()
 
-    mock_ondemand_ai = mocker.patch("app.routes.notes_routes.ai_services.generate_note_diff_summary", return_value="On-demand AI summary for V2")
+    mock_ondemand_ai = mocker.patch("app.ai_services.generate_note_diff_summary", return_value="On-demand AI summary for V2")
 
     response = client.post(f"/api/notes/{note_id}/history/{history_id_v2}/generate_summary")
     assert response.status_code == 200
@@ -328,7 +328,7 @@ def test_generate_history_item_summary_metadata_change_on_demand(client, db, moc
     hist_meta_obj = NoteHistory.query.get(history_id_metadata_change)
     assert hist_meta_obj.note_diff == "[Metadata change only]" # Set by save_note_to_db
 
-    mock_ai_summary = mocker.patch("app.routes.notes_routes.ai_services.generate_note_diff_summary")
+    mock_ai_summary = mocker.patch("app.ai_services.generate_note_diff_summary")
     response = client.post(f"/api/notes/{note_id}/history/{history_id_metadata_change}/generate_summary")
     assert response.status_code == 200
     data = response.get_json()
@@ -356,7 +356,7 @@ def test_generate_history_item_summary_ai_failure_on_demand(client, db, mocker):
     hist_fail_obj.note_diff = None # Simulate pending
     flask_db.session.commit()
 
-    mock_ai_summary = mocker.patch("app.routes.notes_routes.ai_services.generate_note_diff_summary", return_value="[AI Error] Failed")
+    mock_ai_summary = mocker.patch("app.ai_services.generate_note_diff_summary", return_value="[AI Error] Failed")
     response = client.post(f"/api/notes/{note_id}/history/{history_id_fail}/generate_summary")
     assert response.status_code == 200
     data = response.get_json()
@@ -385,7 +385,7 @@ def test_generate_history_item_summary_already_exists_on_demand(client, db, mock
     history_entry_check = NoteHistory.query.get(history_id_exists)
     assert history_entry_check.note_diff == existing_summary_text
 
-    mock_ondemand_ai = mocker.patch("app.routes.notes_routes.ai_services.generate_note_diff_summary")
+    mock_ondemand_ai = mocker.patch("app.ai_services.generate_note_diff_summary")
     response = client.post(f"/api/notes/{note_id}/history/{history_id_exists}/generate_summary")
     assert response.status_code == 200
     data = response.get_json()
