@@ -10,7 +10,7 @@ from app import db as flask_db # Alias to avoid conflict
 def create_db_file(filename="test.txt", content_type="text/plain", size=100, content_blob=b"test content", summary=None):
     new_file = File(
         filename=filename,
-        content_blob=content_blob,
+        content=content_blob,
         mimetype=content_type,
         filesize=size,
         summary=summary
@@ -80,7 +80,7 @@ def test_upload_single_file_success(client, db, mocker, app):
     # For simplicity in testing the route's response construction, let's make the mock return
     # a File object that looks like it has been committed.
     
-    mock_file_obj = File(id=1, filename="upload.txt", mimetype="text/plain", filesize=12, content_blob=b"test content")
+    mock_file_obj = File(id=1, filename="upload.txt", mimetype="text/plain", filesize=12, content=b"test content")
     mock_save_file.return_value = mock_file_obj
     mocker.patch.object(flask_db.session, 'commit') # Mock the commit
 
@@ -150,7 +150,7 @@ def test_add_file_from_url_success(client, db, mocker):
     # Mock save_file_record_to_db to return a file ID
     mock_save_db = mocker.patch("app.database.save_file_record_to_db", return_value=1)
     # Mock File.query.get to return a File object
-    mock_file_instance = File(id=1, filename="example_com.html", mimetype="text/html", filesize=29, content_blob=b"")
+    mock_file_instance = File(id=1, filename="example_com.html", mimetype="text/html", filesize=29, content=b"")
     mocker.patch.object(File.query, "get", return_value=mock_file_instance)
 
     response = client.post("/api/files/from_url", json={"url": "http://example.com"})
