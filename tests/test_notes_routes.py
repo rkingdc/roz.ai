@@ -263,7 +263,7 @@ def test_generate_history_item_summary_initial_on_demand(client, db, mocker):
     initial_hist_entry_obj = NoteHistory.query.get(history_id)
     assert initial_hist_entry_obj.note_diff == "[Initial version]" # Set by save_note_to_db
 
-    mock_ai_summary = mocker.patch("app.routes.notes_routes.ai_services.generate_note_diff_summary")
+    mock_ai_summary = mocker.patch("app.ai_services.generate_note_diff_summary")
 
     response = client.post(f"/api/notes/{note_id}/history/{history_id}/generate_summary")
     assert response.status_code == 200
