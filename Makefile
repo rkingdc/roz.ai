@@ -84,9 +84,9 @@ start: upgrade check-gcloud-auth # Depends on upgrade and check-gcloud-auth now
 launch:
 	firefox --new-tab localhost:8000 > /dev/null 
 
-test: install check-gcloud-auth # Depends on check-gcloud-auth now (if tests hit live APIs)
+test: install # Removed check-gcloud-auth dependency for local tests
 	@echo "Running tests..."
-	# Note: If your tests mock Google Cloud APIs, you might remove the check-gcloud-auth dependency here.
+	# Note: If your tests were to hit live Google Cloud APIs, you might re-add check-gcloud-auth.
 	@$(PYTHON) -m pytest $(TEST_DIR) # Now uses .venv/bin/python3
 
 lint: install
