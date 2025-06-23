@@ -59,10 +59,6 @@ def test_upload_single_file_success(client, db, mocker, app):
     # For this test, we'll assume it's populated after commit for simplicity in checking response.
     # The route itself handles the commit and then re-fetches.
     
-    # The route calls db.session.commit() itself.
-    # After commit, the file_obj in the route will have an ID.
-    # We need to ensure our mock reflects that an ID is available for the response.
-    
     # Let's refine the mocking strategy:
     # 1. Mock save_file_record_to_db to return a File instance (without ID yet, as commit is deferred)
     # 2. Mock db.session.commit()
@@ -147,20 +143,30 @@ def test_add_file_from_url_success(client, db, mocker):
         "filename": "example_com.html"
     }
     
-    # Mock save_file_record_to_db to return a file ID
-    mock_save_db = mocker.patch("app.database.save_file_record_to_db", return_value=1)
-    # Mock File.query.get to return a File object
-    mock_file_instance = File(id=1, filename="example_com.html", mimetype="text/html", filesize=29, content=b"", uploaded_at=default_utcnow())
-    mocker.patch.object(File.query, "get", return_value=mock_file_instance)
+    # Removed mocks for save_file_record_to_db and File.query.get
+    # Let the actual database functions run.
 
     response = client.post("/api/files/from_url", json={"url": "http://example.com"})
     
     assert response.status_code == 201
     data = response.get_json()
     assert data["filename"] == "example_com.html"
-    assert data["id"] == 1
+    
+    # The ID will be assigned by the database, so we need to fetch it or check the response.
+    # The response should contain the actual ID.
+    file_id_from_response = data["id"]
+    assert file_id_from_response is not None
+
+    # Verify the file was actually saved in the database
+    saved_file = File.query.get(file_id_from_response)
+    assert saved_file is not None
+    assert saved_file.filename == "example_com.html"
+    assert saved_file.mimetype == "text/html"
+    assert saved_file.filesize == len("<html><body>Test</body></html>".encode('utf-8'))
+    assert saved_file.content == "<html><body>Test</body></html>".encode('utf-8')
+
     mock_fetch_content.assert_called_once_with("http://example.com")
-    mock_save_db.assert_called_once()
+    # No assert for mock_save_db as it's no longer mocked.
 
 def test_add_file_from_url_no_url(client, db):
     response = client.post("/api/files/from_url", json={})
