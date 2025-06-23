@@ -329,10 +329,9 @@ event.listen(
         f"""
         CREATE TRIGGER IF NOT EXISTS files_ad_trigger
         AFTER DELETE ON {File.__tablename__}
-        WHEN old.summary IS NOT NULL
+        WHEN old.summary IS NOT NULL -- Ensure we only try to delete if summary existed
         BEGIN
-            INSERT INTO {file_fts_table.name} ({file_fts_table.name}, rowid, summary)
-            VALUES ('delete', old.id, old.summary);
+            DELETE FROM {file_fts_table.name} WHERE rowid = old.id;
         END;
     """
     ),
