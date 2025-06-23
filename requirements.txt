@@ -37,6 +37,7 @@ pydantic>=2.11.5 # Updated for browser-use
 # pydantic_core==2.33.1 # Removed, let pydantic handle its core version
 pyparsing==3.2.3
 pytest  # Added for unit testing
+pytest-mock # Added for mocking in tests
 python-dotenv==1.1.0
 requests==2.32.3
 requests-oauthlib==2.0.0
