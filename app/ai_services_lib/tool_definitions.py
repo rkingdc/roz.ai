@@ -14,7 +14,7 @@ WEB_SEARCH_TOOL = Tool(
             description=(
                 "Performs a web search using a search engine based on a user query. "
                 "Returns a list of search results, each including a title, link, and snippet. "
-                "Use this tool to find relevant web pages before deciding to scrape specific URLs."Y
+                "Use this tool to find relevant web pages before deciding to scrape specific URLs."
             ),
             parameters=Schema(
                 type=Type.OBJECT,
