@@ -15,7 +15,7 @@ def test_create_new_chat(client, db):
     data = response.get_json()
     assert "id" in data
     assert "name" in data # Default name is usually assigned
-    assert "model" in data # Default model is usually assigned
+    assert "model_name" in data # Default model is usually assigned
 
     # Verify in DB (optional, but good for confidence)
     chat_in_db = Chat.query.get(data["id"])
@@ -142,7 +142,7 @@ def test_save_chat_model(client, db, app):
 
     # Verify in DB
     chat_in_db = Chat.query.get(chat_id)
-    assert chat_in_db.model == new_model
+    assert chat_in_db.model_name == new_model
 
 def test_save_chat_model_no_model_name(client, db):
     """Test updating chat model without providing model_name."""
@@ -170,7 +170,7 @@ def test_save_chat_model_unknown_model(client, db, app):
     assert response.status_code == 200 # Current behavior
     # Verify in DB
     chat_in_db = Chat.query.get(chat_id)
-    assert chat_in_db.model == unknown_model
+    assert chat_in_db.model_name == unknown_model
 
 def test_save_chat_model_chat_not_found(client, db):
     """Test updating model for a non-existent chat."""
