@@ -11,6 +11,8 @@ class TestConfig(Config):
     DEBUG = False # Usually set by TESTING = True, but good to be explicit
     # If you have email sending or other external services, disable them here
     # MAIL_SUPPRESS_SEND = True
+    AVAILABLE_MODELS = ["test_model_1", "test_model_2", "test_model_default"]
+    DEFAULT_MODEL = "test_model_default"
 
 
 @pytest.fixture(scope='session')
