@@ -282,8 +282,8 @@ event.listen(
         CREATE TRIGGER IF NOT EXISTS notes_ad_trigger
         AFTER DELETE ON {Note.__tablename__}
         BEGIN
-            INSERT INTO {note_fts_table.name} ({note_fts_table.name}, rowid, content)
-            VALUES ('delete', old.id, old.content);
+            INSERT INTO {note_fts_table.name} ({note_fts_table.name}, rowid)
+            VALUES ('delete', old.id);
         END;
     """
     ),
@@ -298,8 +298,8 @@ event.listen(
         AFTER UPDATE ON {Note.__tablename__}
         WHEN new.content IS NOT old.content
         BEGIN
-            INSERT INTO {note_fts_table.name} ({note_fts_table.name}, rowid, content)
-            VALUES ('delete', old.id, old.content);
+            INSERT INTO {note_fts_table.name} ({note_fts_table.name}, rowid)
+            VALUES ('delete', old.id);
             INSERT INTO {note_fts_table.name} (rowid, content)
             VALUES (new.id, new.content);
         END;

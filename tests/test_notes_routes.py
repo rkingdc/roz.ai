@@ -25,8 +25,8 @@ def test_create_new_note(client, db):
     assert "id" in data
     assert "name" in data and data["name"] is not None
     assert "content" in data and data["content"] == ""
-    assert "created_at" in data
-    assert "last_updated_at" in data # This is actually last_saved_at from the model/db function
+    assert "last_saved_at" in data # Check for the key returned by get_note_from_db
+    # created_at is not part of the JSON response from get_note_from_db
 
     # Verify in DB
     note_in_db = Note.query.get(data["id"])
@@ -34,6 +34,8 @@ def test_create_new_note(client, db):
     assert note_in_db.id == data["id"]
     assert note_in_db.name == data["name"]
     assert note_in_db.content == ""
+    assert note_in_db.created_at is not None # Verify created_at exists on the DB model
+    assert note_in_db.last_saved_at is not None # Verify last_saved_at exists on the DB model
 
     # Verify NO initial history entry upon creation via POST /api/notes
     history_entry_count = NoteHistory.query.filter_by(note_id=data["id"]).count()
