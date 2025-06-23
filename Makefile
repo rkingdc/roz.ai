@@ -84,17 +84,15 @@ start: upgrade check-gcloud-auth # Depends on upgrade and check-gcloud-auth now
 launch:
 	firefox --new-tab localhost:8000 > /dev/null 
 
-test: install # Removed check-gcloud-auth dependency for local tests
+test:
 	@echo "Running tests..."
-	# Note: If your tests were to hit live Google Cloud APIs, you might re-add check-gcloud-auth.
-	@$(PYTHON) -m pytest $(TEST_DIR) # Now uses .venv/bin/python3
+	@$(PYTHON) -m pytest --disable-warnings $(TEST_DIR) # Now uses .venv/bin/python3
 
-lint: install
+lint:
 	@echo "Running linting..."
-	@$(PIP) install flake8 isort black > /dev/null # Ensure linters are installed silently
-	@$(VENV_DIR)/bin/flake8 $(LINT_DIR) # This was already explicit, but let's keep it consistent
-	@$(VENV_DIR)/bin/isort --check-only $(LINT_DIR) # This was already explicit
-	@$(VENV_DIR)/bin/black --check $(LINT_DIR) # This was already explicit
+	@$(VENV_DIR)/bin/flake8 $(LINT_DIR)
+	@$(VENV_DIR)/bin/isort --check-only $(LINT_DIR)
+	@$(VENV_DIR)/bin/black --check $(LINT_DIR)
 
 # New deploy target
 deploy: install
@@ -105,7 +103,6 @@ deploy: install
 	@cp $(RUN_FILE) $(RELEASE_DIR)/
 	@cp $(REQUIREMENTS_FILE) $(RELEASE_DIR)/
 	@cp .env.example $(RELEASE_DIR)/
-	# schema.sql is no longer needed or copied
 	@echo "Release bundle created successfully."
 	@echo "Run 'make start' to run the latest release."
 
