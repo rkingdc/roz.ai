@@ -13,6 +13,9 @@ class TestConfig(Config):
     # MAIL_SUPPRESS_SEND = True
     AVAILABLE_MODELS = ["test_model_1", "test_model_2", "test_model_default"]
     DEFAULT_MODEL = "test_model_default"
+    UPLOAD_FOLDER = "tests/test_uploads" # Define a test-specific upload folder
+    MAX_FILE_SIZE_BYTES = 1 * 1024 * 1024  # 1 MB for tests
+    ALLOWED_EXTENSIONS = {"txt", "pdf", "png", "jpg", "jpeg", "gif", "md", "log"}
 
 
 @pytest.fixture(scope='session')
