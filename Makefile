@@ -86,13 +86,16 @@ launch:
 
 test:
 	@echo "Running tests..."
-	@$(PYTHON) -m pytest --disable-warnings $(TEST_DIR) # Now uses .venv/bin/python3
+	@DATABASE_NAME=":memory" $(PYTHON) -m pytest --disable-warnings $(TEST_DIR) # Now uses .venv/bin/python3
 
 lint:
 	@echo "Running linting..."
 	@$(VENV_DIR)/bin/flake8 $(LINT_DIR)
 	@$(VENV_DIR)/bin/isort --check-only $(LINT_DIR)
 	@$(VENV_DIR)/bin/black --check $(LINT_DIR)
+
+backup:
+	@/usr/bin/sqlite3 /home/roz/assistant/assistant_chat_v10.db <<< ".backup /home/roz/Dropbox/projects/assistant/assistant_chat_v10.db"
 
 # New deploy target
 deploy: install
