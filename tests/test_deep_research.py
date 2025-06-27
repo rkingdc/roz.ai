@@ -13,7 +13,7 @@ import requests
 # Import the module to be tested
 from app import deep_research
 from app.plugins import web_search as web_search_plugin
-from app import ai_services # For transcribe_pdf_bytes
+from app import ai_services # For transcribe_pdf_bytes (used in the actual code, but mocked here)
 from app import database # For add_message_to_db
 from app import socketio as app_socketio # Import the actual socketio instance from app/__init__.py
 
@@ -43,64 +43,19 @@ MOCK_PDF_CONTENT_INFO = {
 }
 MOCK_TRANSCRIBED_PDF_TEXT = "This is the transcribed text from the PDF document."
 
-MOCK_LLM_TOOL_CALL_SEARCH = types.GenerateContentResponse(
-    candidates=[
-        types.Candidate(
-            content=types.Content(
-                parts=[
-                    types.Part(
-                        function_call=types.FunctionCall(name="web_search", args={"query": "test query", "num_results": 2})
-                    )
-                ]
-            )
-        )
-    ]
-)
+# MOCK_LLM_TOOL_CALL_SEARCH, MOCK_LLM_TOOL_CALL_SCRAPE, MOCK_LLM_TOOL_CALL_SCRAPE_PDF
+# These are now used directly as return values for mock_generate_text when a tool call is expected.
+# They are types.GenerateContentResponse objects, which generate_text is expected to return for tool calls.
 
-MOCK_LLM_TOOL_CALL_SCRAPE = types.GenerateContentResponse(
-    candidates=[
-        types.Candidate(
-            content=types.Content(
-                parts=[
-                    types.Part(
-                        function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/page1"})
-                    )
-                ]
-            )
-        )
-    ]
-)
+MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH = json.dumps([
+    "Title: Result 1\nLink: http://example.com/page1\nSnippet: Snippet 1\nContent: This is the scraped content from an HTML page.\n---",
+    "Title: Document\nLink: http://example.com/document.pdf\nSnippet: No Snippet Available\nContent: This is the transcribed text from the PDF document.\n---"
+])
 
-MOCK_LLM_TOOL_CALL_SCRAPE_PDF = types.GenerateContentResponse(
-    candidates=[
-        types.Candidate(
-            content=types.Content(
-                parts=[
-                    types.Part(
-                        function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/document.pdf"})
-                    )
-                ]
-            )
-        )
-    ]
-)
+MOCK_LLM_FINAL_JSON_OUTPUT_DETAILED_ANALYSIS = json.dumps(["Detailed analysis content."])
 
-MOCK_LLM_FINAL_JSON_OUTPUT = types.GenerateContentResponse(
-    candidates=[
-        types.Candidate(
-            content=types.Content(
-                parts=[
-                    types.Part(
-                        text=json.dumps([
-                            "Title: Result 1\nLink: http://example.com/page1\nSnippet: Snippet 1\nContent: This is the scraped content from an HTML page.\n---",
-                            "Title: Document\nLink: http://example.com/document.pdf\nSnippet: No Snippet Available\nContent: This is the transcribed text from the PDF document.\n---"
-                        ])
-                    )
-                ]
-            )
-        )
-    ]
-)
+MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH = json.dumps(["Additional research content."])
+
 
 MOCK_UPDATED_REPORT_PLAN = [
     ["Introduction", "Summarize the query and purpose."],
@@ -126,14 +81,14 @@ def mock_socketio():
         yield mock_sio
 
 @pytest.fixture
-def mock_genai_client():
-    """Mocks google.genai.Client and its generate_content method."""
-    with unittest.mock.patch('google.genai.Client') as MockClient:
-        mock_instance = MockClient.return_value
-        mock_instance.models.generate_content.return_value = types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="Mock LLM response")]))]
-        )
-        yield mock_instance
+def mock_generate_text():
+    """Mocks app.ai_services.generate_text."""
+    # Patch the function where deep_research *uses* it.
+    # deep_research imports `ai_services` and then calls `ai_services.generate_text`.
+    with unittest.mock.patch('app.deep_research.ai_services.generate_text') as mock_gen_text:
+        # Default return value for cases not covered by side_effect
+        mock_gen_text.return_value = "Default mock text generation response."
+        yield mock_gen_text
 
 @pytest.fixture
 def mock_web_search_plugin():
@@ -145,7 +100,9 @@ def mock_web_search_plugin():
 @pytest.fixture
 def mock_transcribe_pdf_bytes():
     """Mocks app.ai_services.transcribe_pdf_bytes."""
-    with unittest.mock.patch('app.ai_services.transcribe_pdf_bytes') as mock_transcribe:
+    # Patch the function where deep_research *uses* it, not necessarily where it's defined.
+    # deep_research imports `ai_services` and then calls `ai_services.transcribe_pdf_bytes`.
+    with unittest.mock.patch('app.deep_research.ai_services.transcribe_pdf_bytes') as mock_transcribe:
         mock_transcribe.return_value = MOCK_TRANSCRIBED_PDF_TEXT
         yield mock_transcribe
 
@@ -170,7 +127,7 @@ def mock_cpu_executor():
         yield mock_instance
 
 
-def test_perform_deep_research_success(app, mock_socketio, mock_genai_client, 
+def test_perform_deep_research_success(app, mock_socketio, mock_generate_text, 
                                        mock_web_search_plugin, mock_transcribe_pdf_bytes, 
                                        mock_add_message_to_db, mock_cpu_executor):
     """
@@ -178,96 +135,54 @@ def test_perform_deep_research_success(app, mock_socketio, mock_genai_client,
     """
     mock_perform_web_search, mock_fetch_web_content = mock_web_search_plugin
 
-    # Configure LLM mocks for each stage
-    # 1. Initial Research Plan
-    mock_genai_client.models.generate_content.side_effect = [
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_RESEARCH_PLAN))]))]
-        ),
-        # 2. Tool calls for execute_research_step (Initial Search)
-        MOCK_LLM_TOOL_CALL_SEARCH, # LLM asks for web_search
-        types.GenerateContentResponse( # LLM gets search results, then asks for scrape
-            candidates=[
-                types.Candidate(
-                    content=types.Content(
-                        parts=[
-                            types.Part.from_function_response(
-                                name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}
-                            ),
-                            types.Part(
-                                function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/page1"})
-                            )
-                        ]
-                    )
-                )
-            ]
-        ),
-        types.GenerateContentResponse( # LLM gets scrape result, then asks for scrape PDF
-            candidates=[
-                types.Candidate(
-                    content=types.Content(
-                        parts=[
-                            types.Part.from_function_response(
-                                name="scrape_url", response={"scraped_data": MOCK_HTML_CONTENT}
-                            ),
-                            types.Part(
-                                function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/document.pdf"})
-                            )
-                        ]
-                    )
-                )
-            ]
-        ),
-        types.GenerateContentResponse( # LLM gets PDF scrape result (placeholder), then final JSON
-            candidates=[
-                types.Candidate(
-                    content=types.Content(
-                        parts=[
-                            types.Part.from_function_response(
-                                name="scrape_url", response={"status": "pdf_transcription_submitted", "url": "http://example.com/document.pdf", "filename": "document.pdf", "content_placeholder": "PDF_CONTENT_PENDING_ID_MOCK"}
-                            ),
-                            types.Part(text="Ready for final JSON.") # LLM indicates it's done with tools
-                        ]
-                    )
-                )
-            ]
-        ),
-        MOCK_LLM_FINAL_JSON_OUTPUT, # LLM provides final JSON for Initial Search step
+    # Configure mock_generate_text for each stage
+    mock_generate_text.side_effect = [
+        # 1. Initial Research Plan (1 call)
+        json.dumps(MOCK_RESEARCH_PLAN),
         
-        # 3. Tool calls for execute_research_step (Detailed Analysis) - simpler for this test
-        types.GenerateContentResponse(
+        # 2. execute_research_step (Initial Search) (2 calls to generate_text)
+        MOCK_LLM_TOOL_CALL_SEARCH, # LLM asks for web_search (first call in tool loop)
+        MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH, # LLM provides final JSON for Initial Search step (second call in tool loop)
+        
+        # 3. execute_research_step (Detailed Analysis) (2 calls to generate_text)
+        types.GenerateContentResponse( # LLM interaction for tool calls (returns no tool calls, just text)
             candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for detailed analysis. Just some text.")]))]
         ),
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(["Detailed analysis content."]))] ))]
-        ),
+        MOCK_LLM_FINAL_JSON_OUTPUT_DETAILED_ANALYSIS, # LLM provides final JSON
 
-        # 4. Updated Report Plan
+        # 4. Updated Report Plan (1 call)
+        json.dumps(MOCK_UPDATED_REPORT_PLAN),
+        
+        # 5. Additional Research Steps (Introduction, Key Findings, Conclusion) (2 calls each = 6 calls)
+        # For "Introduction"
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_UPDATED_REPORT_PLAN))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Introduction. Just some text.")]))]
         ),
-        # 5. Synthesize Report Sections (for each section in MOCK_UPDATED_REPORT_PLAN)
+        MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
+        # For "Key Findings"
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
-        ), # For Introduction
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
-        ), # For Key Findings
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
-        ), # For Conclusion
-        # 6. Executive Summary
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_EXECUTIVE_SUMMARY)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Key Findings. Just some text.")]))]
         ),
-        # 7. Next Steps
+        MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
+        # For "Conclusion"
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_NEXT_STEPS)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Conclusion. Just some text.")]))]
         ),
-        # 8. Final Report Formatting
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_FINAL_REPORT)]))]
-        ),
+        MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
+
+        # 6. Synthesize Report Sections (3 calls)
+        json.dumps(MOCK_SYNTHESIZED_SECTION), # For Introduction
+        json.dumps(MOCK_SYNTHESIZED_SECTION), # For Key Findings
+        json.dumps(MOCK_SYNTHESIZED_SECTION), # For Conclusion
+        
+        # 7. Executive Summary (1 call)
+        MOCK_EXECUTIVE_SUMMARY,
+        
+        # 8. Next Steps (1 call)
+        MOCK_NEXT_STEPS,
+        
+        # 9. Final Report Formatting (1 call)
+        MOCK_FINAL_REPORT,
     ]
 
     # Configure web search/scrape mocks
@@ -308,17 +223,16 @@ def test_perform_deep_research_success(app, mock_socketio, mock_genai_client,
     # Verify PDF transcription was called
     mock_transcribe_pdf_bytes.assert_called_once_with(MOCK_PDF_BYTES, 'document.pdf', app) # Check for app instance
 
-    # Verify LLM calls (simplified check, more detailed checks can be added)
-    assert mock_genai_client.models.generate_content.call_count >= 8 # At least 1 for plan, 4 for tool loop, 1 for final JSON, 1 for updated plan, 3 for synthesis, 1 for exec summary, 1 for next steps, 1 for final format.
+    # Verify generate_text calls
+    assert mock_generate_text.call_count == 18 # 1 (plan) + 2 (initial search) + 2 (detailed analysis) + 1 (updated plan) + 6 (additional research) + 3 (synthesis) + 1 (exec summary) + 1 (next steps) + 1 (final format) = 18
 
-def test_perform_deep_research_cancellation(app, mock_socketio, mock_genai_client, mock_add_message_to_db):
+def test_perform_deep_research_cancellation(app, mock_socketio, mock_generate_text, mock_add_message_to_db):
     """
     Tests that deep research can be cancelled at an early stage.
     """
     # Mock the LLM to return a plan, but then immediately set cancellation
-    mock_genai_client.models.generate_content.return_value = types.GenerateContentResponse(
-        candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_RESEARCH_PLAN))]))]
-    )
+    # This will be the first call to generate_text
+    mock_generate_text.return_value = json.dumps(MOCK_RESEARCH_PLAN)
 
     # Create a mutable cancellation flag
     cancellation_flag = {"cancelled": False}
@@ -328,10 +242,8 @@ def test_perform_deep_research_cancellation(app, mock_socketio, mock_genai_clien
     # Set cancellation to True after the first step (plan generation)
     def set_cancel_after_plan(*args, **kwargs):
         cancellation_flag["cancelled"] = True
-        return types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_RESEARCH_PLAN))]))]
-        )
-    mock_genai_client.models.generate_content.side_effect = set_cancel_after_plan
+        return json.dumps(MOCK_RESEARCH_PLAN) # Return a valid plan for the first call
+    mock_generate_text.side_effect = set_cancel_after_plan
 
     with app.app_context():
         deep_research.perform_deep_research(
@@ -351,13 +263,12 @@ def test_perform_deep_research_cancellation(app, mock_socketio, mock_genai_clien
     # Assert error message was saved to DB
     mock_add_message_to_db.assert_called_once_with(124, "assistant", "[AI Info: Deep research cancelled before step 'Initial Search'.]")
 
-def test_perform_deep_research_llm_plan_failure(app, mock_socketio, mock_genai_client, mock_add_message_to_db):
+def test_perform_deep_research_llm_plan_failure(app, mock_socketio, mock_generate_text, mock_add_message_to_db):
     """
     Tests handling when the LLM fails to generate an initial research plan.
     """
-    mock_genai_client.models.generate_content.return_value = types.GenerateContentResponse(
-        candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="[Error: LLM failed]")]))]
-    )
+    # This will be the first call to generate_text
+    mock_generate_text.return_value = "[Error: LLM failed]" # Not valid JSON, will cause parse error
 
     with app.app_context():
         deep_research.perform_deep_research(
@@ -374,31 +285,21 @@ def test_perform_deep_research_llm_plan_failure(app, mock_socketio, mock_genai_c
     )
     mock_add_message_to_db.assert_called_once_with(125, "assistant", "[Error: Could not generate initial research plan.]")
 
-def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_genai_client, mock_web_search_plugin, mock_cpu_executor):
+def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_generate_text, mock_web_search_plugin, mock_cpu_executor):
     """
     Tests that web_search_plugin.perform_web_search is called within an app context
     when executed by the ThreadPoolExecutor.
     """
     mock_perform_web_search, mock_fetch_web_content = mock_web_search_plugin
 
-    # Mock LLM to request a web_search tool call
-    mock_genai_client.models.generate_content.side_effect = [
-        MOCK_LLM_TOOL_CALL_SEARCH, # LLM asks for web_search
-        types.GenerateContentResponse( # LLM gets search results, then final JSON
-            candidates=[
-                types.Candidate(
-                    content=types.Content(
-                        parts=[
-                            types.Part.from_function_response(
-                                name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}
-                            ),
-                            types.Part(text="Ready for final JSON.") # LLM indicates it's done with tools
-                        ]
-                    )
-                )
-            ]
-        ),
-        MOCK_LLM_FINAL_JSON_OUTPUT # LLM provides final JSON
+    # Mock generate_text to return tool call and then final JSON
+    mock_generate_text.side_effect = [
+        # LLM interaction for tool calls
+        MOCK_LLM_TOOL_CALL_SEARCH,
+        # LLM interaction for final JSON output after tool results
+        json.dumps([
+            "Title: Result 1\nLink: http://example.com/page1\nSnippet: Snippet 1\nContent: This is the scraped content from an HTML page.\n---"
+        ])
     ]
 
     # Mock perform_web_search to assert app context
@@ -424,31 +325,21 @@ def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_g
     mock_perform_web_search.assert_called_once()
     assert "Snippet 1" in llm_summary_strings[0] # Verify content from mock search results
 
-def test_execute_research_step_scrape_context_fix(app, mock_socketio, mock_genai_client, mock_web_search_plugin, mock_cpu_executor):
+def test_execute_research_step_scrape_context_fix(app, mock_socketio, mock_generate_text, mock_web_search_plugin, mock_cpu_executor):
     """
     Tests that web_search_plugin.fetch_web_content is called within an app context
     when executed by the ThreadPoolExecutor.
     """
     mock_perform_web_search, mock_fetch_web_content = mock_web_search_plugin
 
-    # Mock LLM to request a scrape_url tool call
-    mock_genai_client.models.generate_content.side_effect = [
-        MOCK_LLM_TOOL_CALL_SCRAPE, # LLM asks for scrape_url
-        types.GenerateContentResponse( # LLM gets scrape result, then final JSON
-            candidates=[
-                types.Candidate(
-                    content=types.Content(
-                        parts=[
-                            types.Part.from_function_response(
-                                name="scrape_url", response={"scraped_data": MOCK_HTML_CONTENT}
-                            ),
-                            types.Part(text="Ready for final JSON.") # LLM indicates it's done with tools
-                        ]
-                    )
-                )
-            ]
-        ),
-        MOCK_LLM_FINAL_JSON_OUTPUT # LLM provides final JSON
+    # Mock generate_text to return tool call and then final JSON
+    mock_generate_text.side_effect = [
+        # LLM interaction for tool calls
+        MOCK_LLM_TOOL_CALL_SCRAPE,
+        # LLM interaction for final JSON output after tool results
+        json.dumps([
+            "Title: Scraped Page\nLink: http://example.com/page1\nSnippet: Scraped content\nContent: This is the scraped content from an HTML page.\n---"
+        ])
     ]
 
     # Mock fetch_web_content to assert app context
@@ -474,7 +365,7 @@ def test_execute_research_step_scrape_context_fix(app, mock_socketio, mock_genai
     mock_fetch_web_content.assert_called_once()
     assert "scraped content" in llm_summary_strings[0] # Verify content from mock scrape results
 
-def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_genai_client, 
+def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_generate_text, 
                                                       mock_web_search_plugin, mock_transcribe_pdf_bytes, 
                                                       mock_add_message_to_db, mock_cpu_executor):
     """
@@ -482,68 +373,56 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
     """
     mock_perform_web_search, mock_fetch_web_content = mock_web_search_plugin
 
-    # Configure LLM mocks for each stage
-    mock_genai_client.models.generate_content.side_effect = [
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_RESEARCH_PLAN))]))]
-        ),
-        # Tool calls for execute_research_step (Initial Search) - only PDF scrape
+    # Configure mock_generate_text for each stage
+    mock_generate_text.side_effect = [
+        # 1. Initial Research Plan (1 call)
+        json.dumps(MOCK_RESEARCH_PLAN),
+        
+        # 2. execute_research_step (Initial Search) - only PDF scrape (2 calls)
         MOCK_LLM_TOOL_CALL_SCRAPE_PDF, # LLM asks for scrape PDF
-        types.GenerateContentResponse( # LLM gets PDF scrape result (placeholder), then final JSON
-            candidates=[
-                types.Candidate(
-                    content=types.Content(
-                        parts=[
-                            types.Part.from_function_response(
-                                name="scrape_url", response={"status": "pdf_transcription_submitted", "url": "http://example.com/document.pdf", "filename": "document.pdf", "content_placeholder": "PDF_CONTENT_PENDING_ID_MOCK"}
-                            ),
-                            types.Part(text="Ready for final JSON.") # LLM indicates it's done with tools
-                        ]
-                    )
-                )
-            ]
+        json.dumps([ # LLM provides final JSON for Initial Search step
+            "Title: Document\nLink: http://example.com/document.pdf\nSnippet: No Snippet Available\nContent: PDF_CONTENT_PENDING_ID_MOCK\n---"
+        ]),
+        
+        # 3. execute_research_step (Detailed Analysis) (2 calls)
+        types.GenerateContentResponse(
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for detailed analysis. Just some text.")]))]
         ),
-        types.GenerateContentResponse( # LLM provides final JSON for Initial Search step
-            candidates=[
-                types.Candidate(
-                    content=types.Content(
-                        parts=[
-                            types.Part(text=
-                                json.dumps([
-                                    "Title: Document\nLink: http://example.com/document.pdf\nSnippet: No Snippet Available\nContent: PDF_CONTENT_PENDING_ID_MOCK\n---"
-                                ])
-                            )
-                        ]
-                    )
-                )
-            ]
+        MOCK_LLM_FINAL_JSON_OUTPUT_DETAILED_ANALYSIS,
+
+        # 4. Updated Report Plan (1 call)
+        json.dumps(MOCK_UPDATED_REPORT_PLAN),
+        
+        # 5. Additional Research Steps (Introduction, Key Findings, Conclusion) (6 calls)
+        # For "Introduction"
+        types.GenerateContentResponse(
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Introduction. Just some text.")]))]
         ),
-        # Updated Report Plan
+        MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
+        # For "Key Findings"
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_UPDATED_REPORT_PLAN))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Key Findings. Just some text.")]))]
         ),
-        # Synthesize Report Sections (for each section in MOCK_UPDATED_REPORT_PLAN)
+        MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
+        # For "Conclusion"
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
-        ), # For Introduction
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
-        ), # For Key Findings
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
-        ), # For Conclusion
-        # Executive Summary
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_EXECUTIVE_SUMMARY)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Conclusion. Just some text.")]))]
         ),
-        # Next Steps
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_NEXT_STEPS)]))]
-        ),
-        # Final Report Formatting
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_FINAL_REPORT)]))]
-        ),
+        MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
+
+        # 6. Synthesize Report Sections (3 calls)
+        json.dumps(MOCK_SYNTHESIZED_SECTION), # For Introduction
+        json.dumps(MOCK_SYNTHESIZED_SECTION), # For Key Findings
+        json.dumps(MOCK_SYNTHESIZED_SECTION), # For Conclusion
+        
+        # 7. Executive Summary (1 call)
+        MOCK_EXECUTIVE_SUMMARY,
+        
+        # 8. Next Steps (1 call)
+        MOCK_NEXT_STEPS,
+        
+        # 9. Final Report Formatting (1 call)
+        MOCK_FINAL_REPORT,
     ]
 
     # Configure web scrape mock to return PDF
@@ -567,91 +446,73 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
 
     # Assertions
     mock_fetch_web_content.assert_called_once_with(url="http://example.com/document.pdf")
-    mock_cpu_executor.submit.assert_called_once_with(ai_services.transcribe_pdf_bytes, MOCK_PDF_BYTES, 'document.pdf', app) # Check for app instance
+    # The mock_transcribe_pdf_bytes fixture patches `app.deep_research.ai_services.transcribe_pdf_bytes`
+    # so the call to `submit` will receive the *mock* object, not the original function.
+    mock_cpu_executor.submit.assert_called_once_with(mock_transcribe_pdf_bytes, MOCK_PDF_BYTES, 'document.pdf', app) # Check for app instance
     mock_transcribe_pdf_bytes.assert_called_once() # Ensure the actual transcription function was called via the executor
 
     # Verify the final report content contains the transcribed text, not the placeholder
-    # This requires inspecting the arguments passed to create_exec_summary or final_report
-    # Since we mocked the final_report output, we need to check the input to it.
-    # The easiest way is to check the `collected_research` after `execute_research_step`
-    # or the `full_report_body` before `create_exec_summary`.
-    # For this test, we'll rely on the fact that if the flow completes, the placeholder
-    # must have been replaced for the subsequent LLM calls to work correctly.
-    
-    # For now, let's check the final emitted report, assuming the mock for final_report
-    # would have received the correctly substituted content.
     # This is a limitation of mocking the final step, but the core PDF flow is tested.
     mock_socketio.emit.assert_any_call("deep_research_result", {"report": MOCK_FINAL_REPORT}, room="test_sid")
     mock_add_message_to_db.assert_called_once_with(126, "assistant", MOCK_FINAL_REPORT)
+    assert mock_generate_text.call_count == 18 # Total generate_text calls
 
-def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_genai_client, mock_web_search_plugin, mock_cpu_executor, mock_add_message_to_db):
+def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_generate_text, mock_web_search_plugin, mock_cpu_executor, mock_add_message_to_db):
     """
     Tests handling when web search fails during a research step.
     """
     mock_perform_web_search, mock_fetch_web_content = mock_web_search_plugin
 
-    # Configure LLM mocks
-    mock_genai_client.models.generate_content.side_effect = [
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_RESEARCH_PLAN))]))]
-        ),
-        # Tool calls for execute_research_step (Initial Search)
+    # Configure mock_generate_text
+    mock_generate_text.side_effect = [
+        # 1. Initial Research Plan (1 call)
+        json.dumps(MOCK_RESEARCH_PLAN),
+        
+        # 2. execute_research_step (Initial Search) (2 calls)
         MOCK_LLM_TOOL_CALL_SEARCH, # LLM asks for web_search
-        types.GenerateContentResponse( # LLM gets search results, then final JSON
-            candidates=[
-                types.Candidate(
-                    content=types.Content(
-                        parts=[
-                            types.Part.from_function_response(
-                                name="web_search", response={"error": {"type": "tool_retry_failed", "message": "Web search failed after retries"}}
-                            ),
-                            types.Part(text="Ready for final JSON.") # LLM indicates it's done with tools
-                        ]
-                    )
-                )
-            ]
+        json.dumps([ # LLM provides final JSON for Initial Search step (with error message)
+            "Title: Search Error\nLink: \nSnippet: [System Error: Web search failed. Reason: 500 Internal Server Error]\nContent: [System Error: Web search failed. Reason: 500 Internal Server Error]\n---"
+        ]),
+        
+        # 3. execute_research_step (Detailed Analysis) (2 calls)
+        types.GenerateContentResponse(
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for detailed analysis. Just some text.")]))]
         ),
-        types.GenerateContentResponse( # LLM provides final JSON for Initial Search step
-            candidates=[
-                types.Candidate(
-                    content=types.Content(
-                        parts=[
-                            types.Part(text=
-                                json.dumps([
-                                    "Title: Search Error\nLink: \nSnippet: [System Error: Web search failed. Reason: 500 Internal Server Error]\nContent: [System Error: Web search failed. Reason: 500 Internal Server Error]\n---"
-                                ])
-                            )
-                        ]
-                    )
-                )
-            ]
+        MOCK_LLM_FINAL_JSON_OUTPUT_DETAILED_ANALYSIS,
+
+        # 4. Updated Report Plan (1 call)
+        json.dumps(MOCK_UPDATED_REPORT_PLAN),
+        
+        # 5. Additional Research Steps (Introduction, Key Findings, Conclusion) (6 calls)
+        # For "Introduction"
+        types.GenerateContentResponse(
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Introduction. Just some text.")]))]
         ),
-        # Updated Report Plan
+        MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
+        # For "Key Findings"
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_UPDATED_REPORT_PLAN))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Key Findings. Just some text.")]))]
         ),
-        # Synthesize Report Sections (for each section in MOCK_UPDATED_REPORT_PLAN)
+        MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
+        # For "Conclusion"
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
-        ), # For Introduction
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
-        ), # For Key Findings
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
-        ), # For Conclusion
-        # Executive Summary
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_EXECUTIVE_SUMMARY)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Conclusion. Just some text.")]))]
         ),
-        # Next Steps
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_NEXT_STEPS)]))]
-        ),
-        # Final Report Formatting
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_FINAL_REPORT)]))]
-        ),
+        MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
+
+        # 6. Synthesize Report Sections (3 calls)
+        json.dumps(MOCK_SYNTHESIZED_SECTION), # For Introduction
+        json.dumps(MOCK_SYNTHESIZED_SECTION), # For Key Findings
+        json.dumps(MOCK_SYNTHESIZED_SECTION), # For Conclusion
+        
+        # 7. Executive Summary (1 call)
+        MOCK_EXECUTIVE_SUMMARY,
+        
+        # 8. Next Steps (1 call)
+        MOCK_NEXT_STEPS,
+        
+        # 9. Final Report Formatting (1 call)
+        MOCK_FINAL_REPORT,
     ]
 
     # Simulate web search failure
@@ -667,22 +528,18 @@ def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_genai
         )
 
     # Verify that an error message related to search failure is in the collected research
-    # This is tricky because the error is handled internally by the LLM's tool response.
-    # We need to check the final report content or the status updates.
-    # The LLM is expected to incorporate the tool error into its final JSON output.
-    # The MOCK_LLM_FINAL_JSON_OUTPUT above reflects this.
     mock_socketio.emit.assert_any_call(
         "task_error",
         unittest.mock.ANY, # Match any dictionary for the second argument
         room="test_sid"
     )
     # And then more specifically check the content of the error message
-    # Find the call that emitted 'task_error'
     emitted_calls = [call for call in mock_socketio.emit.call_args_list if call[0][0] == "task_error"]
     assert len(emitted_calls) > 0
     error_message_dict = emitted_calls[0][0][1] # Get the dictionary from the first 'task_error' call
     assert "error" in error_message_dict
     assert "Failed to generate the report outline" in error_message_dict["error"]
 
-    # Ensure the web search was attempted
-    mock_perform_web_search.assert_called_once()
+    # Ensure the web search was attempted multiple times due to retries
+    assert mock_perform_web_search.call_count == 3
+    assert mock_generate_text.call_count == 18 # Total generate_text calls
