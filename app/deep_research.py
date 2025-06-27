@@ -215,8 +215,6 @@ def execute_research_step(
     logger.info(f"Executing research step: {step_description[:100]}...")
     processed_research_items = []
 
-    # This function is already called within an app context from perform_deep_research.
-    # So, current_app and g are available here.
     try:
         # --- Client Acquisition (copied from old web_search, ensure it's robust) ---
         api_key = flask_app.config.get("API_KEY")
@@ -375,84 +373,84 @@ Indicate you are ready for the final compilation step once all searches and scra
                             name=fc_name, 
                             response={"error": {"type": "unknown_tool", "message": f"Unknown tool: {fc_name}"}}
                         )
-                            conversation_history.append(types.Content(parts=[err_resp_part], role="tool"))
-                            continue
+                        conversation_history.append(types.Content(parts=[err_resp_part], role="tool"))
+                        continue
                         
-                        if callable_task:
-                            tasks_for_this_llm_response.append({'callable': callable_task, 'original_fc': fc})
+                    if callable_task:
+                        tasks_for_this_llm_response.append({'callable': callable_task, 'original_fc': fc})
+            
+            if not tasks_for_this_llm_response:
+                # LLM did not request any tools in this turn, it might have provided text.
+                logger.info("LLM provided text response or no tools in this turn, exiting manual tool loop.")
+                consecutive_empty_tool_turns +=1
+                if consecutive_empty_tool_turns >= MAX_CONSECUTIVE_EMPTY_TOOL_CALL_TURNS:
+                    logger.warning(f"LLM provided no tool calls for {MAX_CONSECUTIVE_EMPTY_TOOL_CALL_TURNS} consecutive turns. Breaking tool loop.")
+                    break
+                # If it's just one turn of no tools, maybe it's thinking or summarizing before a final JSON.
+                # The main loop break condition is if LLM outputs text (no function_call).
+                # If there was any text part in model_response_content.parts, we assume it's done.
+                has_text_part = any(part.text for part in model_response_content.parts if hasattr(part, 'text'))
+                if has_text_part:
+                    break # Exit loop, proceed to final JSON generation
+                else: # No text and no tools, this is an empty response from LLM.
+                    logger.warning("LLM returned no tools and no text. Continuing tool loop for now.")
+                    continue # Next turn of the tool loop
+            else:
+                consecutive_empty_tool_turns = 0 # Reset counter if tools were called
                 
-                if not tasks_for_this_llm_response:
-                    # LLM did not request any tools in this turn, it might have provided text.
-                    logger.info("LLM provided text response or no tools in this turn, exiting manual tool loop.")
-                    consecutive_empty_tool_turns +=1
-                    if consecutive_empty_tool_turns >= MAX_CONSECUTIVE_EMPTY_TOOL_CALL_TURNS:
-                        logger.warning(f"LLM provided no tool calls for {MAX_CONSECUTIVE_EMPTY_TOOL_CALL_TURNS} consecutive turns. Breaking tool loop.")
-                        break
-                    # If it's just one turn of no tools, maybe it's thinking or summarizing before a final JSON.
-                    # The main loop break condition is if LLM outputs text (no function_call).
-                    # If there was any text part in model_response_content.parts, we assume it's done.
-                    has_text_part = any(part.text for part in model_response_content.parts if hasattr(part, 'text'))
-                    if has_text_part:
-                        break # Exit loop, proceed to final JSON generation
-                    else: # No text and no tools, this is an empty response from LLM.
-                        logger.warning("LLM returned no tools and no text. Continuing tool loop for now.")
-                        continue # Next turn of the tool loop
-                else:
-                    consecutive_empty_tool_turns = 0 # Reset counter if tools were called
-                    
-                    function_response_parts_batch = []
-                    # Max workers for I/O bound tasks like web requests
-                    # TODO: Consider making this configurable or dynamic
-                    num_workers = min(len(tasks_for_this_llm_response), 10) 
-                    
-                    if socketio and sid:
-                        socketio.emit("status_update", {"message": f"Executing {len(tasks_for_this_llm_response)} tool(s) in parallel..."}, room=sid)
+                function_response_parts_batch = []
+                # Max workers for I/O bound tasks like web requests
+                # TODO: Consider making this configurable or dynamic
+                num_workers = min(len(tasks_for_this_llm_response), 10) 
+                
+                if socketio and sid:
+                    socketio.emit("status_update", {"message": f"Executing {len(tasks_for_this_llm_response)} tool(s) in parallel..."}, room=sid)
 
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
-                        future_to_fc_info = {
-                            executor.submit(task_info['callable']): task_info['original_fc']
-                            for task_info in tasks_for_this_llm_response
-                        }
+                with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+                    future_to_fc_info = {
+                        executor.submit(task_info['callable']): task_info['original_fc']
+                        for task_info in tasks_for_this_llm_response
+                    }
 
-                        for future in concurrent.futures.as_completed(future_to_fc_info):
-                            original_fc = future_to_fc_info[future]
-                            fc_name = original_fc.name
-                            function_response_data_for_llm = {}
-                            try:
-                                tool_call_result_data = future.result() # This is the direct return from the plugin function
+                    for future in concurrent.futures.as_completed(future_to_fc_info):
+                        original_fc = future_to_fc_info[future]
+                        fc_name = original_fc.name
+                        function_response_data_for_llm = {}
+                        try:
+                            tool_call_result_data = future.result() # This is the direct return from the plugin function
 
-                                if fc_name == "web_search":
-                                    function_response_data_for_llm = {"results": tool_call_result_data}
-                                elif fc_name == "scrape_url":
-                                    if tool_call_result_data['type'] == 'pdf' and isinstance(tool_call_result_data['content'], bytes):
-                                        pdf_bytes = tool_call_result_data['content']
-                                        pdf_filename = tool_call_result_data.get('filename', 'scraped.pdf')
-                                        original_url = tool_call_result_data.get('url', 'unknown_url')
-                                        placeholder_id = str(uuid.uuid4())
-                                        placeholder_string_for_llm = f"PDF_CONTENT_PENDING_ID_{placeholder_id}"
-                                        
-                                        logger.info(f"Submitting PDF for async transcription: {pdf_filename}, placeholder: {placeholder_string_for_llm}")
-                                        if socketio and sid:
-                                            socketio.emit("status_update", {"message": f"PDF queued for transcription: {pdf_filename[:25]}..."}, room=sid)
-                                        
-                                        transcription_future = cpu_executor.submit(transcribe_pdf_bytes, pdf_bytes, pdf_filename, flask_app) # Pass flask_app
-                                        submitted_pdf_futures_info.append({
-                                            'placeholder': placeholder_string_for_llm,
-                                            'future': transcription_future,
-                                            'original_url': original_url, # Store for context
-                                            'original_filename': pdf_filename
-                                        })
-                                        # Respond to LLM that transcription is pending
-                                        function_response_data_for_llm = {
-                                            "status": "pdf_transcription_submitted", 
-                                            "url": original_url, 
-                                            "filename": pdf_filename, 
-                                            "content_placeholder": placeholder_string_for_llm
-                                        }
-                                    else: # HTML or error from scrape
-                                        function_response_data_for_llm = {"scraped_data": tool_call_result_data}
-                                else: 
-                                    function_response_data_for_llm = {"error": f"Unknown tool {fc_name} result processing."}
+                            if fc_name == "web_search":
+                                function_response_data_for_llm = {"results": tool_call_result_data}
+                            elif fc_name == "scrape_url":
+                                if tool_call_result_data['type'] == 'pdf' and isinstance(tool_call_result_data['content'], bytes):
+                                    pdf_bytes = tool_call_result_data['content']
+                                    pdf_filename = tool_call_result_data.get('filename', 'scraped.pdf')
+                                    original_url = tool_call_result_data.get('url', 'unknown_url')
+                                    placeholder_id = str(uuid.uuid4())
+                                    placeholder_string_for_llm = f"PDF_CONTENT_PENDING_ID_{placeholder_id}"
+                                    
+                                    logger.info(f"Submitting PDF for async transcription: {pdf_filename}, placeholder: {placeholder_string_for_llm}")
+                                    if socketio and sid:
+                                        socketio.emit("status_update", {"message": f"PDF queued for transcription: {pdf_filename[:25]}..."}, room=sid)
+                                    
+                                    transcription_future = cpu_executor.submit(transcribe_pdf_bytes, pdf_bytes, pdf_filename, flask_app) # Pass flask_app
+                                    submitted_pdf_futures_info.append({
+                                        'placeholder': placeholder_string_for_llm,
+                                        'future': transcription_future,
+                                        'original_url': original_url, # Store for context
+                                        'original_filename': pdf_filename
+                                    })
+                                    # Respond to LLM that transcription is pending
+                                    function_response_data_for_llm = {
+                                        "status": "pdf_transcription_submitted", 
+                                        "url": original_url, 
+                                        "filename": pdf_filename, 
+                                        "content_placeholder": placeholder_string_for_llm
+                                    }
+                                else: # HTML or error from scrape
+                                    function_response_data_for_llm = {"scraped_data": tool_call_result_data}
+                            else: 
+                                function_response_data_for_llm = {"error": f"Unknown tool {fc_name} result processing."}
                                 
                             except RETRYABLE_EXCEPTIONS as retry_exc:
                                 error_msg = f"Tool call {fc_name} failed after multiple retries: {type(retry_exc).__name__} - {str(retry_exc)}"
@@ -579,17 +577,12 @@ Example Format:
   ["Introduction", "Define the fundamental principles and terminology related to the query."],
   ["Identify Key Players", "Find the main individuals, companies, or organizations involved."],
   ["Analyze Current Trends", "Research the latest developments, challenges, and opportunities."]
-]
+    ]
+    ```
 
+    User Query: "{query}"
 
-Note: This example structure is illustrative and the actual sections should be derived directly from the research and query.
-
-Original User Query: "{query}"
-
-Collected Research Snippets:
-{research_summary}
-
-Refined Report Plan (JSON):
+    Research Plan (JSON):
     """
     try:
         llm_response = generate_text(prompt)
@@ -1093,7 +1086,7 @@ def perform_deep_research(
                     logger.debug(f"Description: {section_description}")
                     try:
                         llm_summary_strings, step_pdf_futures_info = execute_research_step(
-                            section_description, 
+                            step_description, 
                             is_cancelled_callback,
                             socketio,
                             sid,
@@ -1261,7 +1254,7 @@ def perform_deep_research(
                         # Mark this specific one as cancelled if it wasn't already processed
                         if section_name_completed not in temp_report_sections_results:
                             temp_report_sections_results[section_name_completed] = f"## {section_name_completed}\n\n[Synthesis cancelled by user.]\n"
-                            temp_report_references_results[sn + "_references"] = []
+                            temp_report_references_results[section_name_completed + "_references"] = []
                         continue # Don't process more futures if cancelled
 
                     try:
