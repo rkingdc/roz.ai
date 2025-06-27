@@ -43,9 +43,48 @@ MOCK_PDF_CONTENT_INFO = {
 }
 MOCK_TRANSCRIBED_PDF_TEXT = "This is the transcribed text from the PDF document."
 
-# MOCK_LLM_TOOL_CALL_SEARCH, MOCK_LLM_TOOL_CALL_SCRAPE, MOCK_LLM_TOOL_CALL_SCRAPE_PDF
-# These are now used directly as return values for mock_generate_text when a tool call is expected.
-# They are types.GenerateContentResponse objects, which generate_text is expected to return for tool calls.
+# Re-adding definitions for LLM tool call responses
+MOCK_LLM_TOOL_CALL_SEARCH = types.GenerateContentResponse(
+    candidates=[
+        types.Candidate(
+            content=types.Content(
+                parts=[
+                    types.Part(
+                        function_call=types.FunctionCall(name="web_search", args={"query": "test query", "num_results": 2})
+                    )
+                ]
+            )
+        )
+    ]
+)
+
+MOCK_LLM_TOOL_CALL_SCRAPE = types.GenerateContentResponse(
+    candidates=[
+        types.Candidate(
+            content=types.Content(
+                parts=[
+                    types.Part(
+                        function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/page1"})
+                    )
+                ]
+            )
+        )
+    ]
+)
+
+MOCK_LLM_TOOL_CALL_SCRAPE_PDF = types.GenerateContentResponse(
+    candidates=[
+        types.Candidate(
+            content=types.Content(
+                parts=[
+                    types.Part(
+                        function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/document.pdf"})
+                    )
+                ]
+            )
+        )
+    ]
+)
 
 MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH = json.dumps([
     "Title: Result 1\nLink: http://example.com/page1\nSnippet: Snippet 1\nContent: This is the scraped content from an HTML page.\n---",
