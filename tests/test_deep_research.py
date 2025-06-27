@@ -414,7 +414,7 @@ def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_g
             lambda: False, # Not cancelled
             mock_socketio,
             "test_sid",
-            app, # Pass the app object directly
+            app.app_context(), # Pass the app context object
             mock_cpu_executor
         )
 
@@ -464,7 +464,7 @@ def test_execute_research_step_scrape_context_fix(app, mock_socketio, mock_genai
             lambda: False, # Not cancelled
             mock_socketio,
             "test_sid",
-            app, # Pass the app object directly
+            app.app_context(), # Pass the app context object
             mock_cpu_executor
         )
 
