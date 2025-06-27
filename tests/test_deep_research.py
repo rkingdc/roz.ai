@@ -131,7 +131,7 @@ def mock_genai_client():
     with unittest.mock.patch('google.genai.Client') as MockClient:
         mock_instance = MockClient.return_value
         mock_instance.models.generate_content.return_value = types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text("Mock LLM response")]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="Mock LLM response")]))]
         )
         yield mock_instance
 
@@ -179,7 +179,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_genai_client,
     # 1. Initial Research Plan
     mock_genai_client.models.generate_content.side_effect = [
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_RESEARCH_PLAN))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_RESEARCH_PLAN))]))]
         ),
         # 2. Tool calls for execute_research_step (Initial Search)
         MOCK_LLM_TOOL_CALL_SEARCH, # LLM asks for web_search
@@ -233,37 +233,37 @@ def test_perform_deep_research_success(app, mock_socketio, mock_genai_client,
         
         # 3. Tool calls for execute_research_step (Detailed Analysis) - simpler for this test
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text("No tools needed for detailed analysis. Just some text.")]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for detailed analysis. Just some text.")]))]
         ),
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(["Detailed analysis content."]))] ))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(["Detailed analysis content."]))] ))]
         ),
 
         # 4. Updated Report Plan
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_UPDATED_REPORT_PLAN))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_UPDATED_REPORT_PLAN))]))]
         ),
         # 5. Synthesize Report Sections (for each section in MOCK_UPDATED_REPORT_PLAN)
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
         ), # For Introduction
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
         ), # For Key Findings
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
         ), # For Conclusion
         # 6. Executive Summary
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(MOCK_EXECUTIVE_SUMMARY)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_EXECUTIVE_SUMMARY)]))]
         ),
         # 7. Next Steps
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(MOCK_NEXT_STEPS)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_NEXT_STEPS)]))]
         ),
         # 8. Final Report Formatting
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(MOCK_FINAL_REPORT)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_FINAL_REPORT)]))]
         ),
     ]
 
@@ -314,7 +314,7 @@ def test_perform_deep_research_cancellation(app, mock_socketio, mock_genai_clien
     """
     # Mock the LLM to return a plan, but then immediately set cancellation
     mock_genai_client.models.generate_content.return_value = types.GenerateContentResponse(
-        candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_RESEARCH_PLAN))]))]
+        candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_RESEARCH_PLAN))]))]
     )
 
     # Create a mutable cancellation flag
@@ -326,7 +326,7 @@ def test_perform_deep_research_cancellation(app, mock_socketio, mock_genai_clien
     def set_cancel_after_plan(*args, **kwargs):
         cancellation_flag["cancelled"] = True
         return types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_RESEARCH_PLAN))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_RESEARCH_PLAN))]))]
         )
     mock_genai_client.models.generate_content.side_effect = set_cancel_after_plan
 
@@ -353,7 +353,7 @@ def test_perform_deep_research_llm_plan_failure(app, mock_socketio, mock_genai_c
     Tests handling when the LLM fails to generate an initial research plan.
     """
     mock_genai_client.models.generate_content.return_value = types.GenerateContentResponse(
-        candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text("[Error: LLM failed]")]))]
+        candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="[Error: LLM failed]")]))]
     )
 
     with app.app_context():
@@ -482,7 +482,7 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
     # Configure LLM mocks for each stage
     mock_genai_client.models.generate_content.side_effect = [
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_RESEARCH_PLAN))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_RESEARCH_PLAN))]))]
         ),
         # Tool calls for execute_research_step (Initial Search) - only PDF scrape
         MOCK_LLM_TOOL_CALL_SCRAPE_PDF, # LLM asks for scrape PDF
@@ -505,7 +505,7 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
                 types.Candidate(
                     content=types.Content(
                         parts=[
-                            types.Part.from_text(
+                            types.Part(text=
                                 json.dumps([
                                     "Title: Document\nLink: http://example.com/document.pdf\nSnippet: No Snippet Available\nContent: PDF_CONTENT_PENDING_ID_MOCK\n---"
                                 ])
@@ -517,29 +517,29 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
         ),
         # Updated Report Plan
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_UPDATED_REPORT_PLAN))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_UPDATED_REPORT_PLAN))]))]
         ),
         # Synthesize Report Sections (for each section in MOCK_UPDATED_REPORT_PLAN)
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
         ), # For Introduction
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
         ), # For Key Findings
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
         ), # For Conclusion
         # Executive Summary
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(MOCK_EXECUTIVE_SUMMARY)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_EXECUTIVE_SUMMARY)]))]
         ),
         # Next Steps
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(MOCK_NEXT_STEPS)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_NEXT_STEPS)]))]
         ),
         # Final Report Formatting
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(MOCK_FINAL_REPORT)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_FINAL_REPORT)]))]
         ),
     ]
 
@@ -591,7 +591,7 @@ def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_genai
     # Configure LLM mocks
     mock_genai_client.models.generate_content.side_effect = [
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_RESEARCH_PLAN))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_RESEARCH_PLAN))]))]
         ),
         # Tool calls for execute_research_step (Initial Search)
         MOCK_LLM_TOOL_CALL_SEARCH, # LLM asks for web_search
@@ -614,7 +614,7 @@ def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_genai
                 types.Candidate(
                     content=types.Content(
                         parts=[
-                            types.Part.from_text(
+                            types.Part(text=
                                 json.dumps([
                                     "Title: Search Error\nLink: \nSnippet: [System Error: Web search failed. Reason: 500 Internal Server Error]\nContent: [System Error: Web search failed. Reason: 500 Internal Server Error]\n---"
                                 ])
@@ -626,29 +626,29 @@ def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_genai
         ),
         # Updated Report Plan
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_UPDATED_REPORT_PLAN))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_UPDATED_REPORT_PLAN))]))]
         ),
         # Synthesize Report Sections (for each section in MOCK_UPDATED_REPORT_PLAN)
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
         ), # For Introduction
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
         ), # For Key Findings
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=json.dumps(MOCK_SYNTHESIZED_SECTION))]))]
         ), # For Conclusion
         # Executive Summary
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(MOCK_EXECUTIVE_SUMMARY)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_EXECUTIVE_SUMMARY)]))]
         ),
         # Next Steps
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(MOCK_NEXT_STEPS)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_NEXT_STEPS)]))]
         ),
         # Final Report Formatting
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(MOCK_FINAL_REPORT)]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text=MOCK_FINAL_REPORT)]))]
         ),
     ]
 
