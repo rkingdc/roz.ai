@@ -395,7 +395,7 @@ Indicate you are ready for the final compilation step once all searches and scra
                 else: # No text and no tools, this is an empty response from LLM.
                     logger.warning("LLM returned no tools and no text. Continuing tool loop for now.")
                     continue # Next turn of the tool loop
-            else:
+            else: # This else belongs to the 'if not tasks_for_this_llm_response' block
                 consecutive_empty_tool_turns = 0 # Reset counter if tools were called
                 
                 function_response_parts_batch = []
@@ -468,17 +468,18 @@ Indicate you are ready for the final compilation step once all searches and scra
                     if function_response_parts_batch:
                         conversation_history.append(types.Content(parts=function_response_parts_batch, role="tool"))
                     # Continue to the next turn of the tool loop
-            else: # Loop finished due to MAX_TOOL_TURNS
-                logger.warning(f"Exceeded MAX_TOOL_TURNS ({MAX_TOOL_TURNS}). Proceeding to final JSON generation.")
+            # This else belongs to the 'for turn_count in range(MAX_TOOL_TURNS)' loop
+        else: # Loop finished due to MAX_TOOL_TURNS
+            logger.warning(f"Exceeded MAX_TOOL_TURNS ({MAX_TOOL_TURNS}). Proceeding to final JSON generation.")
 
 
-            if is_cancelled_callback():
-                logger.info("Research step cancelled after manual tool loop, before final JSON generation.")
-                processed_research_items.append("[AI Info: Research step cancelled by user.]")
-                return processed_research_items, submitted_pdf_futures_info
+        if is_cancelled_callback():
+            logger.info("Research step cancelled after manual tool loop, before final JSON generation.")
+            processed_research_items.append("[AI Info: Research step cancelled by user.]")
+            return processed_research_items, submitted_pdf_futures_info
 
-            # Step B: Final JSON Generation
-            final_json_prompt_text = """
+        # Step B: Final JSON Generation
+        final_json_prompt_text = """
 Based on our entire preceding interaction, including all search queries, search results, and scraped content:
 Compile all the gathered information. For each distinct source of information you considered (whether successfully scraped, a PDF, failed scrape, or snippet-only), format it as a string:
 "Title: [Title]\nLink: [URL]\nSnippet: [Original snippet]\nContent: [Summary of scraped content / 'PDF document, content not directly viewable.' / 'Scraping failed.' / 'Snippet only.']\n---"
@@ -486,57 +487,57 @@ Compile all the gathered information. For each distinct source of information yo
 Your *FINAL and ONLY* output for this entire multi-phase task MUST be a single JSON list containing all these formatted source strings.
 This JSON list should be the *only content* in your response. Do not include any other text, commentary, or acknowledgments.
 """
-            # Add this new instruction to the conversation history
-            conversation_history.append(types.Content(parts=[types.Part.from_text(text=final_json_prompt_text)], role="user"))
+        # Add this new instruction to the conversation history
+        conversation_history.append(types.Content(parts=[types.Part.from_text(text=final_json_prompt_text)], role="user"))
 
-            max_tokens_final = current_app.config.get("DEFAULT_MAX_OUTPUT_TOKENS", 8192)
-            final_json_generation_config = types.GenerateContentConfig(
-                tool_config=types.ToolConfig(
-                    function_calling_config=types.FunctionCallingConfig(mode=types.FunctionCallingConfigMode.NONE)
-                ),
-                max_output_tokens=max_tokens_final,
-                response_mime_type='text/plain'
-            )
+        max_tokens_final = current_app.config.get("DEFAULT_MAX_OUTPUT_TOKENS", 8192)
+        final_json_generation_config = types.GenerateContentConfig(
+            tool_config=types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(mode=types.FunctionCallingConfigMode.NONE)
+            ),
+            max_output_tokens=max_tokens_final,
+            response_mime_type='text/plain'
+        )
 
-            if socketio and sid:
-                socketio.emit("status_update", {"message": f"Compiling research: {step_description[:30]}..."}, room=sid)
-            
-            final_response = gemini_client.models.generate_content(
-                model=model_to_use,
-                contents=conversation_history, # Pass the whole history
-                config=final_json_generation_config
-            )
+        if socketio and sid:
+            socketio.emit("status_update", {"message": f"Compiling research: {step_description[:30]}..."}, room=sid)
+        
+        final_response = gemini_client.models.generate_content(
+            model=model_to_use,
+            contents=conversation_history, # Pass the whole history
+            config=final_json_generation_config
+        )
 
-            final_model_output_text = None
-            if final_response.candidates and final_response.candidates[0].content and final_response.candidates[0].content.parts:
-                # The model's final textual reply should be the last part.
-                for part in reversed(final_response.candidates[0].content.parts): # Check the last response's parts
-                    if part.text:
-                        final_model_output_text = part.text
-                        break
-                if not final_model_output_text and final_response.text:
-                     logger.info("Using final_response.text as fallback for final JSON output.")
-                     final_model_output_text = final_response.text
+        final_model_output_text = None
+        if final_response.candidates and final_response.candidates[0].content and final_response.candidates[0].content.parts:
+            # The model's final textual reply should be the last part.
+            for part in reversed(final_response.candidates[0].content.parts): # Check the last response's parts
+                if part.text:
+                    final_model_output_text = part.text
+                    break
+            if not final_model_output_text and final_response.text:
+                 logger.info("Using final_response.text as fallback for final JSON output.")
+                 final_model_output_text = final_response.text
 
 
-            if final_model_output_text:
-                logger.debug(f"LLM final JSON output text for research step: {final_model_output_text[:500]}")
-                parsed_items = parse_llm_json_output(final_model_output_text, expected_keys=[]) # Expecting a list of strings
-                if isinstance(parsed_items, list) and all(isinstance(item, str) for item in parsed_items):
-                    processed_research_items.extend(parsed_items)
-                    logger.info(f"Successfully processed {len(parsed_items)} items for research step.")
-                else:
-                    logger.error(f"LLM response for final JSON was not a JSON list of strings: {final_model_output_text[:500]}")
-                    processed_research_items.append(f"[System Error: LLM did not return a valid JSON list of research items for '{step_description}'. Raw response: {final_model_output_text[:200]}]")
+        if final_model_output_text:
+            logger.debug(f"LLM final JSON output text for research step: {final_model_output_text[:500]}")
+            parsed_items = parse_llm_json_output(final_model_output_text, expected_keys=[]) # Expecting a list of strings
+            if isinstance(parsed_items, list) and all(isinstance(item, str) for item in parsed_items):
+                processed_research_items.extend(parsed_items)
+                logger.info(f"Successfully processed {len(parsed_items)} items for research step.")
             else:
-                logger.warning(f"LLM returned no discernible final JSON text for research step: {step_description}")
-                if final_response.prompt_feedback and final_response.prompt_feedback.block_reason:
-                    reason = final_response.prompt_feedback.block_reason
-                    msg = final_response.prompt_feedback.block_reason_message
-                    logger.error(f"Prompt blocked for final JSON generation. Reason: {reason}, Message: {msg}")
-                    processed_research_items.append(f"[System Error: Prompt blocked by API for final JSON - {reason}.]")
-                else:
-                    processed_research_items.append(f"[System Error: LLM returned no usable JSON output for '{step_description}'.]")
+                logger.error(f"LLM response for final JSON was not a JSON list of strings: {final_model_output_text[:500]}")
+                processed_research_items.append(f"[System Error: LLM did not return a valid JSON list of research items for '{step_description}'. Raw response: {final_model_output_text[:200]}]")
+        else:
+            logger.warning(f"LLM returned no discernible final JSON text for research step: {step_description}")
+            if final_response.prompt_feedback and final_response.prompt_feedback.block_reason:
+                reason = final_response.prompt_feedback.block_reason
+                msg = final_response.prompt_feedback.block_reason_message
+                logger.error(f"Prompt blocked for final JSON generation. Reason: {reason}, Message: {msg}")
+                processed_research_items.append(f"[System Error: Prompt blocked by API for final JSON - {reason}.]")
+            else:
+                processed_research_items.append(f"[System Error: LLM returned no usable JSON output for '{step_description}'.]")
 
     except Exception as e:
         logger.error(f"Error during execute_research_step for '{step_description}': {e}", exc_info=True)
