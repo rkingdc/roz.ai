@@ -123,9 +123,8 @@ def mock_socketio():
 def mock_generate_text():
     """Mocks app.ai_services.generate_text."""
     # Patch the function where deep_research *uses* it.
-    # Changed patch target from 'app.deep_research.ai_services.generate_text'
-    # to 'app.deep_research.generate_text'
-    with unittest.mock.patch('app.deep_research.generate_text') as mock_gen_text:
+    # Corrected patch target to 'app.deep_research.ai_services.generate_text'
+    with unittest.mock.patch('app.deep_research.ai_services.generate_text') as mock_gen_text:
         # Default return value for cases not covered by side_effect
         mock_gen_text.return_value = "Default mock text generation response."
         yield mock_gen_text
@@ -141,9 +140,8 @@ def mock_web_search_plugin():
 def mock_transcribe_pdf_bytes():
     """Mocks app.ai_services.transcribe_pdf_bytes."""
     # Patch the function where deep_research *uses* it, not necessarily where it's defined.
-    # Changed patch target from 'app.deep_research.ai_services.transcribe_pdf_bytes'
-    # to 'app.deep_research.transcribe_pdf_bytes'
-    with unittest.mock.patch('app.deep_research.transcribe_pdf_bytes') as mock_transcribe:
+    # Corrected patch target to 'app.deep_research.ai_services.transcribe_pdf_bytes'
+    with unittest.mock.patch('app.deep_research.ai_services.transcribe_pdf_bytes') as mock_transcribe:
         mock_transcribe.return_value = MOCK_TRANSCRIBED_PDF_TEXT
         yield mock_transcribe
 
@@ -186,9 +184,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH, # LLM provides final JSON for Initial Search step (second call in tool loop)
         
         # 3. execute_research_step (Detailed Analysis) (2 calls to generate_text)
-        types.GenerateContentResponse( # LLM interaction for tool calls (returns no tool calls, just text)
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for detailed analysis. Just some text.")]))]
-        ),
+        "No tools needed for detailed analysis. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_DETAILED_ANALYSIS, # LLM provides final JSON
 
         # 4. Updated Report Plan (1 call)
@@ -196,19 +192,13 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         
         # 5. Additional Research Steps (Introduction, Key Findings, Conclusion) (2 calls each = 6 calls)
         # For "Introduction"
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Introduction. Just some text.")]))]
-        ),
+        "No tools needed for Introduction. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
         # For "Key Findings"
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Key Findings. Just some text.")]))]
-        ),
+        "No tools needed for Key Findings. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
         # For "Conclusion"
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Conclusion. Just some text.")]))]
-        ),
+        "No tools needed for Conclusion. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
 
         # 6. Synthesize Report Sections (3 calls)
@@ -426,9 +416,7 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
         ]),
         
         # 3. execute_research_step (Detailed Analysis) (2 calls)
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for detailed analysis. Just some text.")]))]
-        ),
+        "No tools needed for detailed analysis. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_DETAILED_ANALYSIS,
 
         # 4. Updated Report Plan (1 call)
@@ -436,19 +424,13 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
         
         # 5. Additional Research Steps (Introduction, Key Findings, Conclusion) (6 calls)
         # For "Introduction"
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Introduction. Just some text.")]))]
-        ),
+        "No tools needed for Introduction. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
         # For "Key Findings"
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Key Findings. Just some text.")]))]
-        ),
+        "No tools needed for Key Findings. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
         # For "Conclusion"
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Conclusion. Just some text.")]))]
-        ),
+        "No tools needed for Conclusion. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
 
         # 6. Synthesize Report Sections (3 calls)
@@ -487,7 +469,7 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
 
     # Assertions
     mock_fetch_web_content.assert_called_once_with(url="http://example.com/document.pdf")
-    # The mock_transcribe_pdf_bytes fixture patches `app.deep_research.transcribe_pdf_bytes`
+    # The mock_transcribe_pdf_bytes fixture patches `app.deep_research.ai_services.transcribe_pdf_bytes`
     # so the call to `submit` will receive the *mock* object, not the original function.
     mock_cpu_executor.submit.assert_called_once_with(mock_transcribe_pdf_bytes, MOCK_PDF_BYTES, 'document.pdf', app) # Check for app instance
     mock_transcribe_pdf_bytes.assert_called_once() # Ensure the actual transcription function was called via the executor
@@ -516,9 +498,7 @@ def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_gener
         ]),
         
         # 3. execute_research_step (Detailed Analysis) (2 calls)
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for detailed analysis. Just some text.")]))]
-        ),
+        "No tools needed for detailed analysis. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_DETAILED_ANALYSIS,
 
         # 4. Updated Report Plan (1 call)
@@ -526,19 +506,13 @@ def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_gener
         
         # 5. Additional Research Steps (Introduction, Key Findings, Conclusion) (6 calls)
         # For "Introduction"
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Introduction. Just some text.")]))]
-        ),
+        "No tools needed for Introduction. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
         # For "Key Findings"
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Key Findings. Just some text.")]))]
-        ),
+        "No tools needed for Key Findings. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
         # For "Conclusion"
-        types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part(text="No tools needed for Conclusion. Just some text.")]))]
-        ),
+        "No tools needed for Conclusion. Just some text.", # LLM interaction for text-only response
         MOCK_LLM_FINAL_JSON_OUTPUT_ADDITIONAL_RESEARCH,
 
         # 6. Synthesize Report Sections (3 calls)
