@@ -123,8 +123,9 @@ def mock_socketio():
 def mock_generate_text():
     """Mocks app.ai_services.generate_text."""
     # Patch the function where deep_research *uses* it.
-    # deep_research imports `ai_services` and then calls `ai_services.generate_text`.
-    with unittest.mock.patch('app.deep_research.ai_services.generate_text') as mock_gen_text:
+    # Changed patch target from 'app.deep_research.ai_services.generate_text'
+    # to 'app.deep_research.generate_text'
+    with unittest.mock.patch('app.deep_research.generate_text') as mock_gen_text:
         # Default return value for cases not covered by side_effect
         mock_gen_text.return_value = "Default mock text generation response."
         yield mock_gen_text
@@ -140,8 +141,9 @@ def mock_web_search_plugin():
 def mock_transcribe_pdf_bytes():
     """Mocks app.ai_services.transcribe_pdf_bytes."""
     # Patch the function where deep_research *uses* it, not necessarily where it's defined.
-    # deep_research imports `ai_services` and then calls `ai_services.transcribe_pdf_bytes`.
-    with unittest.mock.patch('app.deep_research.ai_services.transcribe_pdf_bytes') as mock_transcribe:
+    # Changed patch target from 'app.deep_research.ai_services.transcribe_pdf_bytes'
+    # to 'app.deep_research.transcribe_pdf_bytes'
+    with unittest.mock.patch('app.deep_research.transcribe_pdf_bytes') as mock_transcribe:
         mock_transcribe.return_value = MOCK_TRANSCRIBED_PDF_TEXT
         yield mock_transcribe
 
@@ -485,7 +487,7 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
 
     # Assertions
     mock_fetch_web_content.assert_called_once_with(url="http://example.com/document.pdf")
-    # The mock_transcribe_pdf_bytes fixture patches `app.deep_research.ai_services.transcribe_pdf_bytes`
+    # The mock_transcribe_pdf_bytes fixture patches `app.deep_research.transcribe_pdf_bytes`
     # so the call to `submit` will receive the *mock* object, not the original function.
     mock_cpu_executor.submit.assert_called_once_with(mock_transcribe_pdf_bytes, MOCK_PDF_BYTES, 'document.pdf', app) # Check for app instance
     mock_transcribe_pdf_bytes.assert_called_once() # Ensure the actual transcription function was called via the executor
