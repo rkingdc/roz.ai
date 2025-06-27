@@ -121,9 +121,8 @@ def mock_socketio():
 
 @pytest.fixture
 def mock_generate_text():
-    """Mocks app.ai_services.generate_text."""
-    # Patch the function where deep_research *uses* it.
-    # Corrected patch target to the original definition path
+    """Mocks app.ai_services_lib.generation_services.generate_text."""
+    # Patch the function at its original definition location
     with unittest.mock.patch('app.ai_services_lib.generation_services.generate_text') as mock_gen_text:
         # Default return value for cases not covered by side_effect
         mock_gen_text.return_value = "Default mock text generation response."
@@ -132,15 +131,15 @@ def mock_generate_text():
 @pytest.fixture
 def mock_web_search_plugin():
     """Mocks app.plugins.web_search functions."""
+    # Patch the functions at their original definition locations
     with unittest.mock.patch('app.plugins.web_search.perform_web_search') as mock_perform_web_search, \
          unittest.mock.patch('app.plugins.web_search.fetch_web_content') as mock_fetch_web_content:
         yield mock_perform_web_search, mock_fetch_web_content
 
 @pytest.fixture
 def mock_transcribe_pdf_bytes():
-    """Mocks app.ai_services.transcribe_pdf_bytes."""
-    # Patch the function where deep_research *uses* it, not necessarily where it's defined.
-    # Corrected patch target to the original definition path
+    """Mocks app.ai_services_lib.transcription_services.transcribe_pdf_bytes."""
+    # Patch the function at its original definition location
     with unittest.mock.patch('app.ai_services_lib.transcription_services.transcribe_pdf_bytes') as mock_transcribe:
         mock_transcribe.return_value = MOCK_TRANSCRIBED_PDF_TEXT
         yield mock_transcribe
@@ -179,9 +178,31 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         # 1. Initial Research Plan (1 call)
         json.dumps(MOCK_RESEARCH_PLAN),
         
-        # 2. execute_research_step (Initial Search) (2 calls to generate_text)
+        # 2. execute_research_step (Initial Search) (multiple calls to generate_text)
         MOCK_LLM_TOOL_CALL_SEARCH, # LLM asks for web_search (first call in tool loop)
-        MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH, # LLM provides final JSON for Initial Search step (second call in tool loop)
+        # LLM gets search results, then asks for scrape_url for page1 and document.pdf
+        types.GenerateContentResponse(
+            candidates=[
+                types.Candidate(
+                    content=types.Content(
+                        parts=[
+                            types.Part.from_function_response(
+                                name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}
+                            ),
+                            types.Part(
+                                function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/page1"})
+                            ),
+                            types.Part(
+                                function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/document.pdf"})
+                            )
+                        ]
+                    )
+                )
+            ]
+        ),
+        # LLM gets scrape results, then provides final JSON.
+        # This is the third LLM call for the initial search step.
+        MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH,
         
         # 3. execute_research_step (Detailed Analysis) (2 calls to generate_text)
         "No tools needed for detailed analysis. Just some text.", # LLM interaction for text-only response
@@ -218,10 +239,17 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
 
     # Configure web search/scrape mocks
     mock_perform_web_search.return_value = MOCK_WEB_SEARCH_RESULTS
-    mock_fetch_web_content.side_effect = [
-        MOCK_HTML_CONTENT,
-        MOCK_PDF_CONTENT_INFO
-    ]
+    # The side_effect for fetch_web_content needs to be robust to multiple calls, including retries.
+    def fetch_web_content_side_effect(url):
+        if url == "http://example.com/page1":
+            return MOCK_HTML_CONTENT
+        elif url == "http://example.com/document.pdf":
+            return MOCK_PDF_CONTENT_INFO
+        else:
+            # For any other unexpected scrape URL, return a generic HTML content
+            return {'type': 'html', 'content': f'Content from {url}', 'url': url}
+
+    mock_fetch_web_content.side_effect = fetch_web_content_side_effect
 
     # Configure PDF transcription mock
     mock_transcribe_pdf_bytes.return_value = MOCK_TRANSCRIBED_PDF_TEXT
@@ -255,7 +283,8 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
     mock_transcribe_pdf_bytes.assert_called_once_with(MOCK_PDF_BYTES, 'document.pdf', app) # Check for app instance
 
     # Verify generate_text calls
-    assert mock_generate_text.call_count == 18 # 1 (plan) + 2 (initial search) + 2 (detailed analysis) + 1 (updated plan) + 6 (additional research) + 3 (synthesis) + 1 (exec summary) + 1 (next steps) + 1 (final format) = 18
+    # 1 (plan) + 3 (initial search) + 2 (detailed analysis) + 1 (updated plan) + 6 (additional research) + 3 (synthesis) + 1 (exec summary) + 1 (next steps) + 1 (final format) = 19
+    assert mock_generate_text.call_count == 19
 
 def test_perform_deep_research_cancellation(app, mock_socketio, mock_generate_text, mock_add_message_to_db):
     """
@@ -340,7 +369,7 @@ def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_g
         return MOCK_WEB_SEARCH_RESULTS
 
     mock_perform_web_search.side_effect = mock_perform_web_search_with_context_check
-    mock_fetch_web_content.return_value = MOCK_HTML_CONTENT # Not used in this specific test, but good to have a default
+    mock_fetch_web_content.return_value = MOCK_HTML_CONTENT # Default for scrape
 
     with app.app_context():
         # Call execute_research_step directly to isolate the test
