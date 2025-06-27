@@ -89,8 +89,8 @@ MOCK_LLM_FINAL_JSON_OUTPUT = types.GenerateContentResponse(
         types.Candidate(
             content=types.Content(
                 parts=[
-                    types.Part.from_text(
-                        json.dumps([
+                    types.Part(
+                        text=json.dumps([
                             "Title: Result 1\nLink: http://example.com/page1\nSnippet: Snippet 1\nContent: This is the scraped content from an HTML page.\n---",
                             "Title: Document\nLink: http://example.com/document.pdf\nSnippet: No Snippet Available\nContent: This is the transcribed text from the PDF document.\n---"
                         ])
@@ -221,7 +221,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_genai_client,
                             types.Part.from_function_response(
                                 name="scrape_url", response={"status": "pdf_transcription_submitted", "url": "http://example.com/document.pdf", "filename": "document.pdf", "content_placeholder": "PDF_CONTENT_PENDING_ID_MOCK"}
                             ),
-                            types.Part.from_text("Ready for final JSON.") # LLM indicates it's done with tools
+                            types.Part(text="Ready for final JSON.") # LLM indicates it's done with tools
                         ]
                     )
                 )
@@ -387,7 +387,7 @@ def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_g
                             types.Part.from_function_response(
                                 name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}
                             ),
-                            types.Part.from_text("Ready for final JSON.") # LLM indicates it's done with tools
+                            types.Part(text="Ready for final JSON.") # LLM indicates it's done with tools
                         ]
                     )
                 )
@@ -437,7 +437,7 @@ def test_execute_research_step_scrape_context_fix(app, mock_socketio, mock_genai
                             types.Part.from_function_response(
                                 name="scrape_url", response={"scraped_data": MOCK_HTML_CONTENT}
                             ),
-                            types.Part.from_text("Ready for final JSON.") # LLM indicates it's done with tools
+                            types.Part(text="Ready for final JSON.") # LLM indicates it's done with tools
                         ]
                     )
                 )
@@ -492,7 +492,7 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
                             types.Part.from_function_response(
                                 name="scrape_url", response={"status": "pdf_transcription_submitted", "url": "http://example.com/document.pdf", "filename": "document.pdf", "content_placeholder": "PDF_CONTENT_PENDING_ID_MOCK"}
                             ),
-                            types.Part.from_text("Ready for final JSON.") # LLM indicates it's done with tools
+                            types.Part(text="Ready for final JSON.") # LLM indicates it's done with tools
                         ]
                     )
                 )
@@ -601,7 +601,7 @@ def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_genai
                             types.Part.from_function_response(
                                 name="web_search", response={"error": {"type": "tool_retry_failed", "message": "Web search failed after retries"}}
                             ),
-                            types.Part.from_text("Ready for final JSON.") # LLM indicates it's done with tools
+                            types.Part(text="Ready for final JSON.") # LLM indicates it's done with tools
                         ]
                     )
                 )
