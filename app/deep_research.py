@@ -451,19 +451,19 @@ Indicate you are ready for the final compilation step once all searches and scra
                                     function_response_data_for_llm = {"scraped_data": tool_call_result_data}
                             else: 
                                 function_response_data_for_llm = {"error": f"Unknown tool {fc_name} result processing."}
-                                
-                            except RETRYABLE_EXCEPTIONS as retry_exc:
-                                error_msg = f"Tool call {fc_name} failed after multiple retries: {type(retry_exc).__name__} - {str(retry_exc)}"
-                                logger.error(error_msg, exc_info=False) # No need for full exc_info for retries
-                                function_response_data_for_llm = {"error": {"type": "tool_retry_failed", "message": error_msg}}
-                            except Exception as exc:
-                                error_msg = f"Exception executing tool {fc_name} in parallel: {type(exc).__name__} - {str(exc)}"
-                                logger.error(error_msg, exc_info=True)
-                                function_response_data_for_llm = {"error": {"type": "parallel_tool_execution_error", "message": error_msg}}
                             
-                            function_response_parts_batch.append(
-                                types.Part.from_function_response(name=fc_name, response=function_response_data_for_llm)
-                            )
+                        except RETRYABLE_EXCEPTIONS as retry_exc:
+                            error_msg = f"Tool call {fc_name} failed after multiple retries: {type(retry_exc).__name__} - {str(retry_exc)}"
+                            logger.error(error_msg, exc_info=False) # No need for full exc_info for retries
+                            function_response_data_for_llm = {"error": {"type": "tool_retry_failed", "message": error_msg}}
+                        except Exception as exc:
+                            error_msg = f"Exception executing tool {fc_name} in parallel: {type(exc).__name__} - {str(exc)}"
+                            logger.error(error_msg, exc_info=True)
+                            function_response_data_for_llm = {"error": {"type": "parallel_tool_execution_error", "message": error_msg}}
+                        
+                        function_response_parts_batch.append(
+                            types.Part.from_function_response(name=fc_name, response=function_response_data_for_llm)
+                        )
                     
                     if function_response_parts_batch:
                         conversation_history.append(types.Content(parts=function_response_parts_batch, role="tool"))
@@ -538,11 +538,11 @@ This JSON list should be the *only content* in your response. Do not include any
                 else:
                     processed_research_items.append(f"[System Error: LLM returned no usable JSON output for '{step_description}'.]")
 
-        except Exception as e:
-            logger.error(f"Error during execute_research_step for '{step_description}': {e}", exc_info=True)
-            processed_research_items.append(f"[System Error: Exception during research step execution - {type(e).__name__}]")
+    except Exception as e:
+        logger.error(f"Error during execute_research_step for '{step_description}': {e}", exc_info=True)
+        processed_research_items.append(f"[System Error: Exception during research step execution - {type(e).__name__}]")
 
-        return processed_research_items, submitted_pdf_futures_info
+    return processed_research_items, submitted_pdf_futures_info
 
 
 # --- Research Plan Update ---
@@ -1325,7 +1325,7 @@ def perform_deep_research(
                 final_report_content = (
                     final_report_output  # Store the successfully formatted report
                 )
-                emit_status("Final report formatting complete.")
+                emit_status("Final formatting complete.")
 
             # --- Emit Final Result ---
             logger.info(f"--- Deep Research Complete for Query: '{query}' (SID: {sid}) ---")
