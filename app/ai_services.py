@@ -1,3 +1,8 @@
+import logging
+
+# Configure logging - Removed basicConfig and setLevel here
+logger = logging.getLogger(__name__)
+
 from . import database  # Use alias to avoid conflict with db instance
 from .plugins.web_search import (
     perform_web_search,
@@ -24,8 +29,3 @@ from .ai_services_lib.tool_definitions import (
     WEB_SEARCH_TOOL,
     WEB_SCRAPE_TOOL,
 )  # Import tool definitions
-
-import logging
-
-# Configure logging - Removed basicConfig and setLevel here
-logger = logging.getLogger(__name__)

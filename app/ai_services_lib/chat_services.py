@@ -297,24 +297,15 @@ You are operating within an AI assistant tool that provides several features to 
 """
         # ... (other general instructions)
     ]
+    tools_to_provide = [] # Initialize here
     if web_search_enabled:
-        system_prompt_parts.extend(
-            [
-                "\n--- Web Interaction Tool Instructions ---",
-                "You have access to several tools for interacting with the web. Please use them strategically:",
-                "1. 'web_search': Use this first to find relevant web pages for a query. Review the search results carefully.",
-                "2. 'scrape_url': After using 'web_search', if a specific URL seems promising and you need its textual content (including PDFs, which will be transcribed), use this tool. It's good for extracting information from static pages or articles.",
-                "IMPORTANT: When you use information obtained from 'web_search' or 'scrape_url', you MUST cite your sources. Only cite the specific URLs that directly contributed to your answer. Present citations clearly (e.g., list at the end or inline Markdown links: [source](URL)).",
-                "If you encounter a 403 Forbidden error, paywall, or similar access restriction when trying to use 'scrape_url' or 'perform_browser_task' on a specific URL, consider attempting to access an archived version of that URL through the Wayback Machine (archive.org). You can construct a Wayback Machine URL like this: `https://web.archive.org/web/YYYYMMDDHHMMSS/ORIGINAL_URL` (using a recent date or omitting the timestamp for the latest archive) or by searching for the URL on archive.org. Then, use 'scrape_url' or 'perform_browser_task' on the archive.org URL.",
-                
-                "3. 'perform_browser_task': This tool controls a web browser (Chromium) for complex, interactive tasks. Use this tool ONLY IF:",
-                "    a. 'web_search' and 'scrape_url' are insufficient (e.g., the site requires login, form submissions, complex navigation, or is heavily JavaScript-driven and 'scrape_url' fails to get the needed dynamic content).",
-                "    b. The task explicitly requires direct browser interaction (e.g., 'add this to my cart', 'download this file by clicking the button').",
-                "Before using 'perform_browser_task', consider if 'web_search' and 'scrape_url' can first help you identify specific URLs or information that would make your browser task instruction more precise and efficient.",
-                "For 'perform_browser_task', provide a clear, natural language instruction. The tool will return a 'summary' which may be a structured object containing fields like 'status_message', 'summary_of_actions', 'extracted_information', 'key_urls', and 'errors_encountered'. Use this detailed information to inform your response to the user. If you encounter difficulties or limitations with a specific action, focus on understanding the user's overall goal and attempt to achieve it through alternative interactions or by providing the most relevant information you can gather using any of the available web tools.",
-                "--- End Web Interaction Tool Instructions ---",
-            ]
-        )
+        tools_to_provide.extend([WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL])
+    if browser_automation_enabled: # Only add browser tool if enabled
+        tools_to_provide.append(BROWSER_USE_TOOL)
+    
+    if not tools_to_provide: # If list is still empty after checks
+        tools_to_provide = None
+
     final_system_prompt = "\n\n".join(
         system_prompt_parts
     )  # Reconstruct the full system prompt from non-streaming version here.
@@ -339,14 +330,7 @@ You are operating within an AI assistant tool that provides several features to 
             logger.info(
                 f"Calling model.generate_content_stream (Iteration {iteration}) for chat {chat_id}."
             )
-            tools_to_provide = [] # Initialize as an empty list
-            if web_search_enabled:
-                tools_to_provide.extend([WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL])
-                tools_to_provide.append(BROWSER_USE_TOOL)
             
-            if not tools_to_provide: # If list is still empty after checks
-                tools_to_provide = None
-
             # GenerateContentConfig is needed for system_instruction and tools with streaming
             gen_config = GenerateContentConfig(
                 system_instruction=final_system_prompt,
@@ -453,7 +437,7 @@ You are operating within an AI assistant tool that provides several features to 
                         # This should ideally not happen if current_chunk_is_tool_call is true
                         # and the detection logic for setting it was correct.
                         logger.error(
-                            "CRITICAL: current_chunk_is_tool_call is true, but the 'chunk' object from stream lacks 'function_calls'."
+                            "CRITICAL: chunk.function_calls is populated but chunk.candidates[0].content is missing. Tool call processing may fail."
                         )
                         tool_error_msg = "[System Error: Inconsistent state for tool call extraction.]"
                         socketio.emit("task_error", {"error": tool_error_msg}, room=sid)
@@ -660,7 +644,7 @@ You are operating within an AI assistant tool that provides several features to 
 
             if (
                 emitted_error_or_cancel_final_signal
-            ):  # If an error/cancel occurred in chunk loop
+            ):  # If any error broke the inner chunk loop or API call
                 break  # Break from main tool loop
 
         # --- Error Handling for Streaming API Call (client.models.generate_content_stream call itself) ---
