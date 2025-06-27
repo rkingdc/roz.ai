@@ -47,8 +47,8 @@ MOCK_LLM_TOOL_CALL_SEARCH = types.GenerateContentResponse(
         types.Candidate(
             content=types.Content(
                 parts=[
-                    types.Part.from_function_call(
-                        types.FunctionCall(name="web_search", args={"query": "test query", "num_results": 2})
+                    types.Part(
+                        function_call=types.FunctionCall(name="web_search", args={"query": "test query", "num_results": 2})
                     )
                 ]
             )
@@ -61,8 +61,8 @@ MOCK_LLM_TOOL_CALL_SCRAPE = types.GenerateContentResponse(
         types.Candidate(
             content=types.Content(
                 parts=[
-                    types.Part.from_function_call(
-                        types.FunctionCall(name="scrape_url", args={"url": "http://example.com/page1"})
+                    types.Part(
+                        function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/page1"})
                     )
                 ]
             )
@@ -75,8 +75,8 @@ MOCK_LLM_TOOL_CALL_SCRAPE_PDF = types.GenerateContentResponse(
         types.Candidate(
             content=types.Content(
                 parts=[
-                    types.Part.from_function_call(
-                        types.FunctionCall(name="scrape_url", args={"url": "http://example.com/document.pdf"})
+                    types.Part(
+                        function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/document.pdf"})
                     )
                 ]
             )
@@ -189,8 +189,8 @@ def test_perform_deep_research_success(app, mock_socketio, mock_genai_client,
                             types.Part.from_function_response(
                                 name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}
                             ),
-                            types.Part.from_function_call(
-                                types.FunctionCall(name="scrape_url", args={"url": "http://example.com/page1"})
+                            types.Part(
+                                function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/page1"})
                             )
                         ]
                     )
@@ -205,8 +205,8 @@ def test_perform_deep_research_success(app, mock_socketio, mock_genai_client,
                             types.Part.from_function_response(
                                 name="scrape_url", response={"scraped_data": MOCK_HTML_CONTENT}
                             ),
-                            types.Part.from_function_call(
-                                types.FunctionCall(name="scrape_url", args={"url": "http://example.com/document.pdf"})
+                            types.Part(
+                                function_call=types.FunctionCall(name="scrape_url", args={"url": "http://example.com/document.pdf"})
                             )
                         ]
                     )
@@ -412,7 +412,7 @@ def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_g
             lambda: False, # Not cancelled
             mock_socketio,
             "test_sid",
-            app, # Pass the app instance
+            app.app_context(), # Pass the app context
             mock_cpu_executor
         )
 
@@ -462,7 +462,7 @@ def test_execute_research_step_scrape_context_fix(app, mock_socketio, mock_genai
             lambda: False, # Not cancelled
             mock_socketio,
             "test_sid",
-            app, # Pass the app instance
+            app.app_context(), # Pass the app context
             mock_cpu_executor
         )
 
