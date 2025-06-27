@@ -1,5 +1,6 @@
 import logging
 from flask import current_app, g
+import google.genai as genai # Import genai
 from google.api_core.exceptions import GoogleAPIError, ClientError, InvalidArgument, DeadlineExceeded, NotFound
 from .. import database
 from .generation_services import generate_text # Import generate_text
