@@ -15,6 +15,7 @@ from app import deep_research
 from app.plugins import web_search as web_search_plugin
 from app import ai_services # For transcribe_pdf_bytes
 from app import database # For add_message_to_db
+from app import socketio as app_socketio # Import the actual socketio instance from app/__init__.py
 
 # Define common mock responses for LLM
 MOCK_RESEARCH_PLAN = [
@@ -119,8 +120,9 @@ MOCK_FINAL_REPORT = "Final Report Content"
 
 @pytest.fixture
 def mock_socketio():
-    """Mocks the SocketIO object."""
-    with unittest.mock.patch('app.deep_research.socketio') as mock_sio:
+    """Mocks the SocketIO object by patching the instance in app/__init__.py."""
+    # Patch the actual socketio instance where it's defined/initialized
+    with unittest.mock.patch('app.__init__.socketio') as mock_sio:
         yield mock_sio
 
 @pytest.fixture
@@ -234,7 +236,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_genai_client,
             candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text("No tools needed for detailed analysis. Just some text.")]))]
         ),
         types.GenerateContentResponse(
-            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(["Detailed analysis content."]))]))]
+            candidates=[types.Candidate(content=types.Content(parts=[types.Part.from_text(json.dumps(["Detailed analysis content."]))] ))]
         ),
 
         # 4. Updated Report Plan
@@ -412,7 +414,7 @@ def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_g
             lambda: False, # Not cancelled
             mock_socketio,
             "test_sid",
-            app.app_context(), # Pass the app context
+            app, # Pass the app object directly
             mock_cpu_executor
         )
 
@@ -462,7 +464,7 @@ def test_execute_research_step_scrape_context_fix(app, mock_socketio, mock_genai
             lambda: False, # Not cancelled
             mock_socketio,
             "test_sid",
-            app.app_context(), # Pass the app context
+            app, # Pass the app object directly
             mock_cpu_executor
         )
 
@@ -672,4 +674,3 @@ def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_genai
 
     # Ensure the web search was attempted
     mock_perform_web_search.assert_called_once()
-
