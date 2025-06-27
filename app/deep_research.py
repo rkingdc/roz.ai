@@ -201,7 +201,7 @@ def execute_research_step(
     is_cancelled_callback: Callable[[], bool],
     socketio, # For emit_status
     sid,
-    app_context, # Pass Flask app context for background thread safety
+    flask_app, # Pass Flask app object for background thread safety
     cpu_executor: concurrent.futures.ProcessPoolExecutor # For Task 3
 ) -> Tuple[List[str], List[Dict]]: # Returns (llm_summary_strings, pdf_futures_info_list)
     """
@@ -210,39 +210,40 @@ def execute_research_step(
         - A list of strings, where each string is a formatted summary of a processed source (may contain placeholders for PDFs).
         - A list of dictionaries, each containing info about a submitted PDF transcription task 
           (e.g., {'placeholder': str, 'future': Future, 'original_url': str, 'original_filename': str}).
-    Must be called within an active Flask app context.
+    This function is called within an active Flask app context.
     """
     logger.info(f"Executing research step: {step_description[:100]}...")
     processed_research_items = []
 
-    with app_context:
-        try:
-            # --- Client Acquisition (copied from old web_search, ensure it's robust) ---
-            api_key = current_app.config.get("API_KEY")
-            if not api_key:
-                logger.error("API_KEY is missing from current_app.config for execute_research_step.")
-                return ["[System Error: AI Service API Key not configured]"]
+    # This function is already called within an app context from perform_deep_research.
+    # So, current_app and g are available here.
+    try:
+        # --- Client Acquisition (copied from old web_search, ensure it's robust) ---
+        api_key = flask_app.config.get("API_KEY")
+        if not api_key:
+            logger.error("API_KEY is missing from flask_app.config for execute_research_step.")
+            return ["[System Error: AI Service API Key not configured]"]
 
-            if "genai_client" not in g:
-                logger.info("execute_research_step: Creating new genai.Client and caching in 'g'.")
-                try:
-                    g.genai_client = genai.Client(api_key=api_key)
-                except Exception as e_client:
-                    logger.error(f"execute_research_step: Failed to initialize genai.Client: {e_client}", exc_info=True)
-                    return [f"[System Error: Failed to initialize AI client: {type(e_client).__name__}]"]
-            
-            gemini_client = g.genai_client
-            if not gemini_client:
-                logger.error("LLM client (g.genai_client) is unexpectedly None in execute_research_step.")
-                return ["[System Error: LLM client not available after init attempt]"]
-            # --- End Client Acquisition ---
+        if "genai_client" not in g:
+            logger.info("execute_research_step: Creating new genai.Client and caching in 'g'.")
+            try:
+                g.genai_client = genai.Client(api_key=api_key)
+            except Exception as e_client:
+                logger.error(f"execute_research_step: Failed to initialize genai.Client: {e_client}", exc_info=True)
+                return [f"[System Error: Failed to initialize AI client: {type(e_client).__name__}]"]
+        
+        gemini_client = g.genai_client
+        if not gemini_client:
+            logger.error("LLM client (g.genai_client) is unexpectedly None in execute_research_step.")
+            return ["[System Error: LLM client not available after init attempt]"]
+        # --- End Client Acquisition ---
 
-            raw_model_name = current_app.config.get("DEFAULT_MODEL", "gemini-2.5-flash-preview-04-17")
-            model_to_use = f"models/{raw_model_name}" if not raw_model_name.startswith("models/") else raw_model_name
-            logger.info(f"execute_research_step: Using model '{model_to_use}' for research step.")
+        raw_model_name = flask_app.config.get("DEFAULT_MODEL", "gemini-2.5-flash-preview-04-17")
+        model_to_use = f"models/{raw_model_name}" if not raw_model_name.startswith("models/") else raw_model_name
+        logger.info(f"execute_research_step: Using model '{model_to_use}' for research step.")
 
-            # Prompt for Phase 1-3: Tool usage and information gathering
-            tool_usage_prompt = f"""
+        # Prompt for Phase 1-3: Tool usage and information gathering
+        tool_usage_prompt = f"""
 You are an AI research assistant. Your task is to execute a research step: "{step_description}"
 Follow these phases strictly:
 
@@ -264,113 +265,116 @@ After completing these three phases and all necessary tool calls, you will be as
 Indicate you are ready for the final compilation step once all searches and scraping are done.
             """
 
-            if is_cancelled_callback():
-                logger.info("Research step cancelled before LLM tool usage call.")
-                return ["[AI Info: Research step cancelled by user.]"]
+        if is_cancelled_callback():
+            logger.info("Research step cancelled before LLM tool usage call.")
+            return ["[AI Info: Research step cancelled by user.]"], []
 
-            # Config for tool execution phase - Manual Loop
-            # Note: max_output_tokens is not strictly necessary here as we expect tool calls or short text.
-            # response_mime_type is also not critical for this phase.
-            tool_execution_config = types.GenerateContentConfig(
-                tools=[WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL], 
-                automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
-            )
-            
-            if socketio and sid:
-                socketio.emit("status_update", {"message": f"Researching (Tool Phase): {step_description[:30]}..."}, room=sid)
+        # Config for tool execution phase - Manual Loop
+        # Note: max_output_tokens is not strictly necessary here as we expect tool calls or short text.
+        # response_mime_type is also not critical for this phase.
+        tool_execution_config = types.GenerateContentConfig(
+            tools=[WEB_SEARCH_TOOL, WEB_SCRAPE_TOOL], 
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
+        )
+        
+        if socketio and sid:
+            socketio.emit("status_update", {"message": f"Researching (Tool Phase): {step_description[:30]}..."}, room=sid)
 
-            # Step A: Manual Tool Execution Loop
-            conversation_history = [types.Content(parts=[types.Part.from_text(text=tool_usage_prompt)], role="user")]
-            
-            MAX_TOOL_TURNS = 15 
-            MAX_CONSECUTIVE_EMPTY_TOOL_CALL_TURNS = 2
-            consecutive_empty_tool_turns = 0
-            
-            submitted_pdf_futures_info = [] # For Task 3
+        # Step A: Manual Tool Execution Loop
+        conversation_history = [types.Content(parts=[types.Part.from_text(text=tool_usage_prompt)], role="user")]
+        
+        MAX_TOOL_TURNS = 15 
+        MAX_CONSECUTIVE_EMPTY_TOOL_CALL_TURNS = 2
+        consecutive_empty_tool_turns = 0
+        
+        submitted_pdf_futures_info = [] # For Task 3
 
-            # Define retryable exceptions for network/API issues (used by retry-wrapped callables)
-            RETRYABLE_EXCEPTIONS = (
-                requests.exceptions.Timeout,
-                requests.exceptions.ConnectionError,
-                requests.exceptions.RequestException, 
-                GoogleHttpError, 
-            )
+        # Define retryable exceptions for network/API issues (used by retry-wrapped callables)
+        RETRYABLE_EXCEPTIONS = (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+            requests.exceptions.RequestException, 
+            GoogleHttpError, 
+        )
 
-            # Retry-wrapped callables (defined once, used in the loop)
-            @retry(
-                stop=stop_after_attempt(3),
-                wait=wait_exponential(multiplier=1, min=2, max=10),
-                retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
-                reraise=True
-            )
-            def call_web_search_with_retry(query_arg, num_results_arg):
-                logger.info(f"Attempting web_search for '{query_arg}' (retriable)")
+        # Retry-wrapped callables (defined once, used in the loop)
+        @retry(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=2, max=10),
+            retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
+            reraise=True
+        )
+        def call_web_search_with_retry(flask_app_instance, query_arg, num_results_arg):
+            with flask_app_instance.app_context(): # PUSH CONTEXT HERE
+                logger.info(f"Attempting web_search for '{query_arg}' (retriable) in worker thread.")
                 return web_search_plugin.perform_web_search(query=query_arg, num_results=num_results_arg)
 
-            @retry(
-                stop=stop_after_attempt(3),
-                wait=wait_exponential(multiplier=1, min=2, max=10),
-                retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
-                reraise=True
-            )
-            def call_fetch_web_content_with_retry(url_arg):
-                logger.info(f"Attempting fetch_web_content for '{url_arg}' (retriable)")
+        @retry(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential(multiplier=1, min=2, max=10),
+            retry=retry_if_exception_type(RETRYABLE_EXCEPTIONS),
+            reraise=True
+        )
+        def call_fetch_web_content_with_retry(flask_app_instance, url_arg):
+            with flask_app_instance.app_context(): # PUSH CONTEXT HERE
+                logger.info(f"Attempting fetch_web_content for '{url_arg}' (retriable) in worker thread.")
                 return web_search_plugin.fetch_web_content(url=url_arg)
 
-            for turn_count in range(MAX_TOOL_TURNS):
-                if is_cancelled_callback():
-                    logger.info("Research step cancelled during manual tool loop.")
-                    processed_research_items.append("[AI Info: Research step cancelled by user.]")
-                    return processed_research_items
+        for turn_count in range(MAX_TOOL_TURNS):
+            if is_cancelled_callback():
+                logger.info("Research step cancelled during manual tool loop.")
+                processed_research_items.append("[AI Info: Research step cancelled by user.]")
+                return processed_research_items, submitted_pdf_futures_info
 
-                logger.info(f"Manual tool loop turn {turn_count + 1}/{MAX_TOOL_TURNS} for step: {step_description[:30]}...")
-                
-                response_from_model_turn = gemini_client.models.generate_content(
-                    model=model_to_use,
-                    contents=conversation_history,
-                    config=tool_execution_config 
-                )
+            logger.info(f"Manual tool loop turn {turn_count + 1}/{MAX_TOOL_TURNS} for step: {step_description[:30]}...")
+            
+            response_from_model_turn = gemini_client.models.generate_content(
+                model=model_to_use,
+                contents=conversation_history,
+                config=tool_execution_config 
+            )
 
-                if not response_from_model_turn.candidates or not response_from_model_turn.candidates[0].content:
-                    logger.error("No valid candidate/content in LLM's turn response during tool phase.")
-                    processed_research_items.append("[System Error: LLM response missing content during tool phase.]")
-                    break 
-                
-                model_response_content = response_from_model_turn.candidates[0].content
-                conversation_history.append(model_response_content)
+            if not response_from_model_turn.candidates or not response_from_model_turn.candidates[0].content:
+                logger.error("No valid candidate/content in LLM's turn response during tool phase.")
+                processed_research_items.append("[System Error: LLM response missing content during tool phase.]")
+                break 
+            
+            model_response_content = response_from_model_turn.candidates[0].content
+            conversation_history.append(model_response_content)
 
-                tasks_for_this_llm_response = []
-                for part in model_response_content.parts:
-                    if part.function_call:
-                        fc = part.function_call
-                        fc_name = fc.name
-                        fc_args = dict(fc.args)
-                        logger.info(f"LLM requested tool call: {fc_name} with args: {fc_args}")
-                        
-                        callable_task = None
-                        if fc_name == "web_search":
-                            query = fc_args.get("query", "")
-                            num_results = fc_args.get("num_results", 5)
-                            callable_task = functools.partial(call_web_search_with_retry, query_arg=query, num_results_arg=num_results)
-                        elif fc_name == "scrape_url":
-                            url_to_scrape = fc_args.get("url")
-                            if url_to_scrape:
-                                callable_task = functools.partial(call_fetch_web_content_with_retry, url_arg=url_to_scrape)
-                            else:
-                                logger.error(f"scrape_url call from LLM missing 'url' argument: {fc_args}")
-                                # Immediately prepare an error response for this specific bad call
-                                err_resp_part = types.Part.from_function_response(
-                                    name=fc_name, 
-                                    response={"error": {"type": "argument_error", "message": "URL not provided for scrape_url"}}
-                                )
-                                conversation_history.append(types.Content(parts=[err_resp_part], role="tool"))
-                                continue # to next part in model_response_content.parts
+            tasks_for_this_llm_response = []
+            for part in model_response_content.parts:
+                if part.function_call:
+                    fc = part.function_call
+                    fc_name = fc.name
+                    fc_args = dict(fc.args)
+                    logger.info(f"LLM requested tool call: {fc_name} with args: {fc_args}")
+                    
+                    callable_task = None
+                    # Pass the flask_app object directly to the partial functions
+                    if fc_name == "web_search":
+                        query = fc_args.get("query", "")
+                        num_results = fc_args.get("num_results", 5)
+                        callable_task = functools.partial(call_web_search_with_retry, flask_app_instance=flask_app, query_arg=query, num_results_arg=num_results)
+                    elif fc_name == "scrape_url":
+                        url_to_scrape = fc_args.get("url")
+                        if url_to_scrape:
+                            callable_task = functools.partial(call_fetch_web_content_with_retry, flask_app_instance=flask_app, url_arg=url_to_scrape)
                         else:
-                            logger.warning(f"LLM requested unknown tool: {fc_name}")
+                            logger.error(f"scrape_url call from LLM missing 'url' argument: {fc_args}")
+                            # Immediately prepare an error response for this specific bad call
                             err_resp_part = types.Part.from_function_response(
                                 name=fc_name, 
-                                response={"error": {"type": "unknown_tool", "message": f"Unknown tool: {fc_name}"}}
+                                response={"error": {"type": "argument_error", "message": "URL not provided for scrape_url"}}
                             )
+                            conversation_history.append(types.Content(parts=[err_resp_part], role="tool"))
+                            continue # to next part in model_response_content.parts
+                    else:
+                        logger.warning(f"LLM requested unknown tool: {fc_name}")
+                        err_resp_part = types.Part.from_function_response(
+                            name=fc_name, 
+                            response={"error": {"type": "unknown_tool", "message": f"Unknown tool: {fc_name}"}}
+                        )
                             conversation_history.append(types.Content(parts=[err_resp_part], role="tool"))
                             continue
                         
@@ -431,7 +435,7 @@ Indicate you are ready for the final compilation step once all searches and scra
                                         if socketio and sid:
                                             socketio.emit("status_update", {"message": f"PDF queued for transcription: {pdf_filename[:25]}..."}, room=sid)
                                         
-                                        transcription_future = cpu_executor.submit(transcribe_pdf_bytes, pdf_bytes, pdf_filename)
+                                        transcription_future = cpu_executor.submit(transcribe_pdf_bytes, pdf_bytes, pdf_filename, flask_app) # Pass flask_app
                                         submitted_pdf_futures_info.append({
                                             'placeholder': placeholder_string_for_llm,
                                             'future': transcription_future,
@@ -473,7 +477,7 @@ Indicate you are ready for the final compilation step once all searches and scra
             if is_cancelled_callback():
                 logger.info("Research step cancelled after manual tool loop, before final JSON generation.")
                 processed_research_items.append("[AI Info: Research step cancelled by user.]")
-                return processed_research_items
+                return processed_research_items, submitted_pdf_futures_info
 
             # Step B: Final JSON Generation
             final_json_prompt_text = """
@@ -572,13 +576,9 @@ Return the plan as a JSON list of lists, where each inner list is [section_name,
 Example Format:
 ```json
 [
-  ["Introduction", "Define the core concepts based on research findings and state the report's purpose, drawing from the query and snippets."],
-  ["Historical Context of [Topic]", "Based on research, detail the background and evolution of the topic."],
-  ["Key Drivers and Factors", "Summarize the main influences and contributing factors identified in the snippets."],
-  ["Challenges and Obstacles", "Outline the primary difficulties and impediments found in the research."],
-  ["Potential Solutions or Approaches", "Describe possible ways to address the challenges, if supported by research."],
-  ["Future Outlook/Trends", "Present any forward-looking insights or observed trends from the snippets."],
-  ["Conclusion", "Synthesize the main findings from the research snippets and summarize the report's key takeaways."]
+  ["Introduction", "Define the fundamental principles and terminology related to the query."],
+  ["Identify Key Players", "Find the main individuals, companies, or organizations involved."],
+  ["Analyze Current Trends", "Research the latest developments, challenges, and opportunities."]
 ]
 
 
@@ -628,7 +628,7 @@ Refined Report Plan (JSON):
 
 
 def synthesize_research_into_report_section(
-    section_name: str, section_description: str, all_raw_research_items: List[str]
+    section_name: str, section_description: str, all_raw_research_items: List[str], flask_app # Add flask_app parameter
 ) -> Tuple[str, List[str]]:
     """
     Uses an LLM to synthesize collected research (provided as raw dicts) into a coherent report section.
@@ -683,55 +683,56 @@ Example JSON Output:
 
 JSON Output:
     """
-    try:
-        llm_response = generate_text(prompt)
-        if (
-            not llm_response
-            or llm_response.startswith("[Error")
-            or llm_response.startswith("[System Note")
-        ):
+    with flask_app.app_context(): # Push context here
+        try:
+            llm_response = generate_text(prompt)
+            if (
+                not llm_response
+                or llm_response.startswith("[Error")
+                or llm_response.startswith("[System Note")
+            ):
+                logger.error(
+                    f"LLM failed to synthesize report section '{section_name}': {llm_response}"
+                )
+                return (
+                    f"## {section_name}\n\n[Error: LLM failed to generate this section.]\n",
+                    [],
+                )
+
+            parsed_data = parse_llm_json_output(
+                llm_response, expected_keys=["report_section", "references"]
+            )
+
+            if (
+                parsed_data
+                and isinstance(parsed_data.get("report_section"), str)
+                and isinstance(parsed_data.get("references"), list)
+            ):
+                section_text = parsed_data["report_section"]
+                references = parsed_data["references"]
+                logger.info(
+                    f"Successfully synthesized section '{section_name}' (Length: {len(section_text)}, References: {len(references)})."
+                )
+                return section_text, references
+            else:
+                logger.error(
+                    f"LLM response for section synthesis was not in the expected format: {llm_response}"
+                )
+                # Fallback: return the raw response as the section?
+                return (
+                    f"## {section_name}\n\n[Error: Failed to parse LLM response for this section. Raw response below.]\n\n{llm_response}\n",
+                    [],
+                )
+
+        except Exception as e:
             logger.error(
-                f"LLM failed to synthesize report section '{section_name}': {llm_response}"
+                f"Error in synthesize_research_into_report_section for '{section_name}': {e}",
+                exc_info=True,
             )
             return (
-                f"## {section_name}\n\n[Error: LLM failed to generate this section.]\n",
+                f"## {section_name}\n\n[Error: Exception during section synthesis: {e}]\n",
                 [],
             )
-
-        parsed_data = parse_llm_json_output(
-            llm_response, expected_keys=["report_section", "references"]
-        )
-
-        if (
-            parsed_data
-            and isinstance(parsed_data.get("report_section"), str)
-            and isinstance(parsed_data.get("references"), list)
-        ):
-            section_text = parsed_data["report_section"]
-            references = parsed_data["references"]
-            logger.info(
-                f"Successfully synthesized section '{section_name}' (Length: {len(section_text)}, References: {len(references)})."
-            )
-            return section_text, references
-        else:
-            logger.error(
-                f"LLM response for section synthesis was not in the expected format: {llm_response}"
-            )
-            # Fallback: return the raw response as the section?
-            return (
-                f"## {section_name}\n\n[Error: Failed to parse LLM response for this section. Raw response below.]\n\n{llm_response}\n",
-                [],
-            )
-
-    except Exception as e:
-        logger.error(
-            f"Error in synthesize_research_into_report_section for '{section_name}': {e}",
-            exc_info=True,
-        )
-        return (
-            f"## {section_name}\n\n[Error: Exception during section synthesis: {e}]\n",
-            [],
-        )
 
 
 def create_exec_summary(report_content: str) -> str:
@@ -745,7 +746,7 @@ def create_exec_summary(report_content: str) -> str:
     Full Report Content:
     --- START REPORT ---
     {report_content}
-    --- END REPORT ---
+    --- END ---
 
     Executive Summary (Markdown):
     """
@@ -759,7 +760,7 @@ def create_exec_summary(report_content: str) -> str:
             logger.info("Successfully generated executive summary.")
             return summary
         else:
-            logger.error(f"Failed to generate executive summary: {summary}")
+            logger.error(f"LLM failed to generate executive summary: {summary}")
             return "# Executive Summary\n\n[Error: Failed to generate executive summary.]\n"
     except Exception as e:
         logger.error(f"Error in create_exec_summary: {e}", exc_info=True)
@@ -777,7 +778,7 @@ def create_next_steps(report_content: str) -> str:
     Full Report Content:
     --- START REPORT ---
     {report_content}
-    --- END REPORT ---
+    --- END ---
 
     Next Steps / Further Research (Markdown):
     """
@@ -791,7 +792,7 @@ def create_next_steps(report_content: str) -> str:
             logger.info("Successfully generated next steps.")
             return next_steps
         else:
-            logger.error(f"Failed to generate next steps: {next_steps}")
+            logger.error(f"LLM failed to generate next steps: {next_steps}")
             return "# Next Steps / Further Research\n\n[Error: Failed to generate next steps.]\n"
     except Exception as e:
         logger.error(f"Error in create_next_steps: {e}", exc_info=True)
@@ -927,7 +928,7 @@ def perform_deep_research(
         # Cannot emit error, just log and return
         return
 
-    # --- Get Flask app context ---
+    # --- Get Flask app instance ---
     # This is necessary because this function runs in a background thread started by SocketIO
     # and needs access to app.config, g, etc. for the AI/DB calls.
     app = current_app._get_current_object()
@@ -992,7 +993,7 @@ def perform_deep_research(
                         is_cancelled_callback,
                         socketio,
                         sid,
-                        app.app_context(), 
+                        app, # Pass the app object directly
                         cpu_executor 
                     )
                     collected_research[step_name] = llm_summary_strings
@@ -1096,7 +1097,7 @@ def perform_deep_research(
                             is_cancelled_callback,
                             socketio,
                             sid,
-                            app.app_context(), 
+                            app, # Pass the app object directly
                             cpu_executor 
                         )
                         # Ensure collected_research[section_name] is a list and extend it
@@ -1246,6 +1247,7 @@ def perform_deep_research(
                         section_name,
                         section_description,
                         items_for_synthesis,
+                        app # Pass the app instance
                     )
                     synthesis_futures_map[future] = section_name
                 
@@ -1259,7 +1261,7 @@ def perform_deep_research(
                         # Mark this specific one as cancelled if it wasn't already processed
                         if section_name_completed not in temp_report_sections_results:
                             temp_report_sections_results[section_name_completed] = f"## {section_name_completed}\n\n[Synthesis cancelled by user.]\n"
-                            temp_report_references_results[section_name_completed + "_references"] = []
+                            temp_report_references_results[sn + "_references"] = []
                         continue # Don't process more futures if cancelled
 
                     try:

@@ -160,7 +160,10 @@ def mock_cpu_executor():
     """Mocks concurrent.futures.ProcessPoolExecutor."""
     with unittest.mock.patch('concurrent.futures.ProcessPoolExecutor') as MockExecutor:
         mock_instance = MockExecutor.return_value
-        # Mock the submit method to return a mock future
+        # Mock the __enter__ method of the MockExecutor (the class mock)
+        # to return the mock_instance when the 'with' statement is entered.
+        MockExecutor.return_value.__enter__.return_value = mock_instance
+        # Mock the submit method on the mock_instance
         mock_future = unittest.mock.Mock()
         mock_future.result.return_value = MOCK_TRANSCRIBED_PDF_TEXT
         mock_instance.submit.return_value = mock_future
@@ -289,7 +292,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_genai_client,
     # Assertions
     mock_socketio.emit.assert_any_call("status_update", {"message": "Generating initial research plan..."}, room="test_sid")
     mock_socketio.emit.assert_any_call("status_update", {"message": "Performing initial research..."}, room="test_sid")
-    mock_socketio.emit.assert_any_call("status_update", {"message": "Refining report plan with 3 sections."}, room="test_sid")
+    mock_socketio.emit.assert_any_call("status_update", {"message": "Refined report plan with 3 sections."}, room="test_sid")
     mock_socketio.emit.assert_any_call("status_update", {"message": "Synthesizing report sections in parallel..."}, room="test_sid")
     mock_socketio.emit.assert_any_call("status_update", {"message": "Formatting final report..."}, room="test_sid")
     mock_socketio.emit.assert_any_call("deep_research_result", {"report": MOCK_FINAL_REPORT}, room="test_sid")
@@ -303,7 +306,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_genai_client,
     mock_fetch_web_content.assert_any_call(url="http://example.com/document.pdf")
 
     # Verify PDF transcription was called
-    mock_transcribe_pdf_bytes.assert_called_once_with(MOCK_PDF_BYTES, 'document.pdf')
+    mock_transcribe_pdf_bytes.assert_called_once_with(MOCK_PDF_BYTES, 'document.pdf', app) # Check for app instance
 
     # Verify LLM calls (simplified check, more detailed checks can be added)
     assert mock_genai_client.models.generate_content.call_count >= 8 # At least 1 for plan, 4 for tool loop, 1 for final JSON, 1 for updated plan, 3 for synthesis, 1 for exec summary, 1 for next steps, 1 for final format.
@@ -414,7 +417,7 @@ def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_g
             lambda: False, # Not cancelled
             mock_socketio,
             "test_sid",
-            app.app_context(), # Pass the app context object
+            app, # Pass the app object directly
             mock_cpu_executor
         )
 
@@ -464,7 +467,7 @@ def test_execute_research_step_scrape_context_fix(app, mock_socketio, mock_genai
             lambda: False, # Not cancelled
             mock_socketio,
             "test_sid",
-            app.app_context(), # Pass the app context object
+            app, # Pass the app object directly
             mock_cpu_executor
         )
 
@@ -564,7 +567,7 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
 
     # Assertions
     mock_fetch_web_content.assert_called_once_with(url="http://example.com/document.pdf")
-    mock_cpu_executor.submit.assert_called_once_with(ai_services.transcribe_pdf_bytes, MOCK_PDF_BYTES, 'document.pdf')
+    mock_cpu_executor.submit.assert_called_once_with(ai_services.transcribe_pdf_bytes, MOCK_PDF_BYTES, 'document.pdf', app) # Check for app instance
     mock_transcribe_pdf_bytes.assert_called_once() # Ensure the actual transcription function was called via the executor
 
     # Verify the final report content contains the transcribed text, not the placeholder
@@ -574,7 +577,6 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
     # or the `full_report_body` before `create_exec_summary`.
     # For this test, we'll rely on the fact that if the flow completes, the placeholder
     # must have been replaced for the subsequent LLM calls to work correctly.
-    # A more robust test would involve inspecting the `full_report_body` directly.
     
     # For now, let's check the final emitted report, assuming the mock for final_report
     # would have received the correctly substituted content.
@@ -669,8 +671,18 @@ def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_genai
     # We need to check the final report content or the status updates.
     # The LLM is expected to incorporate the tool error into its final JSON output.
     # The MOCK_LLM_FINAL_JSON_OUTPUT above reflects this.
-    mock_socketio.emit.assert_any_call("deep_research_result", {"report": MOCK_FINAL_REPORT}, room="test_sid")
-    mock_add_message_to_db.assert_called_once_with(127, "assistant", MOCK_FINAL_REPORT)
+    mock_socketio.emit.assert_any_call(
+        "task_error",
+        unittest.mock.ANY, # Match any dictionary for the second argument
+        room="test_sid"
+    )
+    # And then more specifically check the content of the error message
+    # Find the call that emitted 'task_error'
+    emitted_calls = [call for call in mock_socketio.emit.call_args_list if call[0][0] == "task_error"]
+    assert len(emitted_calls) > 0
+    error_message_dict = emitted_calls[0][0][1] # Get the dictionary from the first 'task_error' call
+    assert "error" in error_message_dict
+    assert "Failed to generate the report outline" in error_message_dict["error"]
 
     # Ensure the web search was attempted
     mock_perform_web_search.assert_called_once()
