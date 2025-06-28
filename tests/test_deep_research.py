@@ -122,8 +122,9 @@ def mock_socketio():
 @pytest.fixture
 def mock_generate_text():
     """Mocks app.ai_services_lib.generation_services.generate_text."""
-    # Patch the function at its original definition location
-    with unittest.mock.patch('app.ai_services_lib.generation_services.generate_text') as mock_gen_text:
+    # Patch the function where deep_research *uses* it.
+    # Corrected patch target to 'app.deep_research.generate_text'
+    with unittest.mock.patch('app.deep_research.generate_text') as mock_gen_text:
         # Default return value for cases not covered by side_effect
         mock_gen_text.return_value = "Default mock text generation response."
         yield mock_gen_text
@@ -139,8 +140,9 @@ def mock_web_search_plugin():
 @pytest.fixture
 def mock_transcribe_pdf_bytes():
     """Mocks app.ai_services_lib.transcription_services.transcribe_pdf_bytes."""
-    # Patch the function at its original definition location
-    with unittest.mock.patch('app.ai_services_lib.transcription_services.transcribe_pdf_bytes') as mock_transcribe:
+    # Patch the function where deep_research *uses* it.
+    # Corrected patch target to 'app.deep_research.transcribe_pdf_bytes'
+    with unittest.mock.patch('app.deep_research.transcribe_pdf_bytes') as mock_transcribe:
         mock_transcribe.return_value = MOCK_TRANSCRIBED_PDF_TEXT
         yield mock_transcribe
 
@@ -280,7 +282,11 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
     mock_fetch_web_content.assert_any_call(url="http://example.com/document.pdf")
 
     # Verify PDF transcription was called
-    mock_transcribe_pdf_bytes.assert_called_once_with(MOCK_PDF_BYTES, 'document.pdf', app) # Check for app instance
+    # The mock_transcribe_pdf_bytes fixture patches `app.deep_research.transcribe_pdf_bytes`
+    # so the call to `submit` will receive the *mock* object, not the original function.
+    # The `app` argument is no longer passed to `transcribe_pdf_bytes` in deep_research.py
+    mock_cpu_executor.submit.assert_called_once_with(mock_transcribe_pdf_bytes, MOCK_PDF_BYTES, 'document.pdf')
+    mock_transcribe_pdf_bytes.assert_called_once() # Ensure the actual transcription function was called via the executor
 
     # Verify generate_text calls
     # 1 (plan) + 3 (initial search) + 2 (detailed analysis) + 1 (updated plan) + 6 (additional research) + 3 (synthesis) + 1 (exec summary) + 1 (next steps) + 1 (final format) = 19
@@ -498,9 +504,10 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
 
     # Assertions
     mock_fetch_web_content.assert_called_once_with(url="http://example.com/document.pdf")
-    # The mock_transcribe_pdf_bytes fixture patches `app.ai_services_lib.transcription_services.transcribe_pdf_bytes`
+    # The mock_transcribe_pdf_bytes fixture patches `app.deep_research.transcribe_pdf_bytes`
     # so the call to `submit` will receive the *mock* object, not the original function.
-    mock_cpu_executor.submit.assert_called_once_with(mock_transcribe_pdf_bytes, MOCK_PDF_BYTES, 'document.pdf', app) # Check for app instance
+    # The `app` argument is no longer passed to `transcribe_pdf_bytes` in deep_research.py
+    mock_cpu_executor.submit.assert_called_once_with(mock_transcribe_pdf_bytes, MOCK_PDF_BYTES, 'document.pdf')
     mock_transcribe_pdf_bytes.assert_called_once() # Ensure the actual transcription function was called via the executor
 
     # Verify the final report content contains the transcribed text, not the placeholder
