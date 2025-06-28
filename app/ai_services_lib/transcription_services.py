@@ -158,7 +158,7 @@ The reformatted transcript:
 
 
 # --- PDF Transcription ---
-def transcribe_pdf_bytes(pdf_bytes: bytes, filename: str, flask_app) -> str: # Added flask_app parameter
+def transcribe_pdf_bytes(pdf_bytes: bytes, filename: str) -> str: # Removed flask_app parameter
     """
     Transcribes the content of a PDF provided as bytes using the SUMMARY_MODEL.
     Uses the File API for processing.
@@ -166,19 +166,10 @@ def transcribe_pdf_bytes(pdf_bytes: bytes, filename: str, flask_app) -> str: # A
     """
     logger.info(f"Entering transcribe_pdf_bytes for '{filename}'.")
 
-    with flask_app.app_context(): # Push context here
+    # Push app context here as this function might be called from a separate process
+    with current_app.app_context():
         # --- AI Readiness Check ---
         try:
-            try:
-                _ = current_app.config
-                logger.debug("transcribe_pdf_bytes: Flask request context is active.")
-            except RuntimeError:
-                logger.error(
-                    "transcribe_pdf_bytes called outside active Flask context.",
-                    exc_info=True,
-                )
-                return "[Error: AI Service called outside request context]"
-
             api_key = current_app.config.get("API_KEY")
             if not api_key:
                 logger.error("API_KEY missing for transcribe_pdf_bytes.")
