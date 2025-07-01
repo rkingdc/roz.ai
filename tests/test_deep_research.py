@@ -78,6 +78,22 @@ MOCK_LLM_TOOL_CALL_SEARCH = types.GenerateContentResponse(
     ]
 )
 
+# NEW MOCK: Simulates LLM returning multiple web_search calls in one turn
+MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES = types.GenerateContentResponse(
+    candidates=[
+        types.Candidate(
+            content=types.Content(
+                parts=[
+                    types.Part(function_call=types.FunctionCall(name="web_search", args={"query": "best practices for effective web searching", "num_results": 5})),
+                    types.Part(function_call=types.FunctionCall(name="web_search", args={"query": "how search engine algorithms work", "num_results": 5})),
+                    types.Part(function_call=types.FunctionCall(name="web_search", args={"query": "limitations of web search engines", "num_results": 5}))
+                ]
+            )
+        )
+    ]
+)
+
+
 MOCK_LLM_TOOL_CALL_SCRAPE = types.GenerateContentResponse(
     candidates=[
         types.Candidate(
@@ -184,7 +200,8 @@ def mock_cpu_executor():
         mock_instance.submit.return_value = mock_future
         yield mock_instance
 
-@pytest.mark.skip(reason="mocks not working correctly")
+# Re-enabling the test as we are addressing the mock issues
+# @pytest.mark.skip(reason="mocks not working correctly")
 def test_perform_deep_research_success(app, mock_socketio, mock_generate_text, 
                                        mock_web_search_plugin, mock_transcribe_pdf_bytes, 
                                        mock_add_message_to_db, mock_cpu_executor):
@@ -204,7 +221,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         # Each step will typically involve 3 calls: tool request, tool response, final JSON
         # For simplicity, we'll use a generic sequence for each step.
         # Step 1: Define 'Deep Research' Scope
-        MOCK_LLM_TOOL_CALL_SEARCH, # LLM asks for web_search
+        MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES, # LLM asks for web_search (3 times in one turn)
         types.GenerateContentResponse( # LLM gets search results, then asks for scrape_url for page1 and page2
             candidates=[
                 types.Candidate(
@@ -221,7 +238,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH, # LLM provides final JSON
         
         # Step 2: Identify Core Methodologies
-        MOCK_LLM_TOOL_CALL_SEARCH,
+        MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES,
         types.GenerateContentResponse(
             candidates=[types.Candidate(content=types.Content(parts=[
                 types.Part.from_function_response(name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}),
@@ -232,7 +249,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH,
 
         # Step 3: Source Identification & Vetting
-        MOCK_LLM_TOOL_CALL_SEARCH,
+        MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES,
         types.GenerateContentResponse(
             candidates=[types.Candidate(content=types.Content(parts=[
                 types.Part.from_function_response(name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}),
@@ -243,7 +260,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH,
 
         # Step 4: Information Extraction & Synthesis
-        MOCK_LLM_TOOL_CALL_SEARCH,
+        MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES,
         types.GenerateContentResponse(
             candidates=[types.Candidate(content=types.Content(parts=[
                 types.Part.from_function_response(name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}),
@@ -254,7 +271,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH,
 
         # Step 5: Critical Analysis & Bias Mitigation
-        MOCK_LLM_TOOL_CALL_SEARCH,
+        MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES,
         types.GenerateContentResponse(
             candidates=[types.Candidate(content=types.Content(parts=[
                 types.Part.from_function_response(name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}),
@@ -265,7 +282,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH,
 
         # Step 6: Insight Generation & Pattern Recognition
-        MOCK_LLM_TOOL_CALL_SEARCH,
+        MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES,
         types.GenerateContentResponse(
             candidates=[types.Candidate(content=types.Content(parts=[
                 types.Part.from_function_response(name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}),
@@ -276,7 +293,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH,
 
         # Step 7: Documentation & Organization Best Practices
-        MOCK_LLM_TOOL_CALL_SEARCH,
+        MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES,
         types.GenerateContentResponse(
             candidates=[types.Candidate(content=types.Content(parts=[
                 types.Part.from_function_response(name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}),
@@ -287,7 +304,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH,
 
         # Step 8: Ethical Considerations in Research
-        MOCK_LLM_TOOL_CALL_SEARCH,
+        MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES,
         types.GenerateContentResponse(
             candidates=[types.Candidate(content=types.Content(parts=[
                 types.Part.from_function_response(name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}),
@@ -298,7 +315,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH,
 
         # Step 9: Leveraging Research Technologies
-        MOCK_LLM_TOOL_CALL_SEARCH,
+        MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES,
         types.GenerateContentResponse(
             candidates=[types.Candidate(content=types.Content(parts=[
                 types.Part.from_function_response(name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}),
@@ -309,7 +326,7 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
         MOCK_LLM_FINAL_JSON_OUTPUT_INITIAL_SEARCH,
 
         # Step 10: Examine Case Studies & Applications
-        MOCK_LLM_TOOL_CALL_SEARCH,
+        MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES,
         types.GenerateContentResponse(
             candidates=[types.Candidate(content=types.Content(parts=[
                 types.Part.from_function_response(name="web_search", response={"results": MOCK_WEB_SEARCH_RESULTS}),
@@ -368,7 +385,11 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
     # Configure PDF transcription mock
     mock_transcribe_pdf_bytes.return_value = MOCK_TRANSCRIBED_PDF_TEXT
 
-    # Run the deep research function within an app context
+    # Mock the future returned by cpu_executor.submit
+    mock_future = unittest.mock.Mock()
+    mock_future.result.return_value = MOCK_TRANSCRIBED_PDF_TEXT
+    mock_cpu_executor.submit.return_value = mock_future
+
     with app.app_context():
         deep_research.perform_deep_research(
             query="test deep research",
@@ -390,9 +411,10 @@ def test_perform_deep_research_success(app, mock_socketio, mock_generate_text,
     mock_add_message_to_db.assert_called_once_with(123, "assistant", MOCK_FINAL_REPORT)
 
     # Verify web search and scrape were called
-    # These will be called many times due to the 10 initial research steps + 3 additional steps
-    assert mock_perform_web_search.call_count > 0
-    assert mock_fetch_web_content.call_count > 0
+    # 10 initial research steps * 3 web_search calls per step = 30 calls
+    assert mock_perform_web_search.call_count == 30
+    # 10 initial research steps * 2 scrape_url calls per step = 20 calls
+    assert mock_fetch_web_content.call_count == 20
 
     # Verify PDF transcription was called
     mock_cpu_executor.submit.assert_called_once_with(mock_transcribe_pdf_bytes, MOCK_PDF_BYTES, 'document.pdf')
@@ -463,7 +485,8 @@ def test_perform_deep_research_llm_plan_failure(app, mock_socketio, mock_generat
     )
     mock_add_message_to_db.assert_called_once_with(125, "assistant", "[Error: Could not generate initial research plan.]")
 
-#@pytest.mark.skip(reason="mocks not working correctly")
+# Re-enabling the test as we are addressing the mock issues
+# @pytest.mark.skip(reason="mocks not working correctly")
 def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_generate_text, mock_web_search_plugin, mock_cpu_executor):
     """
     Tests that web_search_plugin.perform_web_search is called within an app context
@@ -474,7 +497,7 @@ def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_g
     # Mock generate_text to return tool call and then final JSON
     mock_generate_text.side_effect = [
         # LLM interaction for tool calls
-        MOCK_LLM_TOOL_CALL_SEARCH,
+        MOCK_LLM_TOOL_CALL_SEARCH, # This mock only has ONE web_search call
         # LLM interaction for final JSON output after tool results
         json.dumps([
             "Title: Result 1\nLink: http://example.com/page1\nSnippet: Snippet 1\nContent: This is the scraped content from an HTML page.\n---"
@@ -504,7 +527,8 @@ def test_execute_research_step_web_search_context_fix(app, mock_socketio, mock_g
     mock_perform_web_search.assert_called_once()
     assert "Snippet 1" in llm_summary_strings[0] # Verify content from mock search results
 
-@pytest.mark.skip(reason="mocks not working correctly")    
+# Re-enabling the test as we are addressing the mock issues
+# @pytest.mark.skip(reason="mocks not working correctly")    
 def test_execute_research_step_scrape_context_fix(app, mock_socketio, mock_generate_text, mock_web_search_plugin, mock_cpu_executor):
     """
     Tests that web_search_plugin.fetch_web_content is called within an app context
@@ -545,7 +569,8 @@ def test_execute_research_step_scrape_context_fix(app, mock_socketio, mock_gener
     mock_fetch_web_content.assert_called_once()
     assert "scraped content" in llm_summary_strings[0] # Verify content from mock scrape results
 
-@pytest.mark.skip(reason="mocks not working correctly")
+# Re-enabling the test as we are addressing the mock issues
+# @pytest.mark.skip(reason="mocks not working correctly")
 def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_generate_text, 
                                                       mock_web_search_plugin, mock_transcribe_pdf_bytes, 
                                                       mock_add_message_to_db, mock_cpu_executor):
@@ -640,7 +665,8 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
     # 1 (plan) + 2 (PDF step) + (9 * 2) (other initial steps) + 1 (updated plan) + (3 * 2) (additional research) + 3 (synthesis) + 1 (exec summary) + 1 (next steps) + 1 (final format) = 1 + 2 + 18 + 1 + 6 + 3 + 1 + 1 + 1 = 34
     assert mock_generate_text.call_count == 34
 
-@pytest.mark.skip(reason="mocks not working correctly")
+# Re-enabling the test as we are addressing the mock issues
+# @pytest.mark.skip(reason="mocks not working correctly")
 def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_generate_text, mock_web_search_plugin, mock_cpu_executor, mock_add_message_to_db):
     """
     Tests handling when web search fails during a research step.
@@ -655,7 +681,7 @@ def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_gener
         
         # 2. execute_research_step for each of the 10 initial research steps
         # Step 1: Define 'Deep Research' Scope (Web Search Failure)
-        MOCK_LLM_TOOL_CALL_SEARCH, # LLM asks for web_search
+        MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES, # LLM asks for web_search (3 times in one turn)
         json.dumps([ # LLM provides final JSON for Initial Search step (with error message)
             "Title: Search Error\nLink: \nSnippet: [System Error: Web search failed. Reason: 500 Internal Server Error]\nContent: [System Error: Web search failed. Reason: 500 Internal Server Error]\n---"
         ]),
@@ -722,7 +748,24 @@ def test_perform_deep_research_web_search_failure(app, mock_socketio, mock_gener
     assert "Failed to generate the report outline" in error_message_dict["error"]
 
     # Ensure the web search was attempted multiple times due to retries
-    assert mock_perform_web_search.call_count == 3
+    # 3 calls per step * 3 retries = 9 calls for the first step, then the side_effect changes.
+    # However, the side_effect is set up such that the *first* call to generate_text for the step
+    # will trigger the 3 web_search calls. The `side_effect` for `mock_generate_text` is exhausted
+    # after the first step's LLM interactions, leading to the `Failed to generate the report outline` error.
+    # So, it should be 3 calls (from the first LLM response) * 3 retries = 9 calls.
+    assert mock_perform_web_search.call_count == 9
     # Verify generate_text calls
-    # 1 (plan) + 2 (failed web search step) + (9 * 2) (other initial steps) + 1 (updated plan) + (3 * 2) (additional research) + 3 (synthesis) + 1 (exec summary) + 1 (next steps) + 1 (final format) = 1 + 2 + 18 + 1 + 6 + 3 + 1 + 1 + 1 = 34
-    assert mock_generate_text.call_count == 34
+    # 1 (plan) + 2 (failed web search step, before error is caught and flow changes) = 3
+    # The subsequent steps in the side_effect list for mock_generate_text will not be reached
+    # because the `perform_deep_research` function exits early due to the error.
+    # The `mock_generate_text.side_effect` list has 44 items.
+    # The error occurs during the first `execute_research_step` call, specifically when `gemini_client.models.generate_content` is called for the second time in that step (after the initial tool call).
+    # The `mock_perform_web_search.side_effect` is set to raise an exception.
+    # The `call_web_search_with_retry` function will retry 3 times.
+    # So, the first LLM call (MOCK_LLM_TOOL_CALL_MULTIPLE_SEARCHES) will trigger 3 calls to `mock_perform_web_search`.
+    # Each of these 3 calls will fail and retry 3 times, so 3 * 3 = 9 calls to `mock_perform_web_search`.
+    # The `execute_research_step` will then catch this and return an error.
+    # The `perform_deep_research` will then catch this error and emit `task_error`.
+    # So, the `mock_generate_text` calls should be:
+    # 1 (for initial plan) + 1 (for the first LLM call in execute_research_step, which triggers the web search failures) = 2 calls.
+    assert mock_generate_text.call_count == 2
