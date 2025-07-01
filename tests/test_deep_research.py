@@ -142,9 +142,8 @@ def mock_socketio():
 @pytest.fixture
 def mock_generate_text():
     """Mocks app.ai_services_lib.generation_services.generate_text."""
-    # Patch the function at its original definition location
-    # This is the most reliable way to ensure the mock is hit across imports.
-    with unittest.mock.patch('app.ai_services_lib.generation_services.generate_text') as mock_gen_text:
+    # Corrected patch target: Patch where deep_research looks it up.
+    with unittest.mock.patch('app.deep_research.generate_text') as mock_gen_text:
         # Default return value for cases not covered by side_effect
         mock_gen_text.return_value = "Default mock text generation response."
         yield mock_gen_text
@@ -160,9 +159,8 @@ def mock_web_search_plugin():
 @pytest.fixture
 def mock_transcribe_pdf_bytes():
     """Mocks app.ai_services_lib.transcription_services.transcribe_pdf_bytes."""
-    # Patch the function at its original definition location
-    # This is the most reliable way to ensure the mock is hit across imports.
-    with unittest.mock.patch('app.ai_services_lib.transcription_services.transcribe_pdf_bytes') as mock_transcribe:
+    # Corrected patch target: Patch where deep_research looks it up.
+    with unittest.mock.patch('app.deep_research.transcribe_pdf_bytes') as mock_transcribe:
         mock_transcribe.return_value = MOCK_TRANSCRIBED_PDF_TEXT
         yield mock_transcribe
 
@@ -622,7 +620,7 @@ def test_perform_deep_research_pdf_transcription_flow(app, mock_socketio, mock_g
 
     # Assertions
     mock_fetch_web_content.assert_called_once_with(url="http://example.com/document.pdf")
-    # The mock_transcribe_pdf_bytes fixture patches `app.ai_services_lib.transcription_services.transcribe_pdf_bytes`
+    # The mock_transcribe_pdf_bytes fixture patches `app.deep_research.transcribe_pdf_bytes`
     # so the call to `submit` will receive the *mock* object, not the original function.
     # The `app` argument is no longer passed to `transcribe_pdf_bytes` in deep_research.py
     mock_cpu_executor.submit.assert_called_once_with(mock_transcribe_pdf_bytes, MOCK_PDF_BYTES, 'document.pdf')
