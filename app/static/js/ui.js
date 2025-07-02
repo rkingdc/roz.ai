@@ -1916,10 +1916,10 @@ export function updateNotesPreview() {
         }
     }
     if (state.currentNoteMode === 'edit' || (state.currentNoteMode === 'view' && !showTabs)) {
-        const debouncedUpdateToc = debounce(() => {
+        const debouncedTocUpdate = debounce(() => {
             if (state.currentTab === 'notes') generateAndRenderToc(state.noteContent || '');
         }, 300);
-        debouncedUpdateToc();
+        debouncedTocUpdate();
     }
 }
 
@@ -2264,14 +2264,15 @@ function renderSingleMermaidNode(node, contextLabel) {
         console.log(`[DEBUG Mermaid Render - ${contextLabel}] Found rendered SVG:`, renderedSvg); // Add this log
 
         if (renderedSvg) {
-            renderedSvg.style.cursor = 'zoom-in'; // Visual cue for clickability
-            renderedSvg.addEventListener('click', (event) => { // Pass event object
-                console.log(`[DEBUG Mermaid Click - ${contextLabel}] SVG clicked! Event target:`, event.target); // Add this log
+            // Attach listener to the 'node' (div.mermaid) instead of 'renderedSvg'
+            node.style.cursor = 'zoom-in'; // Visual cue for clickability on the div
+            node.addEventListener('click', (event) => { // Pass event object
+                console.log(`[DEBUG Mermaid Click - ${contextLabel}] DIV.MERMAID clicked! Event target:`, event.target); // Add this log
                 // Prevent event from bubbling up to parent elements that might have other click handlers
                 event.stopPropagation();
 
                 try {
-                    const svgOuterHTML = renderedSvg.outerHTML;
+                    const svgOuterHTML = renderedSvg.outerHTML; // Still use renderedSvg for content
                     const svgDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgOuterHTML)}`;
 
                     state.setCurrentViewingFile(
@@ -2288,7 +2289,7 @@ function renderSingleMermaidNode(node, contextLabel) {
                     state.setStatusMessage("Failed to open diagram in full view.", true);
                 }
             });
-            console.log(`[DEBUG Mermaid Render - ${contextLabel}] Click listener attached to SVG.`); // Add this log
+            console.log(`[DEBUG Mermaid Render - ${contextLabel}] Click listener attached to DIV.MERMAID.`); // Add this log
         } else {
             console.warn(`[WARN Mermaid Render - ${contextLabel}] No SVG element found within node after mermaid.run().`); // Add this log
         }
