@@ -2254,12 +2254,46 @@ function renderSingleMermaidNode(node, contextLabel) {
     const originalMermaidScript = node.textContent || ''; // Save original script
     try {
         console.log(`[DEBUG Mermaid Render - ${contextLabel}] Processing node. Content (start): "${originalMermaidScript.substring(0, 150)}..."`);
-        // Mermaid.js modifies the node in-place, replacing its textContent with SVG.
-        // No need to clear node.innerHTML if textContent is what we set.
+        console.log(`[DEBUG Mermaid Render - ${contextLabel}] Node element before mermaid.run:`, node); // Add this log
+
         window.mermaid.run({ nodes: [node] });
         console.log(`[DEBUG Mermaid Render - ${contextLabel}] Successfully called mermaid.run() for node.`);
+
+        // After rendering, find the SVG and attach click listener
+        const renderedSvg = node.querySelector('svg');
+        console.log(`[DEBUG Mermaid Render - ${contextLabel}] Found rendered SVG:`, renderedSvg); // Add this log
+
+        if (renderedSvg) {
+            renderedSvg.style.cursor = 'zoom-in'; // Visual cue for clickability
+            renderedSvg.addEventListener('click', (event) => { // Pass event object
+                console.log(`[DEBUG Mermaid Click - ${contextLabel}] SVG clicked! Event target:`, event.target); // Add this log
+                // Prevent event from bubbling up to parent elements that might have other click handlers
+                event.stopPropagation();
+
+                try {
+                    const svgOuterHTML = renderedSvg.outerHTML;
+                    const svgDataUrl = `data:image/svg+xml;utf8,${encodeURIComponent(svgOuterHTML)}`;
+
+                    state.setCurrentViewingFile(
+                        'mermaid-diagram', // A placeholder ID
+                        'Mermaid Diagram.svg', // A descriptive filename
+                        svgDataUrl,
+                        'image/svg+xml',
+                        false // It's a data URL, not raw base64
+                    );
+                    showModal(elements.fileContentModal);
+                    console.log("[DEBUG] Opened Mermaid diagram in file content modal.");
+                } catch (e) {
+                    console.error("Error opening Mermaid diagram in modal:", e);
+                    state.setStatusMessage("Failed to open diagram in full view.", true);
+                }
+            });
+            console.log(`[DEBUG Mermaid Render - ${contextLabel}] Click listener attached to SVG.`); // Add this log
+        } else {
+            console.warn(`[WARN Mermaid Render - ${contextLabel}] No SVG element found within node after mermaid.run().`); // Add this log
+        }
+
     } catch (e) {
-        console.error(`[ERROR Mermaid Render - ${contextLabel}] Error in window.mermaid.run():`, e);
         // Check if the error object has the expected structure for parse errors
         const errorMessage = (e && typeof e.message === 'string') ? e.message : "Unknown error during rendering.";
         
@@ -2802,7 +2836,7 @@ export function renderChatSearchResults() {
             chatSearchResultsContainer.appendChild(item);
         });
     } else if (query) {
-        chatSearchResultsContainer.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No messages found.</p>`;
+        chatSearchResultsContainer.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">No messages found for "${escapeHtml(query)}".</p>`;
     } else {
         chatSearchResultsContainer.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Type to search messages...</p>`;
     }
@@ -3481,7 +3515,7 @@ export function handleStateChange_isLoadingTodos() {
 export function handleStateChange_todoStatusOptions() {
     // This might be called if options are dynamically updated later.
     // For now, it ensures dropdowns are populated if state changes after initial load.
-    if (elements.todoForm && (state.currentTodoItem === null || elements.todoIdInput?.value === '')) { // Only re-populate for new task form
+    if (elements.todoForm && (state.currentTodoItem === null || elements.todoIdInput?.value === '') ) { // Only re-populate for new task form
         populateTodoDropdownWithOptions(elements.todoStatusInput, state.todoStatusOptions, 'pending');
     } else if (elements.todoForm && state.currentTodoItem) { // For edit form, re-populate with current value
         populateTodoDropdownWithOptions(elements.todoStatusInput, state.todoStatusOptions, state.currentTodoItem.status);
