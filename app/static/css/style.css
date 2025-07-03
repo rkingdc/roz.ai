@@ -1140,24 +1140,6 @@
      transform: translateX(14px);
 }
 
-/* REMOVED Old Styles for Nav Buttons */
-/*
-.rounded-l-md.active,
-.rounded-r-md.active {
-    background-color: #3b82f6; /* blue-500 */
-    color: white;
-    border-color: #3b82f6; /* blue-500 */
-}
-
-/* REMOVED dark mode styles for active buttons */
-/*
-.dark .rounded-l-md.active,
-.dark .rounded-r-md.active {
-    background-color: #1d4ed8; /* blue-700 */
-    border-color: #1d4ed8; /* blue-700 */
-}
-*/
-
 /* Ensure the prose class is styled for dark mode if needed */
 /* Tailwind's default prose-invert handles this, but if you have custom prose styles,
    make sure they work in dark mode. */
