@@ -428,9 +428,6 @@
 */
 
 /* --- Custom Prose Styles for Chat Messages --- */
-/* Reduce margins for common block elements within chat messages */
-/* Reduce margins for common block elements within chat messages using rem units */
-/* Reduce margins for common block elements within chat messages using rem units */
 /* Reduce margins for common block elements within chat messages using rem units */
 /* More aggressive reduction */
 /* --- Aggressive Reset for Chat Message Prose --- */
@@ -1001,11 +998,11 @@
 
  .modal-content {
      background-color: var(--rz-popup);
-     margin: 10% auto;
+     margin: 10% auto; /* Default margin for all modals */
      padding: 20px;
      border: 1px solid var(--rz-tab-line);
-     width: 80%;
-     max-width: 600px;
+     width: 80%; /* Default width for all modals */
+     max-width: 600px; /* Default max-width for all modals */
      border-radius: 0.5rem;
      position: relative;
      display: flex;
@@ -1013,6 +1010,14 @@
      max-height: 80vh;
      color: var(--rz-popup-text);
 }
+
+/* Specific styling for the file content modal to make it wider */
+#file-content-modal .modal-content {
+    margin: 5% auto; /* Adjust top margin for wider modal */
+    width: 90%; /* Make it span 90% of the screen width */
+    max-width: 90vw; /* Ensure it doesn't exceed 90% of viewport width */
+}
+
  .modal-header {
      display: flex;
      justify-content: space-between;
