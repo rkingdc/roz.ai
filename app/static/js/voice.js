@@ -438,7 +438,11 @@ export async function startLongRecording() {
             { autoClose: false, type: 'info' } // Keep it open
         );
         console.log(`[DEBUG] startLongRecording: Toast ID received: ${toastId}`);
-        state.setLongRecordingToastId(toastId); // Store toast ID in state
+        if (toastId !== null && toastId !== undefined) {
+            state.setLongRecordingToastId(toastId); // Store toast ID in state
+        } else {
+            console.error("[ERROR] startLongRecording: Received an invalid toastId.");
+        }
 
     } catch (err) {
         console.error("[ERROR] Failed to start long recording:", err);
