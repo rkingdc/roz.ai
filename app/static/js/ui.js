@@ -26,7 +26,8 @@ let overtypeEditor = null;
  */
 export function initializeOvertypeEditor(onChange) {
     if (elements.notesTextarea && !overtypeEditor) {
-        [overtypeEditor] = new OverType(elements.notesTextarea, {
+        const OT = (typeof OverType === 'function') ? OverType : OverType.default;
+        [overtypeEditor] = new OT(elements.notesTextarea, {
             language: 'markdown',
             theme: 'solar',
             showLineNumbers: true,
