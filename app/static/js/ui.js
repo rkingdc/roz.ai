@@ -18,6 +18,26 @@ import { escapeHtml, formatFileSize, debounce } from './utils.js'; // Import uti
 import { marked } from 'https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js'; // Import marked for lexer
 import { markedRenderer } from './config.js'; // Import the custom renderer from config.js
 
+let overtypeEditor = null;
+
+/**
+ * Initializes the Overtype editor.
+ * @param {function} onChange - Callback function to handle the editor's change event.
+ */
+export function initializeOvertypeEditor(onChange) {
+    if (elements.notesTextarea && !overtypeEditor) {
+        [overtypeEditor] = new OverType(elements.notesTextarea, {
+            language: 'markdown',
+            theme: 'solar',
+            showLineNumbers: true,
+            showInvisibles: false,
+            onChange: (value) => {
+                onChange(value);
+            },
+        });
+    }
+}
+
 // Module-level variable to store parsed H1 sections for the current note
 let _currentNoteH1Sections = [];
 
@@ -1041,14 +1061,13 @@ export function renderCurrentNoteDetails() {
  */
 export function renderNoteContent() {
     const { notesTextarea, notesPreview } = elements;
-    // Add null checks for individual elements
-    if (notesTextarea) {
-        notesTextarea.value = state.noteContent || ''; // Read from state
-        notesTextarea.placeholder = state.isLoading ? "Loading note..." : "Start typing your markdown notes here...";
-        notesTextarea.disabled = state.isLoading || state.currentNoteId === null; // Disable if loading or no note loaded
-        autoResizeTextarea(notesTextarea);
+    if (overtypeEditor && notesTextarea) {
+        const currentContent = state.noteContent || '';
+        if (overtypeEditor.getValue() !== currentContent) {
+            overtypeEditor.setValue(currentContent);
+        }
+        notesTextarea.classList.toggle('disabled', state.isLoading || state.currentNoteId === null);
     }
-
 
     if (notesPreview) {
         updateNotesPreview();
@@ -1574,39 +1593,39 @@ export function updatePluginUI() {
         return;
     }
     const activeTab = state.currentTab;
-    const showFilesPlugin = activeTab === 'chat'; // Files plugin only for chat
-    if (elements.filePluginSection) elements.filePluginSection.classList.toggle('hidden', !showFilesPlugin);
-    const showCalendarPlugin = activeTab === 'chat'; // Calendar plugin only for chat
-    if (elements.calendarPluginSection) elements.calendarPluginSection.classList.toggle('hidden', !showCalendarPlugin);
-    const showHistoryPlugin = activeTab === 'notes'; // History plugin only for notes
-    if (elements.historyPluginSection) elements.historyPluginSection.classList.toggle('hidden', !showHistoryPlugin);
 
-    if (showFilesPlugin) {
-        renderUploadedFiles();
+    // Explicitly set visibility for each plugin section based on the tab
+    if (activeTab === 'notes') {
+        if (elements.filePluginSection) elements.filePluginSection.classList.add('hidden');
+        if (elements.calendarPluginSection) elements.calendarPluginSection.classList.add('hidden');
+        if (elements.historyPluginSection) elements.historyPluginSection.classList.remove('hidden');
+    } else if (activeTab === 'chat') {
+        if (elements.filePluginSection) elements.filePluginSection.classList.remove('hidden');
+        if (elements.calendarPluginSection) elements.calendarPluginSection.classList.remove('hidden');
+        if (elements.historyPluginSection) elements.historyPluginSection.classList.add('hidden');
     } else {
-         if (elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-sm p-1">Switch to Chat tab to use Files plugin.</p>`;
-         if (elements.manageFilesList) elements.manageFilesList.innerHTML = `<p class="text-gray-500 text-xs p-1">Switch to Chat tab to use Files plugin.</p>`;
-         renderAttachedAndSessionFiles();
-         updateAttachButtonState();
+        // Hide all for other tabs like TODO
+        if (elements.filePluginSection) elements.filePluginSection.classList.add('hidden');
+        if (elements.calendarPluginSection) elements.calendarPluginSection.classList.add('hidden');
+        if (elements.historyPluginSection) elements.historyPluginSection.classList.add('hidden');
     }
-     if (showCalendarPlugin) {
+
+    // Update content within the visible plugin sections
+    if (activeTab === 'chat') {
+        renderUploadedFiles();
         updateCalendarStatus();
-     } else {
-         if (elements.calendarStatus) elements.calendarStatus.textContent = `Status: Switch to Chat tab to use Calendar plugin.`;
-         if (elements.viewCalendarButton) elements.viewCalendarButton.classList.add('hidden');
-         if (elements.calendarToggle) elements.calendarToggle.checked = false;
-     }
-    if (showHistoryPlugin) {
+    } else if (activeTab === 'notes') {
         renderNoteHistory();
         updateTocVisibility();
     } else {
-        if (elements.noteHistoryList) elements.noteHistoryList.innerHTML = `<p class="text-rz-sidebar-text opacity-75 text-xs p-1">Switch to Notes tab to view history.</p>`;
-        updateTocVisibility();
+        // Clear content for non-visible plugins to be safe
+        if (elements.uploadedFilesList) elements.uploadedFilesList.innerHTML = '';
+        if (elements.calendarStatus) elements.calendarStatus.textContent = 'Status: N/A';
+        if (elements.noteHistoryList) elements.noteHistoryList.innerHTML = '';
     }
-    const anyPluginSectionVisible = showFilesPlugin || showCalendarPlugin || showHistoryPlugin;
+
+    const anyPluginSectionVisible = activeTab === 'chat' || activeTab === 'notes';
     if (elements.pluginsSidebar) elements.pluginsSidebar.classList.toggle('hidden', !anyPluginSectionVisible);
-    // Ensure the toggle tab is always potentially visible (not hidden by this JS logic)
-    // Its actual display (collapsed or not) is handled by its 'collapsed' class and CSS.
     if (elements.pluginsToggleTab) {
         elements.pluginsToggleTab.classList.remove('hidden');
     }
@@ -1762,7 +1781,10 @@ export function setNoteMode(mode) {
     console.log(`[DEBUG] setNoteMode called with mode: '${mode}'. notesMicButtonGroup exists: ${!!notesMicButtonGroup}`);
     if (state.currentNoteMode === 'edit') {
         notesTextarea.classList.remove('hidden');
+        notesTextarea.classList.add('flex-grow');
         notesPreview.classList.add('hidden');
+        notesPreview.classList.remove('flex-grow');
+
         console.log("[DEBUG] setNoteMode: Setting to EDIT mode. Removing 'hidden' from notesMicButtonGroup.");
         editNoteButton.classList.add('active');
         viewNoteButton.classList.remove('active');
@@ -1771,11 +1793,13 @@ export function setNoteMode(mode) {
         _currentNoteH1Sections = [];
         notesPreview.innerHTML = '';
         notesPreview.classList.remove('prose', 'prose-sm', 'max-w-none');
-        autoResizeTextarea(notesTextarea);
         generateAndRenderToc(state.noteContent || '');
     } else {
         notesTextarea.classList.add('hidden');
+        notesTextarea.classList.remove('flex-grow');
         notesPreview.classList.remove('hidden');
+        notesPreview.classList.add('flex-grow');
+
         console.log("[DEBUG] setNoteMode: Setting to VIEW mode. Adding 'hidden' to notesMicButtonGroup.");
         notesMicButtonGroup.classList.add('hidden');
         editNoteButton.classList.remove('active');
