@@ -190,12 +190,11 @@ def add_message_to_db(chat_id, role, content, attached_data_json=None):
         db.session.rollback()
         return False
 
-def get_chat_history_from_db(chat_id, limit=100):
+def get_chat_history_from_db(chat_id):
     """Retrieves messages for a specific chat_id using the Message model."""
     try:
         messages = Message.query.filter_by(chat_id=chat_id)\
                                 .order_by(Message.timestamp.asc())\
-                                .limit(limit)\
                                 .all()
         # Return list of dictionaries matching previous structure
         return [
