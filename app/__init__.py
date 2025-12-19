@@ -46,6 +46,8 @@ def create_app(test_config=None):
     app.config.from_object('app.config.Config') # Load default config
     app.config.from_pyfile('config.py', silent=True) # Load instance config if exists
     # Load test config if passed in
+    if test_config:
+        app.config.from_object(test_config)
 
     # --- Ensure instance folder exists ---
     try:
@@ -61,8 +63,11 @@ def create_app(test_config=None):
     # --- Initialize Extensions with App ---
     db.init_app(app)
     migrate.init_app(app, db)
-    socketio.init_app(app) # Initialize SocketIO with the app
-    logger.info("SocketIO initialized with Flask app.") # ADDED LOG
+    
+    # Check if testing to force threading mode (avoids eventlet monkey patching issues in tests)
+    async_mode = 'threading' if app.config.get('TESTING') else None
+    socketio.init_app(app, async_mode=async_mode) # Initialize SocketIO with the app
+    logger.info(f"SocketIO initialized with Flask app. Async mode: {async_mode if async_mode else 'auto'}") # ADDED LOG
 
     # --- Import Models ---
     # Import models AFTER db is initialized and associated with the app

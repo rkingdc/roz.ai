@@ -158,7 +158,7 @@ The reformatted transcript:
 
 
 # --- PDF Transcription ---
-def transcribe_pdf_bytes(pdf_bytes: bytes, filename: str) -> str: # Removed flask_app parameter
+def transcribe_pdf_bytes(pdf_bytes: bytes, filename: str, flask_app=None) -> str:
     """
     Transcribes the content of a PDF provided as bytes using the SUMMARY_MODEL.
     Uses the File API for processing.
@@ -166,8 +166,13 @@ def transcribe_pdf_bytes(pdf_bytes: bytes, filename: str) -> str: # Removed flas
     """
     logger.info(f"Entering transcribe_pdf_bytes for '{filename}'.")
 
+    # Determine which app to use for context
+    # If flask_app is passed (e.g. from deep_research subprocess), use it.
+    # Otherwise fallback to current_app (e.g. from chat_services in main thread).
+    ctx_manager = flask_app.app_context() if flask_app else current_app.app_context()
+
     # Push app context here as this function might be called from a separate process
-    with current_app.app_context():
+    with ctx_manager:
         # --- AI Readiness Check ---
         try:
             api_key = current_app.config.get("API_KEY")

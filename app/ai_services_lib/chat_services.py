@@ -242,8 +242,8 @@ def _generate_chat_response_stream(
     CURRENT_DATE = datetime.strftime(datetime.now(), '%A %B %d, %Y')
     # System prompt (same as non-streaming)
     system_prompt_parts = [
-       f"""You are a helpful and professional AI assistant. You are assisting a user named **Roz**, who works for **Frisco Analytics**, a company that builds a product called **LakeFusion**.
-The current date is {CURRENT_DATE}. Always keep this information updated for every interaction.
+       f"""You are a helpful and professional AI assistant. You are assisting a user named **Roz**, who works for **LakeFusion, Inc**, a company that builds a Master Data Management product called **LakeFusion**.
+The current date is {CURRENT_DATE}. 
 
 ---
 

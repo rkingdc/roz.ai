@@ -1857,3 +1857,13 @@
     opacity: 0;
     transform: translateX(100%);
 }
+
+/* --- OverType Editor Custom Heading Colors --- */
+#notes-editor .overtype-container {
+    --h1: var(--rz-toolbar-text) !important; /* Gold */
+    --h2: var(--rz-tab-line) !important;     /* Lighter Gold/Brown */
+    --h3: var(--rz-toolbar-opaque) !important;/* Maroon/Purple */
+    --h4: var(--rz-popup-text) !important;    /* Dark Blue/Purple */
+    --h5: var(--rz-popup-text) !important;    /* Dark Blue/Purple */
+    --h6: var(--rz-popup-text) !important;    /* Dark Blue/Purple */
+}

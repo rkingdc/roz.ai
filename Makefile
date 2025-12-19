@@ -20,7 +20,7 @@ LATEST_RELEASE := $(shell ls -td releases/*/ 2>/dev/null | head -n 1)
 # Define the gunicorn command using the venv python
 # Increase timeout to 120 seconds for potentially long AI operations
 # Use run:app which should contain the app instance created by create_app()
-GUNICORN_CMD = $(PYTHON) flask --workers 1 --bind 0.0.0.0:8000 --timeout 120 run:app
+GUNICORN_CMD = gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:8000 --timeout 120 run:app
 
 # Add migration commands and auth check to PHONY
 .PHONY: all venv install init-db upgrade migrate revision run start auth test lint deploy clean help stop start-dev check-gcloud-auth
@@ -86,7 +86,7 @@ launch:
 
 test:
 	@echo "Running tests..."
-	@DATABASE_NAME=":memory" $(PYTHON) -m pytest --disable-warnings $(TEST_DIR) # Now uses .venv/bin/python3
+	@DATABASE_NAME="/tmp/assistant_test.db" $(PYTHON) -m pytest --disable-warnings $(TEST_DIR) # Now uses a dedicated test db
 
 lint:
 	@echo "Running linting..."
@@ -114,7 +114,7 @@ deploy: install
 # It will NOT stop the 'flask run' process started by 'make run' or 'make start-dev'.
 stop:
 	@echo "Attempting to stop gunicorn process..."
-	@-pkill -f "gunicorn --workers 1 --bind 0.0.0.0:8000" 2>/dev/null || echo "No gunicorn process found."
+	@-pkill -f "gunicorn --worker-class eventlet" 2>/dev/null || echo "No gunicorn process found."
 	# Add cleanup for the temporary dev database file (useful if 'start-dev' was interrupted)
 	@echo "Cleaning up temporary dev database file..."
 	@rm -f /tmp/assistant_dev_db.sqlite # Hardcoded path from start-dev target
@@ -172,14 +172,12 @@ help:
 	@echo "  make clean     - Remove venv, cache files, default dev db, and temp dev db"
 	@echo "  make help      - Show this help message"
 
-# Update clean target to remove migrations folder and temp dev db
-clean:
-	@echo "Cleaning up..."
+# A non-destructive clean command that removes build artifacts and the venv.
+clean-build:
+	@echo "Cleaning up build artifacts and virtual environment..."
 	@rm -rf $(VENV_DIR)
-	@rm -f $(PROD_DB) # Remove default prod db file if it exists
 	@rm -f /tmp/assistant_dev_db.sqlite # Remove temp dev db file
-	@rm -rf instance/ # Remove instance folder which might contain dev db (e.g. flask.sqlite)
-	# Removed: @rm -rf migrations/ # Remove migrations folder
+	@rm -f /tmp/assistant_test.db # Remove test db file
 	@find . -type f -name '*.pyc' -delete
 	@find . -type d -name '__pycache__' -delete
 	@echo "Clean complete."

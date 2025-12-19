@@ -59,6 +59,11 @@ async function initializeApp() {
         // UI will react to state.savedNotes change (renderSavedNotes)
 
 
+        // Initialize the Overtype editor
+        ui.initializeOvertypeEditor((content) => {
+            state.setNoteContent(content);
+        });
+
         // Load data for the initial tab based on persisted ID or default
         if (state.currentTab === 'chat') {
              await api.loadInitialChatData();

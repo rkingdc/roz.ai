@@ -644,9 +644,8 @@ export function setupEventListeners() {
         if (state.currentNoteMode === 'view') {
             targetElement = elements.notesPreview?.querySelector(`#${targetId}`);
             if (targetElement && elements.notesPreview) {
-                // Use scrollTop for more reliable scrolling in view mode
-                const targetOffsetTop = targetElement.offsetTop;
-                elements.notesPreview.scrollTop = targetOffsetTop;
+                // Directly set scrollTop to the heading's offsetTop relative to the scrollable container.
+                elements.notesPreview.scrollTop = targetElement.offsetTop;
             } else {
                 console.warn(`[DEBUG] TOC link clicked, but target heading #${targetId} not found in view mode.`);
             }

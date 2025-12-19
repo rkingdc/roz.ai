@@ -79,13 +79,16 @@ class Config:
     API_KEY = os.getenv("GEMINI_API_KEY")
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
     GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
-    DEFAULT_MODEL = "gemini-2.5-flash"
-    BROWSER_USE_MODEL = "gemini-2.5-flash"
-    SUMMARY_MODEL = "gemini-2.5-flash-lite-preview-06-17"  # Model used specifically for summarization
+    DEFAULT_MODEL = "gemini-flash-latest"
+    BROWSER_USE_MODEL = "gemini-flash-latest"
+    SUMMARY_MODEL = "gemini-flash-lite-latest"  # Model used specifically for summarization
     AVAILABLE_MODELS = [
-        "gemini-2.5-flash-lite-preview-06-17",
+        "gemini-flash-lite-latest",
+        "gemini-flash-latest",
         "gemini-2.5-flash",
         "gemini-2.5-pro",
+        "gemini-3.0-pro",
+        "gemini-3.0-flash",
         # Add other valid models as needed
     ]
     GEMINI_REQUEST_TIMEOUT = 300  # Timeout for Gemini API calls in seconds

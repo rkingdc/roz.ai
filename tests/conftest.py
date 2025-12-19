@@ -1,3 +1,9 @@
+import os
+os.environ['FLASK_TESTING'] = '1'
+
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import pytest
 from app import create_app, db as _db # Use _db to avoid conflict with fixture
 from app.config import Config
@@ -58,3 +64,11 @@ def db(app):
 # if you prefer to call it init_database, you can keep that name.
 # For now, the 'db' fixture handles initialization and teardown.
 # If more complex setup/teardown per test is needed, this can be expanded.
+
+
+
+# Alias init_database to db for consistency with Flask-SQLAlchemy patterns
+# if you prefer to call it init_database, you can keep that name.
+# For now, the 'db' fixture handles initialization and teardown.
+# If more complex setup/teardown per test is needed, this can be expanded.
+

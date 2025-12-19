@@ -284,7 +284,7 @@ export function populateElements() {
     elements.filesTabContent = document.getElementById('files-tab-content');
     elements.searchTabContent = document.getElementById('search-tab-content');
 
-    elements.notesTextarea = document.getElementById('notes-textarea');
+    elements.notesTextarea = document.getElementById('notes-editor');
     elements.notesPreview = document.getElementById('notes-preview');
     elements.chatSidebarContent = document.getElementById('chat-sidebar-content');
     elements.notesSidebarContent = document.getElementById('notes-sidebar-content');
